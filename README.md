@@ -24,4 +24,11 @@ Normal edition need vc2010 or higher, and gcc4.6 or higher;
 Compatible edition does not have the limition of normal edition, only need you compile boost successfully.
 
 Boost requirement:
-1.50 or highter, early edition maybe work, but I'm not certain.
+1.49 or highter, early edition maybe work, but I'm not certain.
+
+Debug environment:
+Win7 64bit
+Ubuntu 12.10 32bit
+Ubuntu 12.10 64bit
+Fedora 18 64bit
+
