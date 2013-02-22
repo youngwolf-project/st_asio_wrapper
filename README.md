@@ -1,7 +1,7 @@
 st_asio_wrapper
 ===============
 
-Asynchronous c/s network framework; Based on Boost.Asio; Very efficient.
+An asynchronous c/s network framework; Based on Boost.Asio; Very efficient.
 
 The include folder, which I call it normal edition or standard edition relative to compatible edition
 contains all the library's codes;
