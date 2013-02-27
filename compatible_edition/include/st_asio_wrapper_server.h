@@ -208,8 +208,8 @@ public:
 	}
 
 	//free a specified number of client objects
-	//if you use client pool(define REUSE_CLIENT), you may need free some client objects
-	//when the client pool(get_closed_client_size()) goes big enough to memory saving(because
+	//if you use client pool(define REUSE_CLIENT), you may need to free some client objects
+	//when the client pool(get_closed_client_size()) goes big enough for memory saving(because
 	//the clients in temp_client_can are waiting for reuse and will never be freed)
 	//if you don't use client pool, st_server will invoke this automatically and periodically
 	//so, you don't need invoke this exactly
