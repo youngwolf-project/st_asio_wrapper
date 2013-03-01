@@ -2,6 +2,8 @@ st_asio_wrapper
 ===============
 
 An asynchronous c/s network framework; Based on Boost.Asio; Very efficient.
+email: mail2tao@163.com
+Community on QQ: 198941541
 
 The include folder, which I call it normal edition or standard edition relative to compatible edition
 contains all the library's codes;
