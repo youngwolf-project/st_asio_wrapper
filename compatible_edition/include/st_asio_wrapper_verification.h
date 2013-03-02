@@ -3,7 +3,9 @@
  *
  *  Created on: 2012-10-21
  *      Author: youngwolf
- *		email: mail2tao@163.com QQ: 676218192
+ *		email: mail2tao@163.com
+ *		QQ: 676218192
+ *		Community on QQ: 198941541
  *
  * this head file contain some macros used to verify the compiler and update logs etc.
 

@@ -1,3 +1,14 @@
+/*
+ * st_asio_wrapper_timer.h
+ *
+ *  Created on: 2012-3-2
+ *      Author: youngwolf
+ *		email: mail2tao@163.com
+ *		QQ: 676218192
+ *		Community on QQ: 198941541
+ *
+ * timer base class
+ */
 
 #ifndef ST_ASIO_WRAPPER_TIMER_H_
 #define ST_ASIO_WRAPPER_TIMER_H_
