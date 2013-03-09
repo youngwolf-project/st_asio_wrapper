@@ -137,14 +137,29 @@ protected:
 	{
 		char output_buff[UNIFIED_OUT_BUF_NUM];
 		time_t now = time(NULL);
+
+#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
+		size_t buffer_len = sizeof(output_buff) / 2;
+		ctime_s(output_buff + buffer_len, buffer_len, &now);
+		strcpy_s(output_buff, buffer_len, output_buff + buffer_len);
+#else
 		strcpy(output_buff, ctime(&now));
+#endif
 		size_t len = strlen(output_buff);
 		assert(len > 0);
 		if ('\n' == output_buff[len - 1])
 			--len;
+#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
+		strcpy_s(output_buff + len, buffer_len, " -> ");
+		len += 4;
+		buffer_len = sizeof(output_buff) - len;
+		vsnprintf_s(output_buff + len, buffer_len, buffer_len, fmt, ap);
+#else
 		strcpy(output_buff + len, " -> ");
 		len += 4;
 		vsnprintf(output_buff + len, sizeof(output_buff) - len, fmt, ap);
+#endif
+
 		puts(output_buff);
 	}
 };
