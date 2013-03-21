@@ -45,8 +45,7 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 	mutex::scoped_lock lock(send_msg_buffer_mutex); \
 	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
 	{ \
-		msg_type msg; \
-		packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+		msg_type msg = packer_->pack_msg(pstr, len, num, NATIVE); \
 		return direct_insert_msg(msg); \
 	} \
 	return false; \

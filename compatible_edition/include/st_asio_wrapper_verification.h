@@ -236,6 +236,7 @@
  * 3.1	2013.2.23
  * Move multi_service's logic to service_pump for code simplification and error probability reduction.
  * Drop the multi_service class.
+ * Unify i_packer interface between standard and compatible edition.
  */
 
 #ifndef ST_ASIO_WRAPPER_VERIFICATION_H_

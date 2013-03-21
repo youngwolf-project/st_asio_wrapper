@@ -24,15 +24,15 @@ class i_packer
 {
 public:
 	static size_t get_max_msg_size() {return MAX_MSG_LEN - HEAD_LEN;}
-	virtual void pack_msg(std::string& str, const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+	virtual std::string pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
 };
 
 class packer : public i_packer
 {
 public:
-	virtual void pack_msg(std::string& str, const char* const pstr[], const size_t len[], size_t num, bool native = false)
+	virtual std::string pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
-		str.clear();
+		std::string str;
 		if (NULL != pstr && NULL != len)
 		{
 			size_t total_len = native ? 0 : HEAD_LEN;
@@ -41,7 +41,7 @@ public:
 			{
 				total_len += len[i];
 				if (last_total_len > total_len || NULL == pstr[i] || total_len > MAX_MSG_LEN) //overflow or null pointer
-					return;
+					return str;
 				last_total_len = total_len;
 			}
 
@@ -57,6 +57,8 @@ public:
 					str.append(pstr[i], len[i]);
 			}
 		} //if (NULL != pstr)
+
+		return str;
 	}
 };
 

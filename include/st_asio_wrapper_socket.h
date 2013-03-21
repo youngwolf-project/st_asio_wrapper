@@ -43,12 +43,8 @@ TYPE FUNNAME(const std::string& str, bool can_overflow = false) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
 	mutex::scoped_lock lock(send_msg_buffer_mutex); \
-	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
-	{ \
-		auto msg = packer_->pack_msg(pstr, len, num, NATIVE); \
-		return direct_insert_msg(std::move(msg)); \
-	} \
-	return false; \
+	return (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) ? \
+		direct_insert_msg(packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
 } \
 SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //msg sending interface

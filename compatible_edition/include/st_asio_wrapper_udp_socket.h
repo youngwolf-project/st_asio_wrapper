@@ -55,8 +55,7 @@ bool FUNNAME(const udp::endpoint& peer_addr, const char* const pstr[], const siz
 	mutex::scoped_lock lock(send_msg_buffer_mutex); \
 	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
 	{ \
-		std::string str; \
-		packer_->pack_msg(str, pstr, len, num, NATIVE); \
+		std::string str = packer_->pack_msg(pstr, len, num, NATIVE); \
 		return direct_insert_msg(peer_addr, str); \
 	} \
 	return false; \
