@@ -37,11 +37,11 @@ public:
 	class i_service
 	{
 	public:
-		virtual void init() = 0;
-		virtual void uninit() = 0;
-
 		i_service(st_service_pump& service_pump_) : id(0) {service_pump_.add(this);}
 		virtual ~i_service() {}
+
+		virtual void init() = 0;
+		virtual void uninit() = 0;
 
 		void set_id(int _id) {id = _id;}
 		int get_id() const {return id;}
@@ -52,7 +52,6 @@ public:
 
 public:
 	virtual ~st_service_pump() {clear();}
-	virtual void free(i_service* i_service_) {} //if needed, rewrite this to free the service
 
 	i_service* find(int id)
 	{
@@ -73,14 +72,13 @@ public:
 	}
 	void clear() {do_something_to_all(boost::bind(&st_service_pump::free, this, _1)); service_can.clear();}
 
-	bool start_service(int thread_num = ST_SERVICE_THREAD_NUM)
+	void start_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
 		reset(); //this is needed when re-start_service
 		do_something_to_all(boost::mem_fn(&i_service::init));
 		thread t(boost::bind(&st_service_pump::do_service, this, thread_num));
 		this_thread::yield();
 		t.swap(service_thread);
-		return true;
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example,
 	//close the application
@@ -98,20 +96,40 @@ public:
 	bool is_running() const {return !stopped();}
 	bool is_service_started() const {return service_thread.get_id() != thread::id();}
 
-private:
-	void add(i_service* i_service_) {assert(nullptr != i_service_); service_can.push_back(i_service_);}
+	//this function will block until service run out
+	//it works like start_service, but do not invoke stop_service
+	void run_service(int thread_num = ST_SERVICE_THREAD_NUM)
+	{
+		reset(); //this is needed when re-start_service
+		do_something_to_all(boost::mem_fn(&i_service::init));
+		do_service(thread_num);
+	}
+
+protected:
+	virtual void free(i_service* i_service_) {} //if needed, rewrite this to free the service
 
 #ifdef ENHANCED_STABILITY
-	void safe_run()
+	virtual bool on_exception(const std::exception& e)
+	{
+		unified_out::info_out("service pump exception: %s.", e.what());
+		return true; //continue this service pump
+	}
+
+	size_t run(error_code& ec)
 	{
 		while (true)
 		{
-			error_code ec;
-			try {run(ec); break;}
-			catch (std::exception& e){}
+			try {return io_service::run(ec);}
+			catch (const std::exception& e) {if (!on_exception(e)) return 0;}
 		}
 	}
 #endif
+
+	DO_SOMETHING_TO_ALL(service_can)
+	DO_SOMETHING_TO_ONE(service_can)
+
+private:
+	void add(i_service* i_service_) {assert(nullptr != i_service_); service_can.push_back(i_service_);}
 
 	void do_service(int thread_num)
 	{
@@ -120,23 +138,15 @@ private:
 		--thread_num;
 		thread_group tg;
 		for (auto i = 0; i < thread_num; ++i)
-#ifdef ENHANCED_STABILITY
-			tg.create_thread(boost::bind(&st_service_pump::safe_run, this));
-		safe_run();
-#else
 			tg.create_thread(boost::bind(&st_service_pump::run, this, error_code()));
 		error_code ec;
 		run(ec);
-#endif
+
 		if (thread_num > 0)
 			tg.join_all();
 
 		unified_out::info_out("service pump end.");
 	}
-
-protected:
-	DO_SOMETHING_TO_ALL(service_can)
-	DO_SOMETHING_TO_ONE(service_can)
 
 protected:
 	container::list<i_service*> service_can; //not protected by mutex, please note

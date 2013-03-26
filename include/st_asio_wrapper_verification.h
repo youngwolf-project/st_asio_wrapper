@@ -236,7 +236,14 @@
  * 3.1	2013.2.23
  * Move multi_service's logic to service_pump for code simplification and error probability reduction.
  * Drop the multi_service class.
+ *
+ * 3.2	2013.3.26
  * Unify i_packer interface between standard and compatible edition.
+ * Add a new function run_service to st_service_pump, which works like io_service::run,
+ *  so, it will block until service run out, and do not call stop_service any more.
+ * Add a virtual callback function on_exception to st_service_pump, it will be invoked when exception caught,
+ *  you can rewrite it do decide weather to continue(return true) or stop the service(return false),
+ *  notice: you need to define ENHANCED_STABILITY macro to gain this feature.
  */
 
 #ifndef ST_ASIO_WRAPPER_VERIFICATION_H_

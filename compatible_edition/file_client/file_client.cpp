@@ -3,6 +3,10 @@
 
 //configuration
 #define SERVER_PORT		5051
+#define MAX_MSG_LEN		(HEAD_LEN + 1 + 4096)
+	//read 4096 bytes from disk file one time will gain the best I/O performance
+	//HEAD_LEN is used by the default packer
+	//1 is the head length(see the protocol in file_client.h)
 //configuration
 
 #include "file_client.h"
@@ -106,4 +110,5 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef SERVER_PORT
+#undef MAX_MSG_LEN
 //restore configuration

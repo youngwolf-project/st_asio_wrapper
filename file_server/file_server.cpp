@@ -3,6 +3,10 @@
 #define SERVER_PORT		5050
 #define AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
 #define ENHANCED_STABILITY
+#define MAX_MSG_LEN		(HEAD_LEN + 1 + 4096)
+	//read 4096 bytes from disk file one time will gain the best I/O performance
+	//HEAD_LEN is used by the default packer
+	//1 is the head length(see the protocol in file_server.h)
 //configuration
 
 #include "file_server.h"
@@ -44,4 +48,5 @@ int main()
 #undef SERVER_PORT
 #undef AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
 #undef ENHANCED_STABILITY
+#undef MAX_MSG_LEN
 //restore configuration
