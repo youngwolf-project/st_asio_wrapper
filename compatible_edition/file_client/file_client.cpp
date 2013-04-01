@@ -15,7 +15,7 @@
 #define RESTART_COMMAND	"restart"
 #define REQUEST_FILE	"get"
 
-boost::uint32_t completed_client_num;
+atomic_ushort completed_client_num;
 int link_num = 1;
 __off64_t file_size;
 
@@ -63,17 +63,17 @@ int main(int argc, const char* argv[])
 			tokenizer<char_separator<char> > tok(str, sep);
 			for (BOOST_AUTO(iter, tok.begin()); iter != tok.end(); ++iter)
 			{
-				atomic_write32(&completed_client_num, 0);
+				completed_client_num.store(0);
 				file_size = 0;
 				int begin_time = get_system_time().time_of_day().total_seconds();
-				if (dynamic_pointer_cast<file_client::file_socket>(client.get_client(0))->get_file(*iter))
+				if (dynamic_cast<file_client::file_socket*>(client.get_client(0).get())->get_file(*iter))
 				{
 					for (int i = 1; i < link_num; ++i)
-						dynamic_pointer_cast<file_client::file_socket>(client.get_client(i))->get_file(*iter);
+						dynamic_cast<file_client::file_socket*>(client.get_client(i).get())->get_file(*iter);
 
 					printf("transfer %s begin.\n", iter->data());
 					unsigned percent = -1;
-					while (atomic_read32(&completed_client_num) != (unsigned) link_num)
+					while (completed_client_num.load() != (unsigned short) link_num)
 					{
 						this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
 						if (file_size > 0)
@@ -102,7 +102,7 @@ int main(int argc, const char* argv[])
 			}
 		}
 		else
-			dynamic_pointer_cast<file_client::file_socket>(client.get_client(0))->talk(str);
+			dynamic_cast<file_client::file_socket*>(client.get_client(0).get())->talk(str);
 	}
 
 	return 0;

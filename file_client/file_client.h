@@ -2,13 +2,14 @@
 #ifndef FILE_CLIENT_H_
 #define FILE_CLIENT_H_
 
-#include <boost/interprocess/detail/atomic.hpp>
-using namespace boost::interprocess::ipcdetail;
+#include <atomic>
 
 #include "../include/st_asio_wrapper_client.h"
 using namespace st_asio_wrapper;
 
-extern boost::uint32_t completed_client_num;
+extern std::atomic_ushort completed_client_num;
+extern int link_num;
+extern __off64_t file_size;
 
 /*
 protocol:
@@ -41,9 +42,6 @@ if head equal:
 #else
 #define __off64_t_format "%lld"
 #endif
-
-extern int link_num;
-extern __off64_t file_size;
 
 class file_client : public st_client
 {
@@ -115,7 +113,7 @@ public:
 			}
 			my_length = 0;
 		}
-		void trans_end() {clear(); atomic_inc32(&completed_client_num);}
+		void trans_end() {clear(); ++completed_client_num;}
 
 		void handle_msg(const std::string& str)
 		{
@@ -222,7 +220,7 @@ public:
 	{
 		__off64_t total_rest_size = 0;
 		do_something_to_all([&](decltype(*std::begin(client_can))& item) {
-			total_rest_size += dynamic_pointer_cast<file_client::file_socket>(item)->get_rest_size();
+			total_rest_size += dynamic_cast<file_client::file_socket*>(item.get())->get_rest_size();
 		});
 
 		return total_rest_size;
