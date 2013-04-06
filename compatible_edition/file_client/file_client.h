@@ -7,10 +7,6 @@
 #include "../include/st_asio_wrapper_client.h"
 using namespace st_asio_wrapper;
 
-extern atomic_ushort completed_client_num;
-extern int link_num;
-extern __off64_t file_size;
-
 /*
 protocol:
 head(1 byte) + body
@@ -42,6 +38,10 @@ if head equal:
 #else
 #define __off64_t_format "%lld"
 #endif
+
+extern atomic_ushort completed_client_num;
+extern int link_num;
+extern __off64_t file_size;
 
 class file_client : public st_client
 {

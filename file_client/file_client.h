@@ -2,14 +2,10 @@
 #ifndef FILE_CLIENT_H_
 #define FILE_CLIENT_H_
 
-#include <atomic>
+#include <boost/atomic.hpp>
 
 #include "../include/st_asio_wrapper_client.h"
 using namespace st_asio_wrapper;
-
-extern std::atomic_ushort completed_client_num;
-extern int link_num;
-extern __off64_t file_size;
 
 /*
 protocol:
@@ -42,6 +38,10 @@ if head equal:
 #else
 #define __off64_t_format "%lld"
 #endif
+
+extern atomic_ushort completed_client_num;
+extern int link_num;
+extern __off64_t file_size;
 
 class file_client : public st_client
 {

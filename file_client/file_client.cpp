@@ -15,7 +15,7 @@
 #define RESTART_COMMAND	"restart"
 #define REQUEST_FILE	"get"
 
-std::atomic_ushort completed_client_num;
+atomic_ushort completed_client_num;
 int link_num = 1;
 __off64_t file_size;
 
