@@ -244,6 +244,21 @@
  * Add a virtual callback function on_exception to st_service_pump, it will be invoked when exception caught,
  *  you can rewrite it do decide weather to continue(return true) or stop the service(return false),
  *  notice: you need to define ENHANCED_STABILITY macro to gain this feature.
+ *
+ * 3.3	2013.4.13
+ * Add template support to st_sudp_client(now is st_sudp_client_base), st_udp_client(now is st_udp_client_base),
+ *  st_sclient(now is st_sclient_base), st_client(now is st_client_base) and st_server(now is st_server_base).
+ * Now, st_sudp_client is a typedef of st_sudp_client_base<st_udp_socket>, st_udp_client is a typedef of
+ *  st_udp_client_base<st_udp_socket>, st_sclient is a typedef of st_sclient_base<st_connector>, st_client is a
+ *  typedef of st_client_base<st_connector> and st_server is a typedef of st_server_base<st_server_socket>
+ * Change the class server_socket to st_server_socket, and bring it out of st_server.
+ * Add an interface i_server, which is implemented by st_server_base, and used by st_server_socket.
+ * In st_server_socket::on_recv_error, if the AUTO_CLEAR_CLOSED_SOCKET macro been defined, then simply force_close
+ *  itself instead of call i_server::del_client.
+ *
+ * Notice: If you encounter compile errors such as can't convert from A to A& with boost before 1.53 or gcc before 4.7,
+ *  please wrapper A with boost::ref
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_VERIFICATION_H_

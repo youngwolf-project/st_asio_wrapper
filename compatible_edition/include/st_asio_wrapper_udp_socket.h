@@ -40,30 +40,6 @@ using namespace boost::asio::ip;
 #define UDP_DEFAULT_IP_VERSION udp::v4()
 #endif
 
-///////////////////////////////////////////////////
-//msg sending interface
-#define UDP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
-TYPE FUNNAME(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false) \
-	{return FUNNAME(peer_addr, &pstr, &len, 1, can_overflow);} \
-TYPE FUNNAME(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false) \
-	{return FUNNAME(peer_addr, str.data(), str.size(), can_overflow);}
-
-#define UDP_SEND_MSG(FUNNAME, NATIVE) \
-bool FUNNAME(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
-	bool can_overflow = false) \
-{ \
-	mutex::scoped_lock lock(send_msg_buffer_mutex); \
-	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
-	{ \
-		std::string str = packer_->pack_msg(pstr, len, num, NATIVE); \
-		return direct_insert_msg(peer_addr, str); \
-	} \
-	return false; \
-} \
-UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
-//msg sending interface
-///////////////////////////////////////////////////
-
 namespace st_asio_wrapper
 {
 
@@ -147,6 +123,14 @@ public:
 	UDP_SEND_MSG(send_native_msg, true); //use the packer with native = true to pack the msgs
 	//msg sending interface
 	///////////////////////////////////////////////////
+
+	//if you use can_overflow = true to call send_msg or send_native_msg, it will always succeed
+	//no matter is_send_buffer_available() return true or false
+	bool is_send_buffer_available()
+	{
+		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		return send_msg_buffer.size() < MAX_MSG_NUM;
+	}
 
 	//don't use the packer but insert into the send_msg_buffer directly
 	bool direct_send_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false)
@@ -397,8 +381,8 @@ protected:
 		{
 			sending = true;
 			last_send_msg.move(send_msg_buffer.front());
-			async_send_to(buffer(last_send_msg.str), last_send_msg.peer_addr, boost::bind(&st_udp_socket::send_handler, this,
-				placeholders::error, placeholders::bytes_transferred));
+			async_send_to(buffer(last_send_msg.str), last_send_msg.peer_addr,
+				boost::bind(&st_udp_socket::send_handler, this, placeholders::error, placeholders::bytes_transferred));
 			send_msg_buffer.pop_front();
 		}
 

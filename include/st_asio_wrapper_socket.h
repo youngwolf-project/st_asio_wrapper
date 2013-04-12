@@ -31,25 +31,6 @@ using namespace boost::asio::ip;
 #define size_t_format "%tu"
 #endif
 
-///////////////////////////////////////////////////
-//msg sending interface
-#define SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
-TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow = false) \
-	{return FUNNAME(&pstr, &len, 1, can_overflow);} \
-TYPE FUNNAME(const std::string& str, bool can_overflow = false) \
-	{return FUNNAME(str.data(), str.size(), can_overflow);}
-
-#define SEND_MSG(FUNNAME, NATIVE) \
-bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-{ \
-	mutex::scoped_lock lock(send_msg_buffer_mutex); \
-	return (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) ? \
-		direct_insert_msg(packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
-} \
-SEND_MSG_CALL_SWITCH(FUNNAME, bool)
-//msg sending interface
-///////////////////////////////////////////////////
-
 namespace st_asio_wrapper
 {
 
@@ -115,6 +96,14 @@ public:
 	SEND_MSG(send_native_msg, true); //use the packer with native = true to pack the msgs
 	//msg sending interface
 	///////////////////////////////////////////////////
+
+	//if you use can_overflow = true to call send_msg or send_native_msg, it will always succeed
+	//no matter is_send_buffer_available() return true or false
+	bool is_send_buffer_available()
+	{
+		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		return send_msg_buffer.size() < MAX_MSG_NUM;
+	}
 
 	//don't use the packer but insert into the send_msg_buffer directly
 	bool direct_send_msg(msg_ctype& msg, bool can_overflow = false)

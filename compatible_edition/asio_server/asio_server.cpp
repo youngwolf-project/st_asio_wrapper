@@ -19,39 +19,30 @@ using namespace st_asio_wrapper;
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
 BOOST_AUTO(global_packer, boost::make_shared<packer>());
 
-class echo_server : public st_server
+class echo_socket : public st_server_socket
 {
 public:
-	class echo_socket : public server_socket
-	{
-	public:
-		echo_socket(echo_server& echo_server_) : server_socket(echo_server_) {inner_packer(global_packer);}
-
-	public:
-		//because we use objects pool(REUSE_CLIENT been defined), so, strictly speaking, this virtual
-		//function must be rewrote, but we don't have member variables to initialize but invoke father's
-		//reuse() directly, so, it can be omitted, but we keep it for possibly future using
-		virtual void reuse() {server_socket::reuse();}
-
-	protected:
-		//msg handling: send the original msg back(echo server)
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-		//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
-		virtual bool on_msg(msg_type& msg) {send_msg(msg, true); return false;}
-#endif
-		//we should handle the msg in on_msg_handle for time-consuming task like this:
-		virtual void on_msg_handle(msg_type& msg) {send_msg(msg, true);}
-		//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_socket will directly
-		//use the msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
-		//msg handling end
-	};
+	echo_socket(i_server& server_) : st_server_socket(server_) {inner_packer(global_packer);}
 
 public:
-	echo_server(st_service_pump& service_pump) : st_server(service_pump) {}
+	//because we use objects pool(REUSE_CLIENT been defined), so, strictly speaking, this virtual
+	//function must be rewrote, but we don't have member variables to initialize but invoke father's
+	//reuse() directly, so, it can be omitted, but we keep it for possibly future using
+	virtual void reuse() {st_server_socket::reuse();}
 
 protected:
-	virtual boost::shared_ptr<server_socket> create_client() {return boost::make_shared<echo_socket>(boost::ref(*this));}
+	//msg handling: send the original msg back(echo server)
+#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+	//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
+	virtual bool on_msg(msg_type& msg) {send_msg(msg, true); return false;}
+#endif
+	//we should handle the msg in on_msg_handle for time-consuming task like this:
+	virtual void on_msg_handle(msg_type& msg) {send_msg(msg, true);}
+	//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_socket will directly
+	//use the msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
+	//msg handling end
 };
+typedef st_server_base<echo_socket> echo_server;
 
 int main() {
 	puts("type quit to end these two servers.");

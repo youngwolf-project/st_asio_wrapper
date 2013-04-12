@@ -13,10 +13,7 @@
 #ifndef ST_ASIO_WRAPPER_SERVER_H_
 #define ST_ASIO_WRAPPER_SERVER_H_
 
-#include <boost/enable_shared_from_this.hpp>
-
-#include "st_asio_wrapper_service_pump.h"
-#include "st_asio_wrapper_socket.h"
+#include "st_asio_wrapper_server_socket.h"
 
 #ifndef SERVER_PORT
 #define SERVER_PORT					5050
@@ -31,9 +28,9 @@
 
 //something like memory pool, if you open REUSE_CLIENT, all clients in temp_client_can will never be freed,
 //but waiting for reuse
-//or, st_server will free the clients in temp_client_can automatically and periodically,
+//or, st_server_base will free the clients in temp_client_can automatically and periodically,
 //use CLIENT_FREE_INTERVAL to set the interval,
-//see temp_client_can at the end of st_server class for more details.
+//see temp_client_can at the end of st_server_base class for more details.
 //#define REUSE_CLIENT
 #ifndef REUSE_CLIENT
 #define do_create_client create_client
@@ -42,9 +39,9 @@
 	#endif
 #endif
 
-//define this to have st_server invoke clear_all_closed_socket() automatically and periodically
+//define this to have st_server_base invoke clear_all_closed_socket() automatically and periodically
 //this feature may serious influence server performance with huge number of clients
-//so, re-write st_socket::on_recv_error and invoke st_server::del_client() is recommended
+//so, re-write st_socket::on_recv_error and invoke st_server_base::del_client() is recommended
 //in long connection system
 //in short connection system, you are recommended to open this feature, use CLEAR_CLOSED_SOCKET_INTERVAL
 //to set the interval
@@ -62,57 +59,27 @@
 #define DEFAULT_IP_VERSION tcp::v4()
 #endif
 
-///////////////////////////////////////////////////
-//msg sending interface
-#define BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
-void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-	{do_something_to_all(boost::bind(&st_socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
-SEND_MSG_CALL_SWITCH(FUNNAME, void)
-//msg sending interface
-///////////////////////////////////////////////////
-
 namespace st_asio_wrapper
 {
 
-class st_server : public st_service_pump::i_service, public st_timer
+template<typename Socket = st_server_socket>
+class st_server_base : public st_service_pump::i_service, public i_server, public st_timer
 {
-public:
-	class server_socket : public st_socket, public boost::enable_shared_from_this<server_socket>
-	{
-	public:
-		server_socket(st_server& server_) : st_socket(server_.get_service_pump()), server(server_) {}
-		virtual void start() {do_recv_msg();}
-		//when resue this server_socket, st_server will invoke reuse(), child must re-write this to init
-		//all member variables, and then do not forget to invoke server_socket::reuse() to init father's
-		//member variables
-		virtual void reuse() {reset();}
-
-	protected:
-		virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); force_close();}
-		//do not forget to force_close this st_socket(in del_client(), there's a force_close() invocation)
-		virtual void on_recv_error(const error_code& ec) {server.del_client(shared_from_this());}
-
-	protected:
-		st_server& server;
-	};
-
 protected:
 	struct temp_client
 	{
 		const time_t closed_time;
-		const boost::shared_ptr<server_socket> client_ptr;
+		const boost::shared_ptr<Socket> client_ptr;
 
-		temp_client(const boost::shared_ptr<server_socket>& _client_ptr) :
+		temp_client(const boost::shared_ptr<Socket>& _client_ptr) :
 			closed_time(time(nullptr)), client_ptr(_client_ptr) {}
 
 		bool is_timeout(time_t t) const {return closed_time <= t;}
 	};
 
 public:
-	st_server(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_),
+	st_server_base(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_),
 		acceptor(service_pump_), service_pump(service_pump_) {set_server_addr(SERVER_PORT);}
-	st_service_pump& get_service_pump() {return service_pump;}
-	const st_service_pump& get_service_pump() const {return service_pump;}
 
 	void set_server_addr(unsigned short port, const std::string& ip = std::string())
 	{
@@ -151,7 +118,9 @@ public:
 	void stop_listen() {error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
 	bool is_listening() const {return acceptor.is_open();}
 
-	void del_client(const boost::shared_ptr<server_socket>& client_ptr)
+	virtual st_service_pump& get_service_pump() {return service_pump;}
+	virtual const st_service_pump& get_service_pump() const {return service_pump;}
+	virtual void del_client(const boost::shared_ptr<st_socket>& client_ptr)
 	{
 		auto found = false;
 
@@ -172,7 +141,7 @@ public:
 			client_ptr->direct_dispatch_all_msg();
 
 			mutex::scoped_lock lock(temp_client_can_mutex);
-			temp_client_can.push_back(client_ptr);
+			temp_client_can.push_back(dynamic_pointer_cast<Socket>(client_ptr));
 		}
 	}
 
@@ -182,8 +151,8 @@ public:
 	// or close the st_socket in on_unpack_error
 	//2.For some reason(I haven't met yet), on_recv_error, on_send_error and on_unpack_error
 	// not been invoked
-	//st_server will automatically invoke this if AUTO_CLEAR_CLOSED_SOCKET been defined
-	void clear_all_closed_socket(container::list<boost::shared_ptr<server_socket>>& clients)
+	//st_server_base will automatically invoke this if AUTO_CLEAR_CLOSED_SOCKET been defined
+	void clear_all_closed_socket(container::list<boost::shared_ptr<Socket>>& clients)
 	{
 		mutex::scoped_lock lock(client_can_mutex);
 		for (auto iter = std::begin(client_can); iter != std::end(client_can);)
@@ -197,13 +166,13 @@ public:
 				++iter;
 	}
 
-	size_t get_client_size()
+	size_t size()
 	{
 		mutex::scoped_lock lock(client_can_mutex);
 		return client_can.size();
 	}
 
-	size_t get_closed_client_size()
+	size_t closed_client_size()
 	{
 		mutex::scoped_lock lock(temp_client_can_mutex);
 		return temp_client_can.size();
@@ -213,7 +182,7 @@ public:
 	//if you use client pool(define REUSE_CLIENT), you may need to free some client objects
 	//when the client pool(get_closed_client_size()) goes big enough for memory saving(because
 	//the clients in temp_client_can are waiting for reuse and will never be freed)
-	//if you don't use client pool, st_server will invoke this automatically and periodically
+	//if you don't use client pool, st_server_base will invoke this automatically and periodically
 	//so, you don't need invoke this exactly
 	void free_client(size_t num = -1)
 	{
@@ -245,15 +214,14 @@ public:
 		});
 	}
 
-	void list_all_client() {do_something_to_all(boost::bind(&st_socket::show_info, _1, "", ""));}
+	void list_all_client() {do_something_to_all(boost::bind(&Socket::show_info, _1, "", ""));}
 
 	DO_SOMETHING_TO_ALL_MUTEX(client_can, client_can_mutex)
 	DO_SOMETHING_TO_ONE_MUTEX(client_can, client_can_mutex)
 
 	//Empty ip means don't care, any ip will match
 	//Zero port means don't care, any port will match
-	void find_client(const std::string& ip, unsigned short port,
-		container::list<boost::shared_ptr<server_socket>>& clients)
+	void find_client(const std::string& ip, unsigned short port, container::list<boost::shared_ptr<Socket>>& clients)
 	{
 		if (ip.empty() && 0 == port)
 		{
@@ -279,8 +247,7 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
-	virtual boost::shared_ptr<server_socket> create_client() {return boost::make_shared<server_socket>(boost::ref(*this));}
-	virtual bool on_accept(const boost::shared_ptr<server_socket>& client_ptr) {return true;}
+	virtual bool on_accept(const boost::shared_ptr<Socket>& client_ptr) {return true;}
 
 	virtual bool on_timer(unsigned char id, const void* user_data)
 	{
@@ -317,14 +284,16 @@ protected:
 	}
 
 protected:
+	boost::shared_ptr<Socket> create_client() {return boost::make_shared<Socket>(boost::ref(*this));}
+
 	void start_next_accept()
 	{
 		auto client_ptr = do_create_client();
-		acceptor.async_accept(*client_ptr, boost::bind(&st_server::accept_handler, this,
+		acceptor.async_accept(*client_ptr, boost::bind(&st_server_base::accept_handler, this,
 			placeholders::error, client_ptr));
 	}
 
-	bool add_client(const boost::shared_ptr<server_socket>& client_ptr)
+	bool add_client(const boost::shared_ptr<Socket>& client_ptr)
 	{
 		mutex::scoped_lock lock(client_can_mutex);
 		auto client_num = client_can.size();
@@ -341,7 +310,7 @@ protected:
 		return false;
 	}
 
-	void accept_handler(const error_code& ec, const boost::shared_ptr<server_socket>& client_ptr)
+	void accept_handler(const error_code& ec, const boost::shared_ptr<Socket>& client_ptr)
 	{
 		if (!ec)
 		{
@@ -354,13 +323,13 @@ protected:
 	}
 
 #ifdef REUSE_CLIENT
-	boost::shared_ptr<server_socket> do_create_client()
+	boost::shared_ptr<Socket> do_create_client()
 	{
 		auto client_ptr = reuse_socket();
 		return client_ptr ? client_ptr : create_client();
 	}
 
-	boost::shared_ptr<server_socket> reuse_socket()
+	boost::shared_ptr<Socket> reuse_socket()
 	{
 		auto now = time(nullptr) - 5; //five seconds, hard coding
 		mutex::scoped_lock lock(temp_client_can_mutex);
@@ -377,7 +346,7 @@ protected:
 			return client_ptr;
 		}
 
-		return boost::shared_ptr<server_socket>();
+		return boost::shared_ptr<Socket>();
 	}
 #endif
 
@@ -386,7 +355,7 @@ protected:
 	tcp::acceptor acceptor;
 
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	container::list<boost::shared_ptr<server_socket>> client_can;
+	container::list<boost::shared_ptr<Socket>> client_can;
 	mutex client_can_mutex;
 
 	//because all clients are dynamic created and stored in client_can, maybe when the recv error occur
@@ -402,6 +371,7 @@ protected:
 
 	st_service_pump& service_pump;
 };
+typedef st_server_base<> st_server;
 
 } //namespace
 

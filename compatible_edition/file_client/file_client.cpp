@@ -33,7 +33,7 @@ int main(int argc, const char* argv[])
 	file_client client(service_pump);
 	for (int i = 0; i < link_num; ++i)
 	{
-		BOOST_AUTO(client_ptr, boost::make_shared<file_client::file_socket>(boost::ref(client)));
+		BOOST_AUTO(client_ptr, boost::make_shared<file_socket>(boost::ref(client.get_service_pump())));
 //		client_ptr->set_server_addr(SERVER_PORT, "::1"); //ipv6
 //		client_ptr->set_server_addr(SERVER_PORT, "127.0.0.1"); //ipv4
 		client_ptr->set_index(i);
@@ -66,10 +66,10 @@ int main(int argc, const char* argv[])
 				completed_client_num.store(0);
 				file_size = 0;
 				int begin_time = get_system_time().time_of_day().total_seconds();
-				if (dynamic_cast<file_client::file_socket*>(client.get_client(0).get())->get_file(*iter))
+				if (client.at(0)->get_file(*iter))
 				{
 					for (int i = 1; i < link_num; ++i)
-						dynamic_cast<file_client::file_socket*>(client.get_client(i).get())->get_file(*iter);
+						client.at(i)->get_file(*iter);
 
 					printf("transfer %s begin.\n", iter->data());
 					unsigned percent = -1;
@@ -102,7 +102,7 @@ int main(int argc, const char* argv[])
 			}
 		}
 		else
-			dynamic_cast<file_client::file_socket*>(client.get_client(0).get())->talk(str);
+			client.at(0)->talk(str);
 	}
 
 	return 0;

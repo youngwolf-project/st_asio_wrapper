@@ -23,12 +23,12 @@ using namespace boost::asio;
 /*
 * Please pay attention to the following reserved timer ids:
 * Give a class A,
-* If A inherit from st_socket, the ids from 0 to 9 are reserved;
-* If A inherit from st_server, the ids from 0 to 9 are reserved;
+* If A inherit from st_server_base, the ids from 0 to 9 are reserved;
+* If A inherit from st_socket or st_udp_socket, the ids from 0 to 9 are reserved;
 * If A inherit from st_connector, the ids from 10 to 19 are reserved, but st_connector inherit
 * from st_socket, so, the actual reserved timers of st_connector is 0 to 19.
 *
-* st_client, st_server::server_socket, st_test_client and st_test_client::test_socket don't have
+* st_sclient_base, st_client_base, st_sudp_client_base, st_udp_client_base, st_server_socket don't have
 * reserved timers, so, the actual reserved timers depend on theirs father's reserved timers.
 */
 
@@ -45,7 +45,7 @@ protected:
 		unsigned char id;
 		timer_status status;
 		size_t milliseconds;
-		const void* user_data; //if needed, you must take the responsibility to manage this memery
+		const void* user_data; //if needed, you must take the responsibility to manage this memory
 		boost::shared_ptr<deadline_timer> timer;
 
 		bool operator <(const timer_info& other) const {return id < other.id;}
@@ -91,10 +91,7 @@ public:
 	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex)
 
 	void stop_all_timer()
-	{
-		do_something_to_all(boost::bind
-			((void (st_timer::*) (timer_info&)) &st_timer::stop_timer, this, _1));
-	}
+		{do_something_to_all(boost::bind((void (st_timer::*) (timer_info&)) &st_timer::stop_timer, this, _1));}
 
 protected:
 	//return true to continue the timer, or the timer will stop

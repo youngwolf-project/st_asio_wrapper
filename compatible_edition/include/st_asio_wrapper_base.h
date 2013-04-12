@@ -96,6 +96,70 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) const \
 {for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;}
 
+///////////////////////////////////////////////////
+//msg sending interface
+#define SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
+TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow = false) {return FUNNAME(&pstr, &len, 1, can_overflow);} \
+TYPE FUNNAME(const std::string& str, bool can_overflow = false) {return FUNNAME(str.data(), str.size(), can_overflow);}
+
+#define SEND_MSG(FUNNAME, NATIVE) \
+bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+{ \
+	mutex::scoped_lock lock(send_msg_buffer_mutex); \
+	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
+	{ \
+		msg_type msg = packer_->pack_msg(pstr, len, num, NATIVE); \
+		return direct_insert_msg(msg); \
+	} \
+	return false; \
+} \
+SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+
+//not guarantee successfully send when can_overflow equal to false
+#define BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
+void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+	{do_something_to_all(boost::bind(&Socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
+SEND_MSG_CALL_SWITCH(FUNNAME, void)
+
+#define SEND_AND_WAIT(SOCKET, SEND_FUNNAME) \
+while (!(SOCKET)->SEND_FUNNAME(pstr, len, num, can_overflow)) \
+	this_thread::sleep(get_system_time() + posix_time::milliseconds(50))
+
+//guarantee successfully send even if can_overflow equal to false
+#define SAFE_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
+void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+{ \
+	for (BOOST_AUTO(iter, client_can.begin()); iter != client_can.end(); ++iter) \
+		SEND_AND_WAIT(*iter, SEND_FUNNAME); \
+} \
+SEND_MSG_CALL_SWITCH(FUNNAME, void)
+//msg sending interface
+///////////////////////////////////////////////////
+
+///////////////////////////////////////////////////
+//udp msg sending interface
+#define UDP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
+TYPE FUNNAME(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false) \
+	{return FUNNAME(peer_addr, &pstr, &len, 1, can_overflow);} \
+TYPE FUNNAME(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false) \
+	{return FUNNAME(peer_addr, str.data(), str.size(), can_overflow);}
+
+#define UDP_SEND_MSG(FUNNAME, NATIVE) \
+bool FUNNAME(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
+	bool can_overflow = false) \
+{ \
+	mutex::scoped_lock lock(send_msg_buffer_mutex); \
+	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
+	{ \
+		std::string str = packer_->pack_msg(pstr, len, num, NATIVE); \
+		return direct_insert_msg(peer_addr, str); \
+	} \
+	return false; \
+} \
+UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+//udp msg sending interface
+///////////////////////////////////////////////////
+
 #ifdef NO_UNIFIED_OUT
 namespace unified_out
 {

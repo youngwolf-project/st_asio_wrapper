@@ -16,77 +16,71 @@
 #include "st_asio_wrapper_service_pump.h"
 #include "st_asio_wrapper_connector.h"
 
-///////////////////////////////////////////////////
-//msg sending interface
-#define BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
-void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-	{do_something_to_all(boost::bind(&st_socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
-SEND_MSG_CALL_SWITCH(FUNNAME, void)
-//msg sending interface
-///////////////////////////////////////////////////
-
 namespace st_asio_wrapper
 {
 
 //only support one link
-class st_sclient : public st_service_pump::i_service, public st_connector
+template<typename Socket = st_connector>
+class st_sclient_base : public st_service_pump::i_service, public Socket
 {
 public:
-	st_sclient(st_service_pump& service_pump_) : i_service(service_pump_), st_connector(service_pump_),
+	st_sclient_base(st_service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_),
 		service_pump(service_pump_) {}
 	st_service_pump& get_service_pump() {return service_pump;}
 	const st_service_pump& get_service_pump() const {return service_pump;}
 
-	virtual void init() {reset(); start();}
+	virtual void init() {Socket::reset(); Socket::start();}
 	virtual void uninit()
 	{
 		//graceful closing can prevent reconnecting using is_closing()
 		//if you use force_close() to stop service, please use reconnecting control(RE_CONNECT_CONTROL macro)
 		//to prevent reconnecting, like this:
-		//set_re_connect_times(0);
-		//force_close();
+		//Socket::set_re_connect_times(0);
+		//Socket::force_close();
 
 		//reconnecting occured in on_recv_error(), we must guarantee that it's not because of stopping service
 		//that made recv error, and then proceed to reconnect.
-		graceful_close();
-		direct_dispatch_all_msg();
+		Socket::graceful_close();
+		Socket::direct_dispatch_all_msg();
 	}
 
 protected:
 	st_service_pump& service_pump;
 };
+typedef st_sclient_base<> st_sclient;
 
-class st_client : public st_service_pump::i_service
+template<typename Socket = st_connector>
+class st_client_base : public st_service_pump::i_service
 {
 public:
-	st_client(st_service_pump& service_pump_) : i_service(service_pump_), service_pump(service_pump_) {}
+	st_client_base(st_service_pump& service_pump_) : i_service(service_pump_), service_pump(service_pump_) {}
 	st_service_pump& get_service_pump() {return service_pump;}
 	const st_service_pump& get_service_pump() const {return service_pump;}
 
 	virtual void init()
 	{
-		do_something_to_all(boost::mem_fn(&st_connector::reset));
-		do_something_to_all(boost::mem_fn(&st_connector::start));
+		do_something_to_all(boost::mem_fn(&Socket::reset));
+		do_something_to_all(boost::mem_fn(&Socket::start));
 	}
 	virtual void uninit()
 	{
 		//graceful closing can prevent reconnecting using is_closing()
 		//if you use force_close() to stop service, please use reconnecting control(RE_CONNECT_CONTROL macro)
 		//to prevent reconnecting, like this:
-		//do_something_to_all(boost::bind(&st_connector::set_re_connect_times, _1, 0));
-		//do_something_to_all(boost::mem_fn(&st_connector::force_close));
+		//do_something_to_all(boost::bind(&Socket::set_re_connect_times, _1, 0));
+		//do_something_to_all(boost::mem_fn(&Socket::force_close));
 
 		//reconnecting occured in on_recv_error(), we must guarantee that it's not because of stopping service
 		//that made recv error, and then proceed to reconnect.
-		do_something_to_all(boost::mem_fn(&st_connector::graceful_close));
-		do_something_to_all(boost::mem_fn(&st_connector::direct_dispatch_all_msg));
+		do_something_to_all(boost::mem_fn(&Socket::graceful_close));
+		do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));
 	}
 
 	//not protected by mutex, please note
 	DO_SOMETHING_TO_ALL(client_can)
 	DO_SOMETHING_TO_ONE(client_can)
 
-	void add_client(const boost::shared_ptr<st_connector>& client_ptr)
+	void add_client(const boost::shared_ptr<Socket>& client_ptr)
 	{
 		assert(client_ptr && &client_ptr->get_io_service() == &service_pump);
 		mutex::scoped_lock lock(client_can_mutex);
@@ -95,7 +89,7 @@ public:
 			client_ptr->start();
 	}
 
-	void del_client(const boost::shared_ptr<st_connector>& client_ptr)
+	void del_client(const boost::shared_ptr<Socket>& client_ptr)
 	{
 		mutex::scoped_lock lock(client_can_mutex);
 		//client_can does not contain any duplicate items
@@ -108,6 +102,25 @@ public:
 		client_can.clear();
 	}
 
+	size_t size()
+	{
+		mutex::scoped_lock lock(client_can_mutex);
+		return client_can.size();
+	}
+
+	//not protected by mutex, please notice.
+	boost::shared_ptr<Socket> at(size_t index)
+	{
+		assert(index < client_can.size());
+		return index < client_can.size() ? *(boost::next(client_can.begin(), index)) : boost::shared_ptr<Socket>();
+	}
+
+	boost::shared_ptr<const Socket> at(size_t index) const
+	{
+		assert(index < client_can.size());
+		return index < client_can.size() ? *(boost::next(client_can.begin(), index)) : boost::shared_ptr<const Socket>();
+	}
+
 	///////////////////////////////////////////////////
 	//msg sending interface
 	BROADCAST_MSG(broadcast_msg, send_msg)
@@ -117,11 +130,12 @@ public:
 
 protected:
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	container::list<boost::shared_ptr<st_connector> > client_can;
+	container::list<boost::shared_ptr<Socket> > client_can;
 	mutex client_can_mutex;
 
 	st_service_pump& service_pump;
 };
+typedef st_client_base<> st_client;
 
 } //namespace
 

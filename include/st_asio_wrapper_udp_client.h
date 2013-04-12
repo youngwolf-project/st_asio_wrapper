@@ -20,45 +20,48 @@ namespace st_asio_wrapper
 {
 
 //only support one udp socket
-class st_sudp_client : public st_service_pump::i_service, public st_udp_socket
+template<typename Socket = st_udp_socket>
+class st_sudp_client_base : public st_service_pump::i_service, public Socket
 {
 public:
-	st_sudp_client(st_service_pump& service_pump_) : i_service(service_pump_), st_udp_socket(service_pump_),
+	st_sudp_client_base(st_service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_),
 		service_pump(service_pump_) {}
 	st_service_pump& get_service_pump() {return service_pump;}
 	const st_service_pump& get_service_pump() const {return service_pump;}
 
-	virtual void init() {reset(); start(); send_msg();}
-	virtual void uninit() {graceful_close(); direct_dispatch_all_msg();}
+	virtual void init() {Socket::reset(); Socket::start(); Socket::send_msg();}
+	virtual void uninit() {Socket::graceful_close(); Socket::direct_dispatch_all_msg();}
 
 protected:
 	st_service_pump& service_pump;
 };
+typedef st_sudp_client_base<> st_sudp_client;
 
-class st_udp_client : public st_service_pump::i_service
+template<typename Socket = st_udp_socket>
+class st_udp_client_base : public st_service_pump::i_service
 {
 public:
-	st_udp_client(st_service_pump& service_pump_) : i_service(service_pump_), service_pump(service_pump_) {}
+	st_udp_client_base(st_service_pump& service_pump_) : i_service(service_pump_), service_pump(service_pump_) {}
 	st_service_pump& get_io_service() {return service_pump;}
 	const st_service_pump& get_io_service() const {return service_pump;}
 
 	virtual void init()
 	{
-		do_something_to_all(boost::mem_fn(&st_udp_socket::reset));
-		do_something_to_all(boost::mem_fn(&st_udp_socket::start));
-		do_something_to_all(boost::mem_fn((bool (st_udp_socket::*)()) &st_udp_socket::send_msg));
+		do_something_to_all(boost::mem_fn(&Socket::reset));
+		do_something_to_all(boost::mem_fn(&Socket::start));
+		do_something_to_all(boost::mem_fn((bool (Socket::*)()) &Socket::send_msg));
 	}
 	virtual void uninit()
 	{
-		do_something_to_all(boost::mem_fn(&st_udp_socket::graceful_close));
-		do_something_to_all(boost::mem_fn(&st_udp_socket::direct_dispatch_all_msg));
+		do_something_to_all(boost::mem_fn(&Socket::graceful_close));
+		do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));
 	}
 
 	//not protected by mutex, please note
 	DO_SOMETHING_TO_ALL(client_can)
 	DO_SOMETHING_TO_ONE(client_can)
 
-	void add_client(const boost::shared_ptr<st_udp_socket>& client_ptr)
+	void add_client(const boost::shared_ptr<Socket>& client_ptr)
 	{
 		assert(&client_ptr->get_io_service() == &service_pump);
 		mutex::scoped_lock lock(client_can_mutex);
@@ -67,7 +70,7 @@ public:
 			client_ptr->start();
 	}
 
-	void del_client(const boost::shared_ptr<st_udp_socket>& client_ptr)
+	void del_client(const boost::shared_ptr<Socket>& client_ptr)
 	{
 		mutex::scoped_lock lock(client_can_mutex);
 		//client_can does not contain any duplicate items
@@ -88,11 +91,12 @@ public:
 
 protected:
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	container::list<boost::shared_ptr<st_udp_socket>> client_can;
+	container::list<boost::shared_ptr<Socket>> client_can;
 	mutex client_can_mutex;
 
 	st_service_pump& service_pump;
 };
+typedef st_udp_client_base<> st_udp_client;
 
 } //namespace
 

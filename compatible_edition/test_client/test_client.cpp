@@ -21,12 +21,10 @@ using namespace st_asio_wrapper;
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 
+static bool check_msg;
+
 ///////////////////////////////////////////////////
 //msg sending interface
-#define SEND_AND_WAIT(SOCKET, SEND_FUNNAME) \
-while (!(SOCKET)->SEND_FUNNAME(pstr, len, num, can_overflow)) \
-	this_thread::sleep(get_system_time() + posix_time::milliseconds(50))
-
 #define RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
@@ -36,67 +34,53 @@ void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 	SEND_AND_WAIT(*iter, SEND_FUNNAME); \
 } \
 SEND_MSG_CALL_SWITCH(FUNNAME, void)
-
-#define MY_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
-void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-{ \
-	for (BOOST_AUTO(iter, client_can.begin()); iter != client_can.end(); ++iter) \
-		SEND_AND_WAIT(*iter, SEND_FUNNAME); \
-} \
-SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //msg sending interface
 ///////////////////////////////////////////////////
 
-static bool check_msg;
-class test_client : public st_client
+class test_socket : public st_connector
 {
 public:
-	class test_socket : public st_connector
+	test_socket(st_service_pump& service_pump_) : st_connector(service_pump_), recv_bytes(0), recv_index(0) {}
+
+	uint64_t get_recv_bytes() const {return recv_bytes;}
+	//reset all, be ensure that there's no any operations performed on this st_socket when invoke it
+	virtual void reset() {recv_bytes = recv_index = 0; st_connector::reset();}
+
+protected:
+	//msg handling
+#ifndef FORCE_TO_USE_MSG_RECV_BUFFER //not force to use msg recv buffer(so on_msg() will make the decision)
+	//we can handle the msg very fast, so we don't use the recv buffer(return false)
+	virtual bool on_msg(msg_type& msg) {handle_msg(msg); return false;}
+#endif
+	//we should handle the msg in on_msg_handle for time-consuming task like this:
+	virtual void on_msg_handle(msg_type& msg) {handle_msg(msg);}
+	//msg handling end
+
+private:
+	void handle_msg(const std::string& str)
 	{
-	public:
-		test_socket(test_client& test_client_) : st_connector(test_client_.get_service_pump()),
-			recv_bytes(0), recv_index(0) {}
+		recv_bytes += str.size();
+		if (::check_msg && (str.size() < sizeof(size_t) || recv_index != *(size_t*) str.data()))
+			printf("check msg error: " size_t_format ".\n", recv_index);
+		++recv_index;
+	}
 
-		uint64_t get_recv_bytes() const {return recv_bytes;}
-		//reset all, be ensure that there's no any operations performed on this st_socket when invoke it
-		virtual void reset() {recv_bytes = recv_index = 0; st_connector::reset();}
+private:
+	uint64_t recv_bytes;
+	size_t recv_index;
+};
 
-	protected:
-		//msg handling
-	#ifndef FORCE_TO_USE_MSG_RECV_BUFFER //not force to use msg recv buffer(so on_msg() will make the decision)
-		//we can handle the msg very fast, so we don't use the recv buffer(return false)
-		virtual bool on_msg(msg_type& msg) {handle_msg(msg); return false;}
-	#endif
-		//we should handle the msg in on_msg_handle for time-consuming task like this:
-		virtual void on_msg_handle(msg_type& msg) {handle_msg(msg);}
-		//msg handling end
-
-	private:
-		void handle_msg(const std::string& str)
-		{
-			recv_bytes += str.size();
-			if (::check_msg && (str.size() < sizeof(size_t) || recv_index != *(size_t*) str.data()))
-				printf("check msg error: " size_t_format ".\n", recv_index);
-			++recv_index;
-		}
-
-	private:
-		uint64_t recv_bytes;
-		size_t recv_index;
-	};
-
+class test_client : public st_client_base<test_socket>
+{
 public:
-	test_client(st_service_pump& service_pump) : st_client(service_pump) {}
+	test_client(st_service_pump& service_pump_) : st_client_base<test_socket>(service_pump_) {}
 
-	void reset() {do_something_to_all(boost::mem_fn(&st_connector::reset));}
+	void reset() {do_something_to_all(boost::mem_fn(&test_socket::reset));}
 	uint64_t get_total_recv_bytes() const
 	{
 		uint64_t total_recv_bytes = 0;
 		for (BOOST_AUTO(iter, client_can.begin()); iter != client_can.end(); ++iter)
-			//this cause compiler error in boost_1.52(maybe include lower versions), it's a bug which have been resolved
-			//in boost_1.53
-			//total_recv_bytes += dynamic_cast<test_socket*>(iter->get())->get_recv_bytes();
-			total_recv_bytes += dynamic_cast<test_socket*>((*iter).get())->get_recv_bytes(); //bypass above bug
+			total_recv_bytes += (*iter)->get_recv_bytes();
 
 		return total_recv_bytes;
 	}
@@ -107,8 +91,8 @@ public:
 	//enough send buffers
 	RANDOM_SEND_MSG(random_send_msg, send_msg)
 	RANDOM_SEND_MSG(random_send_native_msg, send_native_msg)
-	MY_BROADCAST_MSG(broadcast_msg, send_msg)
-	MY_BROADCAST_MSG(broadcast_native_msg, send_native_msg)
+	SAFE_BROADCAST_MSG(broadcast_msg, send_msg)
+	SAFE_BROADCAST_MSG(broadcast_native_msg, send_native_msg)
 	//msg sending interface
 	///////////////////////////////////////////////////
 };
@@ -129,7 +113,7 @@ int main(int argc, const char* argv[])
 	test_client client(service_pump);
 	for (size_t i = 0; i < link_num; ++i)
 	{
-		BOOST_AUTO(client_ptr, boost::make_shared<test_client::test_socket>(boost::ref(client)));
+		BOOST_AUTO(client_ptr, boost::make_shared<test_socket>(boost::ref(client.get_service_pump())));
 //		client_ptr->set_server_addr(SERVER_PORT, "::1"); //ipv6
 //		client_ptr->set_server_addr(SERVER_PORT, "127.0.0.1"); //ipv4
 		client.add_client(client_ptr);

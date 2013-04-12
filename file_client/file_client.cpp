@@ -3,6 +3,7 @@
 
 //configuration
 #define SERVER_PORT		5050
+#define FORCE_TO_USE_MSG_RECV_BUFFER
 #define MAX_MSG_LEN		(HEAD_LEN + 1 + 4096)
 	//read 4096 bytes from disk file one time will gain the best I/O performance
 	//HEAD_LEN is used by the default packer
@@ -33,7 +34,7 @@ int main(int argc, const char* argv[])
 	file_client client(service_pump);
 	for (auto i = 0; i < link_num; ++i)
 	{
-		auto client_ptr(boost::make_shared<file_client::file_socket>(boost::ref(client)));
+		auto client_ptr(boost::make_shared<file_socket>(client.get_service_pump()));
 //		client_ptr->set_server_addr(SERVER_PORT, "::1"); //ipv6
 //		client_ptr->set_server_addr(SERVER_PORT, "127.0.0.1"); //ipv4
 		client_ptr->set_index(i);
@@ -65,10 +66,10 @@ int main(int argc, const char* argv[])
 				completed_client_num.store(0);
 				file_size = 0;
 				auto begin_time = get_system_time().time_of_day().total_seconds();
-				if (dynamic_cast<file_client::file_socket*>(client.get_client(0).get())->get_file(item))
+				if (client.at(0)->get_file(item))
 				{
 					for (auto i = 1; i < link_num; ++i)
-						dynamic_cast<file_client::file_socket*>(client.get_client(i).get())->get_file(item);
+						client.at(i)->get_file(item);
 
 					printf("transfer %s begin.\n", item.data());
 					unsigned percent = -1;
@@ -101,7 +102,7 @@ int main(int argc, const char* argv[])
 			});
 		}
 		else
-			dynamic_cast<file_client::file_socket*>(client.get_client(0).get())->talk(str);
+			client.at(0)->talk(str);
 	}
 
 	return 0;
@@ -109,5 +110,6 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef SERVER_PORT
+#undef FORCE_TO_USE_MSG_RECV_BUFFER
 #undef MAX_MSG_LEN
 //restore configuration
