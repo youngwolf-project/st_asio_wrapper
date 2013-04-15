@@ -53,6 +53,7 @@ protected:
 
 public:
 	st_timer(io_service& _io_service_) : io_service_(_io_service_) {}
+	virtual ~st_timer() {}
 
 	void set_timer(unsigned char id, size_t milliseconds, const void* user_data)
 	{

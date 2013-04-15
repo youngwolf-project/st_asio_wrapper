@@ -27,6 +27,8 @@ namespace st_asio_wrapper
 class i_unpacker
 {
 public:
+	virtual ~i_unpacker() {}
+
 	virtual void reset_unpacker_state() = 0;
 	virtual bool on_recv(size_t bytes_transferred, container::list<std::string>& msg_can) = 0;
 	virtual mutable_buffers_1 prepare_next_recv(size_t& min_recv_len) = 0;

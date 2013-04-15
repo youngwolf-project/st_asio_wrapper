@@ -89,6 +89,13 @@ public:
 			client_ptr->start();
 	}
 
+	void add_client(unsigned short port, const std::string& ip)
+	{
+		BOOST_AUTO(client_ptr, boost::make_shared<Socket>(boost::ref(*this)));
+		client_ptr->set_server_addr(port, ip);
+		add_client(client_ptr);
+	}
+
 	void del_client(const boost::shared_ptr<Socket>& client_ptr)
 	{
 		mutex::scoped_lock lock(client_can_mutex);
