@@ -208,14 +208,14 @@ protected:
 	//return true means use the msg recv buffer, you must handle the msgs in on_msg_handle()
 	//notice: on_msg_handle() will not be invoked from within this function
 	//
-	//notice: the msg is unpacked, using inconstant is for the convenience of std::move
+	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
 	virtual bool on_msg(msg_type& msg)
 		{unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return false;}
 #endif
 
 	//handling msg at here will not block msg receiving
 	//if on_msg() return false, this function will not be invoked due to no msgs need to dispatch
-	//notice: the msg is unpacked, using inconstant is for the convenience of std::move
+	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
 	virtual void on_msg_handle(msg_type& msg)
 		{unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data());}
 

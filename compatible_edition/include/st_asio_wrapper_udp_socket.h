@@ -51,8 +51,8 @@ public:
 		udp::endpoint peer_addr;
 		std::string str;
 
-		void move(udp_msg& other) {peer_addr = other.peer_addr; str.swap(other.str);}
-		void move(const udp::endpoint& addr, std::string& tmp_str) {peer_addr = addr; str.swap(tmp_str);}
+		void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); std::swap(str, other.str);}
+		void swap(const udp::endpoint& addr, std::string& tmp_str) {peer_addr = addr; std::swap(str, tmp_str);}
 		bool operator==(const udp_msg& other) const {return this == &other;}
 	};
 	typedef udp_msg msg_type;
@@ -191,7 +191,7 @@ public:
 		mutex::scoped_lock lock(send_msg_buffer_mutex);
 		if (!send_msg_buffer.empty())
 		{
-			msg.move(send_msg_buffer.front());
+			msg.swap(send_msg_buffer.front());
 			send_msg_buffer.pop_front();
 		}
 	}
@@ -218,7 +218,7 @@ protected:
 	//return true means use the msg recv buffer, you must handle the msgs in on_msg_handle()
 	//notice: on_msg_handle() will not be invoked from within this function
 	//
-	//notice: using inconstant is for the convenience swapping
+	//notice: using inconstant is for the convenience of swapping
 	virtual bool on_msg(msg_type& msg)
 		{unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data()); return false;}
 #endif
@@ -322,7 +322,7 @@ protected:
 		{
 			std::string tmp_str(raw_buff.data(), bytes_transferred);
 			temp_msg_buffer.push_back(msg_type());
-			temp_msg_buffer.back().move(peer_addr, tmp_str);
+			temp_msg_buffer.back().swap(peer_addr, tmp_str);
 			bool all_dispatched = dispatch_msg();
 
 			if (all_dispatched)
@@ -380,7 +380,7 @@ protected:
 		else if (!sending && !send_msg_buffer.empty())
 		{
 			sending = true;
-			last_send_msg.move(send_msg_buffer.front());
+			last_send_msg.swap(send_msg_buffer.front());
 			async_send_to(buffer(last_send_msg.str), last_send_msg.peer_addr,
 				boost::bind(&st_udp_socket::send_handler, this, placeholders::error, placeholders::bytes_transferred));
 			send_msg_buffer.pop_front();
@@ -399,7 +399,7 @@ protected:
 		else if (!dispatching && !recv_msg_buffer.empty())
 		{
 			dispatching = true;
-			last_dispatch_msg.move(recv_msg_buffer.front());
+			last_dispatch_msg.swap(recv_msg_buffer.front());
 			io_service_.post(boost::bind(&st_udp_socket::msg_handler, this));
 			recv_msg_buffer.pop_front();
 		}
@@ -411,7 +411,7 @@ protected:
 		if (!str.empty())
 		{
 			send_msg_buffer.push_back(msg_type());
-			send_msg_buffer.back().move(peer_addr, str);
+			send_msg_buffer.back().swap(peer_addr, str);
 			do_send_msg();
 
 			return true;
