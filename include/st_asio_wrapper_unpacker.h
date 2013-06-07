@@ -43,7 +43,7 @@ public:
 	virtual void reset_unpacker_state() {total_data_len = -1; data_len = 0;}
 	virtual bool on_recv(size_t bytes_transferred, container::list<std::string>& msg_can)
 	{
-		//len(unsigned) + msg
+		//len(unsigned short) + msg
 		data_len += bytes_transferred;
 
 		auto pnext = std::begin(raw_buff);

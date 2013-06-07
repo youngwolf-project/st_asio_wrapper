@@ -51,7 +51,7 @@ protected:
 		force_close();
 		direct_dispatch_all_msg();
 #else
-		server.del_client(this->shared_from_this());
+		server.del_client(shared_from_this());
 #endif
 	}
 

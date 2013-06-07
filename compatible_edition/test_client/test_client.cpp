@@ -112,12 +112,9 @@ int main(int argc, const char* argv[])
 	st_service_pump service_pump;
 	test_client client(service_pump);
 	for (size_t i = 0; i < link_num; ++i)
-	{
-		BOOST_AUTO(client_ptr, boost::make_shared<test_socket>(boost::ref(client.get_service_pump())));
-//		client_ptr->set_server_addr(SERVER_PORT, "::1"); //ipv6
-//		client_ptr->set_server_addr(SERVER_PORT, "127.0.0.1"); //ipv4
-		client.add_client(client_ptr);
-	}
+		client.add_client();
+//	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, SERVER_PORT, "::1")); //ipv6
+//	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, SERVER_PORT, "127.0.0.1")); //ipv4
 
 	service_pump.start_service();
 	while(service_pump.is_running())

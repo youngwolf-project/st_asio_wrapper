@@ -91,8 +91,14 @@ public:
 
 	void add_client(unsigned short port, const std::string& ip)
 	{
-		auto client_ptr(boost::make_shared<Socket>(boost::ref(*this)));
+		auto client_ptr(boost::make_shared<Socket>(get_service_pump()));
 		client_ptr->set_server_addr(port, ip);
+		add_client(client_ptr);
+	}
+
+	void add_client()
+	{
+		auto client_ptr(boost::make_shared<Socket>(get_service_pump()));
 		add_client(client_ptr);
 	}
 
