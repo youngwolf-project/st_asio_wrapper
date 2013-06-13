@@ -42,8 +42,8 @@ class st_udp_client_base : public st_service_pump::i_service
 {
 public:
 	st_udp_client_base(st_service_pump& service_pump_) : i_service(service_pump_), service_pump(service_pump_) {}
-	st_service_pump& get_io_service() {return service_pump;}
-	const st_service_pump& get_io_service() const {return service_pump;}
+	st_service_pump& get_service_pump() {return service_pump;}
+	const st_service_pump& get_service_pump() const {return service_pump;}
 
 	virtual void init()
 	{
@@ -63,11 +63,28 @@ public:
 
 	void add_client(const boost::shared_ptr<Socket>& client_ptr)
 	{
-		assert(&client_ptr->get_io_service() == &service_pump);
+		assert(client_ptr && &client_ptr->get_io_service() == &service_pump);
 		mutex::scoped_lock lock(client_can_mutex);
 		client_can.push_back(client_ptr);
 		if (service_pump.is_service_started()) //service already started
 			client_ptr->start();
+	}
+
+	boost::shared_ptr<Socket> add_client(unsigned short port, const std::string& ip = std::string())
+	{
+		auto client_ptr(boost::make_shared<Socket>(get_service_pump()));
+		client_ptr->set_local_addr(port, ip);
+		add_client(client_ptr);
+
+		return client_ptr;
+	}
+
+	boost::shared_ptr<Socket> add_client()
+	{
+		auto client_ptr(boost::make_shared<Socket>(get_service_pump()));
+		add_client(client_ptr);
+
+		return client_ptr;
 	}
 
 	void del_client(const boost::shared_ptr<Socket>& client_ptr)

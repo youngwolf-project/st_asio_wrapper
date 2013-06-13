@@ -89,17 +89,21 @@ public:
 			client_ptr->start();
 	}
 
-	void add_client(unsigned short port, const std::string& ip)
+	boost::shared_ptr<Socket> add_client(unsigned short port, const std::string& ip = std::string())
 	{
 		BOOST_AUTO(client_ptr, boost::make_shared<Socket>(boost::ref(get_service_pump())));
 		client_ptr->set_server_addr(port, ip);
 		add_client(client_ptr);
+
+		return client_ptr;
 	}
 
-	void add_client()
+	boost::shared_ptr<Socket> add_client()
 	{
 		BOOST_AUTO(client_ptr, boost::make_shared<Socket>(boost::ref(get_service_pump())));
 		add_client(client_ptr);
+
+		return client_ptr;
 	}
 
 	void del_client(const boost::shared_ptr<Socket>& client_ptr)
