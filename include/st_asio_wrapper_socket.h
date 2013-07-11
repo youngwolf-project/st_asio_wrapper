@@ -78,8 +78,6 @@ public:
 				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
 			if (loop_num > 100) //graceful disconnecting is not possible
 				clean_up();
-			else
-				closing = false; //restore state for next use
 		}
 	}
 	bool is_closing() {return closing;}
@@ -267,9 +265,12 @@ protected:
 
 	void clean_up()
 	{
-		error_code ec;
-		shutdown(tcp::socket::shutdown_both, ec);
-		close(ec);
+		if (is_open())
+		{
+			error_code ec;
+			shutdown(tcp::socket::shutdown_both, ec);
+			close(ec);
+		}
 
 		reset_unpacker_state();
 		stop_all_timer();

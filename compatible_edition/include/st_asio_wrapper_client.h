@@ -72,7 +72,7 @@ public:
 
 		//reconnecting occured in on_recv_error(), we must guarantee that it's not because of stopping service
 		//that made recv error, and then proceed to reconnect.
-		do_something_to_all(boost::mem_fn(&Socket::graceful_close));
+		do_something_to_all(boost::bind(&Socket::graceful_close, _1, false));
 		do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));
 	}
 

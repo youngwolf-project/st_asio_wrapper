@@ -9,6 +9,7 @@ using namespace st_asio_wrapper;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
+#define RECONNECT_COMMAND "reconnect"
 
 int main() {
 	std::string str;
@@ -32,6 +33,8 @@ int main() {
 			service_pump.stop_service();
 			service_pump.start_service();
 		}
+		else if (str == RECONNECT_COMMAND)
+			client.graceful_close(true);
 		else
 			client.send_msg(str);
 	}
