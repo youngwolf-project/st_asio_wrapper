@@ -32,14 +32,6 @@ public:
 	virtual void init() {Socket::reset(); Socket::start();}
 	virtual void uninit()
 	{
-		//graceful closing can prevent reconnecting using is_closing()
-		//if you use force_close() to stop service, please use reconnecting control(RE_CONNECT_CONTROL macro)
-		//to prevent reconnecting, like this:
-		//Socket::set_re_connect_times(0);
-		//Socket::force_close();
-
-		//reconnecting occured in on_recv_error(), we must guarantee that it's not because of stopping service
-		//that made recv error, and then proceed to reconnect.
 		Socket::graceful_close();
 		Socket::direct_dispatch_all_msg();
 	}
@@ -64,14 +56,6 @@ public:
 	}
 	virtual void uninit()
 	{
-		//graceful closing can prevent reconnecting using is_closing()
-		//if you use force_close() to stop service, please use reconnecting control(RE_CONNECT_CONTROL macro)
-		//to prevent reconnecting, like this:
-		//do_something_to_all(boost::bind(&Socket::set_re_connect_times, _1, 0));
-		//do_something_to_all(boost::mem_fn(&Socket::force_close));
-
-		//reconnecting occured in on_recv_error(), we must guarantee that it's not because of stopping service
-		//that made recv error, and then proceed to reconnect.
 		do_something_to_all(boost::mem_fn(&Socket::graceful_close));
 		do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));
 	}
