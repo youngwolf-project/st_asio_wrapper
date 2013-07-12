@@ -37,7 +37,7 @@ namespace st_asio_wrapper
 class st_connector : public st_socket
 {
 public:
-	st_connector(io_service& io_service_) : st_socket(io_service_), connected(false)
+	st_connector(io_service& io_service_) : st_socket(io_service_), connected(false), reconnecting(false)
 #ifdef RE_CONNECT_CONTROL
 		, re_connect_times(-1)
 #endif
@@ -64,16 +64,17 @@ public:
 		}
 	}
 
-	void disconnect() {force_close();}
-	void force_close() {st_socket::force_close(); connected = false;}
-	void graceful_close()
+	void disconnect(bool reconnect = false) {force_close(reconnect);}
+	void force_close(bool reconnect = false) {reconnecting = reconnect; connected = false; st_socket::force_close();}
+	void graceful_close(bool reconnect = false)
 	{
 		if (!is_connected())
-			force_close();
+			force_close(reconnect);
 		else
 		{
-			st_socket::graceful_close();
+			reconnecting = reconnect;
 			connected = false;
+			st_socket::graceful_close();
 		}
 	}
 
@@ -86,12 +87,18 @@ protected:
 		unified_out::error_out("connection closed.");
 
 		if (is_closing())
-			force_close();
+			force_close(reconnecting);
 		else
 		{
-			force_close();
+			force_close(reconnecting);
 			if (ec && error::operation_aborted != ec && RE_CONNECT_CHECK)
-				start();
+				reconnecting = true;
+		}
+
+		if (reconnecting)
+		{
+			reconnecting = false;
+			start();
 		}
 	}
 
@@ -132,6 +139,7 @@ protected:
 protected:
 	tcp::endpoint server_addr;
 	bool connected;
+	bool reconnecting;
 #ifdef RE_CONNECT_CONTROL
 	size_t re_connect_times;
 #endif

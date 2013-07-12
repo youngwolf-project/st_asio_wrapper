@@ -259,6 +259,10 @@
  * Notice: If you encounter compile errors such as can't convert from A to A& with boost before 1.53 or gcc before 4.7,
  *  please wrapper A with boost::ref
  *
+ * 3.4	2013.7.11
+ * Add reconnect support to st_connector class: use true to invoke force_close or graceful_close.
+ * Other small changes please refer to svn or git logs.
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_VERIFICATION_H_
