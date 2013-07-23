@@ -31,13 +31,14 @@ public:
 	virtual void del_client(const boost::shared_ptr<st_socket>& client_ptr) = 0;
 };
 
-class st_server_socket : public st_socket, public boost::enable_shared_from_this<st_server_socket>
+template<typename Server = i_server>
+class st_server_socket_base : public st_socket, public boost::enable_shared_from_this<st_server_socket_base<Server> >
 {
 public:
-	st_server_socket(i_server& server_) : st_socket(server_.get_service_pump()), server(server_) {}
+	st_server_socket_base(Server& server_) : st_socket(server_.get_service_pump()), server(server_) {}
 	virtual void start() {do_recv_msg();}
-	//when resue this st_server_socket, st_server_base will invoke reuse(), child must re-write this to init
-	//all member variables, and then do not forget to invoke st_server_socket::reuse() to init father's
+	//when resue this st_server_socket_base, st_server_base will invoke reuse(), child must re-write this to init
+	//all member variables, and then do not forget to invoke st_server_socket_base::reuse() to init father's
 	//member variables
 	virtual void reuse() {reset();}
 
@@ -51,13 +52,14 @@ protected:
 		force_close();
 		direct_dispatch_all_msg();
 #else
-		server.del_client(shared_from_this());
+		server.del_client(this->shared_from_this());
 #endif
 	}
 
 protected:
-	i_server& server;
+	Server& server;
 };
+typedef st_server_socket_base<> st_server_socket;
 
 } //namespace
 

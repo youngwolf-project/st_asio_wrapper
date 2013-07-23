@@ -19,18 +19,33 @@ using namespace st_asio_wrapper;
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
 BOOST_AUTO(global_packer, boost::make_shared<packer>());
 
-class echo_socket : public st_server_socket
+//demonstrates how to control the type of st_server_socket_base::server from template parameters
+class i_echo_server : public i_server
 {
 public:
-	echo_socket(i_server& server_) : st_server_socket(server_) {inner_packer(global_packer);}
+	virtual void test() = 0;
+};
+
+class echo_socket : public st_server_socket_base<i_echo_server>
+{
+public:
+	echo_socket(i_echo_server& server_) : st_server_socket_base(server_) {inner_packer(global_packer);}
 
 public:
 	//because we use objects pool(REUSE_CLIENT been defined), so, strictly speaking, this virtual
 	//function must be rewrote, but we don't have member variables to initialize but invoke father's
 	//reuse() directly, so, it can be omitted, but we keep it for possibly future using
-	virtual void reuse() {st_server_socket::reuse();}
+	virtual void reuse() {st_server_socket_base::reuse();}
 
 protected:
+	virtual void on_recv_error(const error_code& ec)
+	{
+		//the type of st_server_socket_base::server now can be controled by derived class(echo_socket),
+		//which is actually i_echo_server, so, we can invoke i_echo_server::test virtual function.
+		server.test();
+		st_server_socket_base::on_recv_error(ec);
+	}
+
 	//msg handling: send the original msg back(echo server)
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
@@ -42,7 +57,15 @@ protected:
 	//use the msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
 	//msg handling end
 };
-typedef st_server_base<echo_socket> echo_server;
+
+class echo_server : public st_server_base<echo_socket, i_echo_server>
+{
+public:
+	echo_server(st_service_pump& service_pump_) : st_server_base(service_pump_) {}
+
+	//from i_echo_server, pure virtual function, we must implement it.
+	virtual void test() {puts("in echo_server::test()");}
+};
 
 int main() {
 	puts("type quit to end these two servers.");

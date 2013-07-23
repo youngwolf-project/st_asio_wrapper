@@ -52,8 +52,13 @@
 	#endif
 #endif
 
+#ifndef INVALID_LINK_MAX_DURATION
+	#define INVALID_LINK_MAX_DURATION	5 //seconds
+	//after this duration, the corresponding client can be freed from the heap or reused again
+#endif
+
 //in set_server_addr, if the ip is empty, DEFAULT_IP_VERSION will define the ip version,
-//or, the ip version will be determined by the ip address.
+//or, the ip version will be deduced by the ip address.
 //tcp::v4() means ipv4 and tcp::v6() means ipv6.
 #ifndef DEFAULT_IP_VERSION
 #define DEFAULT_IP_VERSION tcp::v4()
@@ -62,8 +67,8 @@
 namespace st_asio_wrapper
 {
 
-template<typename Socket = st_server_socket>
-class st_server_base : public st_service_pump::i_service, public i_server, public st_timer
+template<typename Socket = st_server_socket, typename Server = i_server>
+class st_server_base : public st_service_pump::i_service, public Server, public st_timer
 {
 protected:
 	struct temp_client
@@ -189,7 +194,7 @@ public:
 		if (0 == num)
 			return;
 
-		time_t now = time(NULL) - 5; //five seconds, hard coding
+		time_t now = time(NULL) - INVALID_LINK_MAX_DURATION;
 		mutex::scoped_lock lock(temp_client_can_mutex);
 		for (BOOST_AUTO(iter, temp_client_can.begin()); num > 0 && iter != temp_client_can.end();)
 			if (iter->closed_time <= now)
@@ -330,7 +335,7 @@ protected:
 
 	boost::shared_ptr<Socket> reuse_socket()
 	{
-		time_t now = time(NULL) - 5; //five seconds, hard coding
+		time_t now = time(NULL) - INVALID_LINK_MAX_DURATION;
 		mutex::scoped_lock lock(temp_client_can_mutex);
 		//temp_client_can does not contain any duplicate items
 		BOOST_AUTO(iter, std::find_if(temp_client_can.begin(), temp_client_can.end(),

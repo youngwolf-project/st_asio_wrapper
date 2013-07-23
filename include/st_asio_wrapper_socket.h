@@ -25,6 +25,10 @@ using namespace boost::asio::ip;
 //msg recv buffer. notice: there's no on_msg() virtual function any more.
 //this is a compile time optimization
 
+#ifndef GRACEFUL_CLOSE_MAX_DURATION
+	#define GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, max waiting seconds while graceful closing
+#endif
+
 #if defined _MSC_VER
 #define size_t_format "%Iu"
 #else // defined __GNUC__
@@ -63,20 +67,20 @@ public:
 
 	void disconnect() {force_close();}
 	void force_close() {clean_up();}
-	void graceful_close() //will block until closing successfully or timeout
+	void graceful_close() //will block until closing success or timeout
 	{
 		closing = true;
 
 		error_code ec;
 		shutdown(tcp::socket::shutdown_send, ec);
-		if (ec) //graceful disconnecting is not possible
+		if (ec) //graceful disconnecting is impossible
 			clean_up();
 		else
 		{
-			auto loop_num = 0;
-			while (++loop_num <= 100 && closing) //5 seconds
-				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
-			if (loop_num > 100) //graceful disconnecting is not possible
+			auto loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
+			while (--loop_num >= 0 && closing)
+				this_thread::sleep(get_system_time() + posix_time::milliseconds(10));
+			if (loop_num >= 0) //graceful disconnecting is impossible
 				clean_up();
 		}
 	}
