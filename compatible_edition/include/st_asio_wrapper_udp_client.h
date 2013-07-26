@@ -67,7 +67,10 @@ public:
 		mutex::scoped_lock lock(client_can_mutex);
 		client_can.push_back(client_ptr);
 		if (service_pump.is_service_started()) //service already started
+		{
+			client_ptr->reset();
 			client_ptr->start();
+		}
 	}
 
 	boost::shared_ptr<Socket> add_client(unsigned short port, const std::string& ip = std::string())
