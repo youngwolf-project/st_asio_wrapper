@@ -100,13 +100,13 @@
  * If REUSE_CLIENT defined, st_server will not free the closed clients(in st_server::temp_client_can)
  *  automatically and periodically, but try to reuse them when need new client object. In this case,
  *  the client number in st_server::temp_client_can may keeps very large if no or few client objects
- *  will be consumed after a certain duration. So, I provide free_client() to free a specified number of
+ *  will be consumed after a certain duration. So, I provide free_client() to free a specific number of
  *  client objects for memory saving
  *
  * If REUSE_CLIENT not defined, st_server will free the closed clients(in st_server::temp_client_can)
  *  automatically and periodically, and use CLIENT_FREE_INTERVAL to set the interval
  *  In this case, clients in temp_client_can will not be reused but be freed directly
- *  (at the specified interval), and there's no free_client() function because not needed
+ *  (at the specific interval), and there's no free_client() function because not needed
  *
  * 2.1 2012.9.9
  * Interface signature standardization
@@ -134,7 +134,7 @@
  * 	reserved timers, which are listed in st_asio_wrapper_timer.h, and do not use them.
  *
  * Use set_timer() to start a timer, and stop_timer() to stop a timer.
- * When invoke set_timer(), if the specified timer id is already exist, st_timer will update the timer
+ * When invoke set_timer(), if the specific timer id is already exist, st_timer will update the timer
  *  and restart it
  * When timers run out, the virtual function on_timer() will be invoked, you must handle all interested
  *  timers and invoke father's on_timer() for the rests

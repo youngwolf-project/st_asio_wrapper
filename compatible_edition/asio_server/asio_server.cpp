@@ -12,6 +12,7 @@ using namespace st_asio_wrapper;
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
+#define LIST_STATUS		"status"
 
 //demonstrates how to use custom packer
 //in the default behavior, each st_socket has their own packer, and cause memory waste
@@ -87,6 +88,9 @@ int main() {
 			service_pump.stop_service();
 			service_pump.start_service();
 		}
+		else if (str == LIST_STATUS)
+			printf("valid links: " size_t_format " closed links: " size_t_format "\n",
+				echo_server_.size(), echo_server_.closed_client_size());
 		else if (str == LIST_ALL_CLIENT)
 			server_.list_all_client();
 		else

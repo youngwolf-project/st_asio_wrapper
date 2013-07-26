@@ -183,7 +183,7 @@ public:
 		return temp_client_can.size();
 	}
 
-	//free a specified number of client objects
+	//free a specific number of client objects
 	//if you use client pool(define REUSE_CLIENT), you may need to free some client objects
 	//when the client pool(get_closed_client_size()) goes big enough for memory saving(because
 	//the clients in temp_client_can are waiting for reuse and will never be freed)
@@ -369,7 +369,7 @@ protected:
 	//client_can to temp_client_can, and free them from the heap in the near future(controlled by the
 	//0(id) timer)
 	//if AUTO_CLEAR_CLOSED_SOCKET been defined, clear_all_closed_socket() will be invoked automatically
-	//and periodically, and move them to temp_client_can if some closed clients found.
+	//and periodically, and move all closed clients to temp_client_can.
 	container::list<temp_client> temp_client_can;
 	mutex temp_client_can_mutex;
 
