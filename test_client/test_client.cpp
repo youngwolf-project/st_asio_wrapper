@@ -130,6 +130,23 @@ int main(int argc, const char* argv[])
 		}
 		else if (!str.empty())
 		{
+			if ('+' == str[0])
+			{
+				auto n = (size_t) atoi(std::next(str.data()));
+				if (0 == n)
+					n = 1;
+
+				auto old_link_num = link_num;
+				link_num += n;
+				if (link_num > 4096)
+					link_num = 4096;
+
+				for (auto i = old_link_num; i < link_num; ++i)
+					client.add_client();
+
+				continue;
+			}
+
 			size_t msg_num = 1024;
 			size_t msg_len = 1024; //must greater than or equal to sizeof(size_t)
 			char msg_fill = '0';

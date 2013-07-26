@@ -129,6 +129,23 @@ int main(int argc, const char* argv[])
 		}
 		else if (!str.empty())
 		{
+			if ('+' == str[0])
+			{
+				size_t n = (size_t) atoi(str.data() + 1);
+				if (0 == n)
+					n = 1;
+
+				size_t old_link_num = link_num;
+				link_num += n;
+				if (link_num > 4096)
+					link_num = 4096;
+
+				for (size_t i = old_link_num; i < link_num; ++i)
+					client.add_client();
+
+				continue;
+			}
+
 			size_t msg_num = 1024;
 			size_t msg_len = 1024; //must greater than or equal to sizeof(size_t)
 			char msg_fill = '0';

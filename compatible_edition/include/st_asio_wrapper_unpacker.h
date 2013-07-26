@@ -30,6 +30,8 @@ public:
 	virtual ~i_unpacker() {}
 
 	virtual void reset_unpacker_state() = 0;
+	virtual size_t used_buffer_size() = 0; //how many data have been recevied
+	virtual size_t current_msg_length() = 0; //current msg's total length, -1 means don't know(head has not received)
 	virtual bool on_recv(size_t bytes_transferred, container::list<std::string>& msg_can) = 0;
 	virtual mutable_buffers_1 prepare_next_recv(size_t& min_recv_len) = 0;
 };
@@ -41,6 +43,8 @@ public:
 
 public:
 	virtual void reset_unpacker_state() {total_data_len = -1; data_len = 0;}
+	virtual size_t used_buffer_size() {return data_len;}
+	virtual size_t current_msg_length() {return total_data_len;}
 	virtual bool on_recv(size_t bytes_transferred, container::list<std::string>& msg_can)
 	{
 		//len(unsigned short) + msg
