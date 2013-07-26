@@ -82,13 +82,9 @@ public:
 		return client_ptr;
 	}
 
-	boost::shared_ptr<Socket> add_client()
-	{
-		BOOST_AUTO(client_ptr, boost::make_shared<Socket>(boost::ref(get_service_pump())));
-		add_client(client_ptr);
-
-		return client_ptr;
-	}
+	//simply create a st_udp_socket from heap,
+	//secondly you must invoke set_local_addr() and add_client() before this socket can send or recv msgs.
+	boost::shared_ptr<Socket> create_client() {return boost::make_shared<Socket>(boost::ref(get_service_pump()));}
 
 	void del_client(const boost::shared_ptr<Socket>& client_ptr)
 	{
