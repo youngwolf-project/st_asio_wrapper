@@ -59,7 +59,7 @@ public:
 			{
 				if (data_len >= total_data_len) //one msg received
 				{
-					msg_can.push_back(std::string());
+					msg_can.resize(msg_can.size() + 1);
 					msg_can.back().assign(pnext + HEAD_LEN, total_data_len - HEAD_LEN);
 					data_len -= total_data_len;
 					std::advance(pnext, total_data_len);

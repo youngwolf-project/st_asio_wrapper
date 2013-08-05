@@ -41,7 +41,7 @@
 
 //define this to have st_server_base invoke clear_all_closed_socket() automatically and periodically
 //this feature may serious influence server performance with huge number of clients
-//so, re-write st_socket::on_recv_error and invoke st_server_base::del_client() is recommended
+//so, re-write st_tcp_socket::on_recv_error and invoke st_server_base::del_client() is recommended
 //in long connection system
 //in short connection system, you are recommended to open this feature, use CLEAR_CLOSED_SOCKET_INTERVAL
 //to set the interval
@@ -57,11 +57,11 @@
 	//after this duration, the corresponding client can be freed from the heap or reused again
 #endif
 
-//in set_server_addr, if the ip is empty, DEFAULT_IP_VERSION will define the ip version,
+//in set_server_addr, if the ip is empty, TCP_DEFAULT_IP_VERSION will define the ip version,
 //or, the ip version will be deduced by the ip address.
 //tcp::v4() means ipv4 and tcp::v6() means ipv6.
-#ifndef DEFAULT_IP_VERSION
-#define DEFAULT_IP_VERSION tcp::v4()
+#ifndef TCP_DEFAULT_IP_VERSION
+#define TCP_DEFAULT_IP_VERSION tcp::v4()
 #endif
 
 namespace st_asio_wrapper
@@ -84,12 +84,12 @@ protected:
 
 public:
 	st_server_base(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_),
-		acceptor(service_pump_), service_pump(service_pump_) {set_server_addr(SERVER_PORT);}
+		acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
 
 	void set_server_addr(unsigned short port, const std::string& ip = std::string())
 	{
 		if (ip.empty())
-			server_addr = tcp::endpoint(DEFAULT_IP_VERSION, port);
+			server_addr = tcp::endpoint(TCP_DEFAULT_IP_VERSION, port);
 		else
 		{
 			error_code ec;
@@ -125,7 +125,7 @@ public:
 
 	virtual st_service_pump& get_service_pump() {return service_pump;}
 	virtual const st_service_pump& get_service_pump() const {return service_pump;}
-	virtual void del_client(const boost::shared_ptr<st_socket>& client_ptr)
+	virtual void del_client(const boost::shared_ptr<st_tcp_socket>& client_ptr)
 	{
 		bool found = false;
 
@@ -153,7 +153,7 @@ public:
 	//Clear all closed socket from client list
 	//Consider the following conditions:
 	//1.You don't invoke del_client in on_recv_error and on_send_error,
-	// or close the st_socket in on_unpack_error
+	// or close the st_tcp_socket in on_unpack_error
 	//2.For some reason(I haven't met yet), on_recv_error, on_send_error and on_unpack_error
 	// not been invoked
 	//st_server_base will automatically invoke this if AUTO_CLEAR_CLOSED_SOCKET been defined
@@ -164,7 +164,8 @@ public:
 			if (!(*iter)->is_open())
 			{
 				(*iter)->direct_dispatch_all_msg();
-				clients.push_back(*iter);
+				clients.resize(clients.size() + 1);
+				clients.back().swap(*iter);
 				iter = client_can.erase(iter);
 			}
 			else
@@ -221,7 +222,7 @@ public:
 		}
 	}
 
-	void list_all_client() {do_something_to_all(boost::bind(&st_socket::show_info, _1, "", ""));}
+	void list_all_client() {do_something_to_all(boost::bind(&Socket::show_info, _1, "", ""));}
 
 	DO_SOMETHING_TO_ALL_MUTEX(client_can, client_can_mutex)
 	DO_SOMETHING_TO_ONE_MUTEX(client_can, client_can_mutex)
@@ -245,8 +246,12 @@ public:
 
 	///////////////////////////////////////////////////
 	//msg sending interface
-	BROADCAST_MSG(broadcast_msg, send_msg);
-	BROADCAST_MSG(broadcast_native_msg, send_native_msg);
+	TCP_BROADCAST_MSG(broadcast_msg, send_msg)
+	TCP_BROADCAST_MSG(broadcast_native_msg, send_native_msg)
+	//guarantee send msg successfully even if can_overflow equal to false
+	//success at here just means put the msg into st_tcp_socket's send buffer
+	TCP_BROADCAST_MSG(safe_broadcast_msg, safe_send_msg)
+	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
 	//msg sending interface
 	///////////////////////////////////////////////////
 
@@ -372,8 +377,6 @@ protected:
 	//and periodically, and move all closed clients to temp_client_can.
 	container::list<temp_client> temp_client_can;
 	mutex temp_client_can_mutex;
-
-	st_service_pump& service_pump;
 };
 typedef st_server_base<> st_server;
 

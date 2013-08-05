@@ -37,7 +37,7 @@ public:
 	class i_service
 	{
 	public:
-		i_service(st_service_pump& service_pump_) : id(0) {service_pump_.add(this);}
+		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), id(0) {service_pump_.add(this);}
 		virtual ~i_service() {}
 
 		virtual void init() = 0;
@@ -46,6 +46,12 @@ public:
 		void set_id(int _id) {id = _id;}
 		int get_id() const {return id;}
 		bool is_equal_to(int id) const {return get_id() == id;}
+
+		st_service_pump& get_service_pump() {return service_pump;}
+		const st_service_pump& get_service_pump() const {return service_pump;}
+
+	protected:
+		st_service_pump& service_pump;
 
 	private:
 		int id;

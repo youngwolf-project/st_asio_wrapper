@@ -15,7 +15,7 @@ using namespace st_asio_wrapper;
 #define LIST_STATUS		"status"
 
 //demonstrates how to use custom packer
-//in the default behavior, each st_socket has their own packer, and cause memory waste
+//in the default behavior, each st_tcp_socket has their own packer, and cause memory waste
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
 auto global_packer(boost::make_shared<packer>());
@@ -54,7 +54,7 @@ protected:
 #endif
 	//we should handle the msg in on_msg_handle for time-consuming task like this:
 	virtual void on_msg_handle(msg_type& msg) {send_msg(msg, true);}
-	//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_socket will directly
+	//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_tcp_socket will directly
 	//use the msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
 	//msg handling end
 };
@@ -89,8 +89,13 @@ int main() {
 			service_pump.start_service();
 		}
 		else if (str == LIST_STATUS)
-			printf("valid links: " size_t_format " closed links: " size_t_format "\n",
+		{
+			printf("normal server:\nvalid links: " size_t_format ", closed links: " size_t_format "\n",
+				server_.size(), server_.closed_client_size());
+
+			printf("echo server:\nvalid links: " size_t_format ", closed links: " size_t_format "\n",
 				echo_server_.size(), echo_server_.closed_client_size());
+		}
 		else if (str == LIST_ALL_CLIENT)
 			server_.list_all_client();
 		else

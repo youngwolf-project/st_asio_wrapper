@@ -59,7 +59,8 @@ protected:
 			if (!is_send_buffer_available()) //continue this timer
 				return true;
 
-			read_file_handler(*static_cast<const __off64_t*>(user_data));
+			get_io_service().post(boost::bind(&file_socket::read_file_handler, this,
+				*static_cast<const __off64_t*>(user_data)));
 			delete static_cast<const __off64_t*>(user_data); //free this memery, because we newed it in set_timer.
 			break;
 		default:
@@ -98,7 +99,11 @@ private:
 			}
 			else
 			{
-				//network IO slower than disk IO, wait for a moment
+				//network IO is slower than disk IO, wait for a moment
+				//we should avoid invoke blocking functions such as safe_send_msg in service threads,
+				//unless you are sure that the effects on the throughput caused by blocking functions is acceptable,
+				//because blocking here means one service thread suspended
+				//more details about service thread, please refer to class st_service_pump
 				if (!send_msg(buffer, read_size + ORDER_LEN))
 				{
 					fseeko64(file, -(__off64_t) read_size, SEEK_CUR);
@@ -152,7 +157,7 @@ private:
 					printf("can't not open file %s!\n", str.data() + ORDER_LEN);
 				}
 
-				send_msg(buffer, sizeof(buffer));
+				send_msg(buffer, sizeof(buffer), true);
 			}
 			break;
 		case 1:

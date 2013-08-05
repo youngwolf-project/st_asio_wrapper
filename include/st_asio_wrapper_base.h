@@ -20,6 +20,7 @@
 #include <assert.h>
 
 #include <boost/thread.hpp>
+#include <boost/enable_shared_from_this.hpp>
 using namespace boost;
 
 #include "st_asio_wrapper_verification.h"
@@ -36,6 +37,18 @@ using namespace boost;
 #ifndef MAX_MSG_NUM
 #define MAX_MSG_NUM	1024
 #endif
+
+#if defined _MSC_VER
+#define size_t_format "%Iu"
+#else // defined __GNUC__
+#define size_t_format "%tu"
+#endif
+
+#define SHARED_OBJECT(CLASS_NAME, FATHER_NAME) \
+class CLASS_NAME : public FATHER_NAME, public boost::enable_shared_from_this<CLASS_NAME>
+
+#define SHARED_OBJECT_T(CLASS_NAME, FATHER_NAME, TYPENAME) \
+class CLASS_NAME : public FATHER_NAME, public boost::enable_shared_from_this<CLASS_NAME<TYPENAME>>
 
 namespace st_asio_wrapper
 {
@@ -104,49 +117,52 @@ namespace st_asio_wrapper
 #define DO_SOMETHING_TO_ONE(CAN) DO_SOMETHING_TO_ONE_NAME(do_something_to_one, CAN)
 
 #define DO_SOMETHING_TO_ONE_MUTEX_NAME(NAME, CAN, MUTEX) \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) \
-	{ \
-		mutex::scoped_lock lock(MUTEX); \
-		for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break; \
-	}
+template<typename _Predicate> void NAME(const _Predicate& __pred) \
+{ \
+	mutex::scoped_lock lock(MUTEX); \
+	for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break; \
+}
 
 #define DO_SOMETHING_TO_ONE_NAME(NAME, CAN) \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) \
-	{for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;} \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) const \
-	{for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;}
+template<typename _Predicate> void NAME(const _Predicate& __pred) \
+{for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;} \
+template<typename _Predicate> void NAME(const _Predicate& __pred) const \
+{for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;}
 
 ///////////////////////////////////////////////////
-//msg sending interface
-#define SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
+//tcp msg sending interface
+#define TCP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
 TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow = false) {return FUNNAME(&pstr, &len, 1, can_overflow);} \
 TYPE FUNNAME(const std::string& str, bool can_overflow = false) {return FUNNAME(str.data(), str.size(), can_overflow);}
 
-#define SEND_MSG(FUNNAME, NATIVE) \
+#define TCP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
 	mutex::scoped_lock lock(send_msg_buffer_mutex); \
 	return (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) ? \
 		direct_insert_msg(packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
 } \
-SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
-//not guarantee successfully send when can_overflow equal to false
-#define BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
+//guarantee send msg successfully even if can_overflow equal to false
+//success at here just means put the msg into st_tcp_socket's send buffer
+#define TCP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
+bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+{ \
+	while (!SEND_FUNNAME(pstr, len, num, can_overflow)) \
+	{ \
+		if (!is_send_allowed() || get_io_service().stopped()) return false; \
+		this_thread::sleep(get_system_time() + posix_time::milliseconds(50)); \
+	} \
+	return true; \
+} \
+TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+
+#define TCP_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-	{do_something_to_all(boost::bind(&Socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
-SEND_MSG_CALL_SWITCH(FUNNAME, void)
-
-#define SEND_AND_WAIT(SOCKET, SEND_FUNNAME) \
-while (!(SOCKET)->SEND_FUNNAME(pstr, len, num, can_overflow)) \
-	this_thread::sleep(get_system_time() + posix_time::milliseconds(50))
-
-//guarantee successfully send even if can_overflow equal to false
-#define SAFE_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
-void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-	{do_something_to_all([&](decltype(*std::begin(client_can))& item) {SEND_AND_WAIT(item, SEND_FUNNAME);});} \
-SEND_MSG_CALL_SWITCH(FUNNAME, void)
-//msg sending interface
+	{this->do_something_to_all(boost::bind(&Socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
+TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
+//tcp msg sending interface
 ///////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////
@@ -164,6 +180,20 @@ bool FUNNAME(const udp::endpoint& peer_addr, const char* const pstr[], const siz
 	mutex::scoped_lock lock(send_msg_buffer_mutex); \
 	return (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) ? \
 		direct_insert_msg(peer_addr, packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
+} \
+UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+
+//guarantee send msg successfully even if can_overflow equal to false
+//success at here just means put the msg into st_udp_socket's send buffer
+#define UDP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
+bool FUNNAME(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
+	bool can_overflow = false) \
+{ \
+	while (!SEND_FUNNAME(peer_addr, pstr, len, num, can_overflow)) \
+	{ \
+		if (!is_send_allowed() || get_io_service().stopped()) return false; \
+		this_thread::sleep(get_system_time() + posix_time::milliseconds(50)); \
+	} \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //udp msg sending interface

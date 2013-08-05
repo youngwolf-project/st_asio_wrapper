@@ -4,17 +4,19 @@
 #define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 //configuration
 
-#include "../include/st_asio_wrapper_client.h"
+#include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define RECONNECT_COMMAND "reconnect"
+#define SUSPEND_COMMAND	"suspend"
+#define RESUME_COMMAND	"resume"
 
 int main() {
 	std::string str;
 	st_service_pump service_pump;
-	st_sclient client(service_pump);
+	st_tcp_sclient client(service_pump);
 	//there is no corresponding echo client demo as server endpoint
 	//because echo server with echo client made dead loop, and occupy almost all the network resource
 
@@ -35,6 +37,11 @@ int main() {
 		}
 		else if (str == RECONNECT_COMMAND)
 			client.graceful_close(true);
+		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
+		else if (str == SUSPEND_COMMAND)
+			client.suspend_dispatch_msg(true);
+		else if (str == RESUME_COMMAND)
+			client.suspend_dispatch_msg(false);
 		else
 			client.send_msg(str);
 	}

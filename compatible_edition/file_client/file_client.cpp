@@ -22,7 +22,7 @@ __off64_t file_size;
 
 int main(int argc, const char* argv[])
 {
-	puts("usage: asio_client <link num>");
+	puts("usage: asio_client [link num=1]");
 	if (argc > 1)
 		link_num = std::min(256, std::max(atoi(argv[1]), 1));
 
@@ -34,7 +34,7 @@ int main(int argc, const char* argv[])
 	file_client client(service_pump);
 	for (int i = 0; i < link_num; ++i)
 	{
-		BOOST_AUTO(client_ptr, boost::make_shared<file_socket>(boost::ref(client.get_service_pump())));
+		BOOST_AUTO(client_ptr, client.create_client());
 //		client_ptr->set_server_addr(SERVER_PORT, "::1"); //ipv6
 //		client_ptr->set_server_addr(SERVER_PORT, "127.0.0.1"); //ipv4
 		client_ptr->set_index(i);

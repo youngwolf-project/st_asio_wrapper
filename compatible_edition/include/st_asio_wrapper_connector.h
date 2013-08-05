@@ -13,7 +13,7 @@
 #ifndef ST_ASIO_WRAPPER_CONNECTOR_H_
 #define ST_ASIO_WRAPPER_CONNECTOR_H_
 
-#include "st_asio_wrapper_socket.h"
+#include "st_asio_wrapper_tcp_socket.h"
 
 #ifndef SERVER_IP
 #define SERVER_IP				"127.0.0.1"
@@ -34,10 +34,10 @@
 namespace st_asio_wrapper
 {
 
-class st_connector : public st_socket
+class st_connector : public st_tcp_socket
 {
 public:
-	st_connector(io_service& io_service_) : st_socket(io_service_), connected(false), reconnecting(false)
+	st_connector(io_service& io_service_) : st_tcp_socket(io_service_), connected(false), reconnecting(false)
 #ifdef RE_CONNECT_CONTROL
 		, re_connect_times(-1)
 #endif
@@ -52,7 +52,7 @@ public:
 	void set_re_connect_times(size_t times) {re_connect_times = times;}
 #endif
 	bool is_connected() const {return connected;}
-	virtual void reset() {st_socket::reset();}
+	virtual void reset() {st_tcp_socket::reset();}
 	virtual void start() //connect or recv
 	{
 		if (!get_io_service().stopped())
@@ -65,7 +65,7 @@ public:
 	}
 
 	void disconnect(bool reconnect = false) {force_close(reconnect);}
-	void force_close(bool reconnect = false) {reconnecting = reconnect; connected = false; st_socket::force_close();}
+	void force_close(bool reconnect = false) {reconnecting = reconnect; connected = false; st_tcp_socket::force_close();}
 	void graceful_close(bool reconnect = false)
 	{
 		if (!is_connected())
@@ -74,13 +74,13 @@ public:
 		{
 			reconnecting = reconnect;
 			connected = false;
-			st_socket::graceful_close();
+			st_tcp_socket::graceful_close();
 		}
 	}
 
 protected:
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
-	virtual bool is_send_allowed() {return is_connected() && st_socket::is_send_allowed();} //can send data or not
+	virtual bool is_send_allowed() const {return is_connected() && !is_closing();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
 	virtual void on_recv_error(const error_code& ec)
 	{
@@ -112,7 +112,7 @@ protected:
 		case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
 			break;
 		default:
-			return st_socket::on_timer(id, user_data);
+			return st_tcp_socket::on_timer(id, user_data);
 			break;
 		}
 

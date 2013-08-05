@@ -1,63 +1,43 @@
 /*
  * st_asio_wrapper_socket.h
  *
- *  Created on: 2012-3-2
+ *  Created on: 2013-8-4
  *      Author: youngwolf
  *		email: mail2tao@163.com
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * this class used at both client and server endpoint
+ * this class used at both client and server endpoint, and in both tcp and udp socket
  */
 
 #ifndef ST_ASIO_WRAPPER_SOCKET_H_
 #define ST_ASIO_WRAPPER_SOCKET_H_
 
+#include <boost/smart_ptr.hpp>
+#include <boost/container/list.hpp>
+
 #include "st_asio_wrapper_packer.h"
-#include "st_asio_wrapper_unpacker.h"
 #include "st_asio_wrapper_timer.h"
-
-using namespace boost::asio::ip;
-
-//#define FORCE_TO_USE_MSG_RECV_BUFFER
-//use msg recv buffer all the time, you can gain some performance improvement because st_socket will not
-//invoke on_msg() to decide whether to use msg recv buffer or not, but directly push the msgs into
-//msg recv buffer. notice: there's no on_msg() virtual function any more.
-//this is a compile time optimization
-
-#ifndef GRACEFUL_CLOSE_MAX_DURATION
-	#define GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, max waiting seconds while graceful closing
-#endif
-
-#if defined _MSC_VER
-#define size_t_format "%Iu"
-#else // defined __GNUC__
-#define size_t_format "%tu"
-#endif
 
 namespace st_asio_wrapper
 {
 
-class st_socket : public tcp::socket, public st_timer
+template<typename MsgType, typename Socket>
+class st_socket: public Socket, public st_timer
 {
 public:
-	typedef std::string msg_type;
-	typedef const msg_type msg_ctype;
-
-public:
-	st_socket(io_service& io_service_) : tcp::socket(io_service_), st_timer(io_service_), sending(false), dispatching(false),
-		packer_(boost::make_shared<packer>()), unpacker_(boost::make_shared<unpacker>()), closing(false) {}
+	st_socket(io_service& io_service_) : Socket(io_service_), st_timer(io_service_),
+		packer_(boost::make_shared<packer>()) {reset_state();}
+	virtual ~st_socket() {}
 
 	virtual void start() = 0;
-	//reset all, be ensure that there's no any operations performed on this st_socket when invoke it
-	void reset() {reset_state(); clear_buffer();}
 	void reset_state()
 	{
-		reset_unpacker_state();
 		sending = false;
 		dispatching = false;
-		closing = false;
+		suspend_dispatch_msg_ = false;
 	}
+
 	void clear_buffer()
 	{
 		send_msg_buffer.clear();
@@ -65,68 +45,57 @@ public:
 		temp_msg_buffer.clear();
 	}
 
-	void disconnect() {force_close();}
-	void force_close() {clean_up();}
-	void graceful_close() //will block until closing success or timeout
-	{
-		closing = true;
+	void suspend_dispatch_msg(bool suspend) {suspend_dispatch_msg_ = suspend;}
+	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
 
-		error_code ec;
-		shutdown(tcp::socket::shutdown_send, ec);
-		if (ec) //graceful disconnecting is impossible
-			clean_up();
-		else
-		{
-			auto loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
-			while (--loop_num >= 0 && closing)
-				this_thread::sleep(get_system_time() + posix_time::milliseconds(10));
-			if (loop_num >= 0) //graceful disconnecting is impossible
-				clean_up();
-		}
-	}
-	bool is_closing() {return closing;}
-
-	//get or change the packer and unpacker at runtime
+	//get or change the packer at runtime
 	boost::shared_ptr<i_packer> inner_packer() const {return packer_;}
 	void inner_packer(const boost::shared_ptr<i_packer>& _packer_) {packer_ = _packer_;};
-	boost::shared_ptr<i_unpacker> inner_unpacker() const {return unpacker_;}
-	void inner_unpacker(const boost::shared_ptr<i_unpacker>& _unpacker_) {unpacker_ = _unpacker_;}
 
-	///////////////////////////////////////////////////
-	//msg sending interface
-	SEND_MSG(send_msg, false); //use the packer with native = false to pack the msgs
-	SEND_MSG(send_native_msg, true); //use the packer with native = true to pack the msgs
-	//msg sending interface
-	///////////////////////////////////////////////////
-
-	//if you use can_overflow = true to call send_msg or send_native_msg, it will always succeed
-	//no matter is_send_buffer_available() return true or false
+	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed
+	//no matter whether the send buffer is available
 	bool is_send_buffer_available()
 	{
 		mutex::scoped_lock lock(send_msg_buffer_mutex);
 		return send_msg_buffer.size() < MAX_MSG_NUM;
 	}
 
-	//don't use the packer but insert into the send_msg_buffer directly
-	bool direct_send_msg(msg_ctype& msg, bool can_overflow = false)
-		{return direct_send_msg(msg_type(msg), can_overflow);}
-	bool direct_send_msg(msg_type&& msg, bool can_overflow = false)
+	//how many msgs waiting for send
+	size_t get_pending_msg_num()
 	{
 		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM)
-			return direct_insert_msg(std::move(msg));
-
-		return false;
+		return send_msg_buffer.size();
 	}
 
-	//send buffered msgs, return false if send buffer is empty or invalidate status
-	bool send_msg()
+	//the msg's format please refer to on_msg_send
+	void peek_first_pending_msg(MsgType& msg)
+	{
+		msg.clear();
+		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		if (!send_msg_buffer.empty())
+			msg = send_msg_buffer.front();
+	}
+
+	//the msg's format please refer to on_msg_send
+	void pop_first_pending_msg(MsgType& msg)
+	{
+		msg.clear();
+		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		if (!send_msg_buffer.empty())
+		{
+			msg.swap(send_msg_buffer.front());
+			send_msg_buffer.pop_front();
+		}
+	}
+
+	//clear all pending msgs
+	void pop_all_pending_msg(container::list<MsgType>& unsend_msg_list)
 	{
 		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		return do_send_msg();
+		unsend_msg_list.splice(unsend_msg_list.end(), send_msg_buffer);
 	}
 
-	//generally used after the service stopped
+	//must used after the service stopped
 	void direct_dispatch_all_msg()
 	{
 		//mutex::scoped_lock lock(recv_msg_buffer_mutex);
@@ -140,70 +109,19 @@ public:
 		dispatching = false;
 	}
 
-	//how many msgs waiting for send
-	size_t get_pending_msg_num()
-	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		return send_msg_buffer.size();
-	}
-
-	//the msg's format please refer to on_msg_send
-	void peek_first_pending_msg(msg_type& msg)
-	{
-		msg.clear();
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		if (!send_msg_buffer.empty())
-			msg = send_msg_buffer.front();
-	}
-
-	//the msg's format please refer to on_msg_send
-	void pop_first_pending_msg(msg_type& msg)
-	{
-		msg.clear();
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		if (!send_msg_buffer.empty())
-		{
-			msg.swap(send_msg_buffer.front());
-			send_msg_buffer.pop_front();
-		}
-	}
-
-	//clear all pending msgs
-	//the msg's format please refer to on_msg_send
-	void pop_all_pending_msg(container::list<msg_type>& unsend_msg_list)
-	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		unsend_msg_list.splice(std::end(unsend_msg_list), send_msg_buffer);
-	}
-
-	void show_info(const char* head, const char* tail)
-	{
-		error_code ec;
-		auto ep = remote_endpoint(ec);
-		if (!ec)
-			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
-	}
-
 protected:
-	virtual bool is_send_allowed() {return !get_io_service().stopped();} //can send data or not
-	//this function can not be const only because get_io_service() does not have const version
-	//it's a small flaw of asio
+	virtual bool is_send_allowed() const {return this->is_open();}
+	//can send data or not(just put into send buffer)
 
-	//msg can not be unpacked
-	//the link can continue to use, but need not close the st_socket at both client and server endpoint
-	virtual void on_unpack_error() = 0;
+	//generally, you need not re-write this for link broken judgment(tcp)
+	virtual void on_send_error(const error_code& ec)
+		{unified_out::error_out("send msg error: %d %s", ec.value(), ec.message().data());}
 
-	//recv error or peer endpoint quit(false ec means ok)
-	virtual void on_recv_error(const error_code& ec) = 0;
-
-	//generally, you need not re-write this for link broken judgment
-	virtual void on_send_error(const error_code& ec) {}
-
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+	#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//if you want to use your own recv buffer, you can move the msg to your own recv buffer,
 	//and return false, then, handle the msg as your own strategy(may be you'll need a msg dispatch thread)
 	//or, you can handle the msg at here and return false, but this will reduce efficiency(
-	//because this msg handling block the next msg receiving on the same st_socket) unless you can
+	//because this msg handling block the next msg receiving on the same st_tcp_socket) unless you can
 	//handle the msg very fast(which will inversely more efficient, because msg recv buffer and msg dispatching
 	//are not needed any more).
 	//
@@ -211,38 +129,31 @@ protected:
 	//notice: on_msg_handle() will not be invoked from within this function
 	//
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
-	virtual bool on_msg(msg_type& msg)
-		{unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return false;}
+	virtual bool on_msg(MsgType& msg) = 0;
 #endif
 
 	//handling msg at here will not block msg receiving
 	//if on_msg() return false, this function will not be invoked due to no msgs need to dispatch
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
-	virtual void on_msg_handle(msg_type& msg)
-		{unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data());}
-
-#ifdef WANT_MSG_SEND_NOTIFY
-	//one msg has sent to the kernel buffer, msg is the right msg(remain in packed)
-	//if the msg is custom packed, then obviously you know it
-	//or the msg is packed as: len(2 bytes) + original msg, see st_asio_wrapper::packer for more details
-	virtual void on_msg_send(msg_type& msg) {}
-#endif
-#ifdef WANT_ALL_MSG_SEND_NOTIFY
-	//send buffer goes empty, msg remain in packed
-	virtual void on_all_msg_send(msg_type& msg) {}
-#endif
+	virtual void on_msg_handle(MsgType& msg) = 0;
 
 	virtual bool on_timer(unsigned char id, const void* user_data)
 	{
 		switch (id)
 		{
-		case 0: //delay dispatch msgs because of recv buffer overflow
+		case 0: //delay put msgs into recv buffer because of recv buffer overflow
 			if (dispatch_msg())
 				start(); //recv msg sequentially, that means second recv only after first recv success
 			else
 				return true;
 			break;
-		case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
+		case 1: //suspend dispatch msgs
+			{
+				mutex::scoped_lock lock(recv_msg_buffer_mutex);
+				do_dispatch_msg();
+			}
+			break;
+		case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
 			break;
 		default:
 			return st_timer::on_timer(id, user_data);
@@ -252,44 +163,17 @@ protected:
 		return false;
 	}
 
-	//start the async read
-	//it's child's responsibility to invoke this properly,
-	//because st_socket doesn't know any of the connection status
-	void do_recv_msg()
-	{
-		size_t min_recv_len;
-		auto recv_buff = unpacker_->prepare_next_recv(min_recv_len);
-		if (buffer_size(recv_buff) > 0)
-			async_read(*this, recv_buff, transfer_at_least(min_recv_len), boost::bind(&st_socket::recv_handler, this,
-				placeholders::error, placeholders::bytes_transferred));
-	}
-
-	//reset unpacker's state, generally used when unpack error occur
-	void reset_unpacker_state() {unpacker_->reset_unpacker_state();}
-
-	void clean_up()
-	{
-		if (is_open())
-		{
-			error_code ec;
-			shutdown(tcp::socket::shutdown_both, ec);
-			close(ec);
-		}
-
-		reset_unpacker_state();
-		stop_all_timer();
-		sending = false;
-		closing = false;
-	}
-
 	bool dispatch_msg()
 	{
 		if (temp_msg_buffer.empty())
 			return true;
+		else if (suspend_dispatch_msg_)
+			return false;
 
 		auto dispatch = false;
 		mutex::scoped_lock lock(recv_msg_buffer_mutex);
 		auto msg_num = recv_msg_buffer.size();
+
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER //inefficient
 		for (auto iter = std::begin(temp_msg_buffer); iter != std::end(temp_msg_buffer);)
 			if (!on_msg(*iter))
@@ -323,51 +207,8 @@ protected:
 
 		if (dispatch)
 			do_dispatch_msg();
-		lock.unlock();
 
 		return temp_msg_buffer.empty();
-	}
-
-	void recv_handler(const error_code& ec, size_t bytes_transferred)
-	{
-		if (!ec && bytes_transferred > 0)
-		{
-			auto unpack_ok = unpacker_->on_recv(bytes_transferred, temp_msg_buffer);
-			auto all_dispatched = dispatch_msg();
-
-			if (unpack_ok)
-			{
-				if (all_dispatched)
-					start(); //recv msg sequentially, that means second recv only after first recv success
-				else
-					set_timer(0, 50, nullptr);
-			}
-			else
-				on_unpack_error();
-		}
-		else
-			on_recv_error(ec);
-	}
-
-	void send_handler(const error_code& ec, size_t bytes_transferred)
-	{
-		if (!ec)
-		{
-			assert(bytes_transferred > 0);
-#ifdef WANT_MSG_SEND_NOTIFY
-			on_msg_send(last_send_msg);
-#endif
-			mutex::scoped_lock lock(send_msg_buffer_mutex);
-			sending = false;
-			//send msg sequentially, that means second send only after first send success
-			if (!do_send_msg())
-#ifdef WANT_ALL_MSG_SEND_NOTIFY
-				on_all_msg_send(last_send_msg)
-#endif
-				;
-		}
-		else
-			on_send_error(ec);
 	}
 
 	void msg_handler()
@@ -379,66 +220,41 @@ protected:
 		do_dispatch_msg();
 	}
 
-	//must mutex send_msg_buffer before invoke this function
-	bool do_send_msg()
-	{
-		auto state = !closing && is_send_allowed() && is_open();
-		if (!state)
-			sending = false;
-		else if (!sending && !send_msg_buffer.empty())
-		{
-			sending = true;
-			last_send_msg.swap(send_msg_buffer.front());
-			async_write(*this, buffer(last_send_msg), boost::bind(&st_socket::send_handler, this,
-				placeholders::error, placeholders::bytes_transferred));
-			send_msg_buffer.pop_front();
-		}
-
-		return sending;
-	}
-
 	//must mutex recv_msg_buffer before invoke this function
 	void do_dispatch_msg()
 	{
-		auto& io_service_ = get_io_service();
-		auto state = !io_service_.stopped();
-		if (!state)
-			dispatching = false;
-		else if (!dispatching && !recv_msg_buffer.empty())
+		if (suspend_dispatch_msg_)
 		{
-			dispatching = true;
-			last_dispatch_msg.swap(recv_msg_buffer.front());
-			io_service_.post(boost::bind(&st_socket::msg_handler, this));
-			recv_msg_buffer.pop_front();
+			if (!dispatching && !recv_msg_buffer.empty())
+				set_timer(1, 50, NULL);
 		}
-	}
-
-	//must mutex send_msg_buffer before invoke this function
-	bool direct_insert_msg(msg_type&& msg)
-	{
-		if (!msg.empty())
+		else
 		{
-			send_msg_buffer.push_back(std::move(msg));
-			do_send_msg();
-
-			return true;
+			auto& io_service_ = this->get_io_service();
+			if (io_service_.stopped())
+				dispatching = false;
+			else if (!dispatching && !recv_msg_buffer.empty())
+			{
+				dispatching = true;
+				last_dispatch_msg.swap(recv_msg_buffer.front());
+				io_service_.post(boost::bind(&st_socket::msg_handler, this));
+				recv_msg_buffer.pop_front();
+			}
 		}
-
-		return false;
 	}
 
 protected:
-	msg_type last_send_msg, last_dispatch_msg;
+	MsgType last_send_msg, last_dispatch_msg;
 
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	container::list<msg_type> send_msg_buffer;
+	container::list<MsgType> send_msg_buffer;
 	mutex send_msg_buffer_mutex;
 	bool sending;
 
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
 	//using this msg recv buffer or not is decided by the return value of on_msg()
 	//see on_msg() for more details
-	container::list<msg_type> recv_msg_buffer;
+	container::list<MsgType> recv_msg_buffer;
 	mutex recv_msg_buffer_mutex;
 	bool dispatching;
 
@@ -446,12 +262,10 @@ protected:
 	//st_socket will invoke dispatch_msg() when got some msgs. if the msgs can't push into recv_msg_buffer
 	//because of recv buffer overflow, st_socket will delay 50 milliseconds(nonblocking) to invoke
 	//dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
-	container::list<msg_type> temp_msg_buffer;
+	container::list<MsgType> temp_msg_buffer;
 
 	boost::shared_ptr<i_packer> packer_;
-	boost::shared_ptr<i_unpacker> unpacker_;
-
-	bool closing;
+	bool suspend_dispatch_msg_;
 };
 
 } //namespace

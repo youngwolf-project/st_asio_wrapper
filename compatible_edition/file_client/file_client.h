@@ -4,7 +4,7 @@
 
 #include <boost/atomic.hpp>
 
-#include "../include/st_asio_wrapper_client.h"
+#include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
 
 /*
@@ -46,11 +46,11 @@ extern __off64_t file_size;
 class file_socket : public st_connector
 {
 public:
-	file_socket(st_service_pump& service_pump_) : st_connector(service_pump_),
+	file_socket(io_service& io_service_) : st_connector(io_service_),
 		state(TRANS_IDLE), index(-1), file(NULL), my_length(0) {}
 	virtual ~file_socket() {clear();}
 
-	//reset all, be ensure that there's no any operations performed on this st_socket when invoke it
+	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
 	virtual void reset() {clear(); st_connector::reset();}
 
 	void set_index(int index_) {index = index_;}
@@ -69,7 +69,7 @@ public:
 				order += file_name;
 
 				state = TRANS_PREPARE;
-				send_msg(order);
+				send_msg(order, true);
 
 				return true;
 			}
@@ -152,7 +152,7 @@ private:
 						*(__off64_t*) (buffer + ORDER_LEN + OFFSET_LEN) = my_length;
 
 						state = TRANS_BUSY;
-						send_msg(buffer, sizeof(buffer));
+						send_msg(buffer, sizeof(buffer), true);
 					}
 					else
 						trans_end();
@@ -198,10 +198,10 @@ private:
 	__off64_t my_length;
 };
 
-class file_client : public st_client_base<file_socket>
+class file_client : public st_tcp_client_base<file_socket>
 {
 public:
-	file_client(st_service_pump& service_pump_) : st_client_base<file_socket>(service_pump_) {}
+	file_client(st_service_pump& service_pump_) : st_tcp_client_base<file_socket>(service_pump_) {}
 
 	__off64_t get_total_rest_size() const
 	{

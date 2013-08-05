@@ -181,7 +181,7 @@
  * Fix warning: under 32bit gcc, use %ld(d) to print __off64_t raise warnings
  *  (personal behavior of file_client).
  * Add vc2008 support, which means not require c++0x any more, and I call it compatible edition against
- *  normal edition. In order to achieve high efficiency(as std::move does), use shared_ptr to avoid memory
+ *  normal edition. In order to achieve high efficiency(as std::move does), I use shared_ptr to avoid memory
  *  copys, so, the interface has been changed; And, in order to keep the conciseness of normal edition,
  *  I strip it from normal edition and put it into compatible_edition folder.
  * Fix bug: container::set does not have front() member function(personal behavior of vc2010).
@@ -263,6 +263,21 @@
  * Add reconnect support to st_connector class: use true to invoke force_close or graceful_close.
  * Other small changes please refer to svn or git logs.
  *
+ * 3.5	2013.7.28
+ * Code refactor.
+ * Add safe_send_msg and safe_broadcast_msg, they can guarantee send msg successfully just like use can_overflow
+ *  equal to true to invoke send_msg or broadcast_msg, except that when the send buffer is full, they will wait until
+ *  the send buffer becomes available.
+ * Add support to suspend msg dispatching in runtime.
+ * Change class st_socket to st_tcp_socket.
+ * Change class st_sclient to st_tcp_sclient.
+ * Change class st_client to st_tcp_client.
+ * Change class st_sudp_client to st_udp_sclient.
+ * Add class st_client_base which is the father of st_tcp_client and st_udp_client, and provide the common logic
+ *  of the two classes.
+ * Add class st_socket which is the father of st_tcp_socket and st_udp_socket, and provide the common logic
+ *  of the two classes.
+ * Correct some spelling mistake and impertinent spelling, include both code(for example, class name) and comment.
  */
 
 #ifndef ST_ASIO_WRAPPER_VERIFICATION_H_
