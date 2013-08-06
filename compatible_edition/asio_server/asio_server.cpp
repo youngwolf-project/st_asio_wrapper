@@ -13,6 +13,8 @@ using namespace st_asio_wrapper;
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
 #define LIST_STATUS		"status"
+#define SUSPEND_COMMAND	"suspend"
+#define RESUME_COMMAND	"resume"
 
 //demonstrates how to use custom packer
 //in the default behavior, each st_tcp_socket has their own packer, and cause memory waste
@@ -65,7 +67,7 @@ public:
 	echo_server(st_service_pump& service_pump_) : st_server_base(service_pump_) {}
 
 	//from i_echo_server, pure virtual function, we must implement it.
-	virtual void test() {puts("in echo_server::test()");}
+	virtual void test() {/*puts("in echo_server::test()");*/}
 };
 
 int main() {
@@ -96,8 +98,18 @@ int main() {
 			printf("echo server:\nvalid links: " size_t_format ", closed links: " size_t_format "\n",
 				echo_server_.size(), echo_server_.closed_client_size());
 		}
+		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
+		else if (str == SUSPEND_COMMAND)
+			echo_server_.do_something_to_all(boost::bind(&echo_socket::suspend_dispatch_msg, _1, true));
+		else if (str == RESUME_COMMAND)
+			echo_server_.do_something_to_all(boost::bind(&echo_socket::suspend_dispatch_msg, _1, false));
 		else if (str == LIST_ALL_CLIENT)
+		{
+			puts("clients from normal server:");
 			server_.list_all_client();
+			puts("clients from echo server:");
+			echo_server_.list_all_client();
+		}
 		else
 			server_.broadcast_msg(str);
 	}
