@@ -19,16 +19,7 @@
 namespace st_asio_wrapper
 {
 
-//only support one udp socket
-template<typename Socket = st_udp_socket>
-class st_udp_sclient_base : public st_sclient_base<Socket>
-{
-public:
-	st_udp_sclient_base(st_service_pump& service_pump_) : st_sclient_base<Socket>(service_pump_) {}
-
-	virtual void init() {st_sclient_base<Socket>::init(); Socket::send_msg();}
-};
-typedef st_udp_sclient_base<> st_udp_sclient;
+typedef st_sclient_base<st_udp_socket> st_udp_sclient;
 
 template<typename Socket = st_udp_socket>
 class st_udp_client_base : public st_client_base<Socket>
@@ -36,11 +27,6 @@ class st_udp_client_base : public st_client_base<Socket>
 public:
 	st_udp_client_base(st_service_pump& service_pump_) : st_client_base<Socket>(service_pump_) {}
 
-	virtual void init()
-	{
-		st_client_base<Socket>::init();
-		do_something_to_all(boost::mem_fn((bool (Socket::*)()) &Socket::send_msg));
-	}
 	virtual void uninit()
 	{
 		this->do_something_to_all(boost::mem_fn(&Socket::graceful_close));

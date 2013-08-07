@@ -27,8 +27,8 @@ class st_sclient_base : public st_service_pump::i_service, public Socket
 public:
 	st_sclient_base(st_service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
 
-	virtual void init() {Socket::reset(); Socket::start();}
-	virtual void uninit() {Socket::graceful_close(); Socket::direct_dispatch_all_msg();}
+	virtual void init() {this->reset(); this->start(); this->send_msg();}
+	virtual void uninit() {this->graceful_close(); this->direct_dispatch_all_msg();}
 };
 
 template<typename Socket>
@@ -41,6 +41,7 @@ public:
 	{
 		do_something_to_all(boost::mem_fn(&Socket::reset));
 		do_something_to_all(boost::mem_fn(&Socket::start));
+		do_something_to_all(boost::mem_fn((bool (Socket::*)()) &Socket::send_msg));
 	}
 	virtual void uninit() {do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));}
 
