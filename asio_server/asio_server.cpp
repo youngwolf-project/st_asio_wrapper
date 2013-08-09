@@ -1,7 +1,7 @@
 
 //configuration
 #define SERVER_PORT		9527
-#define REUSE_CLIENT //use objects pool
+#define REUSE_OBJECT //use objects pool
 #define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ENHANCED_STABILITY
 //configuration
@@ -35,10 +35,10 @@ public:
 	echo_socket(i_echo_server& server_) : st_server_socket_base(server_) {inner_packer(global_packer);}
 
 public:
-	//because we use objects pool(REUSE_CLIENT been defined), so, strictly speaking, this virtual
+	//because we use objects pool(REUSE_OBJECT been defined), so, strictly speaking, this virtual
 	//function must be rewrote, but we don't have member variables to initialize but invoke father's
-	//reuse() directly, so, it can be omitted, but we keep it for possibly future using
-	virtual void reuse() {st_server_socket_base::reuse();}
+	//reset() directly, so, it can be omitted, but we keep it for possibly future using
+	virtual void reset() {st_server_socket_base::reset();}
 
 protected:
 	virtual void on_recv_error(const error_code& ec)
@@ -119,7 +119,7 @@ int main() {
 
 //restore configuration
 #undef SERVER_PORT
-#undef REUSE_CLIENT //use objects pool
+#undef REUSE_OBJECT //use objects pool
 #undef FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #undef ENHANCED_STABILITY
 //restore configuration

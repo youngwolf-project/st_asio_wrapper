@@ -41,8 +41,10 @@ using namespace boost;
 
 #if defined _MSC_VER
 #define size_t_format "%Iu"
+#define ST_THIS //workaround to make up the BOOST_AUTO's defect under vc2008
 #else // defined __GNUC__
 #define size_t_format "%tu"
+#define ST_THIS this->
 #endif
 
 #define SHARED_OBJECT(CLASS_NAME, FATHER_NAME) \
@@ -182,6 +184,7 @@ bool FUNNAME(const udp::endpoint& peer_addr, const char* const pstr[], const siz
 		if (!is_send_allowed() || get_io_service().stopped()) return false; \
 		this_thread::sleep(get_system_time() + posix_time::milliseconds(50)); \
 	} \
+	return true; \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //udp msg sending interface

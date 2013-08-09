@@ -38,9 +38,9 @@ public:
 	virtual ~file_socket() {trans_end();}
 
 public:
-	//because we don't use objects pool(we don't define REUSE_CLIENT), so, this virtual function will
+	//because we don't use objects pool(we don't define REUSE_OBJECT), so, this virtual function will
 	//not be invoked, and can be omitted, but we keep it for possibly future using
-	virtual void reuse() {trans_end(); st_server_socket::reuse();}
+	virtual void reset() {trans_end(); st_server_socket::reset();}
 
 protected:
 	//msg handling

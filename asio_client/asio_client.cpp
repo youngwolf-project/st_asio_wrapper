@@ -39,11 +39,11 @@ int main() {
 			client.graceful_close(true);
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
-			client.suspend_dispatch_msg(true);
+			client.suspend_send_msg(true);
 		else if (str == RESUME_COMMAND)
-			client.suspend_dispatch_msg(false);
+			client.suspend_send_msg(false);
 		else
-			client.send_msg(str);
+			client.safe_send_msg(str);
 	}
 
 	return 0;

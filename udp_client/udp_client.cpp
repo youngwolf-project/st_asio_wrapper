@@ -34,7 +34,7 @@ int main(int argc, const char* argv[]) {
 			service_pump.start_service();
 		}
 		else
-			client.send_native_msg(peer_addr, str);
+			client.safe_send_native_msg(peer_addr, str);
 	}
 
 	return 0;

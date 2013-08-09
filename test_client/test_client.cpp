@@ -3,6 +3,7 @@
 
 //configuration
 #define SERVER_PORT		9527
+//#define REUSE_OBJECT //use objects pool
 //configuration
 
 #include "../include/st_asio_wrapper_tcp_client.h"
@@ -20,6 +21,10 @@ using namespace st_asio_wrapper;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
+#define LIST_ALL_CLIENT	"list_all_client"
+#define LIST_STATUS		"status"
+#define SUSPEND_COMMAND	"suspend"
+#define RESUME_COMMAND	"resume"
 
 static bool check_msg;
 
@@ -76,7 +81,7 @@ public:
 	test_client(st_service_pump& service_pump_) : st_tcp_client_base<test_socket>(service_pump_) {}
 
 	void reset() {do_something_to_all(boost::mem_fn(&test_socket::reset));}
-	uint64_t get_total_recv_bytes() const
+	uint64_t get_total_recv_bytes()
 	{
 		uint64_t total_recv_bytes = 0;
 		do_something_to_all([&](decltype(*std::begin(client_can))& item) {
@@ -126,21 +131,37 @@ int main(int argc, const char* argv[])
 			service_pump.stop_service();
 			service_pump.start_service();
 		}
+		else if (str == LIST_STATUS)
+		{
+			printf("valid links: " size_t_format ", closed links: " size_t_format "\n",
+				client.size(), client.closed_client_size());
+		}
+		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
+		else if (str == SUSPEND_COMMAND)
+			client.do_something_to_all(boost::bind(&test_socket::suspend_dispatch_msg, _1, true));
+		else if (str == RESUME_COMMAND)
+			client.do_something_to_all(boost::bind(&test_socket::suspend_dispatch_msg, _1, false));
+		else if (str == LIST_ALL_CLIENT)
+			client.list_all_client();
 		else if (!str.empty())
 		{
-			if ('+' == str[0])
+			if ('+' == str[0] || '-' == str[0])
 			{
 				auto n = (size_t) atoi(std::next(str.data()));
 				if (0 == n)
 					n = 1;
 
-				auto old_link_num = link_num;
-				link_num += n;
-				if (link_num > 4096)
-					link_num = 4096;
+				if ('+' == str[0])
+					for (; n > 0 && client.add_client(); ++link_num, --n);
+				else
+				{
+					if (n > client.size())
+						n = client.size();
+					link_num -= n;
 
-				for (auto i = old_link_num; i < link_num; ++i)
-					client.add_client();
+					while (n-- > 0)
+						client.graceful_close(client.at(0));
+				}
 
 				continue;
 			}
@@ -227,4 +248,5 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef SERVER_PORT
+//#undef REUSE_OBJECT
 //restore configuration

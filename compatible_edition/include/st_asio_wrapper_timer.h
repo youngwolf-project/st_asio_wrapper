@@ -22,15 +22,20 @@ using namespace boost::asio;
 
 /*
 * Please pay attention to the following reserved timer ids:
-* Give a class A,
-* If A inherit from st_server_base, the ids from 0 to 9 are reserved;
-* If A inherit from st_tcp_socket or st_udp_socket, the ids from 0 to 9 are reserved;
-* If A inherit from st_connector, the ids from 10 to 19 are reserved, but st_connector inherit
-* from st_tcp_socket, so, the actual reserved timers of st_connector is 0 to 19.
+* st_object_pool: 0 - 9
+* st_tcp_socket: 0 - 9
+* st_udp_socket: 0 - 9
 *
-* st_client_base, st_tcp_sclient_base, st_tcp_client_base, st_udp_sclient_base, st_udp_client_base and
-* st_server_socket_base don't have reserved timers, so, the actual reserved timers depend on theirs father's
-* reserved timers.
+* st_connector: inherit from st_tcp_socket and plus 10 - 19
+* st_server_base: inherit from st_object_pool
+* st_client_base: inherit from st_object_pool
+* st_tcp_client_base: inherit from st_client_base
+* st_udp_client_base: inherit from st_client_base
+* st_server_socket_base: inherit from st_tcp_socket
+*
+* st_client_base: n/a
+* st_tcp_sclient: n/a
+* st_udp_sclient: n/a
 */
 
 namespace st_asio_wrapper

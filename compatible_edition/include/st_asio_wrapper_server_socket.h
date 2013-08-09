@@ -34,11 +34,12 @@ SHARED_OBJECT_T(st_server_socket_base, st_tcp_socket, Server)
 {
 public:
 	st_server_socket_base(Server& server_) : st_tcp_socket(server_.get_service_pump()), server(server_) {}
-	virtual void start() {do_recv_msg();}
-	//when resue this st_server_socket_base, st_server_base will invoke reuse(), child must re-write this to init
-	//all member variables, and then do not forget to invoke st_server_socket_base::reuse() to init father's
+	//reset all, be ensure that there's no any operations performed on this st_server_socket_base when invoke it
+	//notice, when resue this st_server_socket_base, st_object_pool will invoke reset(), child must re-write this
+	//to init all member variables, and then do not forget to invoke st_server_socket_base::reset() to init father's
 	//member variables
-	virtual void reuse() {reset();}
+	virtual void reset() {st_tcp_socket::reset();}
+	virtual void start() {do_recv_msg();}
 
 protected:
 	virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); force_close();}

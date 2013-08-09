@@ -105,6 +105,13 @@ public:
 		return do_send_msg();
 	}
 
+	void suspend_send_msg(bool suspend)
+	{
+		st_socket<msg_type, tcp::socket>::suspend_send_msg(suspend);
+		if (!st_socket<msg_type, tcp::socket>::suspend_send_msg())
+			send_msg();
+	}
+
 	void show_info(const char* head, const char* tail)
 	{
 		error_code ec;
@@ -114,6 +121,9 @@ public:
 	}
 
 protected:
+	virtual bool is_send_allowed() const {return !is_closing() && st_socket<msg_type, tcp::socket>::is_send_allowed();}
+	//can send data or not(just put into send buffer)
+
 	//msg can not be unpacked
 	//the link can continue to use, but need not close the st_tcp_socket at both client and server endpoint
 	virtual void on_unpack_error() = 0;
@@ -187,16 +197,9 @@ protected:
 		if (!ec && bytes_transferred > 0)
 		{
 			bool unpack_ok = unpacker_->on_recv(bytes_transferred, temp_msg_buffer);
-			bool all_dispatched = dispatch_msg();
+			dispatch_msg();
 
-			if (unpack_ok)
-			{
-				if (all_dispatched)
-					start(); //recv msg sequentially, that means second recv only after first recv success
-				else
-					set_timer(0, 50, NULL);
-			}
-			else
+			if (!unpack_ok)
 				on_unpack_error();
 		}
 		else

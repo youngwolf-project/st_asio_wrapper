@@ -33,9 +33,8 @@ public:
 	virtual void start() = 0;
 	void reset_state()
 	{
-		sending = false;
-		dispatching = false;
-		suspend_dispatch_msg_ = false;
+		sending = suspend_send_msg_ = false;
+		dispatching = suspend_dispatch_msg_ = false;
 	}
 
 	void clear_buffer()
@@ -45,7 +44,19 @@ public:
 		temp_msg_buffer.clear();
 	}
 
-	void suspend_dispatch_msg(bool suspend) {suspend_dispatch_msg_ = suspend;}
+protected:
+	void suspend_send_msg(bool suspend) {suspend_send_msg_ = suspend;}
+public:
+	bool suspend_send_msg() const {return suspend_send_msg_;}
+
+	void suspend_dispatch_msg(bool suspend)
+	{
+		suspend_dispatch_msg_ = suspend;
+		stop_timer(1);
+
+		mutex::scoped_lock lock(recv_msg_buffer_mutex);
+		do_dispatch_msg();
+	}
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
 
 	//get or change the packer at runtime
@@ -110,7 +121,7 @@ public:
 	}
 
 protected:
-	virtual bool is_send_allowed() const {return this->is_open();}
+	virtual bool is_send_allowed() const {return !suspend_send_msg_;}
 	//can send data or not(just put into send buffer)
 
 	//generally, you need not re-write this for link broken judgment(tcp)
@@ -142,10 +153,7 @@ protected:
 		switch (id)
 		{
 		case 0: //delay put msgs into recv buffer because of recv buffer overflow
-			if (dispatch_msg())
-				start(); //recv msg sequentially, that means second recv only after first recv success
-			else
-				return true;
+			dispatch_msg();
 			break;
 		case 1: //suspend dispatch msgs
 			{
@@ -163,29 +171,30 @@ protected:
 		return false;
 	}
 
-	bool dispatch_msg()
+	void dispatch_msg()
 	{
 		if (temp_msg_buffer.empty())
-			return true;
-		else if (suspend_dispatch_msg_)
-			return false;
+			return;
 
 		bool dispatch = false;
 		mutex::scoped_lock lock(recv_msg_buffer_mutex);
 		size_t msg_num = recv_msg_buffer.size();
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER //inefficient
-		for (BOOST_AUTO(iter, temp_msg_buffer.begin()); iter != temp_msg_buffer.end();)
-			if (!on_msg(*iter))
-				temp_msg_buffer.erase(iter++);
-			else if (msg_num < MAX_MSG_NUM) //msg recv buffer available
-			{
-				dispatch = true;
-				recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer, iter++);
-				++msg_num;
-			}
-			else
-				++iter;
+		if (!suspend_dispatch_msg_)
+		{
+			for (BOOST_AUTO(iter, temp_msg_buffer.begin()); iter != temp_msg_buffer.end();)
+				if (!on_msg(*iter))
+					temp_msg_buffer.erase(iter++);
+				else if (msg_num < MAX_MSG_NUM) //msg recv buffer available
+				{
+					dispatch = true;
+					recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer, iter++);
+					++msg_num;
+				}
+				else
+					++iter;
+		}
 #else //efficient
 		if (msg_num < MAX_MSG_NUM) //msg recv buffer available
 		{
@@ -210,7 +219,10 @@ protected:
 		if (dispatch)
 			do_dispatch_msg();
 
-		return temp_msg_buffer.empty();
+		if (temp_msg_buffer.empty())
+			start(); //recv msg sequentially, that means second recv only after first recv success
+		else
+			set_timer(0, 50, NULL);
 	}
 
 	void msg_handler()
@@ -228,7 +240,7 @@ protected:
 		if (suspend_dispatch_msg_)
 		{
 			if (!dispatching && !recv_msg_buffer.empty())
-				set_timer(1, 50, NULL);
+				set_timer(1, 24 * 60 * 60 * 1000, NULL); //one day
 		}
 		else
 		{
@@ -247,27 +259,25 @@ protected:
 
 protected:
 	MsgType last_send_msg, last_dispatch_msg;
+	boost::shared_ptr<i_packer> packer_;
 
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
 	container::list<MsgType> send_msg_buffer;
 	mutex send_msg_buffer_mutex;
-	bool sending;
+	bool sending, suspend_send_msg_;
 
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
 	//using this msg recv buffer or not is decided by the return value of on_msg()
 	//see on_msg() for more details
 	container::list<MsgType> recv_msg_buffer;
 	mutex recv_msg_buffer_mutex;
-	bool dispatching;
+	bool dispatching, suspend_dispatch_msg_;
 
 	//if on_msg() return true, which means use the msg recv buffer,
 	//st_socket will invoke dispatch_msg() when got some msgs. if the msgs can't push into recv_msg_buffer
 	//because of recv buffer overflow, st_socket will delay 50 milliseconds(nonblocking) to invoke
 	//dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
 	container::list<MsgType> temp_msg_buffer;
-
-	boost::shared_ptr<i_packer> packer_;
-	bool suspend_dispatch_msg_;
 };
 
 } //namespace

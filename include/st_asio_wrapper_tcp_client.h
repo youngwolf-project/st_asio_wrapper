@@ -13,24 +13,25 @@
 #ifndef ST_ASIO_WRAPPER_TCP_CLIENT_H_
 #define ST_ASIO_WRAPPER_TCP_CLIENT_H_
 
-#include "st_asio_wrapper_client.h"
 #include "st_asio_wrapper_connector.h"
+#include "st_asio_wrapper_client.h"
 
 namespace st_asio_wrapper
 {
 
-typedef st_sclient_base<st_connector> st_tcp_sclient;
+typedef st_sclient<st_connector> st_tcp_sclient;
 
 template<typename Socket = st_connector>
-class st_tcp_client_base : public st_client_base<Socket>
+class st_tcp_client_base : public st_client<Socket>
 {
 public:
-	st_tcp_client_base(st_service_pump& service_pump_) : st_client_base<Socket>(service_pump_) {}
+	st_tcp_client_base(st_service_pump& service_pump_) : st_client<Socket>(service_pump_) {}
 
 	virtual void uninit()
 	{
+		this->stop();
 		this->do_something_to_all(boost::bind(&Socket::graceful_close, _1, false));
-		st_client_base<Socket>::uninit();
+		this->do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));
 	}
 
 	///////////////////////////////////////////////////

@@ -52,6 +52,10 @@ public:
 	void set_re_connect_times(size_t times) {re_connect_times = times;}
 #endif
 	bool is_connected() const {return connected;}
+	//reset all, be ensure that there's no any operations performed on this st_connector when invoke it
+	//notice, when resue this st_connector, st_object_pool will invoke reset(), child must re-write this to init
+	//all member variables, and then do not forget to invoke st_connector::reset() to init father's
+	//member variables
 	virtual void reset() {st_tcp_socket::reset();}
 	virtual void start() //connect or recv
 	{
@@ -80,7 +84,7 @@ public:
 
 protected:
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
-	virtual bool is_send_allowed() const {return is_connected() && !is_closing();}
+	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket::is_send_allowed();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
 	virtual void on_recv_error(const error_code& ec)
 	{

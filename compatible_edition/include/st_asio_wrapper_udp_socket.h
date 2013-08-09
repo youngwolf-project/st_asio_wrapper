@@ -61,14 +61,10 @@ public:
 		}
 	}
 
-	virtual void start()
-	{
-		if (!get_io_service().stopped())
-			async_receive_from(buffer(raw_buff), peer_addr,
-				boost::bind(&st_udp_socket::recv_handler, this, placeholders::error, placeholders::bytes_transferred));
-	}
-
 	//reset all, be ensure that there's no any operations performed on this st_udp_socket when invoke it
+	//notice, when resue this st_udp_socket, st_object_pool will invoke reset(), child must re-write this to init
+	//all member variables, and then do not forget to invoke st_udp_socket::reset() to init father's
+	//member variables
 	virtual void reset()
 	{
 		reset_state();
@@ -82,6 +78,13 @@ public:
 #endif
 		bind(local_addr, ec); assert(!ec);
 		if (ec) {unified_out::error_out("bind failed.");}
+	}
+
+	virtual void start()
+	{
+		if (!get_io_service().stopped())
+			async_receive_from(buffer(raw_buff), peer_addr,
+				boost::bind(&st_udp_socket::recv_handler, this, placeholders::error, placeholders::bytes_transferred));
 	}
 
 	void disconnect() {force_close();}
@@ -125,7 +128,25 @@ public:
 		return do_send_msg();
 	}
 
+	void suspend_send_msg(bool suspend)
+	{
+		st_socket<msg_type, udp::socket>::suspend_send_msg(suspend);
+		if (!st_socket<msg_type, udp::socket>::suspend_send_msg())
+			send_msg();
+	}
+
+	void show_info(const char* head, const char* tail)
+	{
+		error_code ec;
+		BOOST_AUTO(ep, local_endpoint(ec));
+		if (!ec)
+			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
+	}
+
 protected:
+	virtual bool is_send_allowed() const {return is_open() && st_socket<msg_type, udp::socket>::is_send_allowed();}
+	//can send data or not(just put into send buffer)
+
 	virtual void on_recv_error(const error_code& ec)
 		{unified_out::error_out("recv msg error: %d %s", ec.value(), ec.message().data());}
 
@@ -180,12 +201,7 @@ protected:
 			std::string tmp_str(raw_buff.data(), bytes_transferred);
 			temp_msg_buffer.resize(temp_msg_buffer.size() + 1);
 			temp_msg_buffer.back().swap(peer_addr, tmp_str);
-			bool all_dispatched = dispatch_msg();
-
-			if (all_dispatched)
-				start(); //recv msg sequentially, that means second recv only after first recv success
-			else
-				set_timer(0, 50, NULL);
+			dispatch_msg();
 		}
 #ifdef _MSC_VER
 		else if (WSAECONNREFUSED == ec.value())

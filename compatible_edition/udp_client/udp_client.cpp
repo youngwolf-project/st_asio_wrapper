@@ -11,10 +11,10 @@ int main(int argc, const char* argv[]) {
 	if (argc < 3)
 		return 1;
 
-	unsigned short local_port = (unsigned short) atoi(argv[1]);
+	BOOST_AUTO(local_port, (unsigned short) atoi(argv[1]));
 	error_code ec;
-	udp::endpoint peer_addr = udp::endpoint(address::from_string(argc >= 4 ? argv[3] : "127.0.0.1", ec),
-		(unsigned short) atoi(argv[2]));
+	BOOST_AUTO(peer_addr, udp::endpoint(address::from_string(argc >= 4 ? argv[3] : "127.0.0.1", ec),
+		(unsigned short) atoi(argv[2])));
 	assert(!ec);
 
 	std::string str;
@@ -34,7 +34,7 @@ int main(int argc, const char* argv[]) {
 			service_pump.start_service();
 		}
 		else
-			client.send_native_msg(peer_addr, str);
+			client.safe_send_native_msg(peer_addr, str);
 	}
 
 	return 0;

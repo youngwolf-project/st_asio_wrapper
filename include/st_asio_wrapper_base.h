@@ -194,6 +194,7 @@ bool FUNNAME(const udp::endpoint& peer_addr, const char* const pstr[], const siz
 		if (!is_send_allowed() || get_io_service().stopped()) return false; \
 		this_thread::sleep(get_system_time() + posix_time::milliseconds(50)); \
 	} \
+	return true; \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //udp msg sending interface
