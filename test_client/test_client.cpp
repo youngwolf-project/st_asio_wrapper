@@ -33,8 +33,9 @@ static bool check_msg;
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	auto index = (size_t) ((uint64_t) rand() * (client_can.size() - 1) / RAND_MAX); \
-	auto iter = std::begin(client_can); \
+	auto index = (size_t) ((uint64_t) rand() * (object_can.size() - 1) / RAND_MAX); \
+	mutex::scoped_lock lock(object_can_mutex); \
+	auto iter = std::begin(object_can); \
 	std::advance(iter, index); \
 	(*iter)->SEND_FUNNAME(pstr, len, num, can_overflow); \
 } \
@@ -84,7 +85,7 @@ public:
 	uint64_t get_total_recv_bytes()
 	{
 		uint64_t total_recv_bytes = 0;
-		do_something_to_all([&](decltype(*std::begin(client_can))& item) {
+		do_something_to_all([&](decltype(*std::begin(object_can))& item) {
 			total_recv_bytes += item->get_recv_bytes();
 		});
 
@@ -134,7 +135,7 @@ int main(int argc, const char* argv[])
 		else if (str == LIST_STATUS)
 		{
 			printf("valid links: " size_t_format ", closed links: " size_t_format "\n",
-				client.size(), client.closed_client_size());
+				client.size(), client.closed_object_size());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
@@ -142,7 +143,7 @@ int main(int argc, const char* argv[])
 		else if (str == RESUME_COMMAND)
 			client.do_something_to_all(boost::bind(&test_socket::suspend_dispatch_msg, _1, false));
 		else if (str == LIST_ALL_CLIENT)
-			client.list_all_client();
+			client.list_all_object();
 		else if (!str.empty())
 		{
 			if ('+' == str[0] || '-' == str[0])

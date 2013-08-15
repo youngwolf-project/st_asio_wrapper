@@ -238,7 +238,7 @@ protected:
 		if (suspend_dispatch_msg_)
 		{
 			if (!dispatching && !recv_msg_buffer.empty())
-				set_timer(1, 24 * 60 * 60 * 1000, NULL); //one day
+				set_timer(1, 24 * 60 * 60 * 1000, nullptr); //one day
 		}
 		else
 		{

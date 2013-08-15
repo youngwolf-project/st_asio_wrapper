@@ -36,7 +36,7 @@ int main()
 			service_pump.start_service();
 		}
 		else if (str == LIST_ALL_CLIENT)
-			file_server_.list_all_client();
+			file_server_.list_all_object();
 		else
 			file_server_.talk(str);
 	}

@@ -1,5 +1,6 @@
 
 #include <boost/tokenizer.hpp>
+#include <boost/lambda/lambda.hpp>
 
 //configuration
 #define SERVER_PORT		9528
@@ -33,8 +34,9 @@ static bool check_msg;
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	size_t index = (size_t) ((uint64_t) rand() * (client_can.size() - 1) / RAND_MAX); \
-	BOOST_AUTO(iter, client_can.begin()); \
+	size_t index = (size_t) ((uint64_t) rand() * (object_can.size() - 1) / RAND_MAX); \
+	mutex::scoped_lock lock(object_can_mutex); \
+	BOOST_AUTO(iter, object_can.begin()); \
 	std::advance(iter, index); \
 	(*iter)->SEND_FUNNAME(pstr, len, num, can_overflow); \
 } \
@@ -48,6 +50,10 @@ public:
 	test_socket(io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0) {}
 
 	uint64_t get_recv_bytes() const {return recv_bytes;}
+	operator uint64_t() const {return recv_bytes;}
+	//workaround for boost::lambda
+	//how to invoke get_recv_bytes() directly, please tell me if somebody knows!
+
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
 	virtual void reset() {recv_bytes = recv_index = 0; st_connector::reset();}
 
@@ -81,11 +87,11 @@ public:
 	test_client(st_service_pump& service_pump_) : st_tcp_client_base<test_socket>(service_pump_) {}
 
 	void reset() {do_something_to_all(boost::mem_fn(&test_socket::reset));}
-	uint64_t get_total_recv_bytes() const
+	uint64_t get_total_recv_bytes()
 	{
 		uint64_t total_recv_bytes = 0;
-		for (BOOST_AUTO(iter, client_can.begin()); iter != client_can.end(); ++iter)
-			total_recv_bytes += (*iter)->get_recv_bytes();
+		do_something_to_all(boost::ref(total_recv_bytes) += boost::lambda::ret<uint64_t>(*boost::lambda::_1));
+		//how to invoke the test_socket::get_recv_bytes() directly, please tell me if somebody knows!
 
 		return total_recv_bytes;
 	}
@@ -133,7 +139,7 @@ int main(int argc, const char* argv[])
 		else if (str == LIST_STATUS)
 		{
 			printf("valid links: " size_t_format ", closed links: " size_t_format "\n",
-				client.size(), client.closed_client_size());
+				client.size(), client.closed_object_size());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
@@ -141,7 +147,7 @@ int main(int argc, const char* argv[])
 		else if (str == RESUME_COMMAND)
 			client.do_something_to_all(boost::bind(&test_socket::suspend_dispatch_msg, _1, false));
 		else if (str == LIST_ALL_CLIENT)
-			client.list_all_client();
+			client.list_all_object();
 		else if (!str.empty())
 		{
 			if ('+' == str[0] || '-' == str[0])

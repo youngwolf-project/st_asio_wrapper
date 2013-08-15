@@ -321,6 +321,11 @@
  * Add new class st_object_pool.
  * Apply the object pool logic to class st_client(inherit from st_object_pool).
  * Drop reuse(), use reset() instead.
+ * Change macro CLIENT_FREE_INTERVAL to SOCKET_FREE_INTERVAL, concept remains unchanged.
+ * Change macro INVALID_LINK_MAX_DURATION to CLOSED_SOCKET_MAX_DURATION, concept remains unchanged.
+ *
+ * Change the name of the member variables and functions which named *client* to *object* in st_object_pool,
+ * concept remains unchanged.
  */
 
 #ifndef ST_ASIO_WRAPPER_VERIFICATION_H_

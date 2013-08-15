@@ -3,6 +3,7 @@
 #define FILE_CLIENT_H_
 
 #include <boost/atomic.hpp>
+#include <boost/lambda/lambda.hpp>
 
 #include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
@@ -54,7 +55,11 @@ public:
 	virtual void reset() {clear(); st_connector::reset();}
 
 	void set_index(int index_) {index = index_;}
-	__off64_t get_rest_size() {return my_length;}
+	__off64_t get_rest_size() const {return my_length;}
+	operator __off64_t() const {return my_length;}
+	//workaround for boost::lambda
+	//how to invoke get_rest_size() directly, please tell me if somebody knows!
+
 	bool get_file(const std::string& file_name)
 	{
 		if (TRANS_IDLE == state && !file_name.empty())
@@ -203,11 +208,11 @@ class file_client : public st_tcp_client_base<file_socket>
 public:
 	file_client(st_service_pump& service_pump_) : st_tcp_client_base<file_socket>(service_pump_) {}
 
-	__off64_t get_total_rest_size() const
+	__off64_t get_total_rest_size()
 	{
 		__off64_t total_rest_size = 0;
-		for (BOOST_AUTO(iter, client_can.begin()); iter != client_can.end(); ++iter)
-			total_rest_size += (*iter)->get_rest_size();
+		do_something_to_all(boost::ref(total_rest_size) += boost::lambda::ret<__off64_t>(*boost::lambda::_1));
+		//how to invoke the file_socket::get_rest_size() directly, please tell me if somebody knows!
 
 		return total_rest_size;
 	}

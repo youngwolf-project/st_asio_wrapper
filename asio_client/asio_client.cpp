@@ -37,7 +37,7 @@ int main() {
 		}
 		else if (str == RECONNECT_COMMAND)
 			client.graceful_close(true);
-		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
+		//the following two commands demonstrate how to suspend msg sending, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
 			client.suspend_send_msg(true);
 		else if (str == RESUME_COMMAND)

@@ -8,6 +8,7 @@
  *		Community on QQ: 198941541
  *
  * this class used at both client and server endpoint, and in both tcp and udp socket
+ * this class can only manage objects that inheirt from boost::asio::tcp::socket
  */
 
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
@@ -22,20 +23,20 @@
 #define MAX_OBJECT_NUM				4096
 #endif
 
-//something like memory pool, if you open REUSE_OBJECT, all clients in temp_client_can will never be freed,
+//something like memory pool, if you open REUSE_OBJECT, all object in temp_object_can will never be freed,
 //but waiting for reuse
-//or, st_server_base will free the clients in temp_client_can automatically and periodically,
-//use CLIENT_FREE_INTERVAL to set the interval,
-//see temp_client_can at the end of st_server_base class for more details.
+//or, st_object_pool will free the objects in temp_object_can automatically and periodically,
+//use SOCKET_FREE_INTERVAL to set the interval,
+//see temp_object_can at the end of st_object_pool class for more details.
 #ifndef REUSE_OBJECT
-	#ifndef CLIENT_FREE_INTERVAL
-	#define CLIENT_FREE_INTERVAL	10 //seconds, validate only REUSE_OBJECT not defined
+	#ifndef SOCKET_FREE_INTERVAL
+	#define SOCKET_FREE_INTERVAL	10 //seconds, validate only REUSE_OBJECT not defined
 	#endif
 #endif
 
-//define this to have st_server_base invoke clear_all_closed_socket() automatically and periodically
-//this feature may serious influence server performance with huge number of clients
-//so, re-write st_tcp_socket::on_recv_error and invoke st_server_base::del_client() is recommended
+//define this to have st_object_pool invoke clear_all_closed_object() automatically and periodically
+//this feature may serious influence server performance with huge number of objects
+//so, re-write st_tcp_socket::on_recv_error and invoke st_object_pool::del_object() is recommended
 //in long connection system
 //in short connection system, you are recommended to open this feature, use CLEAR_CLOSED_SOCKET_INTERVAL
 //to set the interval
@@ -45,9 +46,9 @@
 	#endif
 #endif
 
-#ifndef INVALID_LINK_MAX_DURATION
-	#define INVALID_LINK_MAX_DURATION	5 //seconds
-	//after this duration, the corresponding client can be freed from the heap or reused again
+#ifndef CLOSED_SOCKET_MAX_DURATION
+	#define CLOSED_SOCKET_MAX_DURATION	5 //seconds
+	//after this duration, the corresponding object can be freed from the heap or reused again
 #endif
 
 namespace st_asio_wrapper
@@ -57,13 +58,13 @@ template<typename Socket>
 class st_object_pool: public st_service_pump::i_service, public st_timer
 {
 protected:
-	struct temp_client
+	struct temp_object
 	{
 		const time_t closed_time;
-		const boost::shared_ptr<Socket> client_ptr;
+		const boost::shared_ptr<Socket> object_ptr;
 
-		temp_client(const boost::shared_ptr<Socket>& _client_ptr) :
-			closed_time(time(nullptr)), client_ptr(_client_ptr) {}
+		temp_object(const boost::shared_ptr<Socket>& object_ptr_) :
+			closed_time(time(nullptr)), object_ptr(object_ptr_) {}
 
 		bool is_timeout(time_t t) const {return closed_time <= t;}
 	};
@@ -74,7 +75,7 @@ public:
 	void start()
 	{
 #ifndef REUSE_OBJECT
-		set_timer(0, 1000 * CLIENT_FREE_INTERVAL, nullptr);
+		set_timer(0, 1000 * SOCKET_FREE_INTERVAL, nullptr);
 #endif
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
 		set_timer(1, 1000 * CLEAR_CLOSED_SOCKET_INTERVAL, nullptr);
@@ -83,36 +84,36 @@ public:
 
 	void stop() {stop_all_timer();}
 
-	bool add_client(const boost::shared_ptr<Socket>& client_ptr)
+	bool add_object(const boost::shared_ptr<Socket>& object_ptr)
 	{
-		assert(client_ptr && &client_ptr->get_io_service() == &get_service_pump());
-		mutex::scoped_lock lock(client_can_mutex);
-		auto client_num = client_can.size();
-		if (client_num < MAX_OBJECT_NUM)
-			client_can.push_back(client_ptr);
+		assert(object_ptr && &object_ptr->get_io_service() == &get_service_pump());
+		mutex::scoped_lock lock(object_can_mutex);
+		auto object_num = object_can.size();
+		if (object_num < MAX_OBJECT_NUM)
+			object_can.push_back(object_ptr);
 		lock.unlock();
 
-		return client_num < MAX_OBJECT_NUM;
+		return object_num < MAX_OBJECT_NUM;
 	}
 
-	bool del_client(const boost::shared_ptr<Socket>& client_ptr)
+	bool del_object(const boost::shared_ptr<Socket>& object_ptr)
 	{
 		auto found = false;
 
-		mutex::scoped_lock lock(client_can_mutex);
-		//client_can does not contain any duplicate items
-		auto iter = std::find(std::begin(client_can), std::end(client_can), client_ptr);
-		if (iter != std::end(client_can))
+		mutex::scoped_lock lock(object_can_mutex);
+		//object_can does not contain any duplicate items
+		auto iter = std::find(std::begin(object_can), std::end(object_can), object_ptr);
+		if (iter != std::end(object_can))
 		{
 			found = true;
-			client_can.erase(iter);
+			object_can.erase(iter);
 		}
 		lock.unlock();
 
 		if (found)
 		{
-			mutex::scoped_lock lock(temp_client_can_mutex);
-			temp_client_can.push_back(client_ptr);
+			mutex::scoped_lock lock(temp_object_can_mutex);
+			temp_object_can.push_back(object_ptr);
 		}
 
 		return found;
@@ -120,94 +121,93 @@ public:
 
 	size_t size()
 	{
-		mutex::scoped_lock lock(client_can_mutex);
-		return client_can.size();
+		mutex::scoped_lock lock(object_can_mutex);
+		return object_can.size();
 	}
 
-	size_t closed_client_size()
+	size_t closed_object_size()
 	{
-		mutex::scoped_lock lock(temp_client_can_mutex);
-		return temp_client_can.size();
+		mutex::scoped_lock lock(temp_object_can_mutex);
+		return temp_object_can.size();
 	}
 
 	boost::shared_ptr<Socket> at(size_t index)
 	{
-		mutex::scoped_lock lock(client_can_mutex);
-		assert(index < client_can.size());
-		return index < client_can.size() ?
-			*(std::next(std::begin(client_can), index)) : boost::shared_ptr<Socket>();
+		mutex::scoped_lock lock(object_can_mutex);
+		assert(index < object_can.size());
+		return index < object_can.size() ?
+			*(std::next(std::begin(object_can), index)) : boost::shared_ptr<Socket>();
 	}
 
-	void list_all_client() {do_something_to_all(boost::bind(&Socket::show_info, _1, "", ""));}
+	void list_all_object() {do_something_to_all(boost::bind(&Socket::show_info, _1, "", ""));}
 
 	//Empty ip means don't care, any ip will match
 	//Zero port means don't care, any port will match
-	//this function only used with st_tcp_socket, because for st_udp_socket, remote endpoint means nothing.
-	void find_client(const std::string& ip, unsigned short port, container::list<boost::shared_ptr<Socket>>& clients)
+	//this function only used with tcp socket, because for udp socket, remote endpoint means nothing.
+	void find_object(const std::string& ip, unsigned short port, container::list<boost::shared_ptr<Socket>>& objects)
 	{
 		if (ip.empty() && 0 == port)
 		{
-			mutex::scoped_lock lock(client_can_mutex);
-			clients.insert(std::end(clients), std::begin(client_can), std::end(client_can));
+			mutex::scoped_lock lock(object_can_mutex);
+			objects.insert(std::end(objects), std::begin(object_can), std::end(object_can));
 		}
 		else
-			do_something_to_all([&](decltype(*std::begin(client_can))& item) {
+			do_something_to_all([&](decltype(*std::begin(object_can))& item) {
 				if (item->is_open())
 				{
 					auto ep = item->remote_endpoint();
 					if ((0 == port || port == ep.port()) && (ip.empty() || ip == ep.address().to_string()))
-						clients.push_back(item);
+						objects.push_back(item);
 				}
 			});
 	}
 
-	//Clear all closed socket from client list
+	//Clear all closed objects from the list
 	//Consider the following conditions:
-	//1.You don't invoke del_client in on_recv_error and on_send_error,
-	// or close the st_tcp_socket in on_unpack_error
+	//1.You don't invoke del_object in on_recv_error and on_send_error, or close the socket in on_unpack_error
 	//2.For some reason(I haven't met yet), on_recv_error, on_send_error and on_unpack_error
 	// not been invoked
-	//st_server_base will automatically invoke this function if AUTO_CLEAR_CLOSED_SOCKET been defined
-	void clear_all_closed_socket(container::list<boost::shared_ptr<Socket>>& clients)
+	//st_object_pool will automatically invoke this function if AUTO_CLEAR_CLOSED_SOCKET been defined
+	void clear_all_closed_object(container::list<boost::shared_ptr<Socket>>& objects)
 	{
-		mutex::scoped_lock lock(client_can_mutex);
-		for (auto iter = std::begin(client_can); iter != std::end(client_can);)
+		mutex::scoped_lock lock(object_can_mutex);
+		for (auto iter = std::begin(object_can); iter != std::end(object_can);)
 			if (!(*iter)->is_open())
 			{
 				(*iter)->direct_dispatch_all_msg();
-				clients.resize(clients.size() + 1);
-				clients.back().swap(*iter);
-				iter = client_can.erase(iter);
+				objects.resize(objects.size() + 1);
+				objects.back().swap(*iter);
+				iter = object_can.erase(iter);
 			}
 			else
 				++iter;
 	}
 
-	//free a specific number of client objects
-	//if you use client pool(define REUSE_OBJECT), you may need to free some client objects
-	//when the client pool(get_closed_client_size()) goes big enough for memory saving(because
-	//the clients in temp_client_can are waiting for reuse and will never be freed)
-	//if you don't use client pool, st_server_base will invoke this automatically and periodically
+	//free a specific number of objects
+	//if you use object pool(define REUSE_OBJECT), you may need to free some objects
+	//when the object pool(get_closed_object_size()) goes big enough for memory saving(because
+	//the objects in temp_object_can are waiting for reuse and will never be freed)
+	//if you don't use object pool, st_object_pool will invoke this automatically and periodically
 	//so, you don't need invoke this exactly
-	void free_client(size_t num = -1)
+	void free_object(size_t num = -1)
 	{
 		if (0 == num)
 			return;
 
-		auto now = time(nullptr) - INVALID_LINK_MAX_DURATION;
-		mutex::scoped_lock lock(temp_client_can_mutex);
-		for (auto iter = std::begin(temp_client_can); num > 0 && iter != std::end(temp_client_can);)
+		auto now = time(nullptr) - CLOSED_SOCKET_MAX_DURATION;
+		mutex::scoped_lock lock(temp_object_can_mutex);
+		for (auto iter = std::begin(temp_object_can); num > 0 && iter != std::end(temp_object_can);)
 			if (iter->closed_time <= now)
 			{
-				iter = temp_client_can.erase(iter);
+				iter = temp_object_can.erase(iter);
 				--num;
 			}
 			else
 				++iter;
 	}
 
-	DO_SOMETHING_TO_ALL_MUTEX(client_can, client_can_mutex)
-	DO_SOMETHING_TO_ONE_MUTEX(client_can, client_can_mutex)
+	DO_SOMETHING_TO_ALL_MUTEX(object_can, object_can_mutex)
+	DO_SOMETHING_TO_ONE_MUTEX(object_can, object_can_mutex)
 
 protected:
 	virtual bool on_timer(unsigned char id, const void* user_data)
@@ -216,19 +216,19 @@ protected:
 		{
 #ifndef REUSE_OBJECT
 		case 0:
-			free_client();
+			free_object();
 			return true;
 			break;
 #endif
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
 		case 1:
 			{
-				decltype(client_can) clients;
-				clear_all_closed_socket(clients);
-				if (!clients.empty())
+				decltype(object_can) objects;
+				clear_all_closed_object(objects);
+				if (!objects.empty())
 				{
-					mutex::scoped_lock lock(temp_client_can_mutex);
-					temp_client_can.insert(std::end(temp_client_can), std::begin(clients), std::end(clients));
+					mutex::scoped_lock lock(temp_object_can_mutex);
+					temp_object_can.insert(std::end(temp_object_can), std::begin(objects), std::end(objects));
 				}
 				return true;
 			}
@@ -247,19 +247,19 @@ protected:
 	boost::shared_ptr<Socket> reuse_object()
 	{
 #ifdef REUSE_OBJECT
-		auto now = time(nullptr) - INVALID_LINK_MAX_DURATION;
-		mutex::scoped_lock lock(temp_client_can_mutex);
-		//temp_client_can does not contain any duplicate items
-		auto iter = std::find_if(std::begin(temp_client_can), std::end(temp_client_can),
-			std::bind2nd(std::mem_fun_ref(&temp_client::is_timeout), now));
-		if (iter != std::end(temp_client_can))
+		auto now = time(nullptr) - CLOSED_SOCKET_MAX_DURATION;
+		mutex::scoped_lock lock(temp_object_can_mutex);
+		//temp_object_can does not contain any duplicate items
+		auto iter = std::find_if(std::begin(temp_object_can), std::end(temp_object_can),
+			std::bind2nd(std::mem_fun_ref(&temp_object::is_timeout), now));
+		if (iter != std::end(temp_object_can))
 		{
-			auto client_ptr(std::move(iter->client_ptr));
-			temp_client_can.erase(iter);
+			auto object_ptr(std::move(iter->object_ptr));
+			temp_object_can.erase(iter);
 			lock.unlock();
 
-			client_ptr->reset();
-			return client_ptr;
+			object_ptr->reset();
+			return object_ptr;
 		}
 #endif
 
@@ -268,19 +268,19 @@ protected:
 
 protected:
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	container::list<boost::shared_ptr<Socket>> client_can;
-	mutex client_can_mutex;
+	container::list<boost::shared_ptr<Socket>> object_can;
+	mutex object_can_mutex;
 
-	//because all clients are dynamic created and stored in client_can, maybe when the recv error occur
-	//(at this point, your standard practice is deleting the client from client_can), some other
+	//because all objects are dynamic created and stored in object_can, maybe when the recv error occur
+	//(at this point, your standard practice is deleting the object from object_can), some other
 	//asynchronous calls are still queued in boost::asio::io_service, and will be dequeued in the future,
-	//we must guarantee these clients not be freed from the heap, so, we move these clients from
-	//client_can to temp_client_can, and free them from the heap in the near future(controlled by the
+	//we must guarantee these objects not be freed from the heap, so, we move these objects from
+	//object_can to temp_object_can, and free them from the heap in the near future(controlled by the
 	//0(id) timer)
-	//if AUTO_CLEAR_CLOSED_SOCKET been defined, clear_all_closed_socket() will be invoked automatically
-	//and periodically, and move all closed clients to temp_client_can.
-	container::list<temp_client> temp_client_can;
-	mutex temp_client_can_mutex;
+	//if AUTO_CLEAR_CLOSED_SOCKET been defined, clear_all_closed_object() will be invoked automatically
+	//and periodically, and move all closed objects to temp_object_can.
+	container::list<temp_object> temp_object_can;
+	mutex temp_object_can_mutex;
 };
 
 } //namespace

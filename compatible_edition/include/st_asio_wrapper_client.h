@@ -41,12 +41,12 @@ public:
 		this->do_something_to_all(boost::mem_fn(&Socket::start));
 		this->do_something_to_all(boost::mem_fn((bool (Socket::*)()) &Socket::send_msg));
 
-		st_object_pool<Socket>::start();
+		this->start();
 	}
 
 	bool add_client(const boost::shared_ptr<Socket>& client_ptr, bool reset = true)
 	{
-		if (st_object_pool<Socket>::add_client(client_ptr))
+		if (this->add_object(client_ptr))
 		{
 			if (this->get_service_pump().is_service_started()) //service already started
 			{
@@ -88,9 +88,9 @@ public:
 
 	void disconnect(const boost::shared_ptr<Socket>& client_ptr) {force_close(client_ptr);}
 	void force_close(const boost::shared_ptr<Socket>& client_ptr)
-		{if (this->del_client(client_ptr)) client_ptr->force_close();}
+		{if (this->del_object(client_ptr)) client_ptr->force_close();}
 	void graceful_close(const boost::shared_ptr<Socket>& client_ptr)
-		{if (this->del_client(client_ptr)) client_ptr->graceful_close();}
+		{if (this->del_object(client_ptr)) client_ptr->graceful_close();}
 };
 
 } //namespace

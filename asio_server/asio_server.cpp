@@ -93,10 +93,10 @@ int main() {
 		else if (str == LIST_STATUS)
 		{
 			printf("normal server:\nvalid links: " size_t_format ", closed links: " size_t_format "\n",
-				server_.size(), server_.closed_client_size());
+				server_.size(), server_.closed_object_size());
 
 			printf("echo server:\nvalid links: " size_t_format ", closed links: " size_t_format "\n",
-				echo_server_.size(), echo_server_.closed_client_size());
+				echo_server_.size(), echo_server_.closed_object_size());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
@@ -106,9 +106,9 @@ int main() {
 		else if (str == LIST_ALL_CLIENT)
 		{
 			puts("clients from normal server:");
-			server_.list_all_client();
+			server_.list_all_object();
 			puts("clients from echo server:");
-			echo_server_.list_all_client();
+			echo_server_.list_all_object();
 		}
 		else
 			server_.broadcast_msg(str);

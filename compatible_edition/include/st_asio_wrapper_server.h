@@ -79,7 +79,7 @@ public:
 	virtual const st_service_pump& get_service_pump() const {return st_object_pool<Socket>::get_service_pump();}
 	virtual void del_client(const boost::shared_ptr<st_tcp_socket>& client_ptr)
 	{
-		if (st_object_pool<Socket>::del_client(dynamic_pointer_cast<Socket>(client_ptr)))
+		if (this->del_object(dynamic_pointer_cast<Socket>(client_ptr)))
 		{
 			client_ptr->show_info("client:", "quit.");
 			client_ptr->force_close();
@@ -90,11 +90,11 @@ public:
 	void close_all_client()
 	{
 		//do not use graceful_close() as client endpoint do,
-		//because in this function, client_can_mutex has been locked,
+		//because in this function, object_can_mutex has been locked,
 		//graceful_close will wait until on_recv_error() been invoked,
-		//in on_recv_error(), we need to lock client_can_mutex too(in del_client()), which made dead lock
-		mutex::scoped_lock lock(this->client_can_mutex);
-		for (BOOST_AUTO(iter, ST_THIS client_can.begin()); iter != this->client_can.end(); ++iter)
+		//in on_recv_error(), we need to lock object_can_mutex too(in del_object()), which made dead lock
+		mutex::scoped_lock lock(this->object_can_mutex);
+		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != this->object_can.end(); ++iter)
 		{
 			(*iter)->show_info("client:", "been closed.");
 			(*iter)->force_close();
@@ -132,7 +132,7 @@ protected:
 
 	bool add_client(const boost::shared_ptr<Socket>& client_ptr)
 	{
-		if (st_object_pool<Socket>::add_client(client_ptr))
+		if (st_object_pool<Socket>::add_object(client_ptr))
 		{
 			client_ptr->show_info("client:", "arrive.");
 			return true;
