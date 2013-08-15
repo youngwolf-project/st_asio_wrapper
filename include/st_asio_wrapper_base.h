@@ -40,8 +40,10 @@ using namespace boost;
 
 #if defined _MSC_VER
 #define size_t_format "%Iu"
+#define ST_THIS //workaround to make up the BOOST_AUTO's defect under vc2008 and compiler bugs before vc2012
 #else // defined __GNUC__
 #define size_t_format "%tu"
+#define ST_THIS this->
 #endif
 
 #define SHARED_OBJECT(CLASS_NAME, FATHER_NAME) \
@@ -160,7 +162,7 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
 #define TCP_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-	{this->do_something_to_all(boost::bind(&Socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
+	{ST_THIS do_something_to_all(boost::bind(&Socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //tcp msg sending interface
 ///////////////////////////////////////////////////

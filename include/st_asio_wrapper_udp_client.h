@@ -29,9 +29,9 @@ public:
 
 	virtual void uninit()
 	{
-		this->stop();
-		this->do_something_to_all(boost::mem_fn(&Socket::graceful_close));
-		this->do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));
+		ST_THIS stop();
+		ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_close));
+		ST_THIS do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));
 	}
 };
 typedef st_udp_client_base<> st_udp_client;

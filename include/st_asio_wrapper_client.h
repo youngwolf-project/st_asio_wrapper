@@ -25,8 +25,8 @@ class st_sclient : public st_service_pump::i_service, public Socket
 public:
 	st_sclient(st_service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
 
-	virtual void init() {this->reset(); this->start(); this->send_msg();}
-	virtual void uninit() {this->graceful_close(); this->direct_dispatch_all_msg();}
+	virtual void init() {ST_THIS reset(); ST_THIS start(); ST_THIS send_msg();}
+	virtual void uninit() {ST_THIS graceful_close(); ST_THIS direct_dispatch_all_msg();}
 };
 
 template<typename Socket>
@@ -38,18 +38,18 @@ protected:
 public:
 	virtual void init()
 	{
-		this->do_something_to_all(boost::mem_fn(&Socket::reset));
-		this->do_something_to_all(boost::mem_fn(&Socket::start));
-		this->do_something_to_all(boost::mem_fn((bool (Socket::*)()) &Socket::send_msg));
+		ST_THIS do_something_to_all(boost::mem_fn(&Socket::reset));
+		ST_THIS do_something_to_all(boost::mem_fn(&Socket::start));
+		ST_THIS do_something_to_all(boost::mem_fn((bool (Socket::*)()) &Socket::send_msg));
 
-		this->start();
+		ST_THIS start();
 	}
 
 	bool add_client(const boost::shared_ptr<Socket>& client_ptr, bool reset = true)
 	{
-		if (this->add_object(client_ptr))
+		if (ST_THIS add_object(client_ptr))
 		{
-			if (this->get_service_pump().is_service_started()) //service already started
+			if (ST_THIS get_service_pump().is_service_started()) //service already started
 			{
 				if (reset)
 					client_ptr->reset();
@@ -83,15 +83,15 @@ public:
 	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
 	boost::shared_ptr<Socket> create_client()
 	{
-		auto client_ptr(this->reuse_object());
-		return client_ptr ? client_ptr : boost::make_shared<Socket>(this->get_service_pump());
+		auto client_ptr(ST_THIS reuse_object());
+		return client_ptr ? client_ptr : boost::make_shared<Socket>(ST_THIS get_service_pump());
 	}
 
 	void disconnect(const boost::shared_ptr<Socket>& client_ptr) {force_close(client_ptr);}
 	void force_close(const boost::shared_ptr<Socket>& client_ptr)
-		{if (this->del_object(client_ptr)) client_ptr->force_close();}
+		{if (ST_THIS del_object(client_ptr)) client_ptr->force_close();}
 	void graceful_close(const boost::shared_ptr<Socket>& client_ptr)
-		{if (this->del_object(client_ptr)) client_ptr->graceful_close();}
+		{if (ST_THIS del_object(client_ptr)) client_ptr->graceful_close();}
 };
 
 } //namespace

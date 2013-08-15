@@ -242,7 +242,7 @@ protected:
 		}
 		else
 		{
-			auto& io_service_ = this->get_io_service();
+			auto& io_service_ = ST_THIS get_io_service();
 			if (io_service_.stopped())
 				dispatching = false;
 			else if (!dispatching && !recv_msg_buffer.empty())
