@@ -32,9 +32,10 @@ public:
 template<typename Socket>
 class st_client : public st_object_pool<Socket>
 {
-public:
+protected:
 	st_client(st_service_pump& service_pump_) : st_object_pool<Socket>(service_pump_) {}
 
+public:
 	virtual void init()
 	{
 		this->do_something_to_all(boost::mem_fn(&Socket::reset));

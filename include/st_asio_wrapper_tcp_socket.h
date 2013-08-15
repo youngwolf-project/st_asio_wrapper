@@ -32,10 +32,11 @@ typedef const msg_type msg_ctype;
 
 class st_tcp_socket : public st_socket<msg_type, tcp::socket>
 {
-public:
+protected:
 	st_tcp_socket(io_service& io_service_) : st_socket(io_service_), unpacker_(boost::make_shared<unpacker>())
 		{reset_state();}
 
+public:
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
 	void reset() {reset_state(); clear_buffer();}
 	void reset_state()

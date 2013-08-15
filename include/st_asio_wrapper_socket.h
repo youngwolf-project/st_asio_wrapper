@@ -25,12 +25,10 @@ namespace st_asio_wrapper
 template<typename MsgType, typename Socket>
 class st_socket: public Socket, public st_timer
 {
-public:
+protected:
 	st_socket(io_service& io_service_) : Socket(io_service_), st_timer(io_service_),
 		packer_(boost::make_shared<packer>()) {reset_state();}
-	virtual ~st_socket() {}
 
-	virtual void start() = 0;
 	void reset_state()
 	{
 		sending = suspend_send_msg_ = false;
@@ -44,8 +42,8 @@ public:
 		temp_msg_buffer.clear();
 	}
 
-protected:
 	void suspend_send_msg(bool suspend) {suspend_send_msg_ = suspend;}
+
 public:
 	bool suspend_send_msg() const {return suspend_send_msg_;}
 
@@ -119,6 +117,8 @@ public:
 
 		dispatching = false;
 	}
+
+	virtual void start() = 0;
 
 protected:
 	virtual bool is_send_allowed() const {return !suspend_send_msg_;}

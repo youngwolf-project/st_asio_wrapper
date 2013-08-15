@@ -69,7 +69,7 @@ protected:
 		bool is_timeout(time_t t) const {return closed_time <= t;}
 	};
 
-public:
+protected:
 	st_object_pool(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_) {}
 
 	void start()
@@ -119,6 +119,63 @@ public:
 		return found;
 	}
 
+	boost::shared_ptr<Socket> reuse_object()
+	{
+#ifdef REUSE_OBJECT
+		time_t now = time(NULL) - CLOSED_SOCKET_MAX_DURATION;
+		mutex::scoped_lock lock(temp_object_can_mutex);
+		//temp_object_can does not contain any duplicate items
+		BOOST_AUTO(iter, std::find_if(temp_object_can.begin(), temp_object_can.end(),
+			std::bind2nd(std::mem_fun_ref(&temp_object::is_timeout), now)));
+		if (iter != temp_object_can.end())
+		{
+			BOOST_AUTO(object_ptr, iter->object_ptr);
+			temp_object_can.erase(iter);
+			lock.unlock();
+
+			object_ptr->reset();
+			return object_ptr;
+		}
+#endif
+
+		return boost::shared_ptr<Socket>();
+	}
+
+	virtual bool on_timer(unsigned char id, const void* user_data)
+	{
+		switch(id)
+		{
+#ifndef REUSE_OBJECT
+		case 0:
+			free_object();
+			return true;
+			break;
+#endif
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
+		case 1:
+			{
+				BOOST_AUTO(objects, object_can);
+				clear_all_closed_object(objects);
+				if (!objects.empty())
+				{
+					mutex::scoped_lock lock(temp_object_can_mutex);
+					temp_object_can.insert(temp_object_can.end(), objects.begin(), objects.end());
+				}
+				return true;
+			}
+			break;
+#endif
+		case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
+			break;
+		default:
+			return st_timer::on_timer(id, user_data);
+			break;
+		}
+
+		return false;
+	}
+
+public:
 	size_t size()
 	{
 		mutex::scoped_lock lock(object_can_mutex);
@@ -205,63 +262,6 @@ public:
 
 	DO_SOMETHING_TO_ALL_MUTEX(object_can, object_can_mutex)
 	DO_SOMETHING_TO_ONE_MUTEX(object_can, object_can_mutex)
-
-protected:
-	virtual bool on_timer(unsigned char id, const void* user_data)
-	{
-		switch(id)
-		{
-#ifndef REUSE_OBJECT
-		case 0:
-			free_object();
-			return true;
-			break;
-#endif
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
-		case 1:
-			{
-				BOOST_AUTO(objects, object_can);
-				clear_all_closed_object(objects);
-				if (!objects.empty())
-				{
-					mutex::scoped_lock lock(temp_object_can_mutex);
-					temp_object_can.insert(temp_object_can.end(), objects.begin(), objects.end());
-				}
-				return true;
-			}
-			break;
-#endif
-		case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
-			break;
-		default:
-			return st_timer::on_timer(id, user_data);
-			break;
-		}
-
-		return false;
-	}
-
-	boost::shared_ptr<Socket> reuse_object()
-	{
-#ifdef REUSE_OBJECT
-		time_t now = time(NULL) - CLOSED_SOCKET_MAX_DURATION;
-		mutex::scoped_lock lock(temp_object_can_mutex);
-		//temp_object_can does not contain any duplicate items
-		BOOST_AUTO(iter, std::find_if(temp_object_can.begin(), temp_object_can.end(),
-			std::bind2nd(std::mem_fun_ref(&temp_object::is_timeout), now)));
-		if (iter != temp_object_can.end())
-		{
-			BOOST_AUTO(object_ptr, iter->object_ptr);
-			temp_object_can.erase(iter);
-			lock.unlock();
-
-			object_ptr->reset();
-			return object_ptr;
-		}
-#endif
-
-		return boost::shared_ptr<Socket>();
-	}
 
 protected:
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
