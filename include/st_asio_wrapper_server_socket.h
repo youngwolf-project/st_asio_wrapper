@@ -22,8 +22,6 @@ namespace st_asio_wrapper
 class i_server
 {
 public:
-	virtual ~i_server() {}
-
 	virtual st_service_pump& get_service_pump() = 0;
 	virtual const st_service_pump& get_service_pump() const = 0;
 	virtual void del_client(const boost::shared_ptr<st_tcp_socket>& client_ptr) = 0;

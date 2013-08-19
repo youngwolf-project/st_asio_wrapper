@@ -23,8 +23,6 @@ namespace st_asio_wrapper
 class i_packer
 {
 public:
-	virtual ~i_packer() {}
-
 	static size_t get_max_msg_size() {return MAX_MSG_LEN - HEAD_LEN;}
 	virtual std::string pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
 };

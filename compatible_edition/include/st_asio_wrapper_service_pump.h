@@ -36,10 +36,11 @@ class st_service_pump : public io_service
 public:
 	class i_service
 	{
-	public:
+	protected:
 		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), id(0) {service_pump_.add(this);}
 		virtual ~i_service() {}
 
+	public:
 		virtual void init() = 0;
 		virtual void uninit() = 0;
 

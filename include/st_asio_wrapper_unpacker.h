@@ -27,8 +27,6 @@ namespace st_asio_wrapper
 class i_unpacker
 {
 public:
-	virtual ~i_unpacker() {}
-
 	virtual void reset_unpacker_state() = 0;
 	virtual size_t used_buffer_size() {return 0;} //how many data have been received
 	//current msg's total length, -1 means don't know(head has not received)

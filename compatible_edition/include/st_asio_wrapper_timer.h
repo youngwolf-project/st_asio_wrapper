@@ -57,10 +57,10 @@ protected:
 		bool operator <(const timer_info& other) const {return id < other.id;}
 	};
 
-public:
 	st_timer(io_service& _io_service_) : io_service_(_io_service_) {}
 	virtual ~st_timer() {}
 
+public:
 	void set_timer(unsigned char id, size_t milliseconds, const void* user_data)
 	{
 		timer_info ti = {id};
