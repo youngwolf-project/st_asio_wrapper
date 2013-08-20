@@ -84,9 +84,8 @@ public:
 	{
 		reset(); //this is needed when re-start_service
 		do_something_to_all(boost::mem_fn(&i_service::init));
-		thread t(boost::bind(&st_service_pump::do_service, this, thread_num));
+		service_thread = thread(boost::bind(&st_service_pump::do_service, this, thread_num));
 		this_thread::yield();
-		t.swap(service_thread);
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example,
 	//close the application

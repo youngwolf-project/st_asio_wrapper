@@ -33,9 +33,8 @@ using namespace boost::asio;
 * st_udp_client_base: inherit from st_client_base
 * st_server_socket_base: inherit from st_tcp_socket
 *
-* st_client_base: n/a
-* st_tcp_sclient: n/a
-* st_udp_sclient: n/a
+* st_tcp_sclient: inherit from st_connector
+* st_udp_sclient: inherit from st_udp_socket
 */
 
 namespace st_asio_wrapper

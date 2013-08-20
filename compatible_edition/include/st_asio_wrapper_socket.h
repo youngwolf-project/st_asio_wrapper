@@ -33,6 +33,7 @@ protected:
 	{
 		sending = suspend_send_msg_ = false;
 		dispatching = suspend_dispatch_msg_ = false;
+		started_ = false;
 	}
 
 	void clear_buffer()
@@ -42,18 +43,28 @@ protected:
 		temp_msg_buffer.clear();
 	}
 
-	void suspend_send_msg(bool suspend) {suspend_send_msg_ = suspend;}
-
 public:
+	bool started() const {return started_;}
+	void start()
+	{
+		mutex::scoped_lock lock(start_mutex);
+		if (!started_)
+			started_ = do_start();
+	}
+	bool send_msg() //return false if send buffer is empty or sending not allowed or io_service stopped
+	{
+		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		return do_send_msg();
+	}
+
+	void suspend_send_msg(bool suspend) {if (!(suspend_send_msg_ = suspend)) send_msg();}
 	bool suspend_send_msg() const {return suspend_send_msg_;}
 
 	void suspend_dispatch_msg(bool suspend)
 	{
 		suspend_dispatch_msg_ = suspend;
 		stop_timer(1);
-
-		mutex::scoped_lock lock(recv_msg_buffer_mutex);
-		do_dispatch_msg();
+		do_dispatch_msg(true);
 	}
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
 
@@ -118,9 +129,11 @@ public:
 		dispatching = false;
 	}
 
-	virtual void start() = 0;
-
 protected:
+	virtual bool do_start() = 0;
+	//must mutex send_msg_buffer before invoke this function
+	virtual bool do_send_msg() = 0;
+
 	virtual bool is_send_allowed() const {return !suspend_send_msg_;}
 	//can send data or not(just put into send buffer)
 
@@ -156,10 +169,7 @@ protected:
 			dispatch_msg();
 			break;
 		case 1: //suspend dispatch msgs
-			{
-				mutex::scoped_lock lock(recv_msg_buffer_mutex);
-				do_dispatch_msg();
-			}
+			do_dispatch_msg(true);
 			break;
 		case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
 			break;
@@ -173,54 +183,54 @@ protected:
 
 	void dispatch_msg()
 	{
-		if (temp_msg_buffer.empty())
-			return;
-
 		bool dispatch = false;
-		mutex::scoped_lock lock(recv_msg_buffer_mutex);
-		size_t msg_num = recv_msg_buffer.size();
-
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER //inefficient
-		if (!suspend_dispatch_msg_)
-		{
-			for (BOOST_AUTO(iter, temp_msg_buffer.begin()); iter != temp_msg_buffer.end();)
-				if (!on_msg(*iter))
-					temp_msg_buffer.erase(iter++);
-				else if (msg_num < MAX_MSG_NUM) //msg recv buffer available
+#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+		for (BOOST_AUTO(iter, temp_msg_buffer.begin()); iter != temp_msg_buffer.end();)
+			if (!on_msg(*iter))
+				temp_msg_buffer.erase(iter++);
+			else
+			{
+				mutex::scoped_lock lock(recv_msg_buffer_mutex);
+				size_t msg_num = recv_msg_buffer.size();
+				if (msg_num < MAX_MSG_NUM) //msg recv buffer available
 				{
 					dispatch = true;
 					recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer, iter++);
-					++msg_num;
 				}
 				else
 					++iter;
-		}
-#else //efficient
-		if (msg_num < MAX_MSG_NUM) //msg recv buffer available
-		{
-			dispatch = true;
-			msg_num = MAX_MSG_NUM - msg_num; //max msg number this time can handle
-			BOOST_AUTO(begin_iter, temp_msg_buffer.begin()); BOOST_AUTO(end_iter, temp_msg_buffer.end());
-			if (temp_msg_buffer.size() > msg_num) //some msgs left behind
-			{
-				size_t left_num = temp_msg_buffer.size() - msg_num;
-				if (left_num > msg_num) //find the minimum movement
-					std::advance(end_iter = begin_iter, msg_num);
-				else
-					std::advance(end_iter, -(typename container::list<MsgType>::iterator::difference_type) left_num);
 			}
-			else
-				msg_num = temp_msg_buffer.size();
-			//use msg_num to avoid std::distance() call, so, msg_num must correct
-			recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer, begin_iter, end_iter, msg_num);
+#else
+		if (!temp_msg_buffer.empty())
+		{
+			mutex::scoped_lock lock(recv_msg_buffer_mutex);
+			size_t msg_num = recv_msg_buffer.size();
+			if (msg_num < MAX_MSG_NUM) //msg recv buffer available
+			{
+				dispatch = true;
+				msg_num = MAX_MSG_NUM - msg_num; //max msg number this time can handle
+				BOOST_AUTO(begin_iter, temp_msg_buffer.begin()); BOOST_AUTO(end_iter, temp_msg_buffer.end());
+				if (temp_msg_buffer.size() > msg_num) //some msgs left behind
+				{
+					size_t left_num = temp_msg_buffer.size() - msg_num;
+					if (left_num > msg_num) //find the minimum movement
+						std::advance(end_iter = begin_iter, msg_num);
+					else
+						std::advance(end_iter, -(typename container::list<MsgType>::iterator::difference_type) left_num);
+				}
+				else
+					msg_num = temp_msg_buffer.size();
+				//use msg_num to avoid std::distance() call, so, msg_num must correct
+				recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer, begin_iter, end_iter, msg_num);
+			}
 		}
 #endif
 
 		if (dispatch)
-			do_dispatch_msg();
+			do_dispatch_msg(true);
 
 		if (temp_msg_buffer.empty())
-			start(); //recv msg sequentially, that means second recv only after first recv success
+			do_start(); //recv msg sequentially, that means second recv only after first recv success
 		else
 			set_timer(0, 50, NULL);
 	}
@@ -231,12 +241,16 @@ protected:
 		mutex::scoped_lock lock(recv_msg_buffer_mutex);
 		dispatching = false;
 		//dispatch msg sequentially, that means second dispatch only after first dispatch success
-		do_dispatch_msg();
+		do_dispatch_msg(false);
 	}
 
 	//must mutex recv_msg_buffer before invoke this function
-	void do_dispatch_msg()
+	void do_dispatch_msg(bool need_lock)
 	{
+		mutex::scoped_lock lock;
+		if (need_lock)
+			lock = mutex::scoped_lock(recv_msg_buffer_mutex);
+
 		if (suspend_dispatch_msg_)
 		{
 			if (!dispatching && !recv_msg_buffer.empty())
@@ -278,6 +292,9 @@ protected:
 	//because of recv buffer overflow, st_socket will delay 50 milliseconds(nonblocking) to invoke
 	//dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
 	container::list<MsgType> temp_msg_buffer;
+
+	bool started_; //has started or not
+	mutex start_mutex;
 };
 
 } //namespace

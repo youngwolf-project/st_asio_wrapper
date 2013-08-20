@@ -49,18 +49,6 @@ class st_udp_socket : public st_socket<udp_msg, udp::socket>
 public:
 	st_udp_socket(io_service& io_service_) : st_socket(io_service_) {reset_state();}
 
-	void set_local_addr(unsigned short port, const std::string& ip = std::string())
-	{
-		error_code ec;
-		if (ip.empty())
-			local_addr = udp::endpoint(UDP_DEFAULT_IP_VERSION, port);
-		else
-		{
-			local_addr = udp::endpoint(address::from_string(ip, ec), port);
-			assert(!ec);
-		}
-	}
-
 	//reset all, be ensure that there's no any operations performed on this st_udp_socket when invoke it
 	//notice, when resue this st_udp_socket, st_object_pool will invoke reset(), child must re-write this to init
 	//all member variables, and then do not forget to invoke st_udp_socket::reset() to init father's
@@ -80,11 +68,16 @@ public:
 		if (ec) {unified_out::error_out("bind failed.");}
 	}
 
-	virtual void start()
+	void set_local_addr(unsigned short port, const std::string& ip = std::string())
 	{
-		if (!get_io_service().stopped())
-			async_receive_from(buffer(raw_buff), peer_addr,
-				boost::bind(&st_udp_socket::recv_handler, this, placeholders::error, placeholders::bytes_transferred));
+		error_code ec;
+		if (ip.empty())
+			local_addr = udp::endpoint(UDP_DEFAULT_IP_VERSION, port);
+		else
+		{
+			local_addr = udp::endpoint(address::from_string(ip, ec), port);
+			assert(!ec);
+		}
 	}
 
 	void disconnect() {force_close();}
@@ -93,6 +86,7 @@ public:
 
 	//udp does not need a unpacker
 
+	using st_socket::send_msg;
 	///////////////////////////////////////////////////
 	//msg sending interface
 	UDP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
@@ -116,20 +110,6 @@ public:
 		return false;
 	}
 
-	//send buffered msgs, return false if send buffer is empty or invalidate status
-	bool send_msg()
-	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		return do_send_msg();
-	}
-
-	void suspend_send_msg(bool suspend)
-	{
-		st_socket<msg_type, udp::socket>::suspend_send_msg(suspend);
-		if (!st_socket<msg_type, udp::socket>::suspend_send_msg())
-			send_msg();
-	}
-
 	void show_info(const char* head, const char* tail)
 	{
 		error_code ec;
@@ -139,6 +119,36 @@ public:
 	}
 
 protected:
+	virtual bool do_start()
+	{
+		if (!get_io_service().stopped())
+		{
+			async_receive_from(buffer(raw_buff), peer_addr, boost::bind(&st_udp_socket::recv_handler, this,
+				placeholders::error, placeholders::bytes_transferred));
+
+			return true;
+		}
+
+		return false;
+	}
+
+	//must mutex send_msg_buffer before invoke this function
+	virtual bool do_send_msg()
+	{
+		if (!is_send_allowed() || get_io_service().stopped())
+			sending = false;
+		else if (!sending && !send_msg_buffer.empty())
+		{
+			sending = true;
+			last_send_msg.swap(send_msg_buffer.front());
+			async_send_to(buffer(last_send_msg.str), last_send_msg.peer_addr,
+				boost::bind(&st_udp_socket::send_handler, this, placeholders::error, placeholders::bytes_transferred));
+			send_msg_buffer.pop_front();
+		}
+
+		return sending;
+	}
+
 	virtual bool is_send_allowed() const {return is_open() && st_socket<msg_type, udp::socket>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
@@ -200,7 +210,7 @@ protected:
 		}
 #ifdef _MSC_VER
 		else if (WSAECONNREFUSED == ec.value())
-			start();
+			do_start();
 #endif
 		else
 			on_recv_error(ec);
@@ -231,23 +241,6 @@ protected:
 			on_all_msg_send(last_send_msg);
 #endif
 		}
-	}
-
-	//must mutex send_msg_buffer before invoke this function
-	bool do_send_msg()
-	{
-		if (!is_send_allowed() || get_io_service().stopped())
-			sending = false;
-		else if (!sending && !send_msg_buffer.empty())
-		{
-			sending = true;
-			last_send_msg.swap(send_msg_buffer.front());
-			async_send_to(buffer(last_send_msg.str), last_send_msg.peer_addr,
-				boost::bind(&st_udp_socket::send_handler, this, placeholders::error, placeholders::bytes_transferred));
-			send_msg_buffer.pop_front();
-		}
-
-		return sending;
 	}
 
 	//must mutex send_msg_buffer before invoke this function

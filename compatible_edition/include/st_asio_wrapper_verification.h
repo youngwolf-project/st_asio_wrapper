@@ -326,6 +326,21 @@
  *
  * Change the name of the member variables and functions which named *client* to *object* in st_object_pool,
  * concept remains unchanged.
+ *
+ * 3.7	2013.8.20
+ * Protected some member functions to avoid abusing them.
+ * Change code to avoid compiler crash before vc2012, gcc doesn't have this problem.
+ * Forbid using some classes(eg st_timer) directly.
+ * Correct some error comments in st_asio_wrapper_timer.h.
+ *
+ * Forbid invoding st_socket::start() repeatedly, this is always forbidden, but it's the user's responsiblity
+ * to avoid this before this release.
+ *
+ * Move the logic of suspending sending msg to st_socket for code conciseness, to approach this, add two pure virtual
+ * functions: do_start and do_send_msg to st_socket.
+ *
+ * Fix bug: Invoking suspend_dispatch_msg() in on_msg cause dead lock.
+ * Fix bug: st_socket may stop continue recv msg in certain situations.
  */
 
 #ifndef ST_ASIO_WRAPPER_VERIFICATION_H_

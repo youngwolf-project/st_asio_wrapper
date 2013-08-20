@@ -43,30 +43,22 @@ public:
 #endif
 		{set_server_addr(SERVER_PORT, SERVER_IP);}
 
-	void set_server_addr(unsigned short port, const std::string& ip)
-	{
-		error_code ec;
-		server_addr = tcp::endpoint(address::from_string(ip, ec), port); assert(!ec);
-	}
-#ifdef RE_CONNECT_CONTROL
-	void set_re_connect_times(size_t times) {re_connect_times = times;}
-#endif
-	bool is_connected() const {return connected;}
 	//reset all, be ensure that there's no any operations performed on this st_connector when invoke it
 	//notice, when resue this st_connector, st_object_pool will invoke reset(), child must re-write this to init
 	//all member variables, and then do not forget to invoke st_connector::reset() to init father's
 	//member variables
 	virtual void reset() {st_tcp_socket::reset();}
-	virtual void start() //connect or recv
+
+	void set_server_addr(unsigned short port, const std::string& ip)
 	{
-		if (!get_io_service().stopped())
-		{
-			if (!is_connected())
-				async_connect(server_addr, boost::bind(&st_connector::connect_handler, this, placeholders::error));
-			else
-				do_recv_msg();
-		}
+		error_code ec;
+		server_addr = tcp::endpoint(address::from_string(ip, ec), port); assert(!ec);
 	}
+
+#ifdef RE_CONNECT_CONTROL
+	void set_re_connect_times(size_t times) {re_connect_times = times;}
+#endif
+	bool is_connected() const {return connected;}
 
 	void disconnect(bool reconnect = false) {force_close(reconnect);}
 	void force_close(bool reconnect = false) {reconnecting = reconnect; connected = false; st_tcp_socket::force_close();}
@@ -83,6 +75,21 @@ public:
 	}
 
 protected:
+	virtual bool do_start() //connect or recv
+	{
+		if (!get_io_service().stopped())
+		{
+			if (!is_connected())
+				async_connect(server_addr, boost::bind(&st_connector::connect_handler, this, placeholders::error));
+			else
+				do_recv_msg();
+
+			return true;
+		}
+
+		return false;
+	}
+
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
 	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket::is_send_allowed();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
@@ -102,7 +109,7 @@ protected:
 		if (reconnecting)
 		{
 			reconnecting = false;
-			start();
+			do_start();
 		}
 	}
 
@@ -111,7 +118,7 @@ protected:
 		switch(id)
 		{
 		case 10:
-			start();
+			do_start();
 			break;
 		case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
 			break;
@@ -130,7 +137,7 @@ protected:
 			connected = true;
 			on_connect();
 			send_msg(); //send msg buffer may have msgs, send them
-			start();
+			do_start();
 		}
 		else if (error::operation_aborted != ec && RE_CONNECT_CHECK && !get_io_service().stopped())
 			set_timer(10, RE_CONNECT_INTERVAL, nullptr);

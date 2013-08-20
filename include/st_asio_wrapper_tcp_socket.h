@@ -71,6 +71,7 @@ public:
 	boost::shared_ptr<i_unpacker> inner_unpacker() const {return unpacker_;}
 	void inner_unpacker(const boost::shared_ptr<i_unpacker>& _unpacker_) {unpacker_ = _unpacker_;}
 
+	using st_socket::send_msg;
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
@@ -94,20 +95,6 @@ public:
 		return false;
 	}
 
-	//send buffered msgs, return false if send buffer is empty or invalidate status
-	bool send_msg()
-	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		return do_send_msg();
-	}
-
-	void suspend_send_msg(bool suspend)
-	{
-		st_socket<msg_type, tcp::socket>::suspend_send_msg(suspend);
-		if (!st_socket<msg_type, tcp::socket>::suspend_send_msg())
-			send_msg();
-	}
-
 	void show_info(const char* head, const char* tail)
 	{
 		error_code ec;
@@ -117,6 +104,23 @@ public:
 	}
 
 protected:
+	//must mutex send_msg_buffer before invoke this function
+	virtual bool do_send_msg()
+	{
+		if (!is_send_allowed() || get_io_service().stopped())
+			sending = false;
+		else if (!sending && !send_msg_buffer.empty())
+		{
+			sending = true;
+			last_send_msg.swap(send_msg_buffer.front());
+			async_write(*this, buffer(last_send_msg), boost::bind(&st_tcp_socket::send_handler, this,
+				placeholders::error, placeholders::bytes_transferred));
+			send_msg_buffer.pop_front();
+		}
+
+		return sending;
+	}
+
 	virtual bool is_send_allowed() const {return !is_closing() && st_socket<msg_type, tcp::socket>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
@@ -225,23 +229,6 @@ protected:
 			on_all_msg_send(last_send_msg);
 #endif
 		}
-	}
-
-	//must mutex send_msg_buffer before invoke this function
-	bool do_send_msg()
-	{
-		if (!is_send_allowed() || get_io_service().stopped())
-			sending = false;
-		else if (!sending && !send_msg_buffer.empty())
-		{
-			sending = true;
-			last_send_msg.swap(send_msg_buffer.front());
-			async_write(*this, buffer(last_send_msg), boost::bind(&st_tcp_socket::send_handler, this,
-				placeholders::error, placeholders::bytes_transferred));
-			send_msg_buffer.pop_front();
-		}
-
-		return sending;
 	}
 
 	//must mutex send_msg_buffer before invoke this function

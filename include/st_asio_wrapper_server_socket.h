@@ -37,9 +37,19 @@ public:
 	//to init all member variables, and then do not forget to invoke st_server_socket_base::reset() to init father's
 	//member variables
 	virtual void reset() {st_tcp_socket::reset();}
-	virtual void start() {do_recv_msg();}
 
 protected:
+	virtual bool do_start()
+	{
+		if (!get_io_service().stopped())
+		{
+			do_recv_msg();
+			return true;
+		}
+
+		return false;
+	}
+
 	virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); force_close();}
 	//do not forget to force_close this st_tcp_socket(in del_client(), there's a force_close() invocation)
 	virtual void on_recv_error(const error_code& ec)
