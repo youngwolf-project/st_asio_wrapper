@@ -28,11 +28,7 @@ public:
 	st_tcp_client_base(st_service_pump& service_pump_) : st_client<Socket>(service_pump_) {}
 
 	virtual void uninit()
-	{
-		ST_THIS stop();
-		ST_THIS do_something_to_all(boost::bind(&Socket::graceful_close, _1, false));
-		ST_THIS do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));
-	}
+		{ST_THIS stop(); ST_THIS do_something_to_all(boost::bind(&Socket::graceful_close, _1, false));}
 
 	///////////////////////////////////////////////////
 	//msg sending interface

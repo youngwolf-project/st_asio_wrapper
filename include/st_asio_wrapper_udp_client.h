@@ -28,11 +28,7 @@ public:
 	st_udp_client_base(st_service_pump& service_pump_) : st_client<Socket>(service_pump_) {}
 
 	virtual void uninit()
-	{
-		ST_THIS stop();
-		ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_close));
-		ST_THIS do_something_to_all(boost::mem_fn(&Socket::direct_dispatch_all_msg));
-	}
+		{ST_THIS stop(); ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_close));}
 };
 typedef st_udp_client_base<> st_udp_client;
 

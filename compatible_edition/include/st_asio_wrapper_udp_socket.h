@@ -201,6 +201,7 @@ protected:
 		}
 
 		stop_all_timer();
+		direct_dispatch_all_msg();
 		reset_state();
 	}
 

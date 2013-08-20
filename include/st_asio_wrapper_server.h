@@ -83,7 +83,6 @@ public:
 		{
 			client_ptr->show_info("client:", "quit.");
 			client_ptr->force_close();
-			client_ptr->direct_dispatch_all_msg();
 		}
 	}
 
@@ -96,7 +95,6 @@ public:
 		ST_THIS do_something_to_all([this](decltype(*std::begin(ST_THIS object_can))& item) {
 			item->show_info("client:", "been closed.");
 			item->force_close();
-			item->direct_dispatch_all_msg();
 		});
 	}
 

@@ -80,53 +80,74 @@ public:
 		return send_msg_buffer.size() < MAX_MSG_NUM;
 	}
 
-	//how many msgs waiting for send
-	size_t get_pending_msg_num()
+	//how many msgs waiting for sending(sending_msg = true) or dispatching
+	size_t get_pending_msg_num(bool sending_msg = true)
 	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		return send_msg_buffer.size();
-	}
-
-	//the msg's format please refer to on_msg_send
-	void peek_first_pending_msg(MsgType& msg)
-	{
-		msg.clear();
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		if (!send_msg_buffer.empty())
-			msg = send_msg_buffer.front();
-	}
-
-	//the msg's format please refer to on_msg_send
-	void pop_first_pending_msg(MsgType& msg)
-	{
-		msg.clear();
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		if (!send_msg_buffer.empty())
+		if (sending_msg)
 		{
-			msg.swap(send_msg_buffer.front());
-			send_msg_buffer.pop_front();
+			mutex::scoped_lock lock(send_msg_buffer_mutex);
+			return send_msg_buffer.size();
+		}
+		else
+		{
+			mutex::scoped_lock lock(recv_msg_buffer_mutex);
+			return recv_msg_buffer.size();
+		}
+	}
+
+	void peek_first_pending_msg(MsgType& msg, bool sending_msg = true)
+	{
+		msg.clear();
+		if (sending_msg) //the msg's format please refer to on_msg_send
+		{
+			mutex::scoped_lock lock(send_msg_buffer_mutex);
+			if (!send_msg_buffer.empty())
+				msg = send_msg_buffer.front();
+		}
+		else //msg is unpacked
+		{
+			mutex::scoped_lock lock(recv_msg_buffer_mutex);
+			if (!recv_msg_buffer.empty())
+				msg = recv_msg_buffer.front();
+		}
+	}
+
+	void pop_first_pending_msg(MsgType& msg, bool sending_msg = true)
+	{
+		msg.clear();
+		if (sending_msg) //the msg's format please refer to on_msg_send
+		{
+			mutex::scoped_lock lock(send_msg_buffer_mutex);
+			if (!send_msg_buffer.empty())
+			{
+				msg.swap(send_msg_buffer.front());
+				send_msg_buffer.pop_front();
+			}
+		}
+		else
+		{
+			mutex::scoped_lock lock(recv_msg_buffer_mutex);
+			if (!recv_msg_buffer.empty())
+			{
+				msg.swap(recv_msg_buffer.front());
+				recv_msg_buffer.pop_front();
+			}
 		}
 	}
 
 	//clear all pending msgs
-	void pop_all_pending_msg(container::list<MsgType>& unsend_msg_list)
+	void pop_all_pending_msg(container::list<MsgType>& msg_list, bool sending_msg = true)
 	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		unsend_msg_list.splice(unsend_msg_list.end(), send_msg_buffer);
-	}
-
-	//must used after the service stopped
-	void direct_dispatch_all_msg()
-	{
-		//mutex::scoped_lock lock(recv_msg_buffer_mutex);
-		if (!recv_msg_buffer.empty() || !temp_msg_buffer.empty())
+		if (sending_msg)
 		{
-			recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
-			st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&st_socket::on_msg_handle, this, _1));
-			recv_msg_buffer.clear();
+			mutex::scoped_lock lock(send_msg_buffer_mutex);
+			msg_list.splice(msg_list.end(), send_msg_buffer);
 		}
-
-		dispatching = false;
+		else
+		{
+			mutex::scoped_lock lock(recv_msg_buffer_mutex);
+			msg_list.splice(msg_list.end(), recv_msg_buffer);
+		}
 	}
 
 protected:
@@ -181,6 +202,8 @@ protected:
 		return false;
 	}
 
+	//can only be invoked after socket closed
+	void direct_dispatch_all_msg() {suspend_dispatch_msg(false);}
 	void dispatch_msg()
 	{
 		auto dispatch = false;
@@ -257,14 +280,28 @@ protected:
 		else
 		{
 			auto& io_service_ = ST_THIS get_io_service();
+			auto dispatch_all = false;
 			if (io_service_.stopped())
-				dispatching = false;
-			else if (!dispatching && !recv_msg_buffer.empty())
+				dispatch_all = !(dispatching = false);
+			else if (!dispatching)
 			{
-				dispatching = true;
-				last_dispatch_msg.swap(recv_msg_buffer.front());
-				io_service_.post(boost::bind(&st_socket::msg_handler, this));
-				recv_msg_buffer.pop_front();
+				if (!ST_THIS is_open())
+					dispatch_all = true;
+				else if (!recv_msg_buffer.empty())
+				{
+					dispatching = true;
+					last_dispatch_msg.swap(recv_msg_buffer.front());
+					io_service_.post(boost::bind(&st_socket::msg_handler, this));
+					recv_msg_buffer.pop_front();
+				}
+			}
+
+			if (dispatch_all)
+			{
+				recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
+				st_asio_wrapper::do_something_to_all(recv_msg_buffer,
+					boost::bind(&st_socket::on_msg_handle, this, _1));
+				recv_msg_buffer.clear();
 			}
 		}
 	}

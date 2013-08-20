@@ -228,7 +228,6 @@ public:
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
 			if (!(*iter)->is_open())
 			{
-				(*iter)->direct_dispatch_all_msg();
 				objects.resize(objects.size() + 1);
 				objects.back().swap(*iter);
 				iter = object_can.erase(iter);

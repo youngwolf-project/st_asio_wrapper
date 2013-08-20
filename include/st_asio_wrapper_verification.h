@@ -341,6 +341,8 @@
  *
  * Fix bug: Invoking suspend_dispatch_msg() in on_msg cause dead lock.
  * Fix bug: st_socket may stop continue recv msg in certain situations.
+ * Fix bug: Invode st_server::del_client may cause mutex problem on recv buffer.
+ * Add some helper function to get the recv buffer size, peek the recv buffer, etc.
  */
 
 #ifndef ST_ASIO_WRAPPER_VERIFICATION_H_

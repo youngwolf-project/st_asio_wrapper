@@ -26,7 +26,7 @@ public:
 	st_sclient(st_service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
 
 	virtual void init() {ST_THIS reset(); ST_THIS start(); ST_THIS send_msg();}
-	virtual void uninit() {ST_THIS graceful_close(); ST_THIS direct_dispatch_all_msg();}
+	virtual void uninit() {ST_THIS graceful_close();}
 };
 
 template<typename Socket>

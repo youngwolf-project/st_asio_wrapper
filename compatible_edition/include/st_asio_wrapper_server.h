@@ -83,7 +83,6 @@ public:
 		{
 			client_ptr->show_info("client:", "quit.");
 			client_ptr->force_close();
-			client_ptr->direct_dispatch_all_msg();
 		}
 	}
 
@@ -98,7 +97,6 @@ public:
 		{
 			(*iter)->show_info("client:", "been closed.");
 			(*iter)->force_close();
-			(*iter)->direct_dispatch_all_msg();
 		}
 	}
 

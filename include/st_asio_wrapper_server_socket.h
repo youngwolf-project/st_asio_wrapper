@@ -57,7 +57,6 @@ protected:
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
 		show_info("client:", "quit.");
 		force_close();
-		direct_dispatch_all_msg();
 #else
 		server.del_client(ST_THIS shared_from_this());
 #endif
