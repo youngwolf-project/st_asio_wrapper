@@ -174,11 +174,12 @@ protected:
 	//because st_tcp_socket doesn't know any of the connection status
 	void do_recv_msg()
 	{
-		size_t min_recv_len;
-		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv(min_recv_len));
+		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
 		if (buffer_size(recv_buff) > 0)
-			async_read(*this, recv_buff, transfer_at_least(min_recv_len),
-				boost::bind(&st_tcp_socket::recv_handler, this, placeholders::error, placeholders::bytes_transferred));
+			async_read(*this, recv_buff, boost::bind(&i_unpacker::completion_condition, unpacker_,
+				placeholders::error, placeholders::bytes_transferred),
+				boost::bind(&st_tcp_socket::recv_handler, this,
+					placeholders::error, placeholders::bytes_transferred));
 	}
 
 	//reset unpacker's state, generally used when unpack error occur
@@ -202,7 +203,7 @@ protected:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			bool unpack_ok = unpacker_->on_recv(bytes_transferred, temp_msg_buffer);
+			bool unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_buffer);
 			dispatch_msg();
 
 			if (!unpack_ok)
@@ -258,6 +259,6 @@ protected:
 } //namespace st_tcp
 } //namespace st_asio_wrapper
 
-using namespace st_asio_wrapper::st_tcp;
+using namespace st_asio_wrapper::st_tcp; //compatible with old version which doesn't have st_tcp namespace.
 
 #endif /* ST_ASIO_WRAPPER_TCP_SOCKET_H_ */

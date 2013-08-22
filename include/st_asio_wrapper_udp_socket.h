@@ -44,7 +44,7 @@ struct udp_msg
 typedef udp_msg msg_type;
 typedef const msg_type msg_ctype;
 
-class st_udp_socket : public st_socket<udp_msg, udp::socket>
+class st_udp_socket : public st_socket<msg_type, udp::socket>
 {
 public:
 	st_udp_socket(io_service& io_service_) : st_socket(io_service_) {reset_state();}
@@ -228,13 +228,13 @@ protected:
 		}
 		else
 			on_send_error(ec);
-		//under windows, send a msg to addr_any may cause sending errors, please note
-		//for udp in st_asio_wrapper, sending error will not stop the following sending.
 
 		mutex::scoped_lock lock(send_msg_buffer_mutex);
 		sending = false;
 
 		//send msg sequentially, that means second send only after first send success
+		//under windows, send a msg to addr_any may cause sending errors, please note
+		//for udp in st_asio_wrapper, sending error will not stop the following sending.
 		if (!do_send_msg())
 		{
 #ifdef WANT_ALL_MSG_SEND_NOTIFY
@@ -265,6 +265,6 @@ protected:
 } //namespace st_udp
 } //namespace st_asio_wrapper
 
-using namespace st_asio_wrapper::st_udp;
+using namespace st_asio_wrapper::st_udp; //compatible with old version which doesn't have st_udp namespace.
 
 #endif /* ST_ASIO_WRAPPER_UDP_SOCKET_H_ */
