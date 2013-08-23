@@ -28,10 +28,10 @@ class i_unpacker
 {
 public:
 	static size_t total_buffer_size() {return MAX_MSG_LEN;}
+
 	virtual void reset_unpacker_state() = 0;
 	virtual size_t used_buffer_size() const {return 0;} //how many data have been received
-	//current msg's total length, -1 means don't know(head has not received)
-	virtual size_t current_msg_length() const {return -1;}
+	virtual size_t current_msg_length() const {return -1;} //current msg's total length, -1 means don't know
 	virtual bool parse_msg(size_t bytes_transferred, container::list<std::string>& msg_can) = 0;
 	virtual size_t completion_condition(const error_code& ec, size_t bytes_transferred) = 0;
 	virtual mutable_buffers_1 prepare_next_recv() = 0;
@@ -54,10 +54,14 @@ public:
 		auto pnext = std::begin(raw_buff);
 		auto unpack_ok = true;
 		while (unpack_ok)
-		{
+			//cur_msg_len now can be assigned in the completion_condition function, or in the following 'else if',
+			//so, we must verify cur_msg_len at the very begining of using it, not at the assignment as we do before,
+			//please pay special attention
 			if ((size_t) -1 != cur_msg_len)
 			{
-				if (cur_data_len >= cur_msg_len) //one msg received
+				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN)
+					unpack_ok = false;
+				else if (cur_data_len >= cur_msg_len) //one msg received
 				{
 					msg_can.resize(msg_can.size() + 1);
 					msg_can.back().assign(std::next(pnext, HEAD_LEN), cur_msg_len - HEAD_LEN);
@@ -69,14 +73,9 @@ public:
 					break;
 			}
 			else if (cur_data_len >= HEAD_LEN) //the msg's head been received
-			{
 				cur_msg_len = ntohs(*(unsigned short*) pnext);
-				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN)
-					unpack_ok = false;
-			}
 			else
 				break;
-		}
 
 		if (!unpack_ok)
 			reset_unpacker_state();
@@ -86,6 +85,10 @@ public:
 		return unpack_ok;
 	}
 
+	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
+	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
+	//read as many as possible to reduce async call-back(completion_condition function), and don't forget to handle
+	//stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const error_code& ec, size_t bytes_transferred)
 	{
 		if (ec)
@@ -96,8 +99,12 @@ public:
 
 		if ((size_t) -1 == cur_msg_len)
 		{
-			if (data_len >= HEAD_LEN)
+			if (data_len >= HEAD_LEN) //the msg's head been received
+			{
 				cur_msg_len = ntohs(*(unsigned short*) raw_buff.begin());
+				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN) //invalid msg, stop reading
+					return 0;
+			}
 			else
 				return raw_buff.size() - data_len; //read as many as possible
 		}
