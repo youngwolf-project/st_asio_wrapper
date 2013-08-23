@@ -53,12 +53,12 @@ public:
 
 		char* pnext = raw_buff.begin();
 		bool unpack_ok = true;
-		while (unpack_ok)
-			//cur_msg_len now can be assigned in the completion_condition function, or in the following 'else if',
-			//so, we must verify cur_msg_len at the very begining of using it, not at the assignment as we do before,
-			//please pay special attention
+		while (unpack_ok) //considering stick package problem, we need a loop
 			if ((size_t) -1 != cur_msg_len)
 			{
+				//cur_msg_len now can be assigned in the completion_condition function, or in the following 'else if',
+				//so, we must verify cur_msg_len at the very begining of using it, not at the assignment as we do
+				//before, please pay special attention
 				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN)
 					unpack_ok = false;
 				else if (cur_data_len >= cur_msg_len) //one msg received
@@ -72,7 +72,7 @@ public:
 				else
 					break;
 			}
-			else if (cur_data_len >= HEAD_LEN) //the msg's head been received
+			else if (cur_data_len >= HEAD_LEN) //the msg's head been received, stick package found
 				cur_msg_len = ntohs(*(unsigned short*) pnext);
 			else
 				break;
@@ -87,7 +87,7 @@ public:
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
-	//read as many as possible to reduce async call-back(completion_condition function), and don't forget to handle
+	//read as many as possible to reduce async call-back(st_tcp_socket::recv_handler), and don't forget to handle
 	//stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const error_code& ec, size_t bytes_transferred)
 	{
