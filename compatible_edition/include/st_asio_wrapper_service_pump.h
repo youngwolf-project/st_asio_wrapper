@@ -13,11 +13,7 @@
 #ifndef ST_ASIO_WRAPPER_SERVICE_PUMP_H_
 #define ST_ASIO_WRAPPER_SERVICE_PUMP_H_
 
-#include <boost/asio.hpp>
-#include <boost/bind.hpp>
 #include <boost/container/list.hpp>
-using namespace boost::asio;
-using namespace boost::system;
 
 #include "st_asio_wrapper_base.h"
 

@@ -16,8 +16,6 @@
 #include "st_asio_wrapper_socket.h"
 #include "st_asio_wrapper_unpacker.h"
 
-using namespace boost::asio::ip;
-
 #ifndef GRACEFUL_CLOSE_MAX_DURATION
 	#define GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, max waiting seconds while graceful closing
 #endif

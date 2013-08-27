@@ -13,12 +13,9 @@
 #ifndef ST_ASIO_WRAPPER_TIMER_H_
 #define ST_ASIO_WRAPPER_TIMER_H_
 
-#include <boost/asio.hpp>
-#include <boost/bind.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/container/set.hpp>
-using namespace boost::system;
-using namespace boost::asio;
+
+#include "st_asio_wrapper_base.h"
 
 /*
 * Please pay attention to the following reserved timer ids:

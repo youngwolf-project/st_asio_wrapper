@@ -17,8 +17,6 @@
 
 #include "st_asio_wrapper_socket.h"
 
-using namespace boost::asio::ip;
-
 //in set_local_addr, if the ip is empty, UDP_DEFAULT_IP_VERSION will define the ip version,
 //or, the ip version will be deduced by the ip address.
 //udp::v4() means ipv4 and udp::v6() means ipv6.

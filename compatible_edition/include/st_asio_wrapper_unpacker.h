@@ -13,11 +13,8 @@
 #ifndef ST_ASIO_WRAPPER_UNPACKER_H_
 #define ST_ASIO_WRAPPER_UNPACKER_H_
 
-#include <boost/asio.hpp>
 #include <boost/array.hpp>
-#include <boost/asio/buffer.hpp>
 #include <boost/container/list.hpp>
-using namespace boost::asio;
 
 #include "st_asio_wrapper_base.h"
 
@@ -106,10 +103,11 @@ public:
 					return 0;
 			}
 			else
-				return raw_buff.size() - data_len; //read as many as possible
+				return i_unpacker::total_buffer_size() - data_len; //read as many as possible
 		}
 
-		return data_len >= cur_msg_len ? 0 : raw_buff.size() - data_len; //read as many as possible
+		return data_len >= cur_msg_len ? 0 : i_unpacker::total_buffer_size() - data_len;
+		//read as many as possible except that we have already got a entire msg
 	}
 
 	virtual mutable_buffers_1 prepare_next_recv()

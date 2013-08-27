@@ -19,10 +19,14 @@
 #include <stdarg.h>
 #include <assert.h>
 
+#include <boost/asio.hpp>
+#include <boost/bind.hpp>
 #include <boost/thread.hpp>
+#include <boost/smart_ptr.hpp>
 #include <boost/typeof/typeof.hpp>
-#include <boost/enable_shared_from_this.hpp>
 using namespace boost;
+using namespace boost::asio;
+using namespace boost::system;
 
 #include "st_asio_wrapper_verification.h"
 

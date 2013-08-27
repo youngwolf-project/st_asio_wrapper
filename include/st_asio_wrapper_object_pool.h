@@ -14,8 +14,6 @@
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
 #define ST_ASIO_WRAPPER_OBJECT_POOL_H_
 
-#include <boost/container/list.hpp>
-
 #include "st_asio_wrapper_timer.h"
 #include "st_asio_wrapper_service_pump.h"
 
@@ -277,7 +275,7 @@ protected:
 	//object_can to temp_object_can, and free them from the heap in the near future(controlled by the
 	//0(id) timer)
 	//if AUTO_CLEAR_CLOSED_SOCKET been defined, clear_all_closed_object() will be invoked automatically
-	//and periodically, and move all closed objects to temp_object_can.
+	//and periodically to move all closed objects to temp_object_can.
 	container::list<temp_object> temp_object_can;
 	mutex temp_object_can_mutex;
 };

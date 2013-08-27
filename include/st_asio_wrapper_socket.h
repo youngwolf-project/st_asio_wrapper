@@ -13,11 +13,12 @@
 #ifndef ST_ASIO_WRAPPER_SOCKET_H_
 #define ST_ASIO_WRAPPER_SOCKET_H_
 
-#include <boost/smart_ptr.hpp>
 #include <boost/container/list.hpp>
 
 #include "st_asio_wrapper_packer.h"
 #include "st_asio_wrapper_timer.h"
+
+using namespace boost::asio::ip;
 
 namespace st_asio_wrapper
 {
