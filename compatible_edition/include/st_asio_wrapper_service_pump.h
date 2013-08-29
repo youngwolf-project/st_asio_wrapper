@@ -99,8 +99,9 @@ public:
 	bool is_running() const {return !stopped();}
 	bool is_service_started() const {return service_thread.get_id() != thread::id();}
 
-	//this function will block until service run out
-	//it works like start_service, but do not invoke stop_service
+	//this function works like start_service except that it will block until service run out,
+	//do not use stop_service(from other thread because this thread has been blocked) to unblock it,
+	//instead, use stop function which is implemented by io_service(also from other thread)
 	void run_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
 		reset(); //this is needed when re-start_service
