@@ -24,8 +24,6 @@ namespace st_asio_wrapper
 class i_unpacker
 {
 public:
-	static size_t total_buffer_size() {return MAX_MSG_LEN;}
-
 	virtual void reset_unpacker_state() = 0;
 	virtual size_t used_buffer_size() const {return 0;} //how many data have been received
 	virtual size_t current_msg_length() const {return -1;} //current msg's total length, -1 means don't know
@@ -92,7 +90,7 @@ public:
 			return 0;
 
 		auto data_len = cur_data_len + bytes_transferred;
-		assert(data_len < MAX_MSG_LEN);
+		assert(data_len <= MAX_MSG_LEN);
 
 		if ((size_t) -1 == cur_msg_len)
 		{
@@ -103,10 +101,10 @@ public:
 					return 0;
 			}
 			else
-				return i_unpacker::total_buffer_size() - data_len; //read as many as possible
+				return MAX_MSG_LEN - data_len; //read as many as possible
 		}
 
-		return data_len >= cur_msg_len ? 0 : i_unpacker::total_buffer_size() - data_len;
+		return data_len >= cur_msg_len ? 0 : MAX_MSG_LEN - data_len;
 		//read as many as possible except that we have already got a entire msg
 	}
 
