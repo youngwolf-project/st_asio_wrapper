@@ -79,7 +79,7 @@ int main() {
 	server_.set_server_addr(SERVER_PORT + 100);
 	echo_server echo_server_(service_pump); //echo server
 
-	service_pump.start_service();
+	service_pump.start_service(1);
 	while(service_pump.is_running())
 	{
 		std::cin >> str;
@@ -88,7 +88,7 @@ int main() {
 		else if (str == RESTART_COMMAND)
 		{
 			service_pump.stop_service();
-			service_pump.start_service();
+			service_pump.start_service(1);
 		}
 		else if (str == LIST_STATUS)
 		{

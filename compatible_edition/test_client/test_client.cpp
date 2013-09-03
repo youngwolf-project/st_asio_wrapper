@@ -125,7 +125,7 @@ int main(int argc, const char* argv[])
 //	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, SERVER_PORT, "::1")); //ipv6
 //	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, SERVER_PORT, "127.0.0.1")); //ipv4
 
-	service_pump.start_service();
+	service_pump.start_service(1);
 	while(service_pump.is_running())
 	{
 		std::getline(std::cin, str);
@@ -134,7 +134,7 @@ int main(int argc, const char* argv[])
 		else if (str == RESTART_COMMAND)
 		{
 			service_pump.stop_service();
-			service_pump.start_service();
+			service_pump.start_service(1);
 		}
 		else if (str == LIST_STATUS)
 		{
