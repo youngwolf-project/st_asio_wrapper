@@ -27,7 +27,7 @@ using namespace boost;
 using namespace boost::asio;
 using namespace boost::system;
 
-#include "st_asio_wrapper_verification.h"
+#include "st_asio_wrapper.h"
 
 #ifndef UNIFIED_OUT_BUF_NUM
 #define UNIFIED_OUT_BUF_NUM	2048
