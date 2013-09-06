@@ -23,6 +23,8 @@ using namespace boost::asio::ip;
 namespace st_asio_wrapper
 {
 
+enum BufferType {SEND_BUFFER, RECV_BUFFER};
+
 template<typename MsgType, typename Socket>
 class st_socket: public Socket, public st_timer
 {
@@ -82,9 +84,9 @@ public:
 	}
 
 	//how many msgs waiting for sending(sending_msg = true) or dispatching
-	size_t get_pending_msg_num(bool sending_msg = true)
+	size_t get_pending_msg_num(BufferType buffer_type = SEND_BUFFER)
 	{
-		if (sending_msg)
+		if (SEND_BUFFER == buffer_type)
 		{
 			mutex::scoped_lock lock(send_msg_buffer_mutex);
 			return send_msg_buffer.size();
@@ -96,10 +98,10 @@ public:
 		}
 	}
 
-	void peek_first_pending_msg(MsgType& msg, bool sending_msg = true)
+	void peek_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER)
 	{
 		msg.clear();
-		if (sending_msg) //the msg's format please refer to on_msg_send
+		if (SEND_BUFFER == buffer_type) //the msg's format please refer to on_msg_send
 		{
 			mutex::scoped_lock lock(send_msg_buffer_mutex);
 			if (!send_msg_buffer.empty())
@@ -113,10 +115,10 @@ public:
 		}
 	}
 
-	void pop_first_pending_msg(MsgType& msg, bool sending_msg = true)
+	void pop_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER)
 	{
 		msg.clear();
-		if (sending_msg) //the msg's format please refer to on_msg_send
+		if (SEND_BUFFER == buffer_type) //the msg's format please refer to on_msg_send
 		{
 			mutex::scoped_lock lock(send_msg_buffer_mutex);
 			if (!send_msg_buffer.empty())
@@ -137,9 +139,9 @@ public:
 	}
 
 	//clear all pending msgs
-	void pop_all_pending_msg(container::list<MsgType>& msg_list, bool sending_msg = true)
+	void pop_all_pending_msg(container::list<MsgType>& msg_list, BufferType buffer_type = SEND_BUFFER)
 	{
-		if (sending_msg)
+		if (SEND_BUFFER == buffer_type)
 		{
 			mutex::scoped_lock lock(send_msg_buffer_mutex);
 			msg_list.splice(msg_list.end(), send_msg_buffer);
