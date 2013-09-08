@@ -23,12 +23,11 @@ using namespace boost::asio::ip;
 namespace st_asio_wrapper
 {
 
+enum BufferType {SEND_BUFFER, RECV_BUFFER};
+
 template<typename MsgType, typename Socket>
 class st_socket: public Socket, public st_timer
 {
-public:
-	enum BufferType {SEND_BUFFER, RECV_BUFFER};
-
 protected:
 	st_socket(io_service& io_service_) : Socket(io_service_), st_timer(io_service_),
 		packer_(boost::make_shared<packer>()) {reset_state();}
