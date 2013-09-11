@@ -78,36 +78,37 @@ public:
 
 	void start_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
-		reset(); //this is needed when re-start_service
-		do_something_to_all(boost::mem_fn(&i_service::init));
-		service_thread = thread(boost::bind(&st_service_pump::do_service, this, thread_num));
+		service_thread = thread(boost::bind(&st_service_pump::run_service, this, thread_num));
 		this_thread::yield();
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example,
 	//close the application
-	bool stop_service()
+	void stop_service()
 	{
-		if (!is_service_started())
-			return false;
-
-		do_something_to_all(boost::mem_fn(&i_service::uninit));
-		service_thread.join();
-		return true;
+		if (is_service_started())
+		{
+			end_service();
+			service_thread.join();
+		}
 	}
+
 	//only used when stop_service() can not stop the service(been blocked and can not return)
 	void force_stop_service(){stop(); service_thread.join();}
 	bool is_running() const {return !stopped();}
 	bool is_service_started() const {return service_thread.get_id() != thread::id();}
 
 	//this function works like start_service except that it will block until service run out,
-	//do not use stop_service(from other thread because this thread has been blocked) to unblock it,
-	//instead, use stop function which is implemented by io_service(also from other thread)
+	//do not invoke stop_service from other thread(because this thread has been blocked) to unblock it,
+	//instead, use end_service(also from other thread)
 	void run_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
 		reset(); //this is needed when re-start_service
 		do_something_to_all(boost::mem_fn(&i_service::init));
 		do_service(thread_num);
 	}
+	//stop the service, must be invoked explicitly when the service need to stop, for example,
+	//close the application
+	void end_service() {do_something_to_all(boost::mem_fn(&i_service::uninit));}
 
 protected:
 	virtual void free(i_service* i_service_) {} //if needed, rewrite this to free the service
