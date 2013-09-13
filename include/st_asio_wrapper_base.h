@@ -146,8 +146,13 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 { \
 	mutex::scoped_lock lock(send_msg_buffer_mutex); \
 	return (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) ? \
-		direct_insert_msg(packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
+		do_direct_send_msg(packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
 } \
+TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+
+#define TCP_POST_MSG(FUNNAME, NATIVE) \
+bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+	{return direct_post_msg(packer_->pack_msg(pstr, len, num, NATIVE), can_overflow);} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
 //guarantee send msg successfully even if can_overflow equal to false
@@ -184,8 +189,21 @@ bool FUNNAME(const udp::endpoint& peer_addr, const char* const pstr[], const siz
 	bool can_overflow = false) \
 { \
 	mutex::scoped_lock lock(send_msg_buffer_mutex); \
-	return (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) ? \
-		direct_insert_msg(peer_addr, packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
+	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
+	{ \
+		msg_type msg = {peer_addr, packer_->pack_msg(pstr, len, num, NATIVE)}; \
+		return do_direct_send_msg(std::move(msg)); \
+	} \
+	return false; \
+} \
+UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+
+#define UDP_POST_MSG(FUNNAME, NATIVE) \
+bool FUNNAME(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
+	bool can_overflow = false) \
+{ \
+	msg_type msg = {peer_addr, packer_->pack_msg(pstr, len, num, NATIVE)}; \
+	return direct_post_msg(std::move(msg), can_overflow); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 

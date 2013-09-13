@@ -343,6 +343,15 @@
  * Fix bug: st_socket may stop continue recv msg in certain situations.
  * Fix bug: Invode st_server::del_client may cause mutex problem on recv buffer.
  * Add some helper function to get the recv buffer size, peek the recv buffer, etc.
+ *
+ * 3.8	2013.9.15
+ * Fix bug: Invoking safe_send_msg in on_msg may cause dead lock, on_msg_handle also has this problem when all
+ * service threads are blocked in on_msg_handle(call safe_send_msg)
+ *
+ * Add post_msg to reslove above issue, you are highly recommended to use these functions in on_msg and
+ * on_msg_handle functions, for others, you are recommended to use send_msg or safe_send_msg instead.
+ *
+ * Make start_service sync.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_

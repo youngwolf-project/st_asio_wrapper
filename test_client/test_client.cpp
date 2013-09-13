@@ -63,10 +63,10 @@ protected:
 	//msg handling end
 
 private:
-	void handle_msg(const std::string& str)
+	void handle_msg(msg_ctype& msg)
 	{
-		recv_bytes += str.size();
-		if (::check_msg && (str.size() < sizeof(size_t) || recv_index != *(size_t*) str.data()))
+		recv_bytes += msg.size();
+		if (::check_msg && (msg.size() < sizeof(size_t) || recv_index != *(size_t*) msg.data()))
 			printf("check msg error: " size_t_format ".\n", recv_index);
 		++recv_index;
 	}

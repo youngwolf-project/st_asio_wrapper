@@ -78,20 +78,11 @@ public:
 	//success at here just means put the msg into st_tcp_socket's send buffer
 	TCP_SAFE_SEND_MSG(safe_send_msg, send_msg)
 	TCP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
+	//like safe_send_msg and safe_send_native_msg, but non-block
+	TCP_POST_MSG(post_msg, false)
+	TCP_POST_MSG(post_native_msg, true)
 	//msg sending interface
 	///////////////////////////////////////////////////
-
-	//don't use the packer but insert into the send_msg_buffer directly
-	bool direct_send_msg(msg_ctype& msg, bool can_overflow = false)
-		{return direct_send_msg(msg_type(msg), can_overflow);}
-	bool direct_send_msg(msg_type&& msg, bool can_overflow = false)
-	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM)
-			return direct_insert_msg(std::move(msg));
-
-		return false;
-	}
 
 	void show_info(const char* head, const char* tail)
 	{
@@ -150,17 +141,6 @@ protected:
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
 	virtual void on_msg_handle(msg_type& msg)
 		{unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data());}
-
-#ifdef WANT_MSG_SEND_NOTIFY
-	//one msg has sent to the kernel buffer, msg is the right msg(remain in packed)
-	//if the msg is custom packed, then obviously you know it
-	//or the msg is packed as: len(2 bytes) + original msg, see st_asio_wrapper::packer for more details
-	virtual void on_msg_send(msg_type& msg) {}
-#endif
-#ifdef WANT_ALL_MSG_SEND_NOTIFY
-	//send buffer goes empty, msg remain in packed
-	virtual void on_all_msg_send(msg_type& msg) {}
-#endif
 
 	//start the async read
 	//it's child's responsibility to invoke this properly,
@@ -229,19 +209,6 @@ protected:
 			on_all_msg_send(last_send_msg);
 #endif
 		}
-	}
-
-	//must mutex send_msg_buffer before invoke this function
-	bool direct_insert_msg(msg_type&& msg)
-	{
-		if (!msg.empty())
-		{
-			send_msg_buffer.resize(send_msg_buffer.size() + 1);
-			send_msg_buffer.back().swap(msg);
-			do_send_msg();
-		}
-
-		return true;
 	}
 
 protected:

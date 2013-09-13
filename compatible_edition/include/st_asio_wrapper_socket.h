@@ -23,7 +23,14 @@ using namespace boost::asio::ip;
 namespace st_asio_wrapper
 {
 
-enum BufferType {SEND_BUFFER, RECV_BUFFER};
+enum BufferType {POST_BUFFER, SEND_BUFFER, RECV_BUFFER};
+
+#define post_msg_buffer msg_buffer[0]
+#define post_msg_buffer_mutex msg_buffer_mutex[0]
+#define send_msg_buffer msg_buffer[1]
+#define send_msg_buffer_mutex msg_buffer_mutex[1]
+#define recv_msg_buffer msg_buffer[2]
+#define recv_msg_buffer_mutex msg_buffer_mutex[2]
 
 template<typename MsgType, typename Socket>
 class st_socket: public Socket, public st_timer
@@ -34,6 +41,7 @@ protected:
 
 	void reset_state()
 	{
+		posting = false;
 		sending = suspend_send_msg_ = false;
 		dispatching = suspend_dispatch_msg_ = false;
 		started_ = false;
@@ -73,7 +81,7 @@ public:
 
 	//get or change the packer at runtime
 	boost::shared_ptr<i_packer> inner_packer() const {return packer_;}
-	void inner_packer(const boost::shared_ptr<i_packer>& _packer_) {packer_ = _packer_;};
+	void inner_packer(const boost::shared_ptr<i_packer>& _packer_) {packer_ = _packer_;}
 
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed
 	//no matter whether the send buffer is available
@@ -83,74 +91,68 @@ public:
 		return send_msg_buffer.size() < MAX_MSG_NUM;
 	}
 
+	//don't use the packer but insert into the send_msg_buffer directly
+	bool direct_send_msg(const MsgType& msg, bool can_overflow = false)
+		{MsgType tmp_msg(msg); return direct_send_msg(tmp_msg, can_overflow);}
+	//after this call, msg becomes empty, please note.
+	bool direct_send_msg(MsgType& msg, bool can_overflow = false)
+	{
+		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM)
+			return do_direct_send_msg(msg);
+
+		return false;
+	}
+
+	bool direct_post_msg(const MsgType& msg, bool can_overflow = false)
+		{MsgType tmp_msg(msg); return direct_post_msg(tmp_msg, can_overflow);}
+	//after this call, msg becomes empty, please note.
+	bool direct_post_msg(MsgType& msg, bool can_overflow = false)
+	{
+		if (direct_send_msg(msg, can_overflow))
+			return true;
+		else
+		{
+			mutex::scoped_lock lock(post_msg_buffer_mutex);
+			return do_direct_post_msg(msg);
+		}
+	}
+
 	//how many msgs waiting for sending(sending_msg = true) or dispatching
 	size_t get_pending_msg_num(BufferType buffer_type = SEND_BUFFER)
 	{
-		if (SEND_BUFFER == buffer_type)
-		{
-			mutex::scoped_lock lock(send_msg_buffer_mutex);
-			return send_msg_buffer.size();
-		}
-		else
-		{
-			mutex::scoped_lock lock(recv_msg_buffer_mutex);
-			return recv_msg_buffer.size();
-		}
+		mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		return msg_buffer[buffer_type].size();
 	}
 
 	void peek_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER)
 	{
 		msg.clear();
-		if (SEND_BUFFER == buffer_type) //the msg's format please refer to on_msg_send
-		{
-			mutex::scoped_lock lock(send_msg_buffer_mutex);
-			if (!send_msg_buffer.empty())
-				msg = send_msg_buffer.front();
-		}
-		else //msg is unpacked
-		{
-			mutex::scoped_lock lock(recv_msg_buffer_mutex);
-			if (!recv_msg_buffer.empty())
-				msg = recv_msg_buffer.front();
-		}
+		//msgs in send buffer and post buffer are packed
+		//msgs in recv buffer are unpacked
+		mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		if (!msg_buffer[buffer_type].empty())
+			msg = msg_buffer[buffer_type].front();
 	}
 
 	void pop_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER)
 	{
 		msg.clear();
-		if (SEND_BUFFER == buffer_type) //the msg's format please refer to on_msg_send
+		//msgs in send buffer and post buffer are packed
+		//msgs in recv buffer are unpacked
+		mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		if (!msg_buffer[buffer_type].empty())
 		{
-			mutex::scoped_lock lock(send_msg_buffer_mutex);
-			if (!send_msg_buffer.empty())
-			{
-				msg.swap(send_msg_buffer.front());
-				send_msg_buffer.pop_front();
-			}
-		}
-		else
-		{
-			mutex::scoped_lock lock(recv_msg_buffer_mutex);
-			if (!recv_msg_buffer.empty())
-			{
-				msg.swap(recv_msg_buffer.front());
-				recv_msg_buffer.pop_front();
-			}
+			msg.swap(msg_buffer[buffer_type].front());
+			msg_buffer[buffer_type].pop_front();
 		}
 	}
 
 	//clear all pending msgs
 	void pop_all_pending_msg(container::list<MsgType>& msg_list, BufferType buffer_type = SEND_BUFFER)
 	{
-		if (SEND_BUFFER == buffer_type)
-		{
-			mutex::scoped_lock lock(send_msg_buffer_mutex);
-			msg_list.splice(msg_list.end(), send_msg_buffer);
-		}
-		else
-		{
-			mutex::scoped_lock lock(recv_msg_buffer_mutex);
-			msg_list.splice(msg_list.end(), recv_msg_buffer);
-		}
+		mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		msg_list.splice(msg_list.end(), msg_buffer[buffer_type]);
 	}
 
 protected:
@@ -185,6 +187,17 @@ protected:
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
 	virtual void on_msg_handle(MsgType& msg) = 0;
 
+#ifdef WANT_MSG_SEND_NOTIFY
+	//one msg has sent to the kernel buffer, msg is the right msg(remain in packed)
+	//if the msg is custom packed, then obviously you know it
+	//or the msg is packed as: len(2 bytes) + original msg, see st_asio_wrapper::packer for more details
+	virtual void on_msg_send(MsgType& msg) {}
+#endif
+#ifdef WANT_ALL_MSG_SEND_NOTIFY
+	//send buffer goes empty, msg remain in packed
+	virtual void on_all_msg_send(MsgType& msg) {}
+#endif
+
 	virtual bool on_timer(unsigned char id, const void* user_data)
 	{
 		switch (id)
@@ -195,7 +208,20 @@ protected:
 		case 1: //suspend dispatch msgs
 			do_dispatch_msg(true);
 			break;
-		case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
+		case 2:
+			{
+				mutex::scoped_lock lock(post_msg_buffer_mutex);
+				while (!post_msg_buffer.empty())
+					if (direct_send_msg(post_msg_buffer.front()))
+						post_msg_buffer.pop_front();
+					else
+						break;
+
+				//continue the timer is not empty
+				return post_msg_buffer.empty() ? (suspend_dispatch_msg(false), posting = false) : true;
+			}
+			break;
+		case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
 			break;
 		default:
 			return st_timer::on_timer(id, user_data);
@@ -311,20 +337,47 @@ protected:
 		}
 	}
 
+	//must mutex send_msg_buffer before invoke this function
+	bool do_direct_send_msg(MsgType& msg)
+	{
+		if (!msg.empty())
+		{
+			send_msg_buffer.resize(send_msg_buffer.size() + 1);
+			send_msg_buffer.back().swap(msg);
+			do_send_msg();
+		}
+
+		return true;
+	}
+
+	//must mutex post_msg_buffer before invoke this function
+	bool do_direct_post_msg(MsgType& msg)
+	{
+		if (!msg.empty())
+		{
+			post_msg_buffer.resize(post_msg_buffer.size() + 1);
+			post_msg_buffer.back().swap(msg);
+			if (!posting)
+			{
+				posting = true;
+				suspend_dispatch_msg(true);
+				set_timer(2, 50, NULL);
+			}
+		}
+
+		return true;
+	}
+
 protected:
 	MsgType last_send_msg, last_dispatch_msg;
 	boost::shared_ptr<i_packer> packer_;
 
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	container::list<MsgType> send_msg_buffer;
-	mutex send_msg_buffer_mutex;
-	bool sending, suspend_send_msg_;
+	container::list<MsgType> msg_buffer[3];
+	mutex msg_buffer_mutex[3];
 
-	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	//using this msg recv buffer or not is decided by the return value of on_msg()
-	//see on_msg() for more details
-	container::list<MsgType> recv_msg_buffer;
-	mutex recv_msg_buffer_mutex;
+	bool posting;
+	bool sending, suspend_send_msg_;
 	bool dispatching, suspend_dispatch_msg_;
 
 	//if on_msg() return true, which means use the msg recv buffer,

@@ -86,7 +86,7 @@ public:
 		{
 			std::string order("\2", ORDER_LEN);
 			order += str;
-			send_msg(order);
+			send_msg(order, true);
 		}
 	}
 

@@ -2,7 +2,7 @@
 //configuration
 #define SERVER_PORT		9528
 #define REUSE_OBJECT //use objects pool
-#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+//#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ENHANCED_STABILITY
 //configuration
 
@@ -52,10 +52,10 @@ protected:
 	//msg handling: send the original msg back(echo server)
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
-	virtual bool on_msg(msg_type& msg) {send_msg(msg, true); return false;}
+	virtual bool on_msg(msg_type& msg) {post_msg(msg); return false;}
 #endif
 	//we should handle the msg in on_msg_handle for time-consuming task like this:
-	virtual void on_msg_handle(msg_type& msg) {send_msg(msg, true);}
+	virtual void on_msg_handle(msg_type& msg) {post_msg(msg);}
 	//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_tcp_socket will directly
 	//use the msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
 	//msg handling end
@@ -120,6 +120,6 @@ int main() {
 //restore configuration
 #undef SERVER_PORT
 #undef REUSE_OBJECT //use objects pool
-#undef FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+//#undef FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #undef ENHANCED_STABILITY
 //restore configuration

@@ -37,6 +37,7 @@ struct udp_msg
 	void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); str.swap(other.str);}
 	void swap(const udp::endpoint& addr, std::string& tmp_str) {peer_addr = addr; str.swap(tmp_str);}
 	void clear() {peer_addr = udp::endpoint(); str.clear();}
+	bool empty() const {return str.empty();}
 	bool operator==(const udp_msg& other) const {return this == &other;}
 };
 typedef udp_msg msg_type;
@@ -93,20 +94,11 @@ public:
 	//success at here just means put the msg into st_udp_socket's send buffer
 	UDP_SAFE_SEND_MSG(safe_send_msg, send_msg)
 	UDP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
+	//like safe_send_msg and safe_send_native_msg, but non-block
+	UDP_POST_MSG(post_msg, false)
+	UDP_POST_MSG(post_native_msg, true)
 	//msg sending interface
 	///////////////////////////////////////////////////
-
-	//don't use the packer but insert into the send_msg_buffer directly
-	bool direct_send_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false)
-		{return direct_send_msg(peer_addr, std::string(str), can_overflow);}
-	bool direct_send_msg(const udp::endpoint& peer_addr, std::string&& str, bool can_overflow = false)
-	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
-		if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM)
-			return direct_insert_msg(peer_addr, std::move(str));
-
-		return false;
-	}
 
 	void show_info(const char* head, const char* tail)
 	{
@@ -175,15 +167,6 @@ protected:
 	virtual void on_msg_handle(msg_type& msg)
 		{unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data());}
 
-#ifdef WANT_MSG_SEND_NOTIFY
-	//one msg has sent to the kernel buffer
-	virtual void on_msg_send(msg_type& msg) {}
-#endif
-#ifdef WANT_ALL_MSG_SEND_NOTIFY
-	//send buffer goes empty
-	virtual void on_all_msg_send(msg_type& msg) {}
-#endif
-
 	void clean_up()
 	{
 		if (is_open())
@@ -240,19 +223,6 @@ protected:
 			on_all_msg_send(last_send_msg);
 #endif
 		}
-	}
-
-	//must mutex send_msg_buffer before invoke this function
-	bool direct_insert_msg(const udp::endpoint& peer_addr, std::string&& str)
-	{
-		if (!str.empty())
-		{
-			send_msg_buffer.resize(send_msg_buffer.size() + 1);
-			send_msg_buffer.back().swap(peer_addr, str);
-			do_send_msg();
-		}
-
-		return true;
 	}
 
 protected:

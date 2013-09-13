@@ -55,6 +55,7 @@ public:
 	};
 
 public:
+	st_service_pump() : started(false) {}
 	virtual ~st_service_pump() {clear();}
 
 	i_service* find(int id)
@@ -78,8 +79,12 @@ public:
 
 	void start_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
-		service_thread = thread(boost::bind(&st_service_pump::run_service, this, thread_num));
-		this_thread::yield();
+		if (!is_service_started())
+		{
+			service_thread = thread(boost::bind(&st_service_pump::run_service, this, thread_num));
+			while (!is_service_started())
+				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+		}
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example,
 	//close the application
@@ -87,7 +92,7 @@ public:
 	{
 		if (is_service_started())
 		{
-			end_service();
+			do_something_to_all(boost::mem_fn(&i_service::uninit));
 			service_thread.join();
 		}
 	}
@@ -95,7 +100,7 @@ public:
 	//only used when stop_service() can not stop the service(been blocked and can not return)
 	void force_stop_service(){stop(); service_thread.join();}
 	bool is_running() const {return !stopped();}
-	bool is_service_started() const {return service_thread.get_id() != thread::id();}
+	bool is_service_started() const {return started;}
 
 	//this function works like start_service except that it will block until service run out,
 	//do not invoke stop_service from other thread(because this thread has been blocked) to unblock it,
@@ -108,7 +113,12 @@ public:
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example,
 	//close the application
-	void end_service() {do_something_to_all(boost::mem_fn(&i_service::uninit));}
+	void end_service()
+	{
+		do_something_to_all(boost::mem_fn(&i_service::uninit));
+		while (is_service_started())
+			this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+	}
 
 protected:
 	virtual void free(i_service* i_service_) {} //if needed, rewrite this to free the service
@@ -138,6 +148,7 @@ private:
 
 	void do_service(int thread_num)
 	{
+		started = true;
 		unified_out::info_out("service pump started.");
 
 		--thread_num;
@@ -151,11 +162,13 @@ private:
 			tg.join_all();
 
 		unified_out::info_out("service pump end.");
+		started = false;
 	}
 
 protected:
 	container::list<i_service*> service_can; //not protected by mutex, please note
 	thread service_thread;
+	bool started;
 };
 
 } //namespace

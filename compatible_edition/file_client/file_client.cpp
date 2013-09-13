@@ -49,11 +49,8 @@ int main(int argc, const char* argv[])
 			service_pump.stop_service();
 		else if (str == RESTART_COMMAND)
 		{
-			for (int i = 0; i < link_num; ++i)
-			{
-				service_pump.stop_service();
-				service_pump.start_service();
-			}
+			service_pump.stop_service();
+			service_pump.start_service();
 		}
 		else if (str.size() > sizeof(REQUEST_FILE) &&
 			!strncmp(REQUEST_FILE, str.data(), sizeof(REQUEST_FILE) - 1) &&
