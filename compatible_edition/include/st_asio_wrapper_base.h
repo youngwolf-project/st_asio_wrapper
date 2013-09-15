@@ -46,6 +46,7 @@ using namespace boost::system;
 #if defined _MSC_VER
 #define size_t_format "%Iu"
 #define ST_THIS //workaround to make up the BOOST_AUTO's defect under vc2008 and compiler bugs before vc2012
+#define ssize_t SSIZE_T
 #else // defined __GNUC__
 #define size_t_format "%tu"
 #define ST_THIS this->
@@ -81,6 +82,33 @@ namespace st_asio_wrapper
 	template<typename _Can, typename _Predicate>
 	void do_something_to_one(_Can& __can, const _Predicate& __pred)
 		{for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) if (__pred(*iter)) break;}
+
+	template<typename _Can>
+	bool splice_helper(_Can& dest_can, _Can& src_can, size_t max_size = MAX_MSG_NUM)
+	{
+		size_t size = dest_can.size();
+		if (size < max_size) //dest_can's buffer available
+		{
+			size = max_size - size; //max items this time can handle
+			BOOST_AUTO(begin_iter, src_can.begin()); BOOST_AUTO(end_iter, src_can.end());
+			if (src_can.size() > size) //some items left behind
+			{
+				size_t left_num = src_can.size() - size;
+				if (left_num > size) //find the minimum movement
+					std::advance(end_iter = begin_iter, size);
+				else
+					std::advance(end_iter, -(ssize_t) left_num);
+			}
+			else
+				size = src_can.size();
+			//use size to avoid std::distance() call, so, size must correct
+			dest_can.splice(dest_can.end(), src_can, begin_iter, end_iter, size);
+
+			return size > 0;
+		}
+
+		return false;
+	}
 
 //member functions, used to do something to any member container optionally with any member mutex
 #define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)

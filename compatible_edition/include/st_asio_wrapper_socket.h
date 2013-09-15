@@ -210,15 +210,20 @@ protected:
 			break;
 		case 2:
 			{
+				bool empty;
 				mutex::scoped_lock lock(post_msg_buffer_mutex);
-				while (!post_msg_buffer.empty())
-					if (direct_send_msg(post_msg_buffer.front()))
-						post_msg_buffer.pop_front();
-					else
-						break;
+				{
+					mutex::scoped_lock lock(send_msg_buffer_mutex);
+					if (splice_helper(send_msg_buffer, post_msg_buffer))
+						do_send_msg();
+				}
+				posting = !(empty = post_msg_buffer.empty());
+				lock.unlock();
 
-				//continue the timer is not empty
-				return post_msg_buffer.empty() ? (suspend_dispatch_msg(false), posting = false) : true;
+				if (empty)
+					do_dispatch_msg(true);
+
+				return !empty; //continue the timer if not empty
 			}
 			break;
 		case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
@@ -235,9 +240,10 @@ protected:
 	void direct_dispatch_all_msg() {suspend_dispatch_msg(false);}
 	void dispatch_msg()
 	{
-		bool dispatch = false;
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-		for (BOOST_AUTO(iter, temp_msg_buffer.begin()); !suspend_dispatch_msg_ && iter != temp_msg_buffer.end();)
+		bool dispatch = false;
+		for (BOOST_AUTO(iter, temp_msg_buffer.begin());
+			!suspend_dispatch_msg_ && !posting && iter != temp_msg_buffer.end();)
 			if (!on_msg(*iter))
 				temp_msg_buffer.erase(iter++);
 			else
@@ -252,34 +258,17 @@ protected:
 				else
 					++iter;
 			}
+
+		if (dispatch)
+			do_dispatch_msg(true);
 #else
 		if (!temp_msg_buffer.empty())
 		{
 			mutex::scoped_lock lock(recv_msg_buffer_mutex);
-			size_t msg_num = recv_msg_buffer.size();
-			if (msg_num < MAX_MSG_NUM) //msg recv buffer available
-			{
-				dispatch = true;
-				msg_num = MAX_MSG_NUM - msg_num; //max msg number this time can handle
-				BOOST_AUTO(begin_iter, temp_msg_buffer.begin()); BOOST_AUTO(end_iter, temp_msg_buffer.end());
-				if (temp_msg_buffer.size() > msg_num) //some msgs left behind
-				{
-					size_t left_num = temp_msg_buffer.size() - msg_num;
-					if (left_num > msg_num) //find the minimum movement
-						std::advance(end_iter = begin_iter, msg_num);
-					else
-						std::advance(end_iter, -(typename container::list<MsgType>::iterator::difference_type) left_num);
-				}
-				else
-					msg_num = temp_msg_buffer.size();
-				//use msg_num to avoid std::distance() call, so, msg_num must correct
-				recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer, begin_iter, end_iter, msg_num);
-			}
+			if (splice_helper(recv_msg_buffer, temp_msg_buffer))
+				do_dispatch_msg(false);
 		}
 #endif
-
-		if (dispatch)
-			do_dispatch_msg(true);
 
 		if (temp_msg_buffer.empty())
 			do_start(); //recv msg sequentially, that means second recv only after first recv success
@@ -308,7 +297,7 @@ protected:
 			if (!dispatching && !recv_msg_buffer.empty())
 				set_timer(1, 24 * 60 * 60 * 1000, NULL); //one day
 		}
-		else
+		else if (!posting)
 		{
 			io_service& io_service_ = ST_THIS get_io_service();
 			bool dispatch_all = false;
@@ -360,7 +349,6 @@ protected:
 			if (!posting)
 			{
 				posting = true;
-				suspend_dispatch_msg(true);
 				set_timer(2, 50, NULL);
 			}
 		}

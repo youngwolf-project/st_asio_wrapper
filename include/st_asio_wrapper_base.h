@@ -90,6 +90,31 @@ namespace st_asio_wrapper
 	void do_something_to_one(_Can& __can, const _Predicate& __pred)
 		{for (auto iter = std::begin(__can); iter != std::end(__can); ++iter) if (__pred(*iter)) break;}
 
+	template<typename _Can>
+	bool splice_helper(_Can& dest_can, _Can& src_can, size_t max_size = MAX_MSG_NUM)
+	{
+		auto size = dest_can.size();
+		if (size < max_size) //dest_can's buffer available
+		{
+			size = max_size - size; //max items this time can handle
+			auto begin_iter = std::begin(src_can), end_iter = std::end(src_can);
+			if (src_can.size() > size) //some items left behind
+			{
+				auto left_num = src_can.size() - size;
+				//find the minimum movement
+				end_iter = left_num > size ? std::next(begin_iter, size) : std::prev(end_iter, left_num);
+			}
+			else
+				size = src_can.size();
+			//use size to avoid std::distance() call, so, size must correct
+			dest_can.splice(std::end(dest_can), src_can, begin_iter, end_iter, size);
+
+			return size > 0;
+		}
+
+		return false;
+	}
+
 //member functions, used to do something to any member container optionally with any member mutex
 #define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)
 #define DO_SOMETHING_TO_ALL(CAN) DO_SOMETHING_TO_ALL_NAME(do_something_to_all, CAN)
