@@ -25,6 +25,7 @@ class st_sclient : public st_service_pump::i_service, public Socket
 public:
 	st_sclient(st_service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
 
+protected:
 	virtual void init() {ST_THIS reset(); ST_THIS start(); ST_THIS send_msg();}
 	virtual void uninit() {ST_THIS graceful_close();}
 };
@@ -35,7 +36,6 @@ class st_client : public st_object_pool<Socket>
 protected:
 	st_client(st_service_pump& service_pump_) : st_object_pool<Socket>(service_pump_) {}
 
-public:
 	virtual void init()
 	{
 		ST_THIS do_something_to_all(boost::mem_fn(&Socket::reset));
@@ -45,6 +45,7 @@ public:
 		ST_THIS start();
 	}
 
+public:
 	bool add_client(const boost::shared_ptr<Socket>& client_ptr, bool reset = true)
 	{
 		if (ST_THIS add_object(client_ptr))

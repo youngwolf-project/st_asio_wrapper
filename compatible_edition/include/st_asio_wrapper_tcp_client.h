@@ -27,9 +27,6 @@ class st_tcp_client_base : public st_client<Socket>
 public:
 	st_tcp_client_base(st_service_pump& service_pump_) : st_client<Socket>(service_pump_) {}
 
-	virtual void uninit()
-		{ST_THIS stop(); ST_THIS do_something_to_all(boost::bind(&Socket::graceful_close, _1, false));}
-
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_BROADCAST_MSG(broadcast_msg, send_msg)
@@ -40,6 +37,10 @@ public:
 	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
 	//msg sending interface
 	///////////////////////////////////////////////////
+
+protected:
+	virtual void uninit()
+		{ST_THIS stop(); ST_THIS do_something_to_all(boost::bind(&Socket::graceful_close, _1, false));}
 };
 typedef st_tcp_client_base<> st_tcp_client;
 

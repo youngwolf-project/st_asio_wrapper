@@ -352,6 +352,8 @@
  * on_msg_handle functions, for others, you are recommended to use send_msg or safe_send_msg instead.
  *
  * Make start_service sync.
+ *
+ * Add support for adding serivce to st_service_pump at runtime.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_

@@ -27,6 +27,7 @@ class st_udp_client_base : public st_client<Socket>
 public:
 	st_udp_client_base(st_service_pump& service_pump_) : st_client<Socket>(service_pump_) {}
 
+protected:
 	virtual void uninit()
 		{ST_THIS stop(); ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_close));}
 };

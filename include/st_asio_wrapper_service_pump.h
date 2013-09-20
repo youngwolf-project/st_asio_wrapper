@@ -33,12 +33,16 @@ public:
 	class i_service
 	{
 	protected:
-		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), id(0) {service_pump_.add(this);}
+		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), id(0), started(false)
+			{service_pump_.add(this);}
 		virtual ~i_service() {}
 
 	public:
-		virtual void init() = 0;
-		virtual void uninit() = 0;
+		//for the same i_service, start_service and stop_service are not thread safe, please pay special attention.
+		//to resolve this defect, we must add a mutex member variable to i_service, it's not worth
+		void start_service() {if (!started) {started = true; init();}}
+		void stop_service() {if (started) {started = false; uninit();}}
+		bool is_started() const {return started;}
 
 		void set_id(int _id) {id = _id;}
 		int get_id() const {return id;}
@@ -47,10 +51,15 @@ public:
 		const st_service_pump& get_service_pump() const {return service_pump;}
 
 	protected:
+		virtual void init() = 0;
+		virtual void uninit() = 0;
+
+	protected:
 		st_service_pump& service_pump;
 
 	private:
 		int id;
+		bool started;
 	};
 
 public:
@@ -59,22 +68,48 @@ public:
 
 	i_service* find(int id)
 	{
+		mutex::scoped_lock lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can),
 			[=](decltype(*std::begin(service_can))& item) {return id == item->get_id();});
 		return iter == std::end(service_can) ? nullptr : *iter;
 	}
-	void remove(i_service* i_service_) {assert(nullptr != i_service_); free(i_service_); service_can.remove(i_service_);}
+
+	void remove(i_service* i_service_)
+	{
+		assert(nullptr != i_service_);
+
+		mutex::scoped_lock lock(service_can_mutex);
+		service_can.remove(i_service_);
+		lock.unlock();
+
+		stop_and_free(i_service_);
+	}
+
 	void remove(int id)
 	{
+		mutex::scoped_lock lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can),
 			[=](decltype(*std::begin(service_can))& item) {return id == item->get_id();});
 		if (iter != std::end(service_can))
 		{
-			free(*iter);
+			i_service* i_service_ = *iter;
 			service_can.erase(iter);
+			lock.unlock();
+
+			stop_and_free(i_service_);
 		}
 	}
-	void clear() {do_something_to_all(boost::bind(&st_service_pump::free, this, _1)); service_can.clear();}
+
+	void clear()
+	{
+		decltype(service_can) temp_service_can;
+
+		mutex::scoped_lock lock(service_can_mutex);
+		temp_service_can.splice(std::end(temp_service_can), service_can);
+		lock.unlock();
+
+		st_asio_wrapper::do_something_to_all(temp_service_can, boost::bind(&st_service_pump::stop_and_free, this, _1));
+	}
 
 	void start_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
@@ -91,10 +126,22 @@ public:
 	{
 		if (is_service_started())
 		{
-			do_something_to_all(boost::mem_fn(&i_service::uninit));
+			do_something_to_all(boost::mem_fn(&i_service::stop_service));
 			service_thread.join();
 		}
 	}
+
+	//if you add a service after start_service, use this to start it
+	void start_service(i_service* i_service_, int thread_num = ST_SERVICE_THREAD_NUM)
+	{
+		assert(nullptr != i_service_);
+
+		if (is_service_started())
+			i_service_->start_service();
+		else
+			start_service(thread_num);
+	}
+	void stop_service(i_service* i_service_) {assert(nullptr != i_service_); i_service_->stop_service();}
 
 	//only used when stop_service() can not stop the service(been blocked and can not return)
 	void force_stop_service(){stop(); service_thread.join();}
@@ -107,19 +154,26 @@ public:
 	void run_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
 		reset(); //this is needed when re-start_service
-		do_something_to_all(boost::mem_fn(&i_service::init));
+		do_something_to_all(boost::mem_fn(&i_service::start_service));
 		do_service(thread_num);
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example,
 	//close the application
 	void end_service()
 	{
-		do_something_to_all(boost::mem_fn(&i_service::uninit));
+		do_something_to_all(boost::mem_fn(&i_service::stop_service));
 		while (is_service_started())
 			this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
 	}
 
 protected:
+	void stop_and_free(i_service* i_service_)
+	{
+		assert(nullptr != i_service_);
+
+		i_service_->stop_service();
+		free(i_service_);
+	}
 	virtual void free(i_service* i_service_) {} //if needed, rewrite this to free the service
 
 #ifdef ENHANCED_STABILITY
@@ -139,11 +193,17 @@ protected:
 	}
 #endif
 
-	DO_SOMETHING_TO_ALL(service_can)
-	DO_SOMETHING_TO_ONE(service_can)
+	DO_SOMETHING_TO_ALL_MUTEX(service_can, service_can_mutex)
+	DO_SOMETHING_TO_ONE_MUTEX(service_can, service_can_mutex)
 
 private:
-	void add(i_service* i_service_) {assert(nullptr != i_service_); service_can.push_back(i_service_);}
+	void add(i_service* i_service_)
+	{
+		assert(nullptr != i_service_);
+
+		mutex::scoped_lock lock(service_can_mutex);
+		service_can.push_back(i_service_);
+	}
 
 	void do_service(int thread_num)
 	{
@@ -165,7 +225,8 @@ private:
 	}
 
 protected:
-	container::list<i_service*> service_can; //not protected by mutex, please note
+	container::list<i_service*> service_can;
+	mutex service_can_mutex;
 	thread service_thread;
 	bool started;
 };

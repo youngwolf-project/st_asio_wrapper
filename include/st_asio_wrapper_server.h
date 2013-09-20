@@ -52,25 +52,6 @@ public:
 		}
 	}
 
-	virtual void init()
-	{
-		error_code ec;
-		acceptor.open(server_addr.protocol(), ec); assert(!ec);
-#ifndef NOT_REUSE_ADDRESS
-		acceptor.set_option(tcp::acceptor::reuse_address(true), ec); assert(!ec);
-#endif
-		acceptor.bind(server_addr, ec); assert(!ec);
-		if (ec) {get_service_pump().stop(); unified_out::error_out("bind failed."); return;}
-		acceptor.listen(tcp::acceptor::max_connections, ec); assert(!ec);
-		if (ec) {get_service_pump().stop(); unified_out::error_out("listen failed."); return;}
-
-		st_object_pool<Socket>::start();
-
-		for (auto i = 0; i < ASYNC_ACCEPT_NUM; ++i)
-			start_next_accept();
-	}
-	virtual void uninit() {st_object_pool<Socket>::stop(); stop_listen(); close_all_client();}
-
 	void stop_listen() {error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
 	bool is_listening() const {return acceptor.is_open();}
 
@@ -116,6 +97,25 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
+	virtual void init()
+	{
+		error_code ec;
+		acceptor.open(server_addr.protocol(), ec); assert(!ec);
+#ifndef NOT_REUSE_ADDRESS
+		acceptor.set_option(tcp::acceptor::reuse_address(true), ec); assert(!ec);
+#endif
+		acceptor.bind(server_addr, ec); assert(!ec);
+		if (ec) {get_service_pump().stop(); unified_out::error_out("bind failed."); return;}
+		acceptor.listen(tcp::acceptor::max_connections, ec); assert(!ec);
+		if (ec) {get_service_pump().stop(); unified_out::error_out("listen failed."); return;}
+
+		st_object_pool<Socket>::start();
+
+		for (auto i = 0; i < ASYNC_ACCEPT_NUM; ++i)
+			start_next_accept();
+	}
+	virtual void uninit() {st_object_pool<Socket>::stop(); stop_listen(); close_all_client();}
+
 	virtual bool on_accept(const boost::shared_ptr<Socket>& client_ptr) {return true;}
 
 protected:
