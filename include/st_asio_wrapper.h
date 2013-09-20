@@ -348,12 +348,12 @@
  * Fix bug: Invoking safe_send_msg in on_msg may cause dead lock, on_msg_handle also has this problem when all
  * service threads are blocked in on_msg_handle(call safe_send_msg)
  *
- * Add post_msg to reslove above issue, you are highly recommended to use these functions in on_msg and
+ * Add post_msg to resolve above issue, you are highly recommended to use these functions in on_msg and
  * on_msg_handle functions, for others, you are recommended to use send_msg or safe_send_msg instead.
  *
  * Make start_service sync.
  *
- * Add support for adding serivce to st_service_pump at runtime.
+ * Add support for adding service to st_service_pump at runtime.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
