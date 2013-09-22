@@ -18,6 +18,8 @@
 
 #include "st_asio_wrapper_base.h"
 
+#define HEAD_LEN (sizeof(unsigned short))
+
 namespace st_asio_wrapper
 {
 

@@ -33,7 +33,6 @@ using namespace boost::system;
 #ifndef UNIFIED_OUT_BUF_NUM
 #define UNIFIED_OUT_BUF_NUM	2048
 #endif
-#define HEAD_LEN			(sizeof(unsigned short))
 #ifndef MAX_MSG_LEN
 #define MAX_MSG_LEN			4000
 #endif
