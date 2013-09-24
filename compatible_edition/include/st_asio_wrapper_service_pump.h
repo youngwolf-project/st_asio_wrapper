@@ -145,7 +145,7 @@ public:
 	void stop_service(i_service* i_service_) {assert(NULL != i_service_); i_service_->stop_service();}
 
 	//only used when stop_service() can not stop the service(been blocked and can not return)
-	void force_stop_service(){stop(); service_thread.join();}
+	void force_stop_service() {stop(); service_thread.join();}
 	bool is_running() const {return !stopped();}
 	bool is_service_started() const {return started;}
 

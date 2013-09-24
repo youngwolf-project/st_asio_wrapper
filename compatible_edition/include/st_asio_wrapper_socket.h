@@ -31,6 +31,7 @@ enum BufferType {POST_BUFFER, SEND_BUFFER, RECV_BUFFER};
 #define send_msg_buffer_mutex msg_buffer_mutex[1]
 #define recv_msg_buffer msg_buffer[2]
 #define recv_msg_buffer_mutex msg_buffer_mutex[2]
+#define temp_msg_buffer msg_buffer[3]
 
 template<typename MsgType, typename Socket>
 class st_socket: public Socket, public st_timer
@@ -49,6 +50,7 @@ protected:
 
 	void clear_buffer()
 	{
+		post_msg_buffer.clear();
 		send_msg_buffer.clear();
 		recv_msg_buffer.clear();
 		temp_msg_buffer.clear();
@@ -361,18 +363,16 @@ protected:
 	boost::shared_ptr<i_packer> packer_;
 
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	container::list<MsgType> msg_buffer[3];
+	container::list<MsgType> msg_buffer[4];
+	//if on_msg() return true, which means use the msg recv buffer,
+	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't push into recv_msg_buffer
+	//because of recv buffer overflow, st_socket will delay 50 milliseconds(nonblocking) to invoke
+	//dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
 	mutex msg_buffer_mutex[3];
 
 	bool posting;
 	bool sending, suspend_send_msg_;
 	bool dispatching, suspend_dispatch_msg_;
-
-	//if on_msg() return true, which means use the msg recv buffer,
-	//st_socket will invoke dispatch_msg() when got some msgs. if the msgs can't push into recv_msg_buffer
-	//because of recv buffer overflow, st_socket will delay 50 milliseconds(nonblocking) to invoke
-	//dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
-	container::list<MsgType> temp_msg_buffer;
 
 	bool started_; //has started or not
 	mutex start_mutex;
