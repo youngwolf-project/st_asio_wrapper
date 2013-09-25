@@ -18,7 +18,14 @@
 
 #include "st_asio_wrapper_base.h"
 
-#define HEAD_LEN (sizeof(unsigned short))
+#ifdef HUGE_MSG
+#define HEAD_TYPE	uint32_t
+#define HEAD_N2H	ntohl
+#else
+#define HEAD_TYPE	uint16_t
+#define HEAD_N2H	ntohs
+#endif
+#define HEAD_LEN	(sizeof(HEAD_TYPE))
 
 namespace st_asio_wrapper
 {
@@ -45,7 +52,7 @@ public:
 	virtual size_t current_msg_length() const {return cur_msg_len;}
 	virtual bool parse_msg(size_t bytes_transferred, container::list<std::string>& msg_can)
 	{
-		//len(unsigned short) + msg
+		//len + msg
 		cur_data_len += bytes_transferred;
 
 		char* pnext = raw_buff.begin();
@@ -70,7 +77,7 @@ public:
 					break;
 			}
 			else if (cur_data_len >= HEAD_LEN) //the msg's head been received, stick package found
-				cur_msg_len = ntohs(*(unsigned short*) pnext);
+				cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) pnext);
 			else
 				break;
 
@@ -98,7 +105,7 @@ public:
 		{
 			if (data_len >= HEAD_LEN) //the msg's head been received
 			{
-				cur_msg_len = ntohs(*(unsigned short*) raw_buff.begin());
+				cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) raw_buff.begin());
 				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN) //invalid msg, stop reading
 					return 0;
 			}

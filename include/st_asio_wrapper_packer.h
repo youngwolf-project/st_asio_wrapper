@@ -15,7 +15,14 @@
 
 #include "st_asio_wrapper_base.h"
 
-#define HEAD_LEN (sizeof(unsigned short))
+#ifdef HUGE_MSG
+#define HEAD_TYPE	uint32_t
+#define HEAD_H2N	htonl
+#else
+#define HEAD_TYPE	uint16_t
+#define HEAD_H2N	htons
+#endif
+#define HEAD_LEN	(sizeof(HEAD_TYPE))
 
 namespace st_asio_wrapper
 {
@@ -39,23 +46,38 @@ public:
 			size_t total_len = native ? 0 : HEAD_LEN;
 			auto last_total_len = total_len;
 			for (size_t i = 0; i < num; ++i)
-			{
-				total_len += len[i];
-				if (last_total_len > total_len || nullptr == pstr[i] || total_len > MAX_MSG_LEN) //overflow or null pointer
-					return str;
-				last_total_len = total_len;
-			}
+				if (nullptr != pstr[i])
+				{
+					total_len += len[i];
+					if (last_total_len > total_len || total_len > MAX_MSG_LEN) //overflow
+					{
+						unified_out::error_out("pack msg error: length exceeds the MAX_MSG_LEN!");
+						return str;
+					}
+					last_total_len = total_len;
+				}
 
 			if (total_len > (native ? 0 : HEAD_LEN))
 			{
-				str.reserve(total_len);
 				if (!native)
 				{
-					auto head_len = htons((unsigned short) total_len);
+					auto head_len = (HEAD_TYPE) total_len;
+					if (total_len != head_len)
+					{
+						unified_out::error_out("pack msg error: length exceeds the header's range!");
+						return str;
+					}
+
+					head_len = HEAD_H2N(head_len);
+					str.reserve(total_len);
 					str.append((const char*) &head_len, HEAD_LEN);
 				}
+				else
+					str.reserve(total_len);
+
 				for (size_t i = 0; i < num; ++i)
-					str.append(pstr[i], len[i]);
+					if (nullptr != pstr[i])
+						str.append(pstr[i], len[i]);
 			}
 		} //if (nullptr != pstr)
 
