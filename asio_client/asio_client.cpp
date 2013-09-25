@@ -3,13 +3,14 @@
 #define SERVER_PORT		9527
 #define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 
-//the following two macro demonstrate how to support huge msg(exceed 65535 - 2).
+//the following three macro demonstrate how to support huge msg(exceed 65535 - 2).
 //huge msg consume huge memory, for example, if we support 1M msg size, because every st_socket has a private packer
 //which has a buffer at lest 1M size, so 1K st_socket will consume 1G memory.
 //if we consider the send buffer and recv buffer, the buffer's default max size is 1K, so, every st_socket
 //can consume 2G(2 * 1M * 1K) memory when performance testing(both send buffer and recv buffer are full).
 //#define HUGE_MSG
 //#define MAX_MSG_LEN (1024 * 1024)
+//#define MAX_MSG_NUM 8 //reduce buffer size to reduce memory occupation
 //configuration
 
 #include "../include/st_asio_wrapper_tcp_client.h"
@@ -62,5 +63,6 @@ int main() {
 #undef FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 
 //#undef HUGE_MSG
-//#undef MAX_MSG_LEN (1024 * 1024)
+//#undef MAX_MSG_LEN
+//#undef MAX_MSG_NUM
 //restore configuration
