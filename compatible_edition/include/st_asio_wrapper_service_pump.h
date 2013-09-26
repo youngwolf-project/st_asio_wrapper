@@ -123,14 +123,7 @@ public:
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example,
 	//close the application
-	void stop_service()
-	{
-		if (is_service_started())
-		{
-			do_something_to_all(boost::mem_fn(&i_service::stop_service));
-			service_thread.join();
-		}
-	}
+	void stop_service() {end_service();}
 
 	//if you add a service after start_service, use this to start it
 	void start_service(i_service* i_service_, int thread_num = ST_SERVICE_THREAD_NUM)
@@ -149,22 +142,26 @@ public:
 	bool is_running() const {return !stopped();}
 	bool is_service_started() const {return started;}
 
-	//this function works like start_service except that it will block until service run out,
-	//do not invoke stop_service from other thread(because this thread has been blocked) to unblock it,
-	//instead, use end_service(also from other thread)
+	//this function works like start_service except that it will block until service run out
 	void run_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
-		reset(); //this is needed when re-start_service
-		do_something_to_all(boost::mem_fn(&i_service::start_service));
-		do_service(thread_num);
+		if (!is_service_started())
+		{
+			reset(); //this is needed when re-start_service
+			do_something_to_all(boost::mem_fn(&i_service::start_service));
+			do_service(thread_num);
+		}
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example,
 	//close the application
 	void end_service()
 	{
-		do_something_to_all(boost::mem_fn(&i_service::stop_service));
-		while (is_service_started())
-			this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+		if (is_service_started())
+		{
+			do_something_to_all(boost::mem_fn(&i_service::stop_service));
+			while (is_service_started())
+				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+		}
 	}
 
 protected:
