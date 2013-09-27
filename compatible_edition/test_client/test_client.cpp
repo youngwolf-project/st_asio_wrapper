@@ -7,9 +7,9 @@
 //#define REUSE_OBJECT //use objects pool
 
 //the following three macro demonstrate how to support huge msg(exceed 65535 - 2).
-//huge msg consume huge memory, for example, if we support 1M msg size, because every st_socket has a private packer
-//which has a buffer at lest 1M size, so 1K st_socket will consume 1G memory.
-//if we consider the send buffer and recv buffer, the buffer's default max size is 1K, so, every st_socket
+//huge msg consume huge memory, for example, if we support 1M msg size, because every st_tcp_socket has a
+//private unpacker which has a buffer at lest 1M size, so 1K st_tcp_socket will consume 1G memory.
+//if we consider the send buffer and recv buffer, the buffer's default max size is 1K, so, every st_tcp_socket
 //can consume 2G(2 * 1M * 1K) memory when performance testing(both send buffer and recv buffer are full).
 //#define HUGE_MSG
 //#define MAX_MSG_LEN (1024 * 1024)

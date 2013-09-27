@@ -33,7 +33,7 @@ public:
 	class i_service
 	{
 	protected:
-		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), id(0), started(false)
+		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), started(false), id(0), data(NULL)
 			{service_pump_.add(this);}
 		virtual ~i_service() {}
 
@@ -47,6 +47,8 @@ public:
 		void set_id(int _id) {id = _id;}
 		int get_id() const {return id;}
 		bool is_equal_to(int id) const {return get_id() == id;}
+		void set_user_data(void* data_) {data = data_;}
+		void* get_user_data() {return data;}
 
 		st_service_pump& get_service_pump() {return service_pump;}
 		const st_service_pump& get_service_pump() const {return service_pump;}
@@ -59,8 +61,9 @@ public:
 		st_service_pump& service_pump;
 
 	private:
-		int id;
 		bool started;
+		int id;
+		void* data; //magic data, you can use it in any way
 	};
 
 public:
@@ -142,18 +145,17 @@ public:
 	bool is_running() const {return !stopped();}
 	bool is_service_started() const {return started;}
 
-	//this function works like start_service except that it will block until service run out
+	//this function works like start_service except that it will block until all services run out
 	void run_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
 		if (!is_service_started())
 		{
-			reset(); //this is needed when re-start_service
+			reset(); //this is needed when restart service
 			do_something_to_all(boost::mem_fn(&i_service::start_service));
 			do_service(thread_num);
 		}
 	}
-	//stop the service, must be invoked explicitly when the service need to stop, for example,
-	//close the application
+	//stop the service, must be invoked explicitly when the service need to stop, for example, close the application
 	void end_service()
 	{
 		if (is_service_started())
@@ -178,7 +180,7 @@ protected:
 	virtual bool on_exception(const std::exception& e)
 	{
 		unified_out::info_out("service pump exception: %s.", e.what());
-		return true; //continue this service pump
+		return true; //continue this io_service::run, if needed, rewrite this to decide whether to continue or not
 	}
 
 	size_t run(error_code& ec)
