@@ -59,7 +59,7 @@ public:
 			int loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
 			while (--loop_num >= 0 && closing)
 				this_thread::sleep(get_system_time() + posix_time::milliseconds(10));
-			if (loop_num >= 0) //graceful disconnecting is impossible
+			if (loop_num < 0) //graceful disconnecting is impossible
 				clean_up();
 		}
 	}

@@ -124,9 +124,26 @@ public:
 				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
 		}
 	}
-	//stop the service, must be invoked explicitly when the service need to stop, for example,
-	//close the application
+	//stop the service, must be invoked explicitly when the service need to stop, for example, close the application
 	void stop_service() {end_service();}
+	//only used when stop_service() can not stop the service(been blocked and can not return)
+	void force_stop_service()
+	{
+		if (is_service_started())
+		{
+			do_something_to_all(boost::mem_fn(&i_service::stop_service));
+			int loop_num = 20; //one second
+			while (is_service_started())
+			{
+				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+				if (--loop_num <= 0)
+				{
+					stop();
+					loop_num = 0x7fffffff;
+				}
+			}
+		}
+	}
 
 	//if you add a service after start_service, use this to start it
 	void start_service(i_service* i_service_, int thread_num = ST_SERVICE_THREAD_NUM)
@@ -140,8 +157,6 @@ public:
 	}
 	void stop_service(i_service* i_service_) {assert(NULL != i_service_); i_service_->stop_service();}
 
-	//only used when stop_service() can not stop the service(been blocked and can not return)
-	void force_stop_service() {stop(); service_thread.join();}
 	bool is_running() const {return !stopped();}
 	bool is_service_started() const {return started;}
 
