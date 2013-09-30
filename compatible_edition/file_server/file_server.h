@@ -86,31 +86,29 @@ private:
 	{
 		if (NULL != file && length > 0)
 		{
-			size_t read_size = (size_t) std::min(
-				(__off64_t) i_packer::get_max_msg_size(), (__off64_t) ORDER_LEN + length);
-			read_size -= ORDER_LEN;
-
-			char* buffer = new char[ORDER_LEN + read_size];
-			*buffer = 1; //head
-			if (read_size != fread(buffer + ORDER_LEN, 1, read_size, file))
-			{
-				printf("fread(" size_t_format ") error!\n", read_size);
-				trans_end();
-			}
+			//network IO is slower than disk IO, wait for a moment
+			//we should avoid invoke blocking functions such as safe_send_msg in service threads,
+			//unless you are sure that the effects on the throughput caused by blocking functions is acceptable,
+			//because blocking here means one service thread suspended
+			//more details about service thread, please refer to class st_service_pump
+			if (!is_send_buffer_available())
+				set_timer(10, 50, new __off64_t(length));
 			else
 			{
-				//network IO is slower than disk IO, wait for a moment
-				//we should avoid invoke blocking functions such as safe_send_msg in service threads,
-				//unless you are sure that the effects on the throughput caused by blocking functions is acceptable,
-				//because blocking here means one service thread suspended
-				//more details about service thread, please refer to class st_service_pump
-				if (!send_msg(buffer, read_size + ORDER_LEN))
+				size_t read_size = (size_t) std::min(
+					(__off64_t) i_packer::get_max_msg_size(), (__off64_t) ORDER_LEN + length);
+				read_size -= ORDER_LEN;
+
+				char* buffer = new char[ORDER_LEN + read_size];
+				*buffer = 1; //head
+				if (read_size != fread(buffer + ORDER_LEN, 1, read_size, file))
 				{
-					fseeko64(file, -(__off64_t) read_size, SEEK_CUR);
-					set_timer(10, 50, new __off64_t(length));
+					printf("fread(" size_t_format ") error!\n", read_size);
+					trans_end();
 				}
 				else
 				{
+					send_msg(buffer, read_size + ORDER_LEN, true);
 					length -= read_size;
 					if (length > 0)
 						get_io_service().post(boost::bind(&file_socket::read_file_handler, this, length));
@@ -120,8 +118,8 @@ private:
 						trans_end();
 					}
 				}
+				delete[] buffer;
 			}
-			delete[] buffer;
 		}
 	}
 
