@@ -64,7 +64,8 @@ protected:
 		temp_object(const boost::shared_ptr<Socket>& object_ptr_) :
 			closed_time(time(nullptr)), object_ptr(object_ptr_) {}
 
-		bool is_timeout(time_t t) const {return closed_time <= t;}
+		bool is_timeout() const {return is_timeout(time(nullptr));}
+		bool is_timeout(time_t now) const {return closed_time <= now - CLOSED_SOCKET_MAX_DURATION;}
 	};
 
 protected:
@@ -120,20 +121,18 @@ protected:
 	boost::shared_ptr<Socket> reuse_object()
 	{
 #ifdef REUSE_OBJECT
-		auto now = time(nullptr) - CLOSED_SOCKET_MAX_DURATION;
 		mutex::scoped_lock lock(temp_object_can_mutex);
-		//temp_object_can does not contain any duplicate items
-		auto iter = std::find_if(std::begin(temp_object_can), std::end(temp_object_can),
-			std::bind2nd(std::mem_fun_ref(&temp_object::is_timeout), now));
-		if (iter != std::end(temp_object_can))
-		{
-			auto object_ptr(std::move(iter->object_ptr));
-			temp_object_can.erase(iter);
-			lock.unlock();
+		//objects are order by time, so we can use this feature to improve the performance
+		for (auto iter = std::begin(temp_object_can); iter->is_timeout() && iter != std::end(temp_object_can); ++iter)
+			if (!iter->object_ptr->started())
+			{
+				auto object_ptr(std::move(iter->object_ptr));
+				temp_object_can.erase(iter);
+				lock.unlock();
 
-			object_ptr->reset();
-			return object_ptr;
-		}
+				object_ptr->reset();
+				return object_ptr;
+			}
 #endif
 
 		return boost::shared_ptr<Socket>();
@@ -248,10 +247,10 @@ public:
 		if (0 == num)
 			return;
 
-		auto now = time(nullptr) - CLOSED_SOCKET_MAX_DURATION;
 		mutex::scoped_lock lock(temp_object_can_mutex);
-		for (auto iter = std::begin(temp_object_can); num > 0 && iter != std::end(temp_object_can);)
-			if (iter->closed_time <= now)
+		//objects are order by time, so we can use this feature to improve the performance
+		for (auto iter = std::begin(temp_object_can); num > 0 && iter->is_timeout() && iter != std::end(temp_object_can);)
+			if (!iter->object_ptr->started())
 			{
 				iter = temp_object_can.erase(iter);
 				--num;
