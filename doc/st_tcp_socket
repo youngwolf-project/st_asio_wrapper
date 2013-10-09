@@ -1,0 +1,114 @@
+
+namespace st_asio_wrapper
+{
+namespace st_tcp
+{
+
+typedef std::string msg_type;
+typedef const msg_type msg_ctype;
+
+tcp套接字类，实现tcp数据的收发
+class st_tcp_socket : public st_socket<msg_type, tcp::socket>
+{
+protected:
+	st_tcp_socket(io_service& io_service_);
+
+public:
+	void reset();
+重置所有。
+
+	void reset_state();
+重载父类同名函数，重置自己的状态之后，调用父类同名函数。
+
+	void disconnect();
+	void force_close();
+	void graceful_close();
+前两个函数功能完全一样（为了完整性而提供了它们），都是直接调用clean_up。
+第三个函数优雅关闭套接字，所谓优雅关闭，就是先关闭自己的数据发送，然后接收完剩余数据之后，才完全关闭套接字。
+
+	bool is_closing() const;
+是否正在优雅关闭套接字，此时不再发送消息，但继续接收消息。
+
+	boost::shared_ptr<i_unpacker> inner_unpacker() const;
+	void inner_unpacker(const boost::shared_ptr<i_unpacker>& _unpacker_);
+获取／修改解包器。
+
+	bool send_msg(const char* pstr, size_t len, bool can_overflow = false);
+	bool send_msg(const std::string& str, bool can_overflow = false);
+	bool send_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+发送消息，前两个是helper函数，最后一个才真正的发送消息（放入消息发送缓存）；第二个调用第一个，第一个调用第三个。
+
+bool send_native_msg(const char* pstr, size_t len, bool can_overflow = false);
+bool send_native_msg(const std::string& str, bool can_overflow = false);
+bool send_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+同和，只是以native为true调用i_packer::pack_msg接口。
+
+	bool safe_send_msg(const char* pstr, size_t len, bool can_overflow = false);
+	bool safe_send_msg(const std::string& str, bool can_overflow = false);
+	bool safe_send_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+同send_msg，只是在消息发送缓存溢出的时候会等待直到缓存可用；如果is_send_allowed返回false或者io_service已经停止，则马上放弃等待返回失败。
+safe系列函数，不能在on_msg和om_msg_handle里面调用，请注意。
+
+	bool safe_send_native_msg(const char* pstr, size_t len, bool can_overflow = false);
+	bool safe_send_native_msg(const std::string& str, bool can_overflow = false);
+	bool safe_send_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+同上，只是以native为true调用i_packer::pack_msg接口。
+
+	bool post_msg(const char* pstr, size_t len, bool can_overflow = false);
+	bool post_msg(const std::string& str, bool can_overflow = false);
+	bool post_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+同send_msg，只是它永远能马上成功。注意：如果消息发送缓存溢出了（当然can_overflow得为false，否则不检测缓存是否溢出），则暂停消息派发（进而也会
+停止消息接收，因为不派发只接收消息，迟早会让消息接收缓存满而暂停消息接收，如果不使用消息接收缓存，则马上暂停消息接收）。
+
+	bool post_native_msg(const char* pstr, size_t len, bool can_overflow = false);
+	bool post_native_msg(const std::string& str, bool can_overflow = false);
+	bool post_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+同上，只是以native为true调用i_packer::pack_msg接口。
+
+	void show_info(const char* head, const char* tail);
+显示套接字的一些信息，在这里会显示对端地址。
+
+protected:
+	virtual bool do_send_msg();
+马上开始消息发送，重写st_socket的do_send_msg，由st_socket调用。
+
+	virtual bool is_send_allowed() const;
+重写st_socket的is_send_allowed，记住，自己的判断加上st_socket的判断，才是最终结果。
+
+	virtual void on_unpack_error() = 0;
+解包出错时回调。
+
+	virtual void on_recv_error(const error_code& ec) = 0;
+接收消息出错时回调。
+
+#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+	virtual bool on_msg(msg_type& msg);
+重写st_socket的on_msg，功能是打印消息到控制台，使用者重写这个函数以处理消息。
+#endif
+
+	virtual void on_msg_handle(msg_type& msg);
+重写st_socket的on_msg_handle，功能是打印消息到控制台，使用者重写这个函数以处理消息。
+
+	void do_recv_msg();
+马上开始接收数据，由子类调用。
+
+	void reset_unpacker_state();
+重置解包器状态。
+
+	void clean_up();
+关闭套接字，停止所有定时器，直接派发所有剩余消息，重置所有状态（调用reset_state）。
+
+	void recv_handler(const error_code& ec, size_t bytes_transferred);
+收到数据时由asio回调。
+
+	void send_handler(const error_code& ec, size_t bytes_transferred);
+成功发送消息（写入底层套接字）时由asio回调。
+
+protected:
+	boost::shared_ptr<i_unpacker> unpacker_;
+	bool closing;
+};
+
+} //namespace st_tcp
+} //namespace st_asio_wrapper
+

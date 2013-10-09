@@ -1,0 +1,45 @@
+
+namespace st_asio_wrapper
+{
+
+用于在st_server_socket_base中操作st_server_base的接口，st_server_socket_base使用，st_server_base实现
+class i_server
+{
+public:
+	virtual st_service_pump& get_service_pump() = 0;
+	virtual const st_service_pump& get_service_pump() const = 0;
+获取st_service_pump。
+	virtual void del_client(const boost::shared_ptr<st_tcp_socket>& client_ptr) = 0;
+关闭一个连接，并从st_server_socket_base的客户链表里面删除。
+一般来说，当出现on_recv_error的时候，这个连接已经无法使用，此时从客户链表里面删除；客户端必然也会出现连接断开，此时它要么退出程序，
+要么重新连接，重新连接成功时，会得到另一个st_server_socket_base，所以这里的删除是没有问题的。
+};
+
+
+服务端套接字类
+template<typename Server = i_server>
+SHARED_OBJECT_T(st_server_socket_base, st_tcp_socket, Server)
+{
+public:
+	st_server_socket_base(Server& server_);
+
+	virtual void reset();
+重置所有，st_object_pool在重用时会调用。重写它以重置子类的状态，记得最后需要调用父类的同名函数。
+
+protected:
+	virtual bool do_start();
+开始，这里开始的意义是，马上开始接收数据。
+
+	virtual void on_unpack_error();
+解包错误，默认的行为是关闭连接，可以重写以自定义行为。
+
+	virtual void on_recv_error(const error_code& ec);
+连接断开，默认的行为是调用i_server::del_client，可以重写以自定义行为。
+
+protected:
+	Server& server;
+};
+typedef st_server_socket_base<> st_server_socket;
+
+} //namespace
+

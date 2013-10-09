@@ -1,0 +1,112 @@
+
+#ifndef MAX_OBJECT_NUM
+#define MAX_OBJECT_NUM				4096
+#endif
+
+#ifndef REUSE_OBJECT
+未开启对象池。
+	#ifndef SOCKET_FREE_INTERVAL
+	#define SOCKET_FREE_INTERVAL	10
+释放（内存）已经关闭的连接的扫描频率，单位为秒。
+	#endif
+#endif
+
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
+自动清除（从对象链表移出到临时链表）已经关闭的连接
+	#ifndef CLEAR_CLOSED_SOCKET_INTERVAL
+	#define CLEAR_CLOSED_SOCKET_INTERVAL	60
+清除已经关闭的连接的扫描频率，单位为秒。
+	#endif
+#endif
+
+#ifndef CLOSED_SOCKET_MAX_DURATION
+	#define CLOSED_SOCKET_MAX_DURATION	5
+已经关闭的连接，多久时间之后，可以重用或者释放，单位为秒。
+#endif
+
+namespace st_asio_wrapper
+{
+
+对象池类，用于管理正常的和失效的连接，对象重用，定时删除已经关闭的连接等；
+注意，只能管理由st_socket派生的对象
+template<typename Socket>
+class st_object_pool: public st_service_pump::i_service, public st_timer
+{
+protected:
+已经关闭的连接，从对象链表移出到临时链表，将按这个结构保存，主要目的是为了记录关闭的时间（以判断是否可以释放或者重用）
+	struct temp_object
+	{
+		const time_t closed_time;
+关闭时间。
+		const boost::shared_ptr<Socket> object_ptr;
+已经关闭的对象。
+
+		temp_object(const boost::shared_ptr<Socket>& object_ptr_);
+
+		bool is_timeout() const;
+		bool is_timeout(time_t now) const;
+是否超时（超时之后就可以释放或者重用object_ptr对象了）。
+	};
+
+protected:
+	st_object_pool(st_service_pump& service_pump_);
+
+	void start();
+开始，根据宏开启一些定时器，比如如果未定义REUSE_OBJECT，则开启一个定时器用于定时查找已经关闭的连接。
+
+	void stop();
+结束，关闭所有定时器。
+
+	bool add_object(const boost::shared_ptr<Socket>& object_ptr);
+添加一个对象，注意对象总数由MAX_OBJECT_NUM宏控制。
+
+	bool del_object(const boost::shared_ptr<Socket>& object_ptr);
+清除一个对象（从对象链表移出到临时链表，并不真正的从内存中释放该对象）。
+
+	boost::shared_ptr<Socket> reuse_object();
+查找可重用的对象，如果没有，返回空的智能指针。
+
+	virtual bool on_timer(unsigned char id, const void* user_data);
+重写st_timer的on_timer。
+
+public:
+	size_t size();
+获取有效对象总数，有效是指正常的套接字，无效是指被关闭了的套接字。
+
+	size_t closed_object_size();
+获取无效对象总数，无效对象要么定时被删除，要么等待被重用，由宏控制。
+
+	boost::shared_ptr<Socket> at(size_t index);
+获取指定位置的有效对象，位置序号从０开始。
+
+	void list_all_object();
+列出所有有效对象。
+
+	void find_object(const std::string& ip, unsigned short port, container::list<boost::shared_ptr<Socket>>& objects);
+查找对象，如果ip为空，则匹配所有ip，如果port为０，则匹配所有端口。
+
+	void clear_all_closed_object(container::list<boost::shared_ptr<Socket>>& objects);
+删除对象链表里面的所有无效对象（移出到临时链表）。
+
+	void free_object(size_t num = -1);
+释放指定数量的无效对象，如果对象重用开启，则无效对象永远不会释放（而等待重用），在某些情况下，你可能不需要这么多等待重用的无效对象，
+可以用这个函数来释放一些无效对象。
+
+	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred);
+对所有有效对象做一个操作，操作由__pred来定，st_asio_wrapper库只是调用__pred()。
+
+	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred);
+与do_something_to_all类型，只是当__pred()返回真时就不再继续循环处理后面的对象，跟查找功能类似。
+
+protected:
+	container::list<boost::shared_ptr<Socket>> object_can;
+	mutex object_can_mutex;
+存放有效对象（对象链表）。
+
+	container::list<temp_object> temp_object_can;
+	mutex temp_object_can_mutex;
+存放无效对象（临时链表）。
+};
+
+} //namespace
+

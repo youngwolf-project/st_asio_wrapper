@@ -33,7 +33,7 @@ public:
 	class i_service
 	{
 	protected:
-		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), started(false), id(0), data(NULL)
+		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), started(false), id_(0), data(NULL)
 			{service_pump_.add(this);}
 		virtual ~i_service() {}
 
@@ -44,11 +44,11 @@ public:
 		void stop_service() {if (started) {started = false; uninit();}}
 		bool is_started() const {return started;}
 
-		void set_id(int _id) {id = _id;}
-		int get_id() const {return id;}
-		bool is_equal_to(int id) const {return get_id() == id;}
-		void set_user_data(void* data_) {data = data_;}
-		void* get_user_data() {return data;}
+		void id(int id) {id_ = id;}
+		int id() const {return id_;}
+		bool is_equal_to(int id) const {return id_ == id;}
+		void user_data(void* data_) {data = data_;}
+		void* user_data() {return data;}
 
 		st_service_pump& get_service_pump() {return service_pump;}
 		const st_service_pump& get_service_pump() const {return service_pump;}
@@ -62,7 +62,7 @@ public:
 
 	private:
 		bool started;
-		int id;
+		int id_;
 		void* data; //magic data, you can use it in any way
 	};
 

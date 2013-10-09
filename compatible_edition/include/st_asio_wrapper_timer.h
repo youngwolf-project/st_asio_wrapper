@@ -136,7 +136,7 @@ protected:
 	mutex timer_can_mutex;
 };
 
-}
+} //namespace
 
 #endif /* ifndef ST_ASIO_WRAPPER_TIMER_H_ */
 

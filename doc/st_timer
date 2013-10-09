@@ -1,0 +1,86 @@
+
+namespace st_asio_wrapper
+{
+
+定时器类
+class st_timer
+{
+protected:
+	struct timer_info
+	{
+		enum timer_status {TIMER_OK, TIMER_CANCELED};
+
+		unsigned char id;
+		timer_status status;
+		size_t milliseconds;
+		const void* user_data; //if needed, you must take the responsibility to manage this memory
+		boost::shared_ptr<deadline_timer> timer;
+
+		bool operator <(const timer_info& other) const {return id < other.id;}
+	};
+定时器数据结构，其中user_data成员需要使用者控制其生命周期。
+
+	st_timer(io_service& _io_service_);
+	virtual ~st_timer();
+
+public:
+	void set_timer(unsigned char id, size_t milliseconds, const void* user_data);
+开启定时器，定时器以id分区，如果定时器已经存在，则重新开始记时。
+注意，对同一个st_timer里面的同一个定时器操作并不是线程安全的。
+
+	void stop_timer(unsigned char id);
+停止定时器，如果定时时间已经到达，且已经被post到io_server的队列中，则on_timer仍然会在未来某个时候被回调，这是asio的设计。
+
+	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred);
+对所有定时器做一个操作，操作由__pred来定，st_asio_wrapper库只是调用__pred()。
+
+	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred);
+与do_something_to_all类型，只是当__pred()返回真时就不再继续循环处理后面的定时器，跟查找功能类似。
+
+	void stop_all_timer();
+停止所有定时器。
+
+protected:
+	virtual bool on_timer(unsigned char id, const void* user_data);
+定时到达之后，回调这个函数，使用者需要重写它以实现自己的功能，对于不感兴趣的定时器，要调用父类的同名函数。
+同一个st_timer内同一个定时器，on_timer的调用是顺序的，其它任何情况下，on_timer的调用都是并发的。
+
+	void start_timer(const timer_info& ti);
+内部使用的helper函数。
+
+	void stop_timer(timer_info& ti);
+内部使用的helper函数。
+
+	void timer_handler(const error_code& ec, const timer_info& ti);
+asio需要的回调函数。
+
+protected:
+	io_service& io_service_;
+	container::set<timer_info> timer_can;
+	mutex timer_can_mutex;
+};
+
+} //namespace
+
+
+注意：每个类都有自己的保留定时器，继承者注意不要使用父类的定时器，具体为：
+/*
+* Please pay attention to the following reserved timer ids:
+* st_object_pool: 0 - 9
+* st_socket: 0 - 9
+
+* st_tcp_socket: inherit from st_socket
+* st_connector: inherit from st_tcp_socket and plus 10 - 19
+* st_tcp_sclient: inherit from st_connector
+*
+* st_udp_socket: inherit from st_socket
+* st_udp_sclient: inherit from st_udp_socket
+*
+* st_server_socket_base: inherit from st_tcp_socket
+* st_server_base: inherit from st_object_pool
+*
+* st_client_base: inherit from st_object_pool
+* st_tcp_client_base: inherit from st_client_base
+* st_udp_client_base: inherit from st_client_base
+*/
+

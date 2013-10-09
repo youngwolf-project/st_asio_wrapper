@@ -1,0 +1,93 @@
+
+#ifndef SERVER_IP
+#define SERVER_IP				"127.0.0.1"
+#endif
+#ifndef SERVER_PORT
+#define SERVER_PORT				5050
+#endif
+#ifndef RE_CONNECT_INTERVAL
+#define RE_CONNECT_INTERVAL		500 //millisecond(s)
+#endif
+
+#ifdef RE_CONNECT_CONTROL
+#define RE_CONNECT_CHECK	prepare_re_connect()
+#else
+#define RE_CONNECT_CHECK	true
+#endif
+
+namespace st_asio_wrapper
+{
+
+带连接功能的st_tcp_socket，算是一个真正的客户端了
+class st_connector : public st_tcp_socket
+{
+public:
+	st_connector(io_service& io_service_);
+
+public:
+	virtual void reset();
+重置所有，st_object_pool在重用时会调用。重写它以重置子类的状态，记得最后需要调用父类的同名函数。
+
+	void set_server_addr(unsigned short port, const std::string& ip);
+设置服务端地址用于连接之用。
+
+#ifdef RE_CONNECT_CONTROL
+	void set_re_connect_times(size_t times);
+#endif
+当连接失败时，重试次数。
+
+	bool is_connected() const;
+是否已经连接成功。
+
+	void disconnect(bool reconnect = false);
+直接调用force_close。
+
+	void force_close(bool reconnect = false);
+强制退出————调用父类的clean_up，更新自己的状态（比如已连接状态等），如果reconnect为true，则关闭之后，马上重新连接服务器。
+
+	void graceful_close(bool reconnect = false);
+优雅关闭，reconnect参数的意义同上。
+
+protected:
+	virtual bool do_start();
+开始，这里开始的意义是，如果连接未成功，则开始连接服务器，如果连接已经成功，则开始接收数据。
+
+	virtual void on_connect();
+连接成功时回调，用户重写它以得到连接成功事件。
+
+	virtual bool is_send_allowed() const;
+是否可发送数据，is_connected()加上父类的is_send_allowed()为最终的判定结果。
+
+	virtual void on_unpack_error();
+解包错误，默认的行为是关闭连接，可以重写以自定义行为。
+
+	virtual void on_recv_error(const error_code& ec);
+接收错误，默认的行为是关闭连接，可以重写以自定义行为。
+
+	virtual bool on_timer(unsigned char id, const void* user_data);
+重写st_socket的on_timer，只处理自己的定时器，其它的定时器一律调用父类同名函数。
+
+	void connect_handler(const error_code& ec);
+连接成功或者失败由asio回调。
+
+#ifdef RE_CONNECT_CONTROL
+	bool prepare_re_connect();
+#endif
+连接失败之后，调用这个函数以判断是否可以继续再次连接服务器。
+
+protected:
+	tcp::endpoint server_addr;
+服务器地址。
+	bool connected;
+是否已经连接成功。
+	bool reconnecting;
+是否正在重新连接。
+
+#ifdef RE_CONNECT_CONTROL
+	size_t re_connect_times;
+重连接次数，达到该次数时如果还未连接成功，将放弃重连接；注意需要开启RE_CONNECT_CONTROL才有此功能。
+#endif
+};
+
+} //namespace
+

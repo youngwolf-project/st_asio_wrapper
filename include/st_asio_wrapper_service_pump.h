@@ -33,7 +33,7 @@ public:
 	class i_service
 	{
 	protected:
-		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), started(false), id(0), data(nullptr)
+		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), started(false), id_(0), data(nullptr)
 			{service_pump_.add(this);}
 		virtual ~i_service() {}
 
@@ -44,10 +44,10 @@ public:
 		void stop_service() {if (started) {started = false; uninit();}}
 		bool is_started() const {return started;}
 
-		void set_id(int _id) {id = _id;}
-		int get_id() const {return id;}
-		void set_user_data(void* data_) {data = data_;}
-		void* get_user_data() {return data;}
+		void id(int id) {id_ = id;}
+		int id() const {return id_;}
+		void user_data(void* data_) {data = data_;}
+		void* user_data() {return data;}
 
 		st_service_pump& get_service_pump() {return service_pump;}
 		const st_service_pump& get_service_pump() const {return service_pump;}
@@ -61,7 +61,7 @@ public:
 
 	private:
 		bool started;
-		int id;
+		int id_;
 		void* data; //magic data, you can use it in any way
 	};
 
@@ -73,7 +73,7 @@ public:
 	{
 		mutex::scoped_lock lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can),
-			[=](decltype(*std::begin(service_can))& item) {return id == item->get_id();});
+			[=](decltype(*std::begin(service_can))& item) {return id == item->id();});
 		return iter == std::end(service_can) ? nullptr : *iter;
 	}
 
@@ -92,7 +92,7 @@ public:
 	{
 		mutex::scoped_lock lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can),
-			[=](decltype(*std::begin(service_can))& item) {return id == item->get_id();});
+			[=](decltype(*std::begin(service_can))& item) {return id == item->id();});
 		if (iter != std::end(service_can))
 		{
 			auto i_service_ = *iter;
