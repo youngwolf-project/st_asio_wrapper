@@ -1,5 +1,5 @@
 
-ifeq ($(MAKECMDGOALS), debug)
+ifeq (${MAKECMDGOALS}, debug)
 	cflag = -g
 	dir = ./debug
 else
@@ -10,19 +10,20 @@ endif
 
 module = file_client
 target = ${dir}/${module}
+sources = ${shell ls *.cpp}
+objects = ${patsubst %.cpp, ${dir}/%.o, ${sources}}
+headers = ${shell ls *.h 2>/dev/null}
+${shell mkdir -p ${dir}}
 
 
 release debug : ${target}
-${target} : makedir ${module}.o
-	g++ -o ${target} ${target}.o ${lflag} -lboost_system -lboost_thread
-${module}.o :
-	g++ -Wall -fexceptions -std=c++11 ${cflag} -c file_client.cpp -o ${target}.o
+${target} : ${objects}
+	g++ -o ${target} ${objects} ${lflag} -lboost_system -lboost_thread
+${objects} : ${dir}/%.o : %.cpp ${headers}
+	g++ -Wall -fexceptions -std=c++11 ${cflag} -c $< -o $@
 
 
-makedir:
-	mkdir -p ${dir}
-
-
+.PHONY : clean
 clean:
-	rm -rf ./debug ./release
+	-rm -rf ./debug ./release
 
