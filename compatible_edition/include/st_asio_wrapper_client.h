@@ -46,7 +46,7 @@ protected:
 	}
 
 public:
-	bool add_client(const boost::shared_ptr<Socket>& client_ptr, bool reset = true)
+	bool add_client(typename st_client::object_ctype& client_ptr, bool reset = true)
 	{
 		if (ST_THIS add_object(client_ptr))
 		{
@@ -63,35 +63,35 @@ public:
 		return false;
 	}
 
-	boost::shared_ptr<Socket> add_client(unsigned short port, const std::string& ip = std::string())
+	typename st_client::object_type add_client(unsigned short port, const std::string& ip = std::string())
 	{
 		BOOST_AUTO(client_ptr, create_client());
 		client_ptr->set_server_addr(port, ip);
-		return add_client(client_ptr) ? client_ptr : boost::shared_ptr<Socket>();
+		return add_client(client_ptr) ? client_ptr : typename st_client::object_type();
 	}
 
 	//this method only used with st_tcp_socket and it's derived class
 	//if you need to change the server address, please use create_client() to create a client, then,
-	//set the server address, finally, invoke bool add_client(const boost::shared_ptr<Socket>&, bool)
-	boost::shared_ptr<Socket> add_client()
+	//set the server address, finally, invoke bool add_client(typename st_client::object_ctype&, bool)
+	typename st_client::object_type add_client()
 	{
 		BOOST_AUTO(client_ptr, create_client());
-		return add_client(client_ptr) ? client_ptr : boost::shared_ptr<Socket>();
+		return add_client(client_ptr) ? client_ptr : typename st_client::object_type();
 	}
 
 	//this method simply create a class derived from st_socket from heap, secondly you must invoke
-	//bool add_client(const boost::shared_ptr<Socket>&, bool) before this socket can send or recv msgs.
+	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or recv msgs.
 	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
-	boost::shared_ptr<Socket> create_client()
+	typename st_client::object_type create_client()
 	{
 		BOOST_AUTO(client_ptr, ST_THIS reuse_object());
 		return client_ptr ? client_ptr : boost::make_shared<Socket>(boost::ref(ST_THIS get_service_pump()));
 	}
 
-	void disconnect(const boost::shared_ptr<Socket>& client_ptr) {force_close(client_ptr);}
-	void force_close(const boost::shared_ptr<Socket>& client_ptr)
+	void disconnect(typename st_client::object_ctype& client_ptr) {force_close(client_ptr);}
+	void force_close(typename st_client::object_ctype& client_ptr)
 		{if (ST_THIS del_object(client_ptr)) client_ptr->force_close();}
-	void graceful_close(const boost::shared_ptr<Socket>& client_ptr)
+	void graceful_close(typename st_client::object_ctype& client_ptr)
 		{if (ST_THIS del_object(client_ptr)) client_ptr->graceful_close();}
 };
 

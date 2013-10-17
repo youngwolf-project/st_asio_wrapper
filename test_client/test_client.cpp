@@ -94,7 +94,7 @@ public:
 	uint64_t get_total_recv_bytes()
 	{
 		uint64_t total_recv_bytes = 0;
-		do_something_to_all([&](decltype(*std::begin(object_can))& item) {
+		do_something_to_all([&](typename test_client::object_ctype& item) {
 			total_recv_bytes += item->get_recv_bytes();
 		});
 
@@ -144,7 +144,7 @@ int main(int argc, const char* argv[])
 		else if (str == LIST_STATUS)
 		{
 			printf("valid links: " size_t_format ", closed links: " size_t_format "\n",
-				client.size(), client.closed_object_size());
+				client.valid_size(), client.closed_object_size());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)

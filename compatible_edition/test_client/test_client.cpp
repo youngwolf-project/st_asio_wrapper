@@ -148,7 +148,7 @@ int main(int argc, const char* argv[])
 		else if (str == LIST_STATUS)
 		{
 			printf("valid links: " size_t_format ", closed links: " size_t_format "\n",
-				client.size(), client.closed_object_size());
+				client.valid_size(), client.closed_object_size());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)

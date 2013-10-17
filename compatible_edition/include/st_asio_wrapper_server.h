@@ -81,7 +81,7 @@ public:
 		}
 	}
 
-	boost::shared_ptr<Socket> create_client()
+	typename st_server_base::object_type create_client()
 	{
 		BOOST_AUTO(client_ptr, ST_THIS reuse_object());
 		return client_ptr ? client_ptr : boost::make_shared<Socket>(boost::ref(*this));
@@ -118,7 +118,7 @@ protected:
 	}
 	virtual void uninit() {st_object_pool<Socket>::stop(); stop_listen(); close_all_client();}
 
-	virtual bool on_accept(const boost::shared_ptr<Socket>& client_ptr) {return true;}
+	virtual bool on_accept(typename st_server_base::object_ctype& client_ptr) {return true;}
 
 protected:
 	void start_next_accept()
@@ -128,7 +128,7 @@ protected:
 			placeholders::error, client_ptr));
 	}
 
-	bool add_client(const boost::shared_ptr<Socket>& client_ptr)
+	bool add_client(typename st_server_base::object_ctype& client_ptr)
 	{
 		if (st_object_pool<Socket>::add_object(client_ptr))
 		{
@@ -139,7 +139,7 @@ protected:
 		return false;
 	}
 
-	void accept_handler(const error_code& ec, const boost::shared_ptr<Socket>& client_ptr)
+	void accept_handler(const error_code& ec, typename st_server_base::object_ctype& client_ptr)
 	{
 		if (!ec)
 		{

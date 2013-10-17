@@ -27,6 +27,17 @@ class st_tcp_client_base : public st_client<Socket>
 public:
 	st_tcp_client_base(st_service_pump& service_pump_) : st_client<Socket>(service_pump_) {}
 
+	//connected link size, may smaller than total object size(st_object_pool::size)
+	size_t valid_size()
+	{
+		size_t size = 0;
+		mutex::scoped_lock lock(ST_THIS object_can_mutex);
+		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
+			if ((*iter)->is_connected())
+				++size;
+		return size;
+	}
+
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_BROADCAST_MSG(broadcast_msg, send_msg)

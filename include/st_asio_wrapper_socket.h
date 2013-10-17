@@ -36,6 +36,10 @@ enum BufferType {POST_BUFFER, SEND_BUFFER, RECV_BUFFER};
 template<typename MsgType, typename Socket>
 class st_socket: public Socket, public st_timer
 {
+public:
+	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
+	typedef container::list<MsgType> container_type;
+
 protected:
 	st_socket(io_service& io_service_) : Socket(io_service_), st_timer(io_service_),
 		packer_(boost::make_shared<packer>()) {reset_state();}
@@ -149,7 +153,7 @@ public:
 	}
 
 	//clear all pending msgs
-	void pop_all_pending_msg(container::list<MsgType>& msg_list, BufferType buffer_type = SEND_BUFFER)
+	void pop_all_pending_msg(container_type& msg_list, BufferType buffer_type = SEND_BUFFER)
 	{
 		mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
 		msg_list.splice(msg_list.end(), msg_buffer[buffer_type]);
@@ -360,8 +364,7 @@ protected:
 	MsgType last_send_msg, last_dispatch_msg;
 	boost::shared_ptr<i_packer> packer_;
 
-	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	container::list<MsgType> msg_buffer[4];
+	container_type msg_buffer[4];
 	//if on_msg() return true, which means use the msg recv buffer,
 	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't push into recv_msg_buffer
 	//because of recv buffer overflow, st_socket will delay 50 milliseconds(nonblocking) to invoke

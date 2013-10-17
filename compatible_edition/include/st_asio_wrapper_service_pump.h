@@ -67,10 +67,14 @@ public:
 	};
 
 public:
+	typedef i_service* object_type;
+	typedef const object_type object_ctype;
+	typedef container::list<object_type> container_type;
+
 	st_service_pump() : started(false) {}
 	virtual ~st_service_pump() {clear();}
 
-	i_service* find(int id)
+	object_type find(int id)
 	{
 		mutex::scoped_lock lock(service_can_mutex);
 		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(),
@@ -78,7 +82,7 @@ public:
 		return iter == service_can.end() ? NULL : *iter;
 	}
 
-	void remove(i_service* i_service_)
+	void remove(object_type i_service_)
 	{
 		assert(NULL != i_service_);
 
@@ -96,7 +100,7 @@ public:
 			std::bind2nd(std::mem_fun(&i_service::is_equal_to), id)));
 		if (iter != service_can.end())
 		{
-			i_service* i_service_ = *iter;
+			object_type i_service_ = *iter;
 			service_can.erase(iter);
 			lock.unlock();
 
@@ -106,7 +110,7 @@ public:
 
 	void clear()
 	{
-		BOOST_AUTO(temp_service_can, service_can);
+		container_type temp_service_can;
 
 		mutex::scoped_lock lock(service_can_mutex);
 		temp_service_can.splice(temp_service_can.end(), service_can);
@@ -146,7 +150,7 @@ public:
 	}
 
 	//if you add a service after start_service, use this to start it
-	void start_service(i_service* i_service_, int thread_num = ST_SERVICE_THREAD_NUM)
+	void start_service(object_type i_service_, int thread_num = ST_SERVICE_THREAD_NUM)
 	{
 		assert(NULL != i_service_);
 
@@ -155,7 +159,7 @@ public:
 		else
 			start_service(thread_num);
 	}
-	void stop_service(i_service* i_service_) {assert(NULL != i_service_); i_service_->stop_service();}
+	void stop_service(object_type i_service_) {assert(NULL != i_service_); i_service_->stop_service();}
 
 	bool is_running() const {return !stopped();}
 	bool is_service_started() const {return started;}
@@ -182,14 +186,14 @@ public:
 	}
 
 protected:
-	void stop_and_free(i_service* i_service_)
+	void stop_and_free(object_type i_service_)
 	{
 		assert(NULL != i_service_);
 
 		i_service_->stop_service();
 		free(i_service_);
 	}
-	virtual void free(i_service* i_service_) {} //if needed, rewrite this to free the service
+	virtual void free(object_type i_service_) {} //if needed, rewrite this to free the service
 
 #ifdef ENHANCED_STABILITY
 	virtual bool on_exception(const std::exception& e)
@@ -212,7 +216,7 @@ protected:
 	DO_SOMETHING_TO_ONE_MUTEX(service_can, service_can_mutex)
 
 private:
-	void add(i_service* i_service_)
+	void add(object_type i_service_)
 	{
 		assert(NULL != i_service_);
 
@@ -240,7 +244,7 @@ private:
 	}
 
 protected:
-	container::list<i_service*> service_can;
+	container_type service_can;
 	mutex service_can_mutex;
 	thread service_thread;
 	bool started;

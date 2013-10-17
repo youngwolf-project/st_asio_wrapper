@@ -69,9 +69,13 @@ protected:
 	virtual ~st_timer() {}
 
 public:
+	typedef timer_info object_type;
+	typedef const object_type object_ctype;
+	typedef container::set<object_type> container_type;
+
 	void set_timer(unsigned char id, size_t milliseconds, const void* user_data)
 	{
-		timer_info ti = {id};
+		object_type ti = {id};
 
 		mutex::scoped_lock lock(timer_can_mutex);
 		auto iter = timer_can.find(ti);
@@ -82,7 +86,7 @@ public:
 		}
 		lock.unlock();
 
-		iter->status = timer_info::TIMER_OK;
+		iter->status = object_type::TIMER_OK;
 		iter->milliseconds = milliseconds;
 		iter->user_data = user_data;
 
@@ -91,7 +95,7 @@ public:
 
 	void stop_timer(unsigned char id)
 	{
-		timer_info ti = {id};
+		object_type ti = {id};
 
 		mutex::scoped_lock lock(timer_can_mutex);
 		auto iter = timer_can.find(ti);
@@ -106,33 +110,33 @@ public:
 	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex)
 
 	void stop_all_timer()
-		{do_something_to_all(boost::bind((void (st_timer::*) (timer_info&)) &st_timer::stop_timer, this, _1));}
+		{do_something_to_all(boost::bind((void (st_timer::*) (object_type&)) &st_timer::stop_timer, this, _1));}
 
 protected:
 	//return true to continue the timer, or the timer will stop
 	virtual bool on_timer(unsigned char id, const void* user_data) {return false;}
 
-	void start_timer(const timer_info& ti)
+	void start_timer(object_ctype& ti)
 	{
 		ti.timer->expires_from_now(posix_time::milliseconds(ti.milliseconds));
 		ti.timer->async_wait(boost::bind(&st_timer::timer_handler, this, placeholders::error, boost::ref(ti)));
 	}
 
-	void stop_timer(timer_info& ti)
+	void stop_timer(object_type& ti)
 	{
 		error_code ec;
 		ti.timer->cancel(ec);
-		ti.status = timer_info::TIMER_CANCELED;
+		ti.status = object_type::TIMER_CANCELED;
 	}
 
-	void timer_handler(const error_code& ec, const timer_info& ti)
+	void timer_handler(const error_code& ec, object_ctype& ti)
 	{
-		if (!ec && on_timer(ti.id, ti.user_data) && timer_info::TIMER_OK == ti.status)
+		if (!ec && on_timer(ti.id, ti.user_data) && object_type::TIMER_OK == ti.status)
 			start_timer(ti);
 	}
 
 	io_service& io_service_;
-	container::set<timer_info> timer_can;
+	container_type timer_can;
 	mutex timer_can_mutex;
 };
 

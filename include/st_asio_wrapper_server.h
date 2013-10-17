@@ -73,13 +73,13 @@ public:
 		//because in this function, object_can_mutex has been locked,
 		//graceful_close will wait until on_recv_error() been invoked,
 		//in on_recv_error(), we need to lock object_can_mutex too(in del_object()), which made dead lock
-		ST_THIS do_something_to_all([this](decltype(*std::begin(ST_THIS object_can))& item) {
+		ST_THIS do_something_to_all([this](typename st_server_base::object_ctype& item) {
 			item->show_info("client:", "been closed.");
 			item->force_close();
 		});
 	}
 
-	boost::shared_ptr<Socket> create_client()
+	typename st_server_base::object_type create_client()
 	{
 		auto client_ptr(ST_THIS reuse_object());
 		return client_ptr ? client_ptr : boost::make_shared<Socket>(boost::ref(*this));
@@ -116,7 +116,7 @@ protected:
 	}
 	virtual void uninit() {st_object_pool<Socket>::stop(); stop_listen(); close_all_client();}
 
-	virtual bool on_accept(const boost::shared_ptr<Socket>& client_ptr) {return true;}
+	virtual bool on_accept(typename st_server_base::object_ctype& client_ptr) {return true;}
 
 protected:
 	void start_next_accept()
@@ -126,7 +126,7 @@ protected:
 			placeholders::error, client_ptr));
 	}
 
-	bool add_client(const boost::shared_ptr<Socket>& client_ptr)
+	bool add_client(typename st_server_base::object_ctype& client_ptr)
 	{
 		if (st_object_pool<Socket>::add_object(client_ptr))
 		{
@@ -137,7 +137,7 @@ protected:
 		return false;
 	}
 
-	void accept_handler(const error_code& ec, const boost::shared_ptr<Socket>& client_ptr)
+	void accept_handler(const error_code& ec, typename st_server_base::object_ctype& client_ptr)
 	{
 		if (!ec)
 		{

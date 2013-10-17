@@ -55,13 +55,18 @@ namespace st_asio_wrapper
 template<typename Socket>
 class st_object_pool: public st_service_pump::i_service, public st_timer
 {
+public:
+	typedef boost::shared_ptr<Socket> object_type;
+	typedef const object_type object_ctype;
+	typedef container::list<object_type> container_type;
+
 protected:
 	struct temp_object
 	{
 		const time_t closed_time;
-		const boost::shared_ptr<Socket> object_ptr;
+		object_ctype object_ptr;
 
-		temp_object(const boost::shared_ptr<Socket>& object_ptr_) :
+		temp_object(object_ctype& object_ptr_) :
 			closed_time(time(nullptr)), object_ptr(object_ptr_) {}
 
 		bool is_timeout() const {return is_timeout(time(nullptr));}
@@ -83,7 +88,7 @@ protected:
 
 	void stop() {stop_all_timer();}
 
-	bool add_object(const boost::shared_ptr<Socket>& object_ptr)
+	bool add_object(object_ctype& object_ptr)
 	{
 		assert(object_ptr && &object_ptr->get_io_service() == &get_service_pump());
 		mutex::scoped_lock lock(object_can_mutex);
@@ -95,7 +100,7 @@ protected:
 		return object_num < MAX_OBJECT_NUM;
 	}
 
-	bool del_object(const boost::shared_ptr<Socket>& object_ptr)
+	bool del_object(object_ctype& object_ptr)
 	{
 		auto found = false;
 
@@ -118,7 +123,7 @@ protected:
 		return found;
 	}
 
-	boost::shared_ptr<Socket> reuse_object()
+	object_type reuse_object()
 	{
 #ifdef REUSE_OBJECT
 		mutex::scoped_lock lock(temp_object_can_mutex);
@@ -135,7 +140,7 @@ protected:
 			}
 #endif
 
-		return boost::shared_ptr<Socket>();
+		return object_type();
 	}
 
 	virtual bool on_timer(unsigned char id, const void* user_data)
@@ -151,7 +156,7 @@ protected:
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
 		case 1:
 			{
-				decltype(object_can) objects;
+				container_type objects;
 				clear_all_closed_object(objects);
 				if (!objects.empty())
 				{
@@ -185,12 +190,12 @@ public:
 		return temp_object_can.size();
 	}
 
-	boost::shared_ptr<Socket> at(size_t index)
+	object_type at(size_t index)
 	{
 		mutex::scoped_lock lock(object_can_mutex);
 		assert(index < object_can.size());
 		return index < object_can.size() ?
-			*(std::next(std::begin(object_can), index)) : boost::shared_ptr<Socket>();
+			*(std::next(std::begin(object_can), index)) : object_type();
 	}
 
 	void list_all_object() {do_something_to_all(boost::bind(&Socket::show_info, _1, "", ""));}
@@ -198,7 +203,7 @@ public:
 	//Empty ip means don't care, any ip will match
 	//Zero port means don't care, any port will match
 	//this function only used with tcp socket, because for udp socket, remote endpoint means nothing.
-	void find_object(const std::string& ip, unsigned short port, container::list<boost::shared_ptr<Socket>>& objects)
+	void find_object(const std::string& ip, unsigned short port, container_type& objects)
 	{
 		if (ip.empty() && 0 == port)
 		{
@@ -206,7 +211,7 @@ public:
 			objects.insert(std::end(objects), std::begin(object_can), std::end(object_can));
 		}
 		else
-			do_something_to_all([&](decltype(*std::begin(object_can))& item) {
+			do_something_to_all([&](object_ctype& item) {
 				if (item->is_open())
 				{
 					auto ep = item->remote_endpoint();
@@ -222,7 +227,7 @@ public:
 	//2.For some reason(I haven't met yet), on_recv_error, on_send_error and on_unpack_error
 	// not been invoked
 	//st_object_pool will automatically invoke this function if AUTO_CLEAR_CLOSED_SOCKET been defined
-	void clear_all_closed_object(container::list<boost::shared_ptr<Socket>>& objects)
+	void clear_all_closed_object(container_type& objects)
 	{
 		mutex::scoped_lock lock(object_can_mutex);
 		for (auto iter = std::begin(object_can); iter != std::end(object_can);)
@@ -264,7 +269,7 @@ public:
 
 protected:
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	container::list<boost::shared_ptr<Socket>> object_can;
+	container_type object_can;
 	mutex object_can_mutex;
 
 	//because all objects are dynamic created and stored in object_can, maybe when the recv error occur
