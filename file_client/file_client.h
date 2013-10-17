@@ -206,7 +206,7 @@ public:
 	__off64_t get_total_rest_size()
 	{
 		__off64_t total_rest_size = 0;
-		do_something_to_all([&](typename file_client::object_ctype& item) {
+		do_something_to_all([&](file_client::object_ctype& item) {
 			total_rest_size += item->get_rest_size();
 		});
 

@@ -94,7 +94,7 @@ public:
 	uint64_t get_total_recv_bytes()
 	{
 		uint64_t total_recv_bytes = 0;
-		do_something_to_all([&](typename test_client::object_ctype& item) {
+		do_something_to_all([&](test_client::object_ctype& item) {
 			total_recv_bytes += item->get_recv_bytes();
 		});
 
