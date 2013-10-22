@@ -322,7 +322,12 @@ protected:
 
 			if (dispatch_all)
 			{
+#ifdef FORCE_TO_USE_MSG_RECV_BUFFER
 				recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
+#endif
+				//the msgs in temp_msg_buffer are discarded, it's very hard to resolve this defect,
+				//so, please be very carefully if you decide to resolve this issue;
+				//the biggest problem is calling force_close in on_msg.
 				st_asio_wrapper::do_something_to_all(recv_msg_buffer,
 					boost::bind(&st_socket::on_msg_handle, this, _1));
 				recv_msg_buffer.clear();
