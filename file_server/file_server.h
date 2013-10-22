@@ -61,7 +61,7 @@ protected:
 
 			get_io_service().post(boost::bind(&file_socket::read_file_handler, this,
 				*static_cast<const __off64_t*>(user_data)));
-			delete static_cast<const __off64_t*>(user_data); //free this memery, because we newed it in set_timer.
+			delete static_cast<const __off64_t*>(user_data); //free this memory, because we newed it in set_timer.
 			break;
 		default:
 			return st_server_socket::on_timer(id, user_data);

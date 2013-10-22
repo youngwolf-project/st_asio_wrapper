@@ -52,7 +52,7 @@ public:
 protected:
 	virtual void on_recv_error(const error_code& ec)
 	{
-		//the type of st_server_socket_base::server now can be controled by derived class(echo_socket),
+		//the type of st_server_socket_base::server now can be controlled by derived class(echo_socket),
 		//which is actually i_echo_server, so, we can invoke i_echo_server::test virtual function.
 		server.test();
 		st_server_socket_base::on_recv_error(ec);
