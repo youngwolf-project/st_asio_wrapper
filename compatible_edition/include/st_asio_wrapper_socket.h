@@ -18,6 +18,10 @@
 #include "st_asio_wrapper_packer.h"
 #include "st_asio_wrapper_timer.h"
 
+#ifndef DEFAULT_PACKER
+#define DEFAULT_PACKER packer
+#endif
+
 using namespace boost::asio::ip;
 
 namespace st_asio_wrapper
@@ -42,7 +46,7 @@ public:
 
 protected:
 	st_socket(io_service& io_service_) : Socket(io_service_), st_timer(io_service_),
-		packer_(boost::make_shared<packer>()) {reset_state();}
+		packer_(boost::make_shared<DEFAULT_PACKER>()) {reset_state();}
 
 	void reset_state()
 	{

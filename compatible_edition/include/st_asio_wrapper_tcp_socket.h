@@ -20,6 +20,10 @@
 	#define GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, max waiting seconds while graceful closing
 #endif
 
+#ifndef DEFAULT_UNPACKER
+#define DEFAULT_UNPACKER unpacker
+#endif
+
 namespace st_asio_wrapper
 {
 namespace st_tcp
@@ -31,7 +35,7 @@ typedef const msg_type msg_ctype;
 class st_tcp_socket : public st_socket<msg_type, tcp::socket>
 {
 protected:
-	st_tcp_socket(io_service& io_service_) : st_socket(io_service_), unpacker_(boost::make_shared<unpacker>())
+	st_tcp_socket(io_service& io_service_) : st_socket(io_service_), unpacker_(boost::make_shared<DEFAULT_UNPACKER>())
 		{reset_state();}
 
 public:
