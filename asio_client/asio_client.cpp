@@ -2,6 +2,7 @@
 //configuration
 #define SERVER_PORT		9527
 #define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+#define CUSTOM_LOG
 
 //the following three macro demonstrate how to support huge msg(exceed 65535 - 2).
 //huge msg consume huge memory, for example, if we support 1M msg size, because every st_tcp_socket has a
@@ -13,6 +14,33 @@
 //#define MAX_MSG_NUM 8 //reduce buffer size to reduce memory occupation
 //configuration
 
+//demonstrate how to use custom log system(two methods):
+//notice: please don't forget to define the CUSTOM_LOG macro.
+#include "../include/st_asio_wrapper_base.h"
+using namespace st_asio_wrapper;
+//one:
+///*
+namespace unified_out
+{
+void fatal_out(const char* fmt, ...) {all_out_helper2;}
+void error_out(const char* fmt, ...) {all_out_helper2;}
+void warning_out(const char* fmt, ...) {all_out_helper2;}
+void info_out(const char* fmt, ...) {all_out_helper2;}
+void debug_out(const char* fmt, ...) {all_out_helper2;}
+}
+//*/
+//two:
+/*
+class unified_out
+{
+public:
+	static void fatal_out(const char* fmt, ...) {all_out_helper2;}
+	static void error_out(const char* fmt, ...) {all_out_helper2;}
+	static void warning_out(const char* fmt, ...) {all_out_helper2;}
+	static void info_out(const char* fmt, ...) {all_out_helper2;}
+	static void debug_out(const char* fmt, ...) {all_out_helper2;}
+};
+*/
 #include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
 

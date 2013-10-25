@@ -248,73 +248,59 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //udp msg sending interface
 ///////////////////////////////////////////////////
 
+void all_out(char* buff, const char* fmt, va_list& ap)
+{
+	assert(nullptr != buff);
+	time_t now = time(nullptr);
+
+#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
+	auto buffer_len = UNIFIED_OUT_BUF_NUM / 2;
+	ctime_s(std::next(buff, buffer_len), buffer_len, &now);
+	strcpy_s(buff, buffer_len, std::next(buff, buffer_len));
+#else
+	strcpy(buff, ctime(&now));
+#endif
+	auto len = strlen(buff);
+	assert(len > 0);
+	if ('\n' == *std::next(buff, len - 1))
+		--len;
+#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
+	strcpy_s(std::next(buff, len), buffer_len, " -> ");
+	len += 4;
+	buffer_len = UNIFIED_OUT_BUF_NUM - len;
+	vsnprintf_s(std::next(buff, len), buffer_len, buffer_len, fmt, ap);
+#else
+	strcpy(std::next(buff, len), " -> ");
+	len += 4;
+	vsnprintf(std::next(buff, len), UNIFIED_OUT_BUF_NUM - len, fmt, ap);
+#endif
+}
+
+#define all_out_helper(buff) va_list ap;va_start(ap, fmt);all_out(buff, fmt, ap);va_end(ap)
+#define all_out_helper2 char output_buff[UNIFIED_OUT_BUF_NUM];all_out_helper(output_buff);puts(output_buff)
+
+#ifndef CUSTOM_LOG
 #ifdef NO_UNIFIED_OUT
 namespace unified_out
 {
 void null_out() {}
+#define fatal_out(fmt, ...) null_out()
+#define error_out(fmt, ...) null_out()
+#define warning_out(fmt, ...) null_out()
 #define info_out(fmt, ...) null_out()
 #define debug_out(fmt, ...) null_out()
-#define error_out(fmt, ...) null_out()
 }
 #else
 class unified_out
 {
 public:
-	static void info_out(const char* fmt, ...)
-	{
-		va_list ap;
-		va_start(ap, fmt);
-		all_out(fmt, ap, 1);
-		va_end(ap);
-	}
-
-	static void debug_out(const char* fmt, ...)
-	{
-		va_list ap;
-		va_start(ap, fmt);
-		all_out(fmt, ap, 2);
-		va_end(ap);
-	}
-
-	static void error_out(const char* fmt, ...)
-	{
-		va_list ap;
-		va_start(ap, fmt);
-		all_out(fmt, ap, 3);
-		va_end(ap);
-	}
-
-protected:
-	static void all_out(const char* fmt, va_list& ap, int type, int level = 1)
-	{
-		char output_buff[UNIFIED_OUT_BUF_NUM];
-		time_t now = time(nullptr);
-
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-		auto buffer_len = sizeof(output_buff) / 2;
-		ctime_s(std::next(output_buff, buffer_len), buffer_len, &now);
-		strcpy_s(output_buff, buffer_len, std::next(output_buff, buffer_len));
-#else
-		strcpy(output_buff, ctime(&now));
-#endif
-		auto len = strlen(output_buff);
-		assert(len > 0);
-		if ('\n' == *std::next(output_buff, len - 1))
-			--len;
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-		strcpy_s(std::next(output_buff, len), buffer_len, " -> ");
-		len += 4;
-		buffer_len = sizeof(output_buff) - len;
-		vsnprintf_s(std::next(output_buff, len), buffer_len, buffer_len, fmt, ap);
-#else
-		strcpy(std::next(output_buff, len), " -> ");
-		len += 4;
-		vsnprintf(std::next(output_buff, len), sizeof(output_buff) - len, fmt, ap);
-#endif
-
-		puts(output_buff);
-	}
+	static void fatal_out(const char* fmt, ...) {all_out_helper2;}
+	static void error_out(const char* fmt, ...) {all_out_helper2;}
+	static void warning_out(const char* fmt, ...) {all_out_helper2;}
+	static void info_out(const char* fmt, ...) {all_out_helper2;}
+	static void debug_out(const char* fmt, ...) {all_out_helper2;}
 };
+#endif
 #endif
 
 } //namespace
