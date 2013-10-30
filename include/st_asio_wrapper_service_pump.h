@@ -71,7 +71,6 @@ public:
 	typedef container::list<object_type> container_type;
 
 	st_service_pump() : started(false) {}
-	virtual ~st_service_pump() {clear();}
 
 	object_type find(int id)
 	{
@@ -123,7 +122,8 @@ public:
 		if (!is_service_started())
 		{
 			service_thread = thread(boost::bind(&st_service_pump::run_service, this, thread_num));
-			while (!is_service_started())
+			auto loop_num = 10;
+			while (--loop_num >= 0 && !is_service_started())
 				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
 		}
 	}
