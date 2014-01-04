@@ -254,7 +254,7 @@ void all_out(char* buff, const char* fmt, va_list& ap)
 	time_t now = time(nullptr);
 
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-	auto buffer_len = UNIFIED_OUT_BUF_NUM / 2;
+	size_t buffer_len = UNIFIED_OUT_BUF_NUM / 2;
 	ctime_s(std::next(buff, buffer_len), buffer_len, &now);
 	strcpy_s(buff, buffer_len, std::next(buff, buffer_len));
 #else

@@ -117,7 +117,7 @@ int main(int argc, const char* argv[])
 	puts("usage: test_client [link num=16]");
 
 	size_t link_num = 16;
-	if (argc > 1) link_num = std::min((size_t) 4096, std::max((size_t) atoi(argv[1]), (size_t) 1));
+	if (argc > 1) link_num = std::min((size_t) MAX_OBJECT_NUM, std::max((size_t) atoi(argv[1]), (size_t) 1));
 
 	printf("exec: test_client " size_t_format "\n", link_num);
 	///////////////////////////////////////////////////////////

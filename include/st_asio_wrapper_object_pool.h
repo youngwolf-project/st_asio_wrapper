@@ -128,7 +128,7 @@ protected:
 #ifdef REUSE_OBJECT
 		mutex::scoped_lock lock(temp_object_can_mutex);
 		//objects are order by time, so we can use this feature to improve the performance
-		for (auto iter = std::begin(temp_object_can); iter->is_timeout() && iter != std::end(temp_object_can); ++iter)
+		for (auto iter = std::begin(temp_object_can); iter != std::end(temp_object_can) && iter->is_timeout(); ++iter)
 			if (!iter->object_ptr->started())
 			{
 				auto object_ptr(std::move(iter->object_ptr));
@@ -254,7 +254,7 @@ public:
 
 		mutex::scoped_lock lock(temp_object_can_mutex);
 		//objects are order by time, so we can use this feature to improve the performance
-		for (auto iter = std::begin(temp_object_can); num > 0 && iter->is_timeout() && iter != std::end(temp_object_can);)
+		for (auto iter = std::begin(temp_object_can); num > 0 && iter != std::end(temp_object_can) && iter->is_timeout();)
 			if (!iter->object_ptr->started())
 			{
 				iter = temp_object_can.erase(iter);
