@@ -39,14 +39,14 @@ if head equal:
 #define __off64_t_format "%lld"
 #endif
 
-extern atomic_ushort completed_client_num;
+extern boost::atomic_ushort completed_client_num;
 extern int link_num;
 extern __off64_t file_size;
 
 class file_socket : public st_connector
 {
 public:
-	file_socket(io_service& io_service_) : st_connector(io_service_),
+	file_socket(boost::asio::io_service& io_service_) : st_connector(io_service_),
 		state(TRANS_IDLE), index(-1), file(nullptr), my_length(0) {}
 	virtual ~file_socket() {clear();}
 

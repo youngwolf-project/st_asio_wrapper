@@ -32,11 +32,11 @@ namespace st_tcp
 typedef std::string msg_type;
 typedef const msg_type msg_ctype;
 
-class st_tcp_socket : public st_socket<msg_type, tcp::socket>
+class st_tcp_socket : public st_socket<msg_type, boost::asio::ip::tcp::socket>
 {
 protected:
-	st_tcp_socket(io_service& io_service_) : st_socket(io_service_), unpacker_(boost::make_shared<DEFAULT_UNPACKER>())
-		{reset_state();}
+	st_tcp_socket(boost::asio::io_service& io_service_) :
+		st_socket(io_service_), unpacker_(boost::make_shared<DEFAULT_UNPACKER>()) {reset_state();}
 
 public:
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
@@ -54,15 +54,15 @@ public:
 	{
 		closing = true;
 
-		error_code ec;
-		shutdown(tcp::socket::shutdown_send, ec);
+		boost::system::error_code ec;
+		shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
 		if (ec) //graceful disconnecting is impossible
 			clean_up();
 		else
 		{
 			int loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
 			while (--loop_num >= 0 && closing)
-				this_thread::sleep(get_system_time() + posix_time::milliseconds(10));
+				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
 			if (loop_num < 0) //graceful disconnecting is impossible
 				clean_up();
 		}
@@ -90,7 +90,7 @@ public:
 
 	void show_info(const char* head, const char* tail)
 	{
-		error_code ec;
+		boost::system::error_code ec;
 		BOOST_AUTO(ep, remote_endpoint(ec));
 		if (!ec)
 			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
@@ -106,15 +106,16 @@ protected:
 		{
 			sending = true;
 			last_send_msg.swap(send_msg_buffer.front());
-			async_write(*this, buffer(last_send_msg), boost::bind(&st_tcp_socket::send_handler, this,
-				placeholders::error, placeholders::bytes_transferred));
+			boost::asio::async_write(*this, boost::asio::buffer(last_send_msg), boost::bind(&st_tcp_socket::send_handler, this,
+				boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 			send_msg_buffer.pop_front();
 		}
 
 		return sending;
 	}
 
-	virtual bool is_send_allowed() const {return !is_closing() && st_socket<msg_type, tcp::socket>::is_send_allowed();}
+	virtual bool is_send_allowed() const
+		{return !is_closing() && st_socket<msg_type, boost::asio::ip::tcp::socket>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
 	//msg can not be unpacked
@@ -122,7 +123,7 @@ protected:
 	virtual void on_unpack_error() = 0;
 
 	//recv error or peer endpoint quit(false ec means ok)
-	virtual void on_recv_error(const error_code& ec) = 0;
+	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//if you want to use your own recv buffer, you can move the msg to your own recv buffer,
@@ -152,11 +153,11 @@ protected:
 	void do_recv_msg()
 	{
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
-		if (buffer_size(recv_buff) > 0)
-			async_read(*this, recv_buff, boost::bind(&i_unpacker::completion_condition, unpacker_,
-				placeholders::error, placeholders::bytes_transferred),
+		if (boost::asio::buffer_size(recv_buff) > 0)
+			boost::asio::async_read(*this, recv_buff, boost::bind(&i_unpacker::completion_condition, unpacker_,
+				boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
 				boost::bind(&st_tcp_socket::recv_handler, this,
-					placeholders::error, placeholders::bytes_transferred));
+					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 	}
 
 	//reset unpacker's state, generally used when unpack error occur
@@ -166,8 +167,8 @@ protected:
 	{
 		if (is_open())
 		{
-			error_code ec;
-			shutdown(tcp::socket::shutdown_both, ec);
+			boost::system::error_code ec;
+			shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
 			close(ec);
 		}
 
@@ -176,7 +177,7 @@ protected:
 		reset_state();
 	}
 
-	void recv_handler(const error_code& ec, size_t bytes_transferred)
+	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec && bytes_transferred > 0)
 		{
@@ -190,7 +191,7 @@ protected:
 			on_recv_error(ec);
 	}
 
-	void send_handler(const error_code& ec, size_t bytes_transferred)
+	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec)
 		{
@@ -202,7 +203,7 @@ protected:
 		else
 			on_send_error(ec);
 
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
 		sending = false;
 
 		//send msg sequentially, that means second send only after first send success

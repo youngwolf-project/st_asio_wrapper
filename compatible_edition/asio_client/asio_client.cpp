@@ -16,6 +16,9 @@
 
 //demonstrate how to use custom log system(two methods):
 //notice: please don't forget to define the CUSTOM_LOG macro.
+//use your own code to replace all_out_helper2 macro.
+//custom log should be defined(or included) before including any st_asio_wrapper header files except
+//st_asio_wrapper_base.h
 #include "../include/st_asio_wrapper_base.h"
 using namespace st_asio_wrapper;
 //one:

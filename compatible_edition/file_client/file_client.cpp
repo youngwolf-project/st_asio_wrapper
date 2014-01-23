@@ -16,7 +16,7 @@
 #define RESTART_COMMAND	"restart"
 #define REQUEST_FILE	"get"
 
-atomic_ushort completed_client_num;
+boost::atomic_ushort completed_client_num;
 int link_num = 1;
 __off64_t file_size;
 
@@ -57,13 +57,13 @@ int main(int argc, const char* argv[])
 			isspace(str[sizeof(REQUEST_FILE) - 1]))
 		{
 			str.erase(0, sizeof(REQUEST_FILE));
-			char_separator<char> sep(" \t");
-			tokenizer<char_separator<char> > tok(str, sep);
+			boost::char_separator<char> sep(" \t");
+			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
 			for (BOOST_AUTO(iter, tok.begin()); iter != tok.end(); ++iter)
 			{
 				completed_client_num.store(0);
 				file_size = 0;
-				int begin_time = get_system_time().time_of_day().total_seconds();
+				int begin_time = boost::get_system_time().time_of_day().total_seconds();
 				if (client.at(0)->get_file(*iter))
 				{
 					for (int i = 1; i < link_num; ++i)
@@ -73,7 +73,7 @@ int main(int argc, const char* argv[])
 					unsigned percent = -1;
 					while (completed_client_num.load() != (unsigned short) link_num)
 					{
-						this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+						boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 						if (file_size > 0)
 						{
 							__off64_t total_rest_size = client.get_total_rest_size();
@@ -90,7 +90,7 @@ int main(int argc, const char* argv[])
 							}
 						}
 					}
-					int used_time = get_system_time().time_of_day().total_seconds() - begin_time;
+					int used_time = boost::get_system_time().time_of_day().total_seconds() - begin_time;
 					if (used_time > 0)
 						printf("\r100%%\ntransfer %s end, speed: " __off64_t_format "kB/s.\n",
 							iter->data(), file_size / 1024 / used_time);

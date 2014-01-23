@@ -16,10 +16,10 @@
 #include "st_asio_wrapper_base.h"
 
 #ifdef HUGE_MSG
-#define HEAD_TYPE	uint32_t
+#define HEAD_TYPE	boost::uint32_t
 #define HEAD_H2N	htonl
 #else
-#define HEAD_TYPE	uint16_t
+#define HEAD_TYPE	boost::uint16_t
 #define HEAD_H2N	htons
 #endif
 #define HEAD_LEN	(sizeof(HEAD_TYPE))

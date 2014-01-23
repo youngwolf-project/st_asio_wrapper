@@ -27,7 +27,7 @@
 namespace st_asio_wrapper
 {
 
-class st_service_pump : public io_service
+class st_service_pump : public boost::asio::io_service
 {
 public:
 	class i_service
@@ -68,13 +68,13 @@ public:
 public:
 	typedef i_service* object_type;
 	typedef const object_type object_ctype;
-	typedef container::list<object_type> container_type;
+	typedef boost::container::list<object_type> container_type;
 
 	st_service_pump() : started(false) {}
 
 	object_type find(int id)
 	{
-		mutex::scoped_lock lock(service_can_mutex);
+		boost::mutex::scoped_lock lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can),
 			[=](object_ctype& item) {return id == item->id();});
 		return iter == std::end(service_can) ? nullptr : *iter;
@@ -84,7 +84,7 @@ public:
 	{
 		assert(nullptr != i_service_);
 
-		mutex::scoped_lock lock(service_can_mutex);
+		boost::mutex::scoped_lock lock(service_can_mutex);
 		service_can.remove(i_service_);
 		lock.unlock();
 
@@ -93,7 +93,7 @@ public:
 
 	void remove(int id)
 	{
-		mutex::scoped_lock lock(service_can_mutex);
+		boost::mutex::scoped_lock lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can),
 			[=](object_ctype& item) {return id == item->id();});
 		if (iter != std::end(service_can))
@@ -110,7 +110,7 @@ public:
 	{
 		container_type temp_service_can;
 
-		mutex::scoped_lock lock(service_can_mutex);
+		boost::mutex::scoped_lock lock(service_can_mutex);
 		temp_service_can.splice(std::end(temp_service_can), service_can);
 		lock.unlock();
 
@@ -121,10 +121,10 @@ public:
 	{
 		if (!is_service_started())
 		{
-			service_thread = thread(boost::bind(&st_service_pump::run_service, this, thread_num));
+			service_thread = boost::thread(boost::bind(&st_service_pump::run_service, this, thread_num));
 			auto loop_num = 10;
 			while (--loop_num >= 0 && !is_service_started())
-				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 		}
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example, close the application
@@ -138,7 +138,7 @@ public:
 			auto loop_num = 20; //one second
 			while (is_service_started())
 			{
-				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 				if (--loop_num <= 0)
 				{
 					stop();
@@ -180,7 +180,7 @@ public:
 		{
 			do_something_to_all(boost::mem_fn(&i_service::stop_service));
 			while (is_service_started())
-				this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 		}
 	}
 
@@ -201,7 +201,7 @@ protected:
 		return true; //continue this io_service::run, if needed, rewrite this to decide whether to continue or not
 	}
 
-	size_t run(error_code& ec)
+	size_t run(boost::system::error_code& ec)
 	{
 		while (true)
 		{
@@ -219,7 +219,7 @@ private:
 	{
 		assert(nullptr != i_service_);
 
-		mutex::scoped_lock lock(service_can_mutex);
+		boost::mutex::scoped_lock lock(service_can_mutex);
 		service_can.push_back(i_service_);
 	}
 
@@ -229,10 +229,10 @@ private:
 		unified_out::info_out("service pump started.");
 
 		--thread_num;
-		thread_group tg;
+		boost::thread_group tg;
 		for (auto i = 0; i < thread_num; ++i)
-			tg.create_thread(boost::bind(&st_service_pump::run, this, error_code()));
-		error_code ec;
+			tg.create_thread(boost::bind(&st_service_pump::run, this, boost::system::error_code()));
+		boost::system::error_code ec;
 		run(ec);
 
 		if (thread_num > 0)
@@ -244,8 +244,8 @@ private:
 
 protected:
 	container_type service_can;
-	mutex service_can_mutex;
-	thread service_thread;
+	boost::mutex service_can_mutex;
+	boost::thread service_thread;
 	bool started;
 };
 

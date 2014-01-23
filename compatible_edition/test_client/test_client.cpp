@@ -43,8 +43,8 @@ static bool check_msg;
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	size_t index = (size_t) ((uint64_t) rand() * (object_can.size() - 1) / RAND_MAX); \
-	mutex::scoped_lock lock(object_can_mutex); \
+	size_t index = (size_t) ((boost::uint64_t) rand() * (object_can.size() - 1) / RAND_MAX); \
+	boost::mutex::scoped_lock lock(object_can_mutex); \
 	BOOST_AUTO(iter, object_can.begin()); \
 	std::advance(iter, index); \
 	(*iter)->SEND_FUNNAME(pstr, len, num, can_overflow); \
@@ -56,10 +56,10 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 SHARED_OBJECT(test_socket, st_connector)
 {
 public:
-	test_socket(io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0) {}
+	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0) {}
 
-	uint64_t get_recv_bytes() const {return recv_bytes;}
-	operator uint64_t() const {return recv_bytes;}
+	boost::uint64_t get_recv_bytes() const {return recv_bytes;}
+	operator boost::uint64_t() const {return recv_bytes;}
 	//workaround for boost::lambda
 	//how to invoke get_recv_bytes() directly, please tell me if somebody knows!
 
@@ -86,7 +86,7 @@ private:
 	}
 
 private:
-	uint64_t recv_bytes;
+	boost::uint64_t recv_bytes;
 	size_t recv_index;
 };
 
@@ -96,10 +96,10 @@ public:
 	test_client(st_service_pump& service_pump_) : st_tcp_client_base<test_socket>(service_pump_) {}
 
 	void reset() {do_something_to_all(boost::mem_fn(&test_socket::reset));}
-	uint64_t get_total_recv_bytes()
+	boost::uint64_t get_total_recv_bytes()
 	{
-		uint64_t total_recv_bytes = 0;
-		do_something_to_all(boost::ref(total_recv_bytes) += boost::lambda::ret<uint64_t>(*boost::lambda::_1));
+		boost::uint64_t total_recv_bytes = 0;
+		do_something_to_all(boost::ref(total_recv_bytes) += boost::lambda::ret<boost::uint64_t>(*boost::lambda::_1));
 		//how to invoke the test_socket::get_recv_bytes() directly, please tell me if somebody knows!
 
 		return total_recv_bytes;
@@ -185,8 +185,8 @@ int main(int argc, const char* argv[])
 			char msg_fill = '0';
 			char model = 0; //0 broadcast, 1 randomly pick one link per msg
 
-			char_separator<char> sep(" \t");
-			tokenizer<char_separator<char> > tok(str, sep);
+			boost::char_separator<char> sep(" \t");
+			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
 			BOOST_AUTO(iter, tok.begin());
 			if (iter != tok.end()) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
 			if (iter != tok.end()) msg_len = std::min(i_packer::get_max_msg_size(),
@@ -195,7 +195,7 @@ int main(int argc, const char* argv[])
 			if (iter != tok.end()) model = *iter++->data() - '0';
 
 			unsigned percent = 0;
-			uint64_t total_msg_bytes;
+			boost::uint64_t total_msg_bytes;
 			switch (model)
 			{
 			case 0:
@@ -218,10 +218,10 @@ int main(int argc, const char* argv[])
 				client.reset();
 
 				total_msg_bytes *= msg_len;
-				int begin_time = get_system_time().time_of_day().total_seconds();
+				int begin_time = boost::get_system_time().time_of_day().total_seconds();
 				char* buff = new char[msg_len];
 				memset(buff, msg_fill, msg_len);
-				uint64_t send_bytes = 0;
+				boost::uint64_t send_bytes = 0;
 				for (size_t i = 0; i < msg_num; ++i)
 				{
 					memcpy(buff, &i, sizeof(size_t)); //seq
@@ -246,9 +246,9 @@ int main(int argc, const char* argv[])
 				delete[] buff;
 
 				while(client.get_total_recv_bytes() != total_msg_bytes)
-					this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+					boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
-				int used_time = get_system_time().time_of_day().total_seconds() - begin_time;
+				int used_time = boost::get_system_time().time_of_day().total_seconds() - begin_time;
 				printf("\r100%%\ntime spent statistics: %d hours, %d minutes, %d seconds.\n",
 					used_time / 60 / 60, (used_time / 60) % 60, used_time % 60);
 				if (used_time > 0)

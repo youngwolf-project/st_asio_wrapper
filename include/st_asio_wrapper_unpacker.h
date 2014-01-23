@@ -36,9 +36,9 @@ public:
 	virtual void reset_unpacker_state() = 0;
 	virtual size_t used_buffer_size() const {return 0;} //how many data have been received
 	virtual size_t current_msg_length() const {return -1;} //current msg's total length, -1 means don't know
-	virtual bool parse_msg(size_t bytes_transferred, container::list<std::string>& msg_can) = 0;
-	virtual size_t completion_condition(const error_code& ec, size_t bytes_transferred) = 0;
-	virtual mutable_buffers_1 prepare_next_recv() = 0;
+	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can) = 0;
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) = 0;
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
 };
 
 class unpacker : public i_unpacker
@@ -50,7 +50,7 @@ public:
 	virtual void reset_unpacker_state() {cur_msg_len = -1; cur_data_len = 0;}
 	virtual size_t used_buffer_size() const {return cur_data_len;}
 	virtual size_t current_msg_length() const {return cur_msg_len;}
-	virtual bool parse_msg(size_t bytes_transferred, container::list<std::string>& msg_can)
+	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
 	{
 		//len + msg
 		cur_data_len += bytes_transferred;
@@ -93,7 +93,7 @@ public:
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
 	//read as many as possible to reduce async call-back(st_tcp_socket::recv_handler), and don't forget to handle
 	//stick package carefully in parse_msg function.
-	virtual size_t completion_condition(const error_code& ec, size_t bytes_transferred)
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (ec)
 			return 0;
@@ -117,14 +117,14 @@ public:
 		//read as many as possible except that we have already got a entire msg
 	}
 
-	virtual mutable_buffers_1 prepare_next_recv()
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
 		assert(cur_data_len < MAX_MSG_LEN);
-		return buffer(buffer(raw_buff) + cur_data_len);
+		return boost::asio::buffer(boost::asio::buffer(raw_buff) + cur_data_len);
 	}
 
 private:
-	array<char, MAX_MSG_LEN> raw_buff;
+	boost::array<char, MAX_MSG_LEN> raw_buff;
 	size_t cur_msg_len; //-1 means head has not received, so, doesn't know the whole msg length.
 	size_t cur_data_len; //include head
 };

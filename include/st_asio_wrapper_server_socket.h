@@ -52,7 +52,7 @@ protected:
 
 	virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); force_close();}
 	//do not forget to force_close this st_tcp_socket(in del_client(), there's a force_close() invocation)
-	virtual void on_recv_error(const error_code& ec)
+	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
 		show_info("client:", "quit.");

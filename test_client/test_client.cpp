@@ -43,7 +43,7 @@ static bool check_msg;
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
 	auto index = (size_t) ((uint64_t) rand() * (object_can.size() - 1) / RAND_MAX); \
-	mutex::scoped_lock lock(object_can_mutex); \
+	boost::mutex::scoped_lock lock(object_can_mutex); \
 	auto iter = std::begin(object_can); \
 	std::advance(iter, index); \
 	(*iter)->SEND_FUNNAME(pstr, len, num, can_overflow); \
@@ -55,7 +55,7 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 SHARED_OBJECT(test_socket, st_connector)
 {
 public:
-	test_socket(io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0) {}
+	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0) {}
 
 	uint64_t get_recv_bytes() const {return recv_bytes;}
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
@@ -181,8 +181,8 @@ int main(int argc, const char* argv[])
 			char msg_fill = '0';
 			char model = 0; //0 broadcast, 1 randomly pick one link per msg
 
-			char_separator<char> sep(" \t");
-			tokenizer<char_separator<char>> tok(str, sep);
+			boost::char_separator<char> sep(" \t");
+			boost::tokenizer<boost::char_separator<char>> tok(str, sep);
 			auto iter = std::begin(tok);
 			if (iter != std::end(tok)) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
 			if (iter != std::end(tok)) msg_len = std::min(i_packer::get_max_msg_size(),
@@ -214,7 +214,7 @@ int main(int argc, const char* argv[])
 				client.reset();
 
 				total_msg_bytes *= msg_len;
-				auto begin_time = get_system_time().time_of_day().total_seconds();
+				auto begin_time = boost::get_system_time().time_of_day().total_seconds();
 				auto buff = new char[msg_len];
 				memset(buff, msg_fill, msg_len);
 				uint64_t send_bytes = 0;
@@ -242,9 +242,9 @@ int main(int argc, const char* argv[])
 				delete[] buff;
 
 				while(client.get_total_recv_bytes() != total_msg_bytes)
-					this_thread::sleep(get_system_time() + posix_time::milliseconds(50));
+					boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
-				auto used_time = get_system_time().time_of_day().total_seconds() - begin_time;
+				auto used_time = boost::get_system_time().time_of_day().total_seconds() - begin_time;
 				printf("\r100%%\ntime spent statistics: %d hours, %d minutes, %d seconds.\n",
 					used_time / 60 / 60, (used_time / 60) % 60, used_time % 60);
 				if (used_time > 0)

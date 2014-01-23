@@ -31,7 +31,7 @@ public:
 	size_t valid_size()
 	{
 		size_t size = 0;
-		mutex::scoped_lock lock(ST_THIS object_can_mutex);
+		boost::mutex::scoped_lock lock(ST_THIS object_can_mutex);
 		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
 			if ((*iter)->is_connected())
 				++size;

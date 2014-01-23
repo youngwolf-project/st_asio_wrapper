@@ -37,7 +37,7 @@ namespace st_asio_wrapper
 class st_connector : public st_tcp_socket
 {
 public:
-	st_connector(io_service& io_service_) : st_tcp_socket(io_service_), connected(false), reconnecting(false)
+	st_connector(boost::asio::io_service& io_service_) : st_tcp_socket(io_service_), connected(false), reconnecting(false)
 #ifdef RE_CONNECT_CONTROL
 		, re_connect_times(-1)
 #endif
@@ -51,8 +51,8 @@ public:
 
 	void set_server_addr(unsigned short port, const std::string& ip)
 	{
-		error_code ec;
-		server_addr = tcp::endpoint(address::from_string(ip, ec), port); assert(!ec);
+		boost::system::error_code ec;
+		server_addr = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(ip, ec), port); assert(!ec);
 	}
 
 #ifdef RE_CONNECT_CONTROL
@@ -80,7 +80,8 @@ protected:
 		if (!get_io_service().stopped())
 		{
 			if (!is_connected())
-				async_connect(server_addr, boost::bind(&st_connector::connect_handler, this, placeholders::error));
+				async_connect(server_addr, boost::bind(&st_connector::connect_handler, this,
+					boost::asio::placeholders::error));
 			else
 				do_recv_msg();
 
@@ -93,7 +94,7 @@ protected:
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
 	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket::is_send_allowed();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
-	virtual void on_recv_error(const error_code& ec)
+	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 		unified_out::error_out("connection closed.");
 
@@ -102,7 +103,7 @@ protected:
 		else
 		{
 			force_close(reconnecting);
-			if (ec && error::operation_aborted != ec && RE_CONNECT_CHECK)
+			if (ec && boost::asio::error::operation_aborted != ec && RE_CONNECT_CHECK)
 				reconnecting = true;
 		}
 
@@ -130,7 +131,7 @@ protected:
 		return false;
 	}
 
-	void connect_handler(const error_code& ec)
+	void connect_handler(const boost::system::error_code& ec)
 	{
 		if (!ec)
 		{
@@ -139,7 +140,7 @@ protected:
 			send_msg(); //send msg buffer may have msgs, send them
 			do_start();
 		}
-		else if (error::operation_aborted != ec && RE_CONNECT_CHECK && !get_io_service().stopped())
+		else if (boost::asio::error::operation_aborted != ec && RE_CONNECT_CHECK && !get_io_service().stopped())
 			set_timer(10, RE_CONNECT_INTERVAL, NULL);
 	}
 
@@ -148,7 +149,7 @@ protected:
 #endif
 
 protected:
-	tcp::endpoint server_addr;
+	boost::asio::ip::tcp::endpoint server_addr;
 	bool connected;
 	bool reconnecting;
 #ifdef RE_CONNECT_CONTROL

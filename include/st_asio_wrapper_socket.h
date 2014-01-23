@@ -22,8 +22,6 @@
 #define DEFAULT_PACKER packer
 #endif
 
-using namespace boost::asio::ip;
-
 namespace st_asio_wrapper
 {
 
@@ -42,10 +40,10 @@ class st_socket: public Socket, public st_timer
 {
 public:
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	typedef container::list<MsgType> container_type;
+	typedef boost::container::list<MsgType> container_type;
 
 protected:
-	st_socket(io_service& io_service_) : Socket(io_service_), st_timer(io_service_),
+	st_socket(boost::asio::io_service& io_service_) : Socket(io_service_), st_timer(io_service_),
 		packer_(boost::make_shared<DEFAULT_PACKER>()) {reset_state();}
 
 	void reset_state()
@@ -68,13 +66,13 @@ public:
 	bool started() const {return started_;}
 	void start()
 	{
-		mutex::scoped_lock lock(start_mutex);
+		boost::mutex::scoped_lock lock(start_mutex);
 		if (!started_)
 			started_ = do_start();
 	}
 	bool send_msg() //return false if send buffer is empty or sending not allowed or io_service stopped
 	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
 		return do_send_msg();
 	}
 
@@ -97,7 +95,7 @@ public:
 	//no matter whether the send buffer is available
 	bool is_send_buffer_available()
 	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
 		return send_msg_buffer.size() < MAX_MSG_NUM;
 	}
 
@@ -106,7 +104,7 @@ public:
 		{return direct_send_msg(MsgType(msg), can_overflow);}
 	bool direct_send_msg(MsgType&& msg, bool can_overflow = false)
 	{
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
 		if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM)
 			return do_direct_send_msg(std::move(msg));
 
@@ -121,7 +119,7 @@ public:
 			return true;
 		else
 		{
-			mutex::scoped_lock lock(post_msg_buffer_mutex);
+			boost::mutex::scoped_lock lock(post_msg_buffer_mutex);
 			return do_direct_post_msg(std::move(msg));
 		}
 	}
@@ -129,7 +127,7 @@ public:
 	//how many msgs waiting for sending(sending_msg = true) or dispatching
 	size_t get_pending_msg_num(BufferType buffer_type = SEND_BUFFER)
 	{
-		mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		boost::mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
 		return msg_buffer[buffer_type].size();
 	}
 
@@ -138,7 +136,7 @@ public:
 		msg.clear();
 		//msgs in send buffer and post buffer are packed
 		//msgs in recv buffer are unpacked
-		mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		boost::mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
 		if (!msg_buffer[buffer_type].empty())
 			msg = msg_buffer[buffer_type].front();
 	}
@@ -148,7 +146,7 @@ public:
 		msg.clear();
 		//msgs in send buffer and post buffer are packed
 		//msgs in recv buffer are unpacked
-		mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		boost::mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
 		if (!msg_buffer[buffer_type].empty())
 		{
 			msg.swap(msg_buffer[buffer_type].front());
@@ -159,7 +157,7 @@ public:
 	//clear all pending msgs
 	void pop_all_pending_msg(container_type& msg_list, BufferType buffer_type = SEND_BUFFER)
 	{
-		mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		boost::mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
 		msg_list.splice(msg_list.end(), msg_buffer[buffer_type]);
 	}
 
@@ -172,7 +170,7 @@ protected:
 	//can send data or not(just put into send buffer)
 
 	//generally, you need not re-write this for link broken judgment(tcp)
-	virtual void on_send_error(const error_code& ec)
+	virtual void on_send_error(const boost::system::error_code& ec)
 		{unified_out::error_out("send msg error: %d %s", ec.value(), ec.message().data());}
 
 	#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
@@ -219,9 +217,9 @@ protected:
 		case 2:
 			{
 				bool empty;
-				mutex::scoped_lock lock(post_msg_buffer_mutex);
+				boost::mutex::scoped_lock lock(post_msg_buffer_mutex);
 				{
-					mutex::scoped_lock lock(send_msg_buffer_mutex);
+					boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
 					if (splice_helper(send_msg_buffer, post_msg_buffer))
 						do_send_msg();
 				}
@@ -256,7 +254,7 @@ protected:
 				temp_msg_buffer.erase(iter++);
 			else
 			{
-				mutex::scoped_lock lock(recv_msg_buffer_mutex);
+				boost::mutex::scoped_lock lock(recv_msg_buffer_mutex);
 				auto msg_num = recv_msg_buffer.size();
 				if (msg_num < MAX_MSG_NUM) //msg recv buffer available
 				{
@@ -272,7 +270,7 @@ protected:
 #else
 		if (!temp_msg_buffer.empty())
 		{
-			mutex::scoped_lock lock(recv_msg_buffer_mutex);
+			boost::mutex::scoped_lock lock(recv_msg_buffer_mutex);
 			if (splice_helper(recv_msg_buffer, temp_msg_buffer))
 				do_dispatch_msg(false);
 		}
@@ -287,7 +285,7 @@ protected:
 	void msg_handler()
 	{
 		on_msg_handle(last_dispatch_msg); //must before next msg dispatch to keep sequence
-		mutex::scoped_lock lock(recv_msg_buffer_mutex);
+		boost::mutex::scoped_lock lock(recv_msg_buffer_mutex);
 		dispatching = false;
 		//dispatch msg sequentially, that means second dispatch only after first dispatch success
 		do_dispatch_msg(false);
@@ -296,9 +294,9 @@ protected:
 	//must mutex recv_msg_buffer before invoke this function
 	void do_dispatch_msg(bool need_lock)
 	{
-		mutex::scoped_lock lock;
+		boost::mutex::scoped_lock lock;
 		if (need_lock)
-			lock = mutex::scoped_lock(recv_msg_buffer_mutex);
+			lock = boost::mutex::scoped_lock(recv_msg_buffer_mutex);
 
 		if (suspend_dispatch_msg_)
 		{
@@ -378,14 +376,14 @@ protected:
 	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't push into recv_msg_buffer
 	//because of recv buffer overflow, st_socket will delay 50 milliseconds(nonblocking) to invoke
 	//dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
-	mutex msg_buffer_mutex[3];
+	boost::mutex msg_buffer_mutex[3];
 
 	bool posting;
 	bool sending, suspend_send_msg_;
 	bool dispatching, suspend_dispatch_msg_;
 
 	bool started_; //has started or not
-	mutex start_mutex;
+	boost::mutex start_mutex;
 };
 
 } //namespace

@@ -60,29 +60,29 @@ protected:
 		timer_status status;
 		size_t milliseconds;
 		const void* user_data; //if needed, you must take the responsibility to manage this memory
-		boost::shared_ptr<deadline_timer> timer;
+		boost::shared_ptr<boost::asio::deadline_timer> timer;
 
 		bool operator <(const timer_info& other) const {return id < other.id;}
 	};
 
-	st_timer(io_service& _io_service_) : io_service_(_io_service_) {}
+	st_timer(boost::asio::io_service& _io_service_) : io_service_(_io_service_) {}
 	virtual ~st_timer() {}
 
 public:
 	typedef timer_info object_type;
 	typedef const object_type object_ctype;
-	typedef container::set<object_type> container_type;
+	typedef boost::container::set<object_type> container_type;
 
 	void set_timer(unsigned char id, size_t milliseconds, const void* user_data)
 	{
 		object_type ti = {id};
 
-		mutex::scoped_lock lock(timer_can_mutex);
+		boost::mutex::scoped_lock lock(timer_can_mutex);
 		auto iter = timer_can.find(ti);
 		if (iter == std::end(timer_can))
 		{
 			iter = timer_can.insert(ti).first;
-			iter->timer = boost::make_shared<deadline_timer>(io_service_);
+			iter->timer = boost::make_shared<boost::asio::deadline_timer>(io_service_);
 		}
 		lock.unlock();
 
@@ -97,7 +97,7 @@ public:
 	{
 		object_type ti = {id};
 
-		mutex::scoped_lock lock(timer_can_mutex);
+		boost::mutex::scoped_lock lock(timer_can_mutex);
 		auto iter = timer_can.find(ti);
 		if (iter != std::end(timer_can))
 		{
@@ -118,26 +118,27 @@ protected:
 
 	void start_timer(object_ctype& ti)
 	{
-		ti.timer->expires_from_now(posix_time::milliseconds(ti.milliseconds));
-		ti.timer->async_wait(boost::bind(&st_timer::timer_handler, this, placeholders::error, boost::ref(ti)));
+		ti.timer->expires_from_now(boost::posix_time::milliseconds(ti.milliseconds));
+		ti.timer->async_wait(boost::bind(&st_timer::timer_handler, this,
+			boost::asio::placeholders::error, boost::ref(ti)));
 	}
 
 	void stop_timer(object_type& ti)
 	{
-		error_code ec;
+		boost::system::error_code ec;
 		ti.timer->cancel(ec);
 		ti.status = object_type::TIMER_CANCELED;
 	}
 
-	void timer_handler(const error_code& ec, object_ctype& ti)
+	void timer_handler(const boost::system::error_code& ec, object_ctype& ti)
 	{
 		if (!ec && on_timer(ti.id, ti.user_data) && object_type::TIMER_OK == ti.status)
 			start_timer(ti);
 	}
 
-	io_service& io_service_;
+	boost::asio::io_service& io_service_;
 	container_type timer_can;
-	mutex timer_can_mutex;
+	boost::mutex timer_can_mutex;
 };
 
 } //namespace

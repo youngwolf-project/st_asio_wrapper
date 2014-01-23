@@ -19,9 +19,9 @@
 
 //in set_local_addr, if the ip is empty, UDP_DEFAULT_IP_VERSION will define the ip version,
 //or, the ip version will be deduced by the ip address.
-//udp::v4() means ipv4 and udp::v6() means ipv6.
+//boost::asio::ip::udp::v4() means ipv4 and boost::asio::ip::udp::v6() means ipv6.
 #ifndef UDP_DEFAULT_IP_VERSION
-#define UDP_DEFAULT_IP_VERSION udp::v4()
+#define UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
 #endif
 
 namespace st_asio_wrapper
@@ -31,22 +31,22 @@ namespace st_udp
 
 struct udp_msg
 {
-	udp::endpoint peer_addr;
+	boost::asio::ip::udp::endpoint peer_addr;
 	std::string str;
 
 	void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); str.swap(other.str);}
-	void swap(const udp::endpoint& addr, std::string& tmp_str) {peer_addr = addr; str.swap(tmp_str);}
-	void clear() {peer_addr = udp::endpoint(); str.clear();}
+	void swap(const boost::asio::ip::udp::endpoint& addr, std::string& tmp_str) {peer_addr = addr; str.swap(tmp_str);}
+	void clear() {peer_addr = boost::asio::ip::udp::endpoint(); str.clear();}
 	bool empty() const {return str.empty();}
 	bool operator==(const udp_msg& other) const {return this == &other;}
 };
 typedef udp_msg msg_type;
 typedef const msg_type msg_ctype;
 
-class st_udp_socket : public st_socket<msg_type, udp::socket>
+class st_udp_socket : public st_socket<msg_type, boost::asio::ip::udp::socket>
 {
 public:
-	st_udp_socket(io_service& io_service_) : st_socket(io_service_) {reset_state();}
+	st_udp_socket(boost::asio::io_service& io_service_) : st_socket(io_service_) {reset_state();}
 
 	//reset all, be ensure that there's no any operations performed on this st_udp_socket when invoke it
 	//notice, when resue this st_udp_socket, st_object_pool will invoke reset(), child must re-write this to init
@@ -57,7 +57,7 @@ public:
 		reset_state();
 		clear_buffer();
 
-		error_code ec;
+		boost::system::error_code ec;
 		close(ec);
 		open(local_addr.protocol(), ec); assert(!ec);
 #ifndef NOT_REUSE_ADDRESS
@@ -69,12 +69,12 @@ public:
 
 	void set_local_addr(unsigned short port, const std::string& ip = std::string())
 	{
-		error_code ec;
+		boost::system::error_code ec;
 		if (ip.empty())
-			local_addr = udp::endpoint(UDP_DEFAULT_IP_VERSION, port);
+			local_addr = boost::asio::ip::udp::endpoint(UDP_DEFAULT_IP_VERSION, port);
 		else
 		{
-			local_addr = udp::endpoint(address::from_string(ip, ec), port);
+			local_addr = boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(ip, ec), port);
 			assert(!ec);
 		}
 	}
@@ -102,7 +102,7 @@ public:
 
 	void show_info(const char* head, const char* tail)
 	{
-		error_code ec;
+		boost::system::error_code ec;
 		BOOST_AUTO(ep, local_endpoint(ec));
 		if (!ec)
 			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
@@ -113,8 +113,8 @@ protected:
 	{
 		if (!get_io_service().stopped())
 		{
-			async_receive_from(buffer(raw_buff), peer_addr, boost::bind(&st_udp_socket::recv_handler, this,
-				placeholders::error, placeholders::bytes_transferred));
+			async_receive_from(boost::asio::buffer(raw_buff), peer_addr, boost::bind(&st_udp_socket::recv_handler, this,
+				boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 
 			return true;
 		}
@@ -131,18 +131,20 @@ protected:
 		{
 			sending = true;
 			last_send_msg.swap(send_msg_buffer.front());
-			async_send_to(buffer(last_send_msg.str), last_send_msg.peer_addr,
-				boost::bind(&st_udp_socket::send_handler, this, placeholders::error, placeholders::bytes_transferred));
+			async_send_to(boost::asio::buffer(last_send_msg.str), last_send_msg.peer_addr,
+				boost::bind(&st_udp_socket::send_handler, this,
+					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 			send_msg_buffer.pop_front();
 		}
 
 		return sending;
 	}
 
-	virtual bool is_send_allowed() const {return is_open() && st_socket<msg_type, udp::socket>::is_send_allowed();}
+	virtual bool is_send_allowed() const
+		{return is_open() && st_socket<msg_type, boost::asio::ip::udp::socket>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
-	virtual void on_recv_error(const error_code& ec)
+	virtual void on_recv_error(const boost::system::error_code& ec)
 		{unified_out::error_out("recv msg error: %d %s", ec.value(), ec.message().data());}
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
@@ -171,8 +173,8 @@ protected:
 	{
 		if (is_open())
 		{
-			error_code ec;
-			shutdown(udp::socket::shutdown_both, ec);
+			boost::system::error_code ec;
+			shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
 			close(ec);
 		}
 
@@ -181,7 +183,7 @@ protected:
 		reset_state();
 	}
 
-	void recv_handler(const error_code& ec, size_t bytes_transferred)
+	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec && bytes_transferred > 0)
 		{
@@ -198,7 +200,7 @@ protected:
 			on_recv_error(ec);
 	}
 
-	void send_handler(const error_code& ec, size_t bytes_transferred)
+	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec)
 		{
@@ -210,7 +212,7 @@ protected:
 		else
 			on_send_error(ec);
 
-		mutex::scoped_lock lock(send_msg_buffer_mutex);
+		boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
 		sending = false;
 
 		//send msg sequentially, that means second send only after first send success
@@ -226,8 +228,8 @@ protected:
 	}
 
 protected:
-	array<char, MAX_MSG_LEN> raw_buff;
-	udp::endpoint peer_addr, local_addr;
+	boost::array<char, MAX_MSG_LEN> raw_buff;
+	boost::asio::ip::udp::endpoint peer_addr, local_addr;
 };
 
 } //namespace st_udp

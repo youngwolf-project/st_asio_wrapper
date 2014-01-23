@@ -58,7 +58,7 @@ class st_object_pool: public st_service_pump::i_service, public st_timer
 public:
 	typedef boost::shared_ptr<Socket> object_type;
 	typedef const object_type object_ctype;
-	typedef container::list<object_type> container_type;
+	typedef boost::container::list<object_type> container_type;
 
 protected:
 	struct temp_object
@@ -91,7 +91,7 @@ protected:
 	bool add_object(object_ctype& object_ptr)
 	{
 		assert(object_ptr && &object_ptr->get_io_service() == &get_service_pump());
-		mutex::scoped_lock lock(object_can_mutex);
+		boost::mutex::scoped_lock lock(object_can_mutex);
 		auto object_num = object_can.size();
 		if (object_num < MAX_OBJECT_NUM)
 			object_can.push_back(object_ptr);
@@ -104,7 +104,7 @@ protected:
 	{
 		auto found = false;
 
-		mutex::scoped_lock lock(object_can_mutex);
+		boost::mutex::scoped_lock lock(object_can_mutex);
 		//object_can does not contain any duplicate items
 		auto iter = std::find(std::begin(object_can), std::end(object_can), object_ptr);
 		if (iter != std::end(object_can))
@@ -116,7 +116,7 @@ protected:
 
 		if (found)
 		{
-			mutex::scoped_lock lock(temp_object_can_mutex);
+			boost::mutex::scoped_lock lock(temp_object_can_mutex);
 			temp_object_can.push_back(object_ptr);
 		}
 
@@ -126,7 +126,7 @@ protected:
 	object_type reuse_object()
 	{
 #ifdef REUSE_OBJECT
-		mutex::scoped_lock lock(temp_object_can_mutex);
+		boost::mutex::scoped_lock lock(temp_object_can_mutex);
 		//objects are order by time, so we can use this feature to improve the performance
 		for (auto iter = std::begin(temp_object_can); iter != std::end(temp_object_can) && iter->is_timeout(); ++iter)
 			if (!iter->object_ptr->started())
@@ -160,7 +160,7 @@ protected:
 				clear_all_closed_object(objects);
 				if (!objects.empty())
 				{
-					mutex::scoped_lock lock(temp_object_can_mutex);
+					boost::mutex::scoped_lock lock(temp_object_can_mutex);
 					temp_object_can.insert(std::end(temp_object_can), std::begin(objects), std::end(objects));
 				}
 				return true;
@@ -180,19 +180,19 @@ protected:
 public:
 	size_t size()
 	{
-		mutex::scoped_lock lock(object_can_mutex);
+		boost::mutex::scoped_lock lock(object_can_mutex);
 		return object_can.size();
 	}
 
 	size_t closed_object_size()
 	{
-		mutex::scoped_lock lock(temp_object_can_mutex);
+		boost::mutex::scoped_lock lock(temp_object_can_mutex);
 		return temp_object_can.size();
 	}
 
 	object_type at(size_t index)
 	{
-		mutex::scoped_lock lock(object_can_mutex);
+		boost::mutex::scoped_lock lock(object_can_mutex);
 		assert(index < object_can.size());
 		return index < object_can.size() ?
 			*(std::next(std::begin(object_can), index)) : object_type();
@@ -207,7 +207,7 @@ public:
 	{
 		if (ip.empty() && 0 == port)
 		{
-			mutex::scoped_lock lock(object_can_mutex);
+			boost::mutex::scoped_lock lock(object_can_mutex);
 			objects.insert(std::end(objects), std::begin(object_can), std::end(object_can));
 		}
 		else
@@ -229,7 +229,7 @@ public:
 	//st_object_pool will automatically invoke this function if AUTO_CLEAR_CLOSED_SOCKET been defined
 	void clear_all_closed_object(container_type& objects)
 	{
-		mutex::scoped_lock lock(object_can_mutex);
+		boost::mutex::scoped_lock lock(object_can_mutex);
 		for (auto iter = std::begin(object_can); iter != std::end(object_can);)
 			if (!(*iter)->is_open())
 			{
@@ -252,7 +252,7 @@ public:
 		if (0 == num)
 			return;
 
-		mutex::scoped_lock lock(temp_object_can_mutex);
+		boost::mutex::scoped_lock lock(temp_object_can_mutex);
 		//objects are order by time, so we can use this feature to improve the performance
 		for (auto iter = std::begin(temp_object_can); num > 0 && iter != std::end(temp_object_can) && iter->is_timeout();)
 			if (!iter->object_ptr->started())
@@ -270,7 +270,7 @@ public:
 protected:
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
 	container_type object_can;
-	mutex object_can_mutex;
+	boost::mutex object_can_mutex;
 
 	//because all objects are dynamic created and stored in object_can, maybe when the recv error occur
 	//(at this point, your standard practice is deleting the object from object_can), some other
@@ -280,8 +280,8 @@ protected:
 	//0(id) timer)
 	//if AUTO_CLEAR_CLOSED_SOCKET been defined, clear_all_closed_object() will be invoked automatically
 	//and periodically to move all closed objects to temp_object_can.
-	container::list<temp_object> temp_object_can;
-	mutex temp_object_can_mutex;
+	boost::container::list<temp_object> temp_object_can;
+	boost::mutex temp_object_can_mutex;
 };
 
 } //namespace

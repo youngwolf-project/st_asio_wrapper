@@ -50,7 +50,7 @@ public:
 	virtual void reset() {st_server_socket_base::reset();}
 
 protected:
-	virtual void on_recv_error(const error_code& ec)
+	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 		//the type of st_server_socket_base::server now can be controlled by derived class(echo_socket),
 		//which is actually i_echo_server, so, we can invoke i_echo_server::test virtual function.

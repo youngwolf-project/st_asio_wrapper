@@ -26,9 +26,9 @@
 
 //in set_server_addr, if the ip is empty, TCP_DEFAULT_IP_VERSION will define the ip version,
 //or, the ip version will be deduced by the ip address.
-//tcp::v4() means ipv4 and tcp::v6() means ipv6.
+//boost::asio::ip::tcp::v4() means ipv4 and boost::asio::ip::tcp::v6() means ipv6.
 #ifndef TCP_DEFAULT_IP_VERSION
-#define TCP_DEFAULT_IP_VERSION tcp::v4()
+#define TCP_DEFAULT_IP_VERSION boost::asio::ip::tcp::v4()
 #endif
 
 namespace st_asio_wrapper
@@ -44,15 +44,16 @@ public:
 	void set_server_addr(unsigned short port, const std::string& ip = std::string())
 	{
 		if (ip.empty())
-			server_addr = tcp::endpoint(TCP_DEFAULT_IP_VERSION, port);
+			server_addr = boost::asio::ip::tcp::endpoint(TCP_DEFAULT_IP_VERSION, port);
 		else
 		{
-			error_code ec;
-			server_addr = tcp::endpoint(address::from_string(ip, ec), port); assert(!ec);
+			boost::system::error_code ec;
+			server_addr = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(ip, ec), port);
+			assert(!ec);
 		}
 	}
 
-	void stop_listen() {error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
+	void stop_listen() {boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
 	bool is_listening() const {return acceptor.is_open();}
 
 	//implement i_server's pure virtual functions
@@ -60,7 +61,7 @@ public:
 	virtual const st_service_pump& get_service_pump() const {return st_object_pool<Socket>::get_service_pump();}
 	virtual void del_client(const boost::shared_ptr<st_tcp_socket>& client_ptr)
 	{
-		if (ST_THIS del_object(dynamic_pointer_cast<Socket>(client_ptr)))
+		if (ST_THIS del_object(boost::dynamic_pointer_cast<Socket>(client_ptr)))
 		{
 			client_ptr->show_info("client:", "quit.");
 			client_ptr->force_close();
@@ -73,7 +74,7 @@ public:
 		//because in this function, object_can_mutex has been locked,
 		//graceful_close will wait until on_recv_error() been invoked,
 		//in on_recv_error(), we need to lock object_can_mutex too(in del_object()), which made dead lock
-		mutex::scoped_lock lock(ST_THIS object_can_mutex);
+		boost::mutex::scoped_lock lock(ST_THIS object_can_mutex);
 		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
 		{
 			(*iter)->show_info("client:", "been closed.");
@@ -101,14 +102,14 @@ public:
 protected:
 	virtual void init()
 	{
-		error_code ec;
+		boost::system::error_code ec;
 		acceptor.open(server_addr.protocol(), ec); assert(!ec);
 #ifndef NOT_REUSE_ADDRESS
-		acceptor.set_option(tcp::acceptor::reuse_address(true), ec); assert(!ec);
+		acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true), ec); assert(!ec);
 #endif
 		acceptor.bind(server_addr, ec); assert(!ec);
 		if (ec) {get_service_pump().stop(); unified_out::error_out("bind failed."); return;}
-		acceptor.listen(tcp::acceptor::max_connections, ec); assert(!ec);
+		acceptor.listen(boost::asio::ip::tcp::acceptor::max_connections, ec); assert(!ec);
 		if (ec) {get_service_pump().stop(); unified_out::error_out("listen failed."); return;}
 
 		st_object_pool<Socket>::start();
@@ -125,7 +126,7 @@ protected:
 	{
 		BOOST_AUTO(client_ptr, create_client());
 		acceptor.async_accept(*client_ptr, boost::bind(&st_server_base::accept_handler, this,
-			placeholders::error, client_ptr));
+			boost::asio::placeholders::error, client_ptr));
 	}
 
 	bool add_client(typename st_server_base::object_ctype& client_ptr)
@@ -139,7 +140,7 @@ protected:
 		return false;
 	}
 
-	void accept_handler(const error_code& ec, typename st_server_base::object_ctype& client_ptr)
+	void accept_handler(const boost::system::error_code& ec, typename st_server_base::object_ctype& client_ptr)
 	{
 		if (!ec)
 		{
@@ -161,8 +162,8 @@ protected:
 	}
 
 protected:
-	tcp::endpoint server_addr;
-	tcp::acceptor acceptor;
+	boost::asio::ip::tcp::endpoint server_addr;
+	boost::asio::ip::tcp::acceptor acceptor;
 };
 typedef st_server_base<> st_server;
 
