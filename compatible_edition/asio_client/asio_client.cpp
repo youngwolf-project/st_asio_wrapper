@@ -25,11 +25,11 @@ using namespace st_asio_wrapper;
 ///*
 namespace unified_out
 {
-void fatal_out(const char* fmt, ...) {all_out_helper2;}
-void error_out(const char* fmt, ...) {all_out_helper2;}
-void warning_out(const char* fmt, ...) {all_out_helper2;}
-void info_out(const char* fmt, ...) {all_out_helper2;}
-void debug_out(const char* fmt, ...) {all_out_helper2;}
+static void fatal_out(const char* fmt, ...) {all_out_helper2;}
+static void error_out(const char* fmt, ...) {all_out_helper2;}
+static void warning_out(const char* fmt, ...) {all_out_helper2;}
+static void info_out(const char* fmt, ...) {all_out_helper2;}
+static void debug_out(const char* fmt, ...) {all_out_helper2;}
 }
 //*/
 //two:

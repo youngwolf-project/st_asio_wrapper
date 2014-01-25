@@ -235,7 +235,7 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //udp msg sending interface
 ///////////////////////////////////////////////////
 
-void all_out(char* buff, const char* fmt, va_list& ap)
+static void all_out(char* buff, const char* fmt, va_list& ap)
 {
 	assert(NULL != buff);
 	time_t now = time(NULL);
@@ -263,14 +263,14 @@ void all_out(char* buff, const char* fmt, va_list& ap)
 #endif
 }
 
-#define all_out_helper(buff) va_list ap;va_start(ap, fmt);all_out(buff, fmt, ap);va_end(ap)
-#define all_out_helper2 char output_buff[UNIFIED_OUT_BUF_NUM];all_out_helper(output_buff);puts(output_buff)
+#define all_out_helper(buff) va_list ap; va_start(ap, fmt); all_out(buff, fmt, ap); va_end(ap)
+#define all_out_helper2 char output_buff[UNIFIED_OUT_BUF_NUM]; all_out_helper(output_buff); puts(output_buff)
 
 #ifndef CUSTOM_LOG
 #ifdef NO_UNIFIED_OUT
 namespace unified_out
 {
-void null_out() {}
+static void null_out() {}
 #define fatal_out(fmt, ...) null_out()
 #define error_out(fmt, ...) null_out()
 #define warning_out(fmt, ...) null_out()
