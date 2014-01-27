@@ -14,26 +14,14 @@
 //#define MAX_MSG_NUM 8 //reduce buffer size to reduce memory occupation
 //configuration
 
-//demonstrate how to use custom log system(two methods):
+//demonstrate how to use custom log system:
 //notice: please don't forget to define the CUSTOM_LOG macro.
 //use your own code to replace all_out_helper2 macro.
 //custom log should be defined(or included) before including any st_asio_wrapper header files except
 //st_asio_wrapper_base.h
 #include "../include/st_asio_wrapper_base.h"
 using namespace st_asio_wrapper;
-//one:
-///*
-namespace unified_out
-{
-static void fatal_out(const char* fmt, ...) {all_out_helper2;}
-static void error_out(const char* fmt, ...) {all_out_helper2;}
-static void warning_out(const char* fmt, ...) {all_out_helper2;}
-static void info_out(const char* fmt, ...) {all_out_helper2;}
-static void debug_out(const char* fmt, ...) {all_out_helper2;}
-}
-//*/
-//two:
-/*
+
 class unified_out
 {
 public:
@@ -43,7 +31,7 @@ public:
 	static void info_out(const char* fmt, ...) {all_out_helper2;}
 	static void debug_out(const char* fmt, ...) {all_out_helper2;}
 };
-*/
+
 #include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
 

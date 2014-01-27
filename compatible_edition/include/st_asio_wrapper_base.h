@@ -235,59 +235,59 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //udp msg sending interface
 ///////////////////////////////////////////////////
 
-static void all_out(char* buff, const char* fmt, va_list& ap)
+class log_formater
 {
-	assert(NULL != buff);
-	time_t now = time(NULL);
+public:
+	static void all_out(char* buff, const char* fmt, va_list& ap)
+	{
+		assert(NULL != buff);
+		time_t now = time(NULL);
 
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-	size_t buffer_len = UNIFIED_OUT_BUF_NUM / 2;
-	ctime_s(buff + buffer_len, buffer_len, &now);
-	strcpy_s(buff, buffer_len, buff + buffer_len);
+		size_t buffer_len = UNIFIED_OUT_BUF_NUM / 2;
+		ctime_s(buff + buffer_len, buffer_len, &now);
+		strcpy_s(buff, buffer_len, buff + buffer_len);
 #else
-	strcpy(buff, ctime(&now));
+		strcpy(buff, ctime(&now));
 #endif
-	size_t len = strlen(buff);
-	assert(len > 0);
-	if ('\n' == buff[len - 1])
-		--len;
+		size_t len = strlen(buff);
+		assert(len > 0);
+		if ('\n' == buff[len - 1])
+			--len;
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-	strcpy_s(buff + len, buffer_len, " -> ");
-	len += 4;
-	buffer_len = UNIFIED_OUT_BUF_NUM - len;
-	vsnprintf_s(buff + len, buffer_len, buffer_len, fmt, ap);
+		strcpy_s(buff + len, buffer_len, " -> ");
+		len += 4;
+		buffer_len = UNIFIED_OUT_BUF_NUM - len;
+		vsnprintf_s(buff + len, buffer_len, buffer_len, fmt, ap);
 #else
-	strcpy(buff + len, " -> ");
-	len += 4;
-	vsnprintf(buff + len, UNIFIED_OUT_BUF_NUM - len, fmt, ap);
+		strcpy(buff + len, " -> ");
+		len += 4;
+		vsnprintf(buff + len, UNIFIED_OUT_BUF_NUM - len, fmt, ap);
 #endif
-}
+	}
+};
 
-#define all_out_helper(buff) va_list ap; va_start(ap, fmt); all_out(buff, fmt, ap); va_end(ap)
+#define all_out_helper(buff) va_list ap; va_start(ap, fmt); log_formater::all_out(buff, fmt, ap); va_end(ap)
 #define all_out_helper2 char output_buff[UNIFIED_OUT_BUF_NUM]; all_out_helper(output_buff); puts(output_buff)
 
 #ifndef CUSTOM_LOG
-#ifdef NO_UNIFIED_OUT
-namespace unified_out
-{
-static void null_out() {}
-#define fatal_out(fmt, ...) null_out()
-#define error_out(fmt, ...) null_out()
-#define warning_out(fmt, ...) null_out()
-#define info_out(fmt, ...) null_out()
-#define debug_out(fmt, ...) null_out()
-}
-#else
 class unified_out
 {
 public:
+#ifdef NO_UNIFIED_OUT
+	static void fatal_out(const char* fmt, ...) {}
+	static void error_out(const char* fmt, ...) {}
+	static void warning_out(const char* fmt, ...) {}
+	static void info_out(const char* fmt, ...) {}
+	static void debug_out(const char* fmt, ...) {}
+#else
 	static void fatal_out(const char* fmt, ...) {all_out_helper2;}
 	static void error_out(const char* fmt, ...) {all_out_helper2;}
 	static void warning_out(const char* fmt, ...) {all_out_helper2;}
 	static void info_out(const char* fmt, ...) {all_out_helper2;}
 	static void debug_out(const char* fmt, ...) {all_out_helper2;}
-};
 #endif
+};
 #endif
 
 } //namespace
