@@ -1,0 +1,29 @@
+
+ifeq (${MAKECMDGOALS}, debug)
+	cflag = -g
+	dir = ./debug
+else
+	cflag = -O -DNDEBUG
+	lflag = -s
+	dir = ./release
+endif
+
+module = ssl_test
+target = ${dir}/${module}
+sources = ${shell ls *.cpp}
+objects = ${patsubst %.cpp, ${dir}/%.o, ${sources}}
+headers = ${shell ls *.h 2>/dev/null}
+${shell mkdir -p ${dir}}
+
+
+release debug : ${target}
+${target} : ${objects}
+	g++ -o ${target} ${objects} ${lflag} -lboost_system -lboost_thread -lssl -lcrypto -lpthread
+${objects} : ${dir}/%.o : %.cpp ${headers}
+	g++ -Wall -fexceptions ${cflag} -c $< -o $@
+
+
+.PHONY : clean
+clean:
+	-rm -rf ./debug ./release
+
