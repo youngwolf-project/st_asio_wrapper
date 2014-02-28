@@ -24,41 +24,46 @@ class i_server
 public:
 	virtual st_service_pump& get_service_pump() = 0;
 	virtual const st_service_pump& get_service_pump() const = 0;
-	virtual void del_client(const boost::shared_ptr<st_tcp_socket>& client_ptr) = 0;
+	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
 };
 
-template<typename Server = i_server>
-SHARED_OBJECT_T(st_server_socket_base, st_tcp_socket, Server)
+template<typename Socket = boost::asio::ip::tcp::socket, typename Server = i_server>
+SHARED_OBJECT_T(st_server_socket_base, st_tcp_socket_base, Socket, Server)
 {
 public:
-	st_server_socket_base(Server& server_) : st_tcp_socket(server_.get_service_pump()), server(server_) {}
+	st_server_socket_base(Server& server_) : st_tcp_socket_base<Socket>(server_.get_service_pump()), server(server_) {}
+
+	template<typename Arg>
+	st_server_socket_base(Server& server_, Arg& arg) :
+		st_tcp_socket_base<Socket>(server_.get_service_pump(), arg), server(server_) {}
+
 	//reset all, be ensure that there's no any operations performed on this st_server_socket_base when invoke it
 	//notice, when resue this st_server_socket_base, st_object_pool will invoke reset(), child must re-write this
 	//to init all member variables, and then do not forget to invoke st_server_socket_base::reset() to init father's
 	//member variables
-	virtual void reset() {st_tcp_socket::reset();}
+	virtual void reset() {st_tcp_socket_base<Socket>::reset();}
 
 protected:
 	virtual bool do_start()
 	{
-		if (!get_io_service().stopped())
+		if (!ST_THIS get_io_service().stopped())
 		{
-			do_recv_msg();
+			ST_THIS do_recv_msg();
 			return true;
 		}
 
 		return false;
 	}
 
-	virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); force_close();}
-	//do not forget to force_close this st_tcp_socket(in del_client(), there's a force_close() invocation)
+	virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); ST_THIS force_close();}
+	//do not forget to force_close this st_tcp_socket_base<Socket>(in del_client(), there's a force_close() invocation)
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
-		show_info("client:", "quit.");
-		force_close();
+		ST_THIS show_info("client:", "quit.");
+		ST_THIS force_close();
 #else
-		server.del_client(ST_THIS shared_from_this());
+		server.del_client(boost::dynamic_pointer_cast<st_timer>(ST_THIS shared_from_this()));
 #endif
 	}
 

@@ -53,7 +53,7 @@ namespace st_asio_wrapper
 {
 
 template<typename Socket>
-class st_object_pool: public st_service_pump::i_service, public st_timer
+class st_object_pool : public st_service_pump::i_service, public st_timer
 {
 public:
 	typedef boost::shared_ptr<Socket> object_type;
@@ -178,6 +178,21 @@ protected:
 	}
 
 public:
+	//this method simply create a class derived from st_socket from heap, secondly you must invoke
+	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or recv msgs.
+	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
+	object_type create_client()
+	{
+		BOOST_AUTO(client_ptr, reuse_object());
+		return client_ptr ? client_ptr : boost::make_shared<Socket>(boost::ref(service_pump));
+	}
+	template<typename Arg>
+	object_type create_client(Arg& arg)
+	{
+		BOOST_AUTO(client_ptr, reuse_object());
+		return client_ptr ? client_ptr : boost::make_shared<Socket>(arg);
+	}
+
 	size_t size()
 	{
 		boost::mutex::scoped_lock lock(object_can_mutex);
@@ -210,9 +225,9 @@ public:
 			objects.insert(objects.end(), object_can.begin(), object_can.end());
 		else
 			for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter)
-				if ((*iter)->is_open())
+				if ((*iter)->lowest_layer().is_open())
 				{
-					boost::asio::ip::tcp::endpoint ep = (*iter)->remote_endpoint();
+					boost::asio::ip::tcp::endpoint ep = (*iter)->lowest_layer().remote_endpoint();
 					if ((0 == port || port == ep.port()) && (ip.empty() || ip == ep.address().to_string()))
 						objects.push_back((*iter));
 				}
@@ -228,7 +243,7 @@ public:
 	{
 		boost::mutex::scoped_lock lock(object_can_mutex);
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
-			if (!(*iter)->is_open())
+			if (!(*iter)->lowest_layer().is_open())
 			{
 				objects.resize(objects.size() + 1);
 				objects.back().swap(*iter);

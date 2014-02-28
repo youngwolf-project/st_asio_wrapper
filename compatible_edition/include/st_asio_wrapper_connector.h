@@ -34,26 +34,39 @@
 namespace st_asio_wrapper
 {
 
-class st_connector : public st_tcp_socket
+template <typename Socket = boost::asio::ip::tcp::socket>
+class st_connector_base : public st_tcp_socket_base<Socket>
 {
 public:
-	st_connector(boost::asio::io_service& io_service_) : st_tcp_socket(io_service_), connected(false), reconnecting(false)
+	st_connector_base(boost::asio::io_service& io_service_) :
+		st_tcp_socket_base<Socket>(io_service_), connected(false), reconnecting(false)
 #ifdef RE_CONNECT_CONTROL
 		, re_connect_times(-1)
 #endif
 		{set_server_addr(SERVER_PORT, SERVER_IP);}
 
-	//reset all, be ensure that there's no any operations performed on this st_connector when invoke it
-	//notice, when resue this st_connector, st_object_pool will invoke reset(), child must re-write this to init
-	//all member variables, and then do not forget to invoke st_connector::reset() to init father's
+	template<typename Arg>
+	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) :
+		st_tcp_socket_base<Socket>(io_service_, arg), connected(false), reconnecting(false)
+#ifdef RE_CONNECT_CONTROL
+		, re_connect_times(-1)
+#endif
+		{set_server_addr(SERVER_PORT, SERVER_IP);}
+
+	//reset all, be ensure that there's no any operations performed on this st_connector_base when invoke it
+	//notice, when resue this st_connector_base, st_object_pool will invoke reset(), child must re-write this to init
+	//all member variables, and then do not forget to invoke st_connector_base::reset() to init father's
 	//member variables
-	virtual void reset() {st_tcp_socket::reset();}
+	virtual void reset() {connected = false; reconnecting = false; st_tcp_socket_base<Socket>::reset();}
 
 	void set_server_addr(unsigned short port, const std::string& ip)
 	{
 		boost::system::error_code ec;
 		server_addr = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(ip, ec), port); assert(!ec);
+		boost::asio::ip::tcp::resolver resolver(ST_THIS get_io_service());
+		server_addr_iter = resolver.resolve(server_addr);
 	}
+	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
 
 #ifdef RE_CONNECT_CONTROL
 	void set_re_connect_times(size_t times) {re_connect_times = times;}
@@ -61,7 +74,8 @@ public:
 	bool is_connected() const {return connected;}
 
 	void disconnect(bool reconnect = false) {force_close(reconnect);}
-	void force_close(bool reconnect = false) {reconnecting = reconnect; connected = false; st_tcp_socket::force_close();}
+	void force_close(bool reconnect = false)
+		{reconnecting = reconnect; connected = false; st_tcp_socket_base<Socket>::force_close();}
 	void graceful_close(bool reconnect = false)
 	{
 		if (!is_connected())
@@ -70,20 +84,20 @@ public:
 		{
 			reconnecting = reconnect;
 			connected = false;
-			st_tcp_socket::graceful_close();
+			st_tcp_socket_base<Socket>::graceful_close();
 		}
 	}
 
 protected:
 	virtual bool do_start() //connect or recv
 	{
-		if (!get_io_service().stopped())
+		if (!ST_THIS get_io_service().stopped())
 		{
 			if (!is_connected())
-				async_connect(server_addr, boost::bind(&st_connector::connect_handler, this,
-					boost::asio::placeholders::error));
+				boost::asio::async_connect(ST_THIS lowest_layer(), server_addr_iter,
+					boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error));
 			else
-				do_recv_msg();
+				ST_THIS do_recv_msg();
 
 			return true;
 		}
@@ -92,13 +106,13 @@ protected:
 	}
 
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
-	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket::is_send_allowed();}
+	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket_base<Socket>::is_send_allowed();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 		unified_out::error_out("connection closed.");
 
-		if (is_closing())
+		if (ST_THIS is_closing())
 			force_close(reconnecting);
 		else
 		{
@@ -124,7 +138,7 @@ protected:
 		case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
 			break;
 		default:
-			return st_tcp_socket::on_timer(id, user_data);
+			return st_tcp_socket_base<Socket>::on_timer(id, user_data);
 			break;
 		}
 
@@ -137,11 +151,11 @@ protected:
 		{
 			connected = true;
 			on_connect();
-			send_msg(); //send msg buffer may have msgs, send them
+			ST_THIS send_msg(); //send msg buffer may have msgs, send them
 			do_start();
 		}
-		else if (boost::asio::error::operation_aborted != ec && RE_CONNECT_CHECK && !get_io_service().stopped())
-			set_timer(10, RE_CONNECT_INTERVAL, NULL);
+		else if (boost::asio::error::operation_aborted != ec && RE_CONNECT_CHECK && !ST_THIS get_io_service().stopped())
+			ST_THIS set_timer(10, RE_CONNECT_INTERVAL, NULL);
 	}
 
 #ifdef RE_CONNECT_CONTROL
@@ -155,7 +169,10 @@ protected:
 #ifdef RE_CONNECT_CONTROL
 	size_t re_connect_times;
 #endif
+
+	boost::asio::ip::tcp::resolver::iterator server_addr_iter;
 };
+typedef st_connector_base<> st_connector;
 
 } //namespace
 

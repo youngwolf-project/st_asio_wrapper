@@ -354,12 +354,15 @@
  * Make start_service sync.
  *
  * Add support for adding service to st_service_pump at runtime.
+ *
+ * 3.9	2014.3.9
+ * Add support for asio.ssl.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VERSION 30700
+#define ST_ASIO_WRAPPER_VERSION 30900
 
 #if !defined _MSC_VER && !defined __GNUC__
 #error st_asio_wrapper only support vc and gcc.

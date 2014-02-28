@@ -58,8 +58,7 @@ public:
 	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0) {}
 
 	uint64_t get_recv_bytes() const {return recv_bytes;}
-	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
-	virtual void reset() {recv_bytes = recv_index = 0; st_connector::reset();}
+	void restart() {recv_bytes = recv_index = 0;}
 
 protected:
 	//msg handling
@@ -90,7 +89,7 @@ class test_client : public st_tcp_client_base<test_socket>
 public:
 	test_client(st_service_pump& service_pump_) : st_tcp_client_base<test_socket>(service_pump_) {}
 
-	void reset() {do_something_to_all(boost::mem_fn(&test_socket::reset));}
+	void restart() {do_something_to_all(boost::mem_fn(&test_socket::restart));}
 	uint64_t get_total_recv_bytes()
 	{
 		uint64_t total_recv_bytes = 0;
@@ -211,7 +210,7 @@ int main(int argc, const char* argv[])
 					msg_num, msg_len, msg_fill, model);
 				puts("performance test begin, this application will have no response during the test!");
 
-				client.reset();
+				client.restart();
 
 				total_msg_bytes *= msg_len;
 				auto begin_time = boost::get_system_time().time_of_day().total_seconds();

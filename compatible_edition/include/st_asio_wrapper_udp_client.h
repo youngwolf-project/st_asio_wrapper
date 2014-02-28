@@ -21,11 +21,11 @@ namespace st_asio_wrapper
 
 typedef st_sclient<st_udp_socket> st_udp_sclient;
 
-template<typename Socket = st_udp_socket>
-class st_udp_client_base : public st_client<Socket>
+template<typename Socket = st_udp_socket, typename Pool = st_object_pool<Socket> >
+class st_udp_client_base : public st_client<Socket, Pool>
 {
 public:
-	st_udp_client_base(st_service_pump& service_pump_) : st_client<Socket>(service_pump_) {}
+	st_udp_client_base(st_service_pump& service_pump_) : st_client<Socket, Pool>(service_pump_) {}
 
 protected:
 	virtual void uninit()

@@ -38,7 +38,7 @@ public:
 	virtual void test() = 0;
 };
 
-class echo_socket : public st_server_socket_base<i_echo_server>
+class echo_socket : public st_server_socket_base<boost::asio::ip::tcp::socket, i_echo_server>
 {
 public:
 	echo_socket(i_echo_server& server_) : st_server_socket_base(server_) {inner_packer(global_packer);}
@@ -70,7 +70,7 @@ protected:
 	//msg handling end
 };
 
-class echo_server : public st_server_base<echo_socket, i_echo_server>
+class echo_server : public st_server_base<echo_socket, st_object_pool<echo_socket>, i_echo_server>
 {
 public:
 	echo_server(st_service_pump& service_pump_) : st_server_base(service_pump_) {}

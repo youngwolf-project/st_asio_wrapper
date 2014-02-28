@@ -22,8 +22,8 @@
 * st_object_pool: 0 - 9
 * st_socket: 0 - 9
 
-* st_tcp_socket: inherit from st_socket
-* st_connector: inherit from st_tcp_socket and plus 10 - 19
+* st_tcp_socket_base: inherit from st_socket
+* st_connector_base: inherit from st_tcp_socket_base and plus 10 - 19
 * st_tcp_sclient: inherit from st_connector
 *
 * st_udp_socket: inherit from st_socket
@@ -105,6 +105,9 @@ public:
 			stop_timer(*iter);
 		}
 	}
+
+	boost::asio::io_service& get_io_service() {return io_service_;}
+	const boost::asio::io_service& get_io_service() const {return io_service_;}
 
 	DO_SOMETHING_TO_ALL_MUTEX(timer_can, timer_can_mutex)
 	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex)

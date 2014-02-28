@@ -32,19 +32,24 @@ namespace st_tcp
 typedef std::string msg_type;
 typedef const msg_type msg_ctype;
 
-class st_tcp_socket : public st_socket<msg_type, boost::asio::ip::tcp::socket>
+template <typename Socket>
+class st_tcp_socket_base : public st_socket<msg_type, Socket>
 {
 protected:
-	st_tcp_socket(boost::asio::io_service& io_service_) :
-		st_socket(io_service_), unpacker_(boost::make_shared<DEFAULT_UNPACKER>()) {reset_state();}
+	st_tcp_socket_base(boost::asio::io_service& io_service_) :
+		st_socket<msg_type, Socket>(io_service_), unpacker_(boost::make_shared<DEFAULT_UNPACKER>()) {reset_state();}
+
+	template<typename Arg>
+	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) :
+		st_socket<msg_type, Socket>(io_service_, arg), unpacker_(boost::make_shared<DEFAULT_UNPACKER>()) {reset_state();}
 
 public:
-	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
-	void reset() {reset_state(); clear_buffer();}
+	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
+	void reset() {ST_THIS reset_state(); ST_THIS clear_buffer();}
 	void reset_state()
 	{
 		reset_unpacker_state();
-		st_socket::reset_state();
+		st_socket<msg_type, Socket>::reset_state();
 		closing = false;
 	}
 
@@ -55,7 +60,7 @@ public:
 		closing = true;
 
 		boost::system::error_code ec;
-		shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+		ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
 		if (ec) //graceful disconnecting is impossible
 			clean_up();
 		else
@@ -73,13 +78,13 @@ public:
 	boost::shared_ptr<i_unpacker> inner_unpacker() const {return unpacker_;}
 	void inner_unpacker(const boost::shared_ptr<i_unpacker>& _unpacker_) {unpacker_ = _unpacker_;}
 
-	using st_socket::send_msg;
+	using st_socket<msg_type, Socket>::send_msg;
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
 	TCP_SEND_MSG(send_native_msg, true) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
-	//success at here just means put the msg into st_tcp_socket's send buffer
+	//success at here just means put the msg into st_tcp_socket_base's send buffer
 	TCP_SAFE_SEND_MSG(safe_send_msg, send_msg)
 	TCP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
 	//like safe_send_msg and safe_send_native_msg, but non-block
@@ -91,7 +96,7 @@ public:
 	void show_info(const char* head, const char* tail)
 	{
 		boost::system::error_code ec;
-		auto ep = remote_endpoint(ec);
+		auto ep = ST_THIS lowest_layer().remote_endpoint(ec);
 		if (!ec)
 			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
 	}
@@ -100,26 +105,27 @@ protected:
 	//must mutex send_msg_buffer before invoke this function
 	virtual bool do_send_msg()
 	{
-		if (!is_send_allowed() || get_io_service().stopped())
-			sending = false;
-		else if (!sending && !send_msg_buffer.empty())
+		if (!is_send_allowed() || ST_THIS get_io_service().stopped())
+			ST_THIS sending = false;
+		else if (!ST_THIS sending && !send_msg_buffer.empty())
 		{
-			sending = true;
-			last_send_msg.swap(send_msg_buffer.front());
-			boost::asio::async_write(*this, boost::asio::buffer(last_send_msg), boost::bind(&st_tcp_socket::send_handler, this,
+			ST_THIS sending = true;
+			ST_THIS last_send_msg.swap(send_msg_buffer.front());
+			boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(ST_THIS last_send_msg),
+				boost::bind(&st_tcp_socket_base::send_handler, this,
 				boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 			send_msg_buffer.pop_front();
 		}
 
-		return sending;
+		return ST_THIS sending;
 	}
 
 	virtual bool is_send_allowed() const
-		{return !is_closing() && st_socket<msg_type, boost::asio::ip::tcp::socket>::is_send_allowed();}
+		{return !is_closing() && st_socket<msg_type, Socket>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
 	//msg can not be unpacked
-	//the link can continue to use, but need not close the st_tcp_socket at both client and server endpoint
+	//the link can continue to use, but need not close the st_tcp_socket_base at both client and server endpoint
 	virtual void on_unpack_error() = 0;
 
 	//recv error or peer endpoint quit(false ec means ok)
@@ -129,7 +135,7 @@ protected:
 	//if you want to use your own recv buffer, you can move the msg to your own recv buffer,
 	//and return false, then, handle the msg as your own strategy(may be you'll need a msg dispatch thread)
 	//or, you can handle the msg at here and return false, but this will reduce efficiency(
-	//because this msg handling block the next msg receiving on the same st_tcp_socket) unless you can
+	//because this msg handling block the next msg receiving on the same st_tcp_socket_base) unless you can
 	//handle the msg very fast(which will inversely more efficient, because msg recv buffer and msg dispatching
 	//are not needed any more).
 	//
@@ -149,14 +155,14 @@ protected:
 
 	//start the async read
 	//it's child's responsibility to invoke this properly,
-	//because st_tcp_socket doesn't know any of the connection status
+	//because st_tcp_socket_base doesn't know any of the connection status
 	void do_recv_msg()
 	{
 		auto recv_buff = unpacker_->prepare_next_recv();
 		if (boost::asio::buffer_size(recv_buff) > 0)
-			boost::asio::async_read(*this, recv_buff, boost::bind(&i_unpacker::completion_condition, unpacker_,
+			boost::asio::async_read(ST_THIS next_layer(), recv_buff, boost::bind(&i_unpacker::completion_condition, unpacker_,
 				boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
-				boost::bind(&st_tcp_socket::recv_handler, this,
+				boost::bind(&st_tcp_socket_base::recv_handler, this,
 					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 	}
 
@@ -165,15 +171,15 @@ protected:
 
 	void clean_up()
 	{
-		if (is_open())
+		if (ST_THIS lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
-			shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-			close(ec);
+			ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+			ST_THIS lowest_layer().close(ec);
 		}
 
-		stop_all_timer();
-		direct_dispatch_all_msg();
+		ST_THIS stop_all_timer();
+		ST_THIS direct_dispatch_all_msg();
 		reset_state();
 	}
 
@@ -182,7 +188,7 @@ protected:
 		if (!ec && bytes_transferred > 0)
 		{
 			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_buffer);
-			dispatch_msg();
+			ST_THIS dispatch_msg();
 
 			if (!unpack_ok)
 				on_unpack_error();
@@ -201,10 +207,10 @@ protected:
 #endif
 		}
 		else
-			on_send_error(ec);
+			ST_THIS on_send_error(ec);
 
 		boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
-		sending = false;
+		ST_THIS sending = false;
 
 		//send msg sequentially, that means second send only after first send success
 		if (!ec && !do_send_msg())

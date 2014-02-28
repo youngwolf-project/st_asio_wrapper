@@ -34,11 +34,14 @@
 namespace st_asio_wrapper
 {
 
-template<typename Socket = st_server_socket, typename Server = i_server>
-class st_server_base : public Server, public st_object_pool<Socket>
+template<typename Socket = st_server_socket, typename Pool = st_object_pool<Socket>, typename Server = i_server>
+class st_server_base : public Server, public Pool
 {
 public:
-	st_server_base(st_service_pump& service_pump_) : st_object_pool<Socket>(service_pump_),
+	st_server_base(st_service_pump& service_pump_) : Pool(service_pump_),
+		acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
+	template<typename Arg>
+	st_server_base(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg),
 		acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
 
 	void set_server_addr(unsigned short port, const std::string& ip = std::string())
@@ -52,19 +55,21 @@ public:
 			assert(!ec);
 		}
 	}
+	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
 
 	void stop_listen() {boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
 	bool is_listening() const {return acceptor.is_open();}
 
 	//implement i_server's pure virtual functions
-	virtual st_service_pump& get_service_pump() {return st_object_pool<Socket>::get_service_pump();}
-	virtual const st_service_pump& get_service_pump() const {return st_object_pool<Socket>::get_service_pump();}
-	virtual void del_client(const boost::shared_ptr<st_tcp_socket>& client_ptr)
+	virtual st_service_pump& get_service_pump() {return Pool::get_service_pump();}
+	virtual const st_service_pump& get_service_pump() const {return Pool::get_service_pump();}
+	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr)
 	{
-		if (ST_THIS del_object(boost::dynamic_pointer_cast<Socket>(client_ptr)))
+		auto raw_client_ptr(boost::dynamic_pointer_cast<Socket>(client_ptr));
+		if (ST_THIS del_object(raw_client_ptr))
 		{
-			client_ptr->show_info("client:", "quit.");
-			client_ptr->force_close();
+			raw_client_ptr->show_info("client:", "quit.");
+			raw_client_ptr->force_close();
 		}
 	}
 
@@ -80,18 +85,12 @@ public:
 		});
 	}
 
-	typename st_server_base::object_type create_client()
-	{
-		auto client_ptr(ST_THIS reuse_object());
-		return client_ptr ? client_ptr : boost::make_shared<Socket>(boost::ref(*this));
-	}
-
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_BROADCAST_MSG(broadcast_msg, send_msg)
 	TCP_BROADCAST_MSG(broadcast_native_msg, send_native_msg)
 	//guarantee send msg successfully even if can_overflow equal to false
-	//success at here just means put the msg into st_tcp_socket's send buffer
+	//success at here just means put the msg into st_tcp_socket_base's send buffer
 	TCP_BROADCAST_MSG(safe_broadcast_msg, safe_send_msg)
 	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
 	//msg sending interface
@@ -115,21 +114,20 @@ protected:
 		for (auto i = 0; i < ASYNC_ACCEPT_NUM; ++i)
 			start_next_accept();
 	}
-	virtual void uninit() {st_object_pool<Socket>::stop(); stop_listen(); close_all_client();}
-
+	virtual void uninit() {Pool::stop(); stop_listen(); close_all_client();}
 	virtual bool on_accept(typename st_server_base::object_ctype& client_ptr) {return true;}
 
-protected:
-	void start_next_accept()
+	virtual void start_next_accept()
 	{
-		auto client_ptr = create_client();
-		acceptor.async_accept(*client_ptr, boost::bind(&st_server_base::accept_handler, this,
+		auto client_ptr = ST_THIS create_client(boost::ref(*this));
+		acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_server_base::accept_handler, this,
 			boost::asio::placeholders::error, client_ptr));
 	}
 
+protected:
 	bool add_client(typename st_server_base::object_ctype& client_ptr)
 	{
-		if (st_object_pool<Socket>::add_object(client_ptr))
+		if (Pool::add_object(client_ptr))
 		{
 			client_ptr->show_info("client:", "arrive.");
 			return true;

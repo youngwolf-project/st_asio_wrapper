@@ -27,23 +27,27 @@ namespace st_asio_wrapper
 
 enum BufferType {POST_BUFFER, SEND_BUFFER, RECV_BUFFER};
 
-#define post_msg_buffer msg_buffer[0]
-#define post_msg_buffer_mutex msg_buffer_mutex[0]
-#define send_msg_buffer msg_buffer[1]
-#define send_msg_buffer_mutex msg_buffer_mutex[1]
-#define recv_msg_buffer msg_buffer[2]
-#define recv_msg_buffer_mutex msg_buffer_mutex[2]
-#define temp_msg_buffer msg_buffer[3]
+#define post_msg_buffer ST_THIS msg_buffer[0]
+#define post_msg_buffer_mutex ST_THIS msg_buffer_mutex[0]
+#define send_msg_buffer ST_THIS msg_buffer[1]
+#define send_msg_buffer_mutex ST_THIS msg_buffer_mutex[1]
+#define recv_msg_buffer ST_THIS msg_buffer[2]
+#define recv_msg_buffer_mutex ST_THIS msg_buffer_mutex[2]
+#define temp_msg_buffer ST_THIS msg_buffer[3]
 
 template<typename MsgType, typename Socket>
-class st_socket: public Socket, public st_timer
+class st_socket: public st_timer
 {
 public:
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
 	typedef boost::container::list<MsgType> container_type;
 
 protected:
-	st_socket(boost::asio::io_service& io_service_) : Socket(io_service_), st_timer(io_service_),
+	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), next_layer_(io_service_),
+		packer_(boost::make_shared<DEFAULT_PACKER>()) {reset_state();}
+
+	template<typename Arg>
+	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), next_layer_(io_service_, arg),
 		packer_(boost::make_shared<DEFAULT_PACKER>()) {reset_state();}
 
 	void reset_state()
@@ -63,6 +67,11 @@ protected:
 	}
 
 public:
+	Socket& next_layer() {return next_layer_;}
+	const Socket& next_layer() const {return next_layer_;}
+	typename Socket::lowest_layer_type& lowest_layer() {return next_layer().lowest_layer();}
+	const typename Socket::lowest_layer_type& lowest_layer() const {return next_layer().lowest_layer();}
+
 	bool started() const {return started_;}
 	void start()
 	{
@@ -305,13 +314,13 @@ protected:
 		}
 		else if (!posting)
 		{
-			auto& io_service_ = ST_THIS get_io_service();
+			auto& io_service_ = get_io_service();
 			auto dispatch_all = false;
 			if (io_service_.stopped())
 				dispatch_all = !(dispatching = false);
 			else if (!dispatching)
 			{
-				if (!ST_THIS is_open())
+				if (!lowest_layer().is_open())
 					dispatch_all = true;
 				else if (!recv_msg_buffer.empty())
 				{
@@ -368,6 +377,8 @@ protected:
 	}
 
 protected:
+	Socket next_layer_;
+
 	MsgType last_send_msg, last_dispatch_msg;
 	boost::shared_ptr<i_packer> packer_;
 

@@ -63,8 +63,7 @@ public:
 	//workaround for boost::lambda
 	//how to invoke get_recv_bytes() directly, please tell me if somebody knows!
 
-	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
-	virtual void reset() {recv_bytes = recv_index = 0; st_connector::reset();}
+	void restart() {recv_bytes = recv_index = 0;}
 
 protected:
 	//msg handling
@@ -95,7 +94,7 @@ class test_client : public st_tcp_client_base<test_socket>
 public:
 	test_client(st_service_pump& service_pump_) : st_tcp_client_base<test_socket>(service_pump_) {}
 
-	void reset() {do_something_to_all(boost::mem_fn(&test_socket::reset));}
+	void restart() {do_something_to_all(boost::mem_fn(&test_socket::restart));}
 	boost::uint64_t get_total_recv_bytes()
 	{
 		boost::uint64_t total_recv_bytes = 0;
@@ -215,7 +214,7 @@ int main(int argc, const char* argv[])
 					msg_num, msg_len, msg_fill, model);
 				puts("performance test begin, this application will have no response during the test!");
 
-				client.reset();
+				client.restart();
 
 				total_msg_bytes *= msg_len;
 				int begin_time = boost::get_system_time().time_of_day().total_seconds();

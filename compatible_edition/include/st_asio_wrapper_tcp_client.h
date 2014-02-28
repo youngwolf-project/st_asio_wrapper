@@ -21,11 +21,13 @@ namespace st_asio_wrapper
 
 typedef st_sclient<st_connector> st_tcp_sclient;
 
-template<typename Socket = st_connector>
-class st_tcp_client_base : public st_client<Socket>
+template<typename Socket = st_connector, typename Pool = st_object_pool<Socket> >
+class st_tcp_client_base : public st_client<Socket, Pool>
 {
 public:
-	st_tcp_client_base(st_service_pump& service_pump_) : st_client<Socket>(service_pump_) {}
+	st_tcp_client_base(st_service_pump& service_pump_) : st_client<Socket, Pool>(service_pump_) {}
+	template<typename Arg>
+	st_tcp_client_base(st_service_pump& service_pump_, Arg arg) : st_client<Socket, Pool>(service_pump_, arg) {}
 
 	//connected link size, may smaller than total object size(st_object_pool::size)
 	size_t valid_size()
@@ -43,7 +45,7 @@ public:
 	TCP_BROADCAST_MSG(broadcast_msg, send_msg)
 	TCP_BROADCAST_MSG(broadcast_native_msg, send_native_msg)
 	//guarantee send msg successfully even if can_overflow equal to false
-	//success at here just means put the msg into st_tcp_socket's send buffer
+	//success at here just means put the msg into st_tcp_socket_base's send buffer
 	TCP_BROADCAST_MSG(safe_broadcast_msg, safe_send_msg)
 	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
 	//msg sending interface

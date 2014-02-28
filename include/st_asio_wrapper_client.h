@@ -24,17 +24,21 @@ class st_sclient : public st_service_pump::i_service, public Socket
 {
 public:
 	st_sclient(st_service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
+	template<typename Arg>
+	st_sclient(st_service_pump& service_pump_, Arg& arg) : i_service(service_pump_), Socket(service_pump_, arg) {}
 
 protected:
 	virtual void init() {ST_THIS reset(); ST_THIS start(); ST_THIS send_msg();}
 	virtual void uninit() {ST_THIS graceful_close();}
 };
 
-template<typename Socket>
-class st_client : public st_object_pool<Socket>
+template<typename Socket, typename Pool>
+class st_client : public Pool
 {
 protected:
-	st_client(st_service_pump& service_pump_) : st_object_pool<Socket>(service_pump_) {}
+	st_client(st_service_pump& service_pump_) : Pool(service_pump_) {}
+	template<typename Arg>
+	st_client(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg) {}
 
 	virtual void init()
 	{
@@ -65,27 +69,18 @@ public:
 
 	typename st_client::object_type add_client(unsigned short port, const std::string& ip = std::string())
 	{
-		auto client_ptr(create_client());
+		auto client_ptr(ST_THIS create_client());
 		client_ptr->set_server_addr(port, ip);
 		return add_client(client_ptr) ? client_ptr : typename st_client::object_type();
 	}
 
-	//this method only used with st_tcp_socket and it's derived class
+	//this method only used with st_tcp_socket_base and it's derived class
 	//if you need to change the server address, please use create_client() to create a client, then,
 	//set the server address, finally, invoke bool add_client(typename st_client::object_ctype&, bool)
 	typename st_client::object_type add_client()
 	{
-		auto client_ptr(create_client());
+		auto client_ptr(ST_THIS create_client());
 		return add_client(client_ptr) ? client_ptr : typename st_client::object_type();
-	}
-
-	//this method simply create a class derived from st_socket from heap, secondly you must invoke
-	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or recv msgs.
-	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
-	typename st_client::object_type create_client()
-	{
-		auto client_ptr(ST_THIS reuse_object());
-		return client_ptr ? client_ptr : boost::make_shared<Socket>(ST_THIS get_service_pump());
 	}
 
 	void disconnect(typename st_client::object_ctype& client_ptr) {force_close(client_ptr);}
