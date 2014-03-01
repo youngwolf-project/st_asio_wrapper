@@ -65,7 +65,7 @@ int main() {
 			service_pump.start_service();
 		}
 		else
-			server_.broadcast_msg(str);;
+			server_.broadcast_msg(str);
 	}
 
 	return 0;

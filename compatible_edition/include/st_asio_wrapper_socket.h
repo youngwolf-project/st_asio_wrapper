@@ -184,7 +184,7 @@ protected:
 	virtual void on_send_error(const boost::system::error_code& ec)
 		{unified_out::error_out("send msg error: %d %s", ec.value(), ec.message().data());}
 
-	#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//if you want to use your own recv buffer, you can move the msg to your own recv buffer,
 	//and return false, then, handle the msg as your own strategy(may be you'll need a msg dispatch thread)
 	//or, you can handle the msg at here and return false, but this will reduce efficiency(
