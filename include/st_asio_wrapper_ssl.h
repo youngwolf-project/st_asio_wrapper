@@ -106,7 +106,7 @@ template<typename Object>
 class st_ssl_object_pool : public st_object_pool<Object>
 {
 public:
-    st_ssl_object_pool(st_service_pump& service_pump_) :
+	st_ssl_object_pool(st_service_pump& service_pump_) :
 		st_object_pool<Object>(service_pump_), ctx(DEFAULT_SSL_METHOD) {}
 	st_ssl_object_pool(st_service_pump& service_pump_, boost::asio::ssl::context::method m) :
 		st_object_pool<Object>(service_pump_), ctx(m) {}
@@ -129,7 +129,7 @@ public:
 	}
 
 protected:
-    boost::asio::ssl::context ctx;
+	boost::asio::ssl::context ctx;
 };
 typedef st_tcp_client_base<st_ssl_connector, st_ssl_object_pool<st_ssl_connector>> st_ssl_tcp_client;
 

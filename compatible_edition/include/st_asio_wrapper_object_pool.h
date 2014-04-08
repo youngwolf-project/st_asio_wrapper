@@ -123,7 +123,7 @@ protected:
 		return found;
 	}
 
-	object_type reuse_object()
+	virtual object_type reuse_object()
 	{
 #ifdef REUSE_OBJECT
 		boost::mutex::scoped_lock lock(temp_object_can_mutex);
