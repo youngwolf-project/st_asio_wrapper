@@ -21,7 +21,8 @@ int main() {
 	st_ssl_server server_(service_pump);
 	server_.ssl_context().set_options(boost::asio::ssl::context::default_workarounds |
 		boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
-	server_.ssl_context().set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
+	server_.ssl_context().set_verify_mode(boost::asio::ssl::context::verify_peer |
+		boost::asio::ssl::context::verify_fail_if_no_peer_cert);
 	server_.ssl_context().load_verify_file("client_certs/server.crt");
 	server_.ssl_context().use_certificate_chain_file("certs/server.crt");
 	server_.ssl_context().use_private_key_file("certs/server.key", boost::asio::ssl::context::pem);
@@ -31,7 +32,8 @@ int main() {
 /*	st_ssl_tcp_client ssl_client(service_pump, boost::asio::ssl::context::sslv23);
 	ssl_client.ssl_context().set_options(boost::asio::ssl::context::default_workarounds |
 		boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
-	ssl_client.ssl_context().set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
+	ssl_client.ssl_context().set_verify_mode(boost::asio::ssl::context::verify_peer |
+		boost::asio::ssl::context::verify_fail_if_no_peer_cert);
 	ssl_client.ssl_context().load_verify_file("certs/server.crt");
 	ssl_client.ssl_context().use_certificate_chain_file(cert_folder + "/server.crt");
 	ssl_client.ssl_context().use_private_key_file(cert_folder + "/server.key", boost::asio::ssl::context::pem);

@@ -61,6 +61,9 @@ protected:
 		return false;
 	}
 
+	virtual void on_unpack_error() {authorized_ = false; st_connector_base<Socket>::on_unpack_error();}
+	virtual void on_recv_error(const boost::system::error_code& ec)
+		{authorized_ = false; st_connector_base<Socket>::on_recv_error(ec);}
 	virtual void on_handshake(bool result)
 	{
 		if (result)
