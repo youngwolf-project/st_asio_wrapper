@@ -252,23 +252,19 @@ public:
 	{
 		assert(nullptr != buff);
 		time_t now = time(nullptr);
-
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-		size_t buffer_len = UNIFIED_OUT_BUF_NUM / 2;
-		ctime_s(std::next(buff, buffer_len), buffer_len, &now);
-		strcpy_s(buff, buffer_len, std::next(buff, buffer_len));
+#if defined _MSC_VER
+		ctime_s(buff, UNIFIED_OUT_BUF_NUM, &now);
 #else
-		strcpy(buff, ctime(&now));
+		ctime_r(&now, buff);
 #endif
 		auto len = strlen(buff);
 		assert(len > 0);
 		if ('\n' == *std::next(buff, len - 1))
 			--len;
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-		strcpy_s(std::next(buff, len), buffer_len, " -> ");
+		strcpy_s(std::next(buff, len), UNIFIED_OUT_BUF_NUM - len, " -> ");
 		len += 4;
-		buffer_len = UNIFIED_OUT_BUF_NUM - len;
-		vsnprintf_s(std::next(buff, len), buffer_len, buffer_len, fmt, ap);
+		vsnprintf_s(std::next(buff, len), UNIFIED_OUT_BUF_NUM - len, _TRUNCATE, fmt, ap);
 #else
 		strcpy(std::next(buff, len), " -> ");
 		len += 4;

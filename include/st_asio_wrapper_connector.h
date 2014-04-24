@@ -73,6 +73,8 @@ public:
 #endif
 	bool is_connected() const {return connected;}
 
+	//the following three functions can only be used when the connection is ok and you want to reconnect to the server.
+	//if the connection is broken unexpectedly, st_connector will try to reconnect to the server automatically.
 	void disconnect(bool reconnect = false) {force_close(reconnect);}
 	void force_close(bool reconnect = false)
 		{reconnecting = reconnect; connected = false; st_tcp_socket_base<Socket>::force_close();}
