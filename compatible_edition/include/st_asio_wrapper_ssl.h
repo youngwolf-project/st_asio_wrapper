@@ -81,6 +81,7 @@ protected:
 		if (!ec)
 		{
 			ST_THIS connected = true;
+			ST_THIS reconnecting = false;
 			ST_THIS on_connect();
 			do_start();
 		}

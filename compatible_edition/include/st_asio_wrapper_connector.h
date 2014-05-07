@@ -114,20 +114,18 @@ protected:
 	{
 		unified_out::error_out("connection closed.");
 
+		bool reconnect = reconnecting;
 		if (ST_THIS is_closing())
 			force_close(reconnecting);
 		else
 		{
 			force_close(reconnecting);
 			if (ec && boost::asio::error::operation_aborted != ec && RE_CONNECT_CHECK)
-				reconnecting = true;
+				reconnect = true;
 		}
 
-		if (reconnecting)
-		{
-			reconnecting = false;
+		if (reconnect)
 			do_start();
-		}
 	}
 
 	virtual bool on_timer(unsigned char id, const void* user_data)
@@ -152,11 +150,13 @@ protected:
 		if (!ec)
 		{
 			connected = true;
+			reconnecting = false;
 			on_connect();
 			ST_THIS send_msg(); //send msg buffer may have msgs, send them
 			do_start();
 		}
-		else if (boost::asio::error::operation_aborted != ec && RE_CONNECT_CHECK && !ST_THIS get_io_service().stopped())
+		else if ((boost::asio::error::operation_aborted != ec || reconnecting) &&
+			RE_CONNECT_CHECK && !ST_THIS get_io_service().stopped())
 			ST_THIS set_timer(10, RE_CONNECT_INTERVAL, NULL);
 	}
 

@@ -11,6 +11,7 @@ using namespace st_asio_wrapper;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
+#define RECONNECT_COMMAND "reconnect"
 
 int main() {
 	puts("type quit to end.");
@@ -29,7 +30,8 @@ int main() {
 	server_.ssl_context().use_tmp_dh_file("certs/dh512.pem");
 
 	std::string cert_folder = "client_certs";
-/*	st_ssl_tcp_client ssl_client(service_pump, boost::asio::ssl::context::sslv23);
+/*
+	st_ssl_tcp_client ssl_client(service_pump, boost::asio::ssl::context::sslv23);
 	ssl_client.ssl_context().set_options(boost::asio::ssl::context::default_workarounds |
 		boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
 	ssl_client.ssl_context().set_verify_mode(boost::asio::ssl::context::verify_peer |
@@ -42,6 +44,7 @@ int main() {
 	//please configurate the ssl context before creating any clients.
 	ssl_client.add_client(SERVER_PORT, SERVER_IP);
 */
+///*
 	//to use st_ssl_tcp_sclient, we must construct ssl context first.
 	boost::asio::ssl::context ctx(boost::asio::ssl::context::sslv23);
 	ctx.set_options(boost::asio::ssl::context::default_workarounds |
@@ -54,7 +57,7 @@ int main() {
 
 	st_ssl_tcp_sclient ssl_sclient(service_pump, ctx);
 	ssl_sclient.set_server_addr(SERVER_PORT, SERVER_IP);
-
+//*/
 	service_pump.start_service();
 	while(service_pump.is_running())
 	{
@@ -66,6 +69,9 @@ int main() {
 			service_pump.stop_service();
 			service_pump.start_service();
 		}
+		else if (str == RECONNECT_COMMAND)
+			ssl_sclient.graceful_close(true);
+			//ssl_client.at(0)->graceful_close(true);
 		else
 			server_.broadcast_msg(str);
 	}
