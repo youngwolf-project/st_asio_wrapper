@@ -85,8 +85,8 @@ protected:
 			ST_THIS on_connect();
 			do_start();
 		}
-		else if (boost::asio::error::operation_aborted != ec && RE_CONNECT_CHECK && !ST_THIS get_io_service().stopped())
-			ST_THIS set_timer(10, RE_CONNECT_INTERVAL, nullptr);
+		else
+			st_connector_base<Socket>::connect_handler(ec);
 	}
 
 	void handshake_handler(const boost::system::error_code& ec)
