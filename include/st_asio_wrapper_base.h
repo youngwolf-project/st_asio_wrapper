@@ -177,15 +177,15 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 		ST_THIS do_direct_send_msg(ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
-bool FUNNAME(std::string& str, bool can_overflow = false) \
-	{if (NATIVE) return ST_THIS direct_send_msg(str); return FUNNAME(str.data(), str.size(), can_overflow);}
+bool FUNNAME(std::string&& str, bool can_overflow = false) \
+	{if (NATIVE) return ST_THIS direct_send_msg(std::move(str), can_overflow); return FUNNAME(str.data(), str.size(), can_overflow);}
 
 #define TCP_POST_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 	{return ST_THIS direct_post_msg(ST_THIS packer_->pack_msg(pstr, len, num, NATIVE), can_overflow);} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
-bool FUNNAME(std::string& str, bool can_overflow = false) \
-	{if (NATIVE) return ST_THIS direct_post_msg(str); return FUNNAME(str.data(), str.size(), can_overflow);}
+bool FUNNAME(std::string&& str, bool can_overflow = false) \
+	{if (NATIVE) return ST_THIS direct_post_msg(std::move(str), can_overflow); return FUNNAME(str.data(), str.size(), can_overflow);}
 
 //guarantee send msg successfully even if can_overflow equal to false
 //success at here just means put the msg into st_tcp_socket's send buffer
@@ -193,8 +193,8 @@ bool FUNNAME(std::string& str, bool can_overflow = false) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 	{while (!SEND_FUNNAME(pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK return true;} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
-bool FUNNAME(std::string& str, bool can_overflow = false) \
-	{while (!SEND_FUNNAME(str, can_overflow)) SAFE_SEND_MSG_CHECK return true;}
+bool FUNNAME(std::string&& str, bool can_overflow = false) \
+	{while (!SEND_FUNNAME(std::move(str), can_overflow)) SAFE_SEND_MSG_CHECK return true;}
 
 #define TCP_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
@@ -224,7 +224,7 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, \
 	return false; \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
-bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, std::string& str, bool can_overflow = false) \
+bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, std::string&& str, bool can_overflow = false) \
 { \
 	if (NATIVE) \
 	{ \
@@ -247,7 +247,7 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const 
 	return ST_THIS direct_post_msg(std::move(msg), can_overflow); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
-bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, std::string& str, bool can_overflow = false) \
+bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, std::string&& str, bool can_overflow = false) \
 { \
 	if (NATIVE) \
 	{ \
@@ -264,8 +264,8 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const 
 	bool can_overflow = false) \
 	{while (!SEND_FUNNAME(peer_addr, pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK return true;} \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
-bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, std::string& str, bool can_overflow = false) \
-	{while (!SEND_FUNNAME(peer_addr, str, can_overflow)) SAFE_SEND_MSG_CHECK return true;}
+bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, std::string&& str, bool can_overflow = false) \
+	{while (!SEND_FUNNAME(peer_addr, std::move(str), can_overflow)) SAFE_SEND_MSG_CHECK return true;}
 //udp msg sending interface
 ///////////////////////////////////////////////////
 

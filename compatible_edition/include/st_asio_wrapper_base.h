@@ -165,7 +165,7 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
 bool FUNNAME(std::string& str, bool can_overflow = false) \
-	{if (NATIVE) return ST_THIS direct_send_msg(str); return FUNNAME(str.data(), str.size(), can_overflow);}
+	{if (NATIVE) return ST_THIS direct_send_msg(str, can_overflow); return FUNNAME(str.data(), str.size(), can_overflow);}
 
 #define TCP_POST_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
@@ -175,7 +175,7 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
 bool FUNNAME(std::string& str, bool can_overflow = false) \
-	{if (NATIVE) return ST_THIS direct_post_msg(str); return FUNNAME(str.data(), str.size(), can_overflow);}
+	{if (NATIVE) return ST_THIS direct_post_msg(str, can_overflow); return FUNNAME(str.data(), str.size(), can_overflow);}
 
 //guarantee send msg successfully even if can_overflow equal to false
 //success at here just means put the msg into st_tcp_socket's send buffer
