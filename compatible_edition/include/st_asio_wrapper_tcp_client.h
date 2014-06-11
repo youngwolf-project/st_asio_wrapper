@@ -40,6 +40,13 @@ public:
 		return size;
 	}
 
+    using st_client<Socket, Pool>::add_client;
+	typename st_client<Socket, Pool>::object_type add_client()
+	{
+		BOOST_AUTO(client_ptr, ST_THIS create_client());
+		return ST_THIS add_client(client_ptr) ? client_ptr : typename st_client<Socket, Pool>::object_type();
+	}
+
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_BROADCAST_MSG(broadcast_msg, send_msg)

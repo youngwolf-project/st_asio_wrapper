@@ -74,15 +74,6 @@ public:
 		return add_client(client_ptr) ? client_ptr : typename st_client::object_type();
 	}
 
-	//this method only used with st_tcp_socket_base and it's derived class
-	//if you need to change the server address, please use create_client() to create a client, then,
-	//set the server address, finally, invoke bool add_client(typename st_client::object_ctype&, bool)
-	typename st_client::object_type add_client()
-	{
-		auto client_ptr(ST_THIS create_client());
-		return add_client(client_ptr) ? client_ptr : typename st_client::object_type();
-	}
-
 	void disconnect(typename st_client::object_ctype& client_ptr) {force_close(client_ptr);}
 	void force_close(typename st_client::object_ctype& client_ptr)
 		{if (ST_THIS del_object(client_ptr)) client_ptr->force_close();}
