@@ -75,7 +75,7 @@ public:
 	bool is_closing() const {return closing;}
 
 	//get or change the unpacker at runtime
-	boost::shared_ptr<i_unpacker> inner_unpacker() const {return unpacker_;}
+	boost::shared_ptr<i_unpacker> inner_unpacker() {return unpacker_;}
 	void inner_unpacker(const boost::shared_ptr<i_unpacker>& _unpacker_) {unpacker_ = _unpacker_;}
 
 	using st_socket<msg_type, Socket>::send_msg;
@@ -191,7 +191,12 @@ protected:
 			ST_THIS dispatch_msg();
 
 			if (!unpack_ok)
+			{
 				on_unpack_error();
+				//reset unpacker's state after on_unpack_error(),
+				//so user can get the left half-baked msg in on_unpack_error()
+				unpacker_->reset_unpacker_state();
+			}
 		}
 		else
 			on_recv_error(ec);

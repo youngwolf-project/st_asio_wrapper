@@ -17,4 +17,5 @@ release debug clean :
 	cd file_client && ${MAKE}
 	cd udp_client && ${MAKE}
 	cd ssl_test && ${MAKE}
+	cd compatible_edition && ${MAKE}
 

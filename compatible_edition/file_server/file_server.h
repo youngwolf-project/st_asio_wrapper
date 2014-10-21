@@ -96,7 +96,7 @@ private:
 			else
 			{
 				size_t read_size = (size_t) std::min(
-					(__off64_t) i_packer::get_max_msg_size(), (__off64_t) ORDER_LEN + length);
+					(__off64_t) packer::get_max_msg_size(), (__off64_t) ORDER_LEN + length);
 				read_size -= ORDER_LEN;
 
 				char* buffer = new char[ORDER_LEN + read_size];

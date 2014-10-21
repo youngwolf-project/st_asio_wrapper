@@ -29,7 +29,7 @@ int main() {
 	server_.ssl_context().use_private_key_file("certs/server.key", boost::asio::ssl::context::pem);
 	server_.ssl_context().use_tmp_dh_file("certs/dh512.pem");
 
-	std::string cert_folder = "client_certs";
+	const std::string cert_folder = "client_certs";
 /*
 	st_ssl_tcp_client ssl_client(service_pump, boost::asio::ssl::context::sslv23);
 	ssl_client.ssl_context().set_options(boost::asio::ssl::context::default_workarounds |

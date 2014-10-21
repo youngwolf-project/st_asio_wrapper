@@ -64,7 +64,7 @@ public:
 		boost::system::error_code ec;
 		server_addr = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(ip, ec), port); assert(!ec);
 		boost::asio::ip::tcp::resolver resolver(ST_THIS get_io_service());
-		server_addr_iter = resolver.resolve(server_addr);
+		server_addr_iter = resolver.resolve(server_addr, ec); assert(!ec);
 	}
 	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
 

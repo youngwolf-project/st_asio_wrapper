@@ -16,6 +16,21 @@
 //#define MAX_MSG_NUM 8 //reduce buffer size to reduce memory occupation
 //configuration
 
+//use the following macro to control the type of packer and unpacker
+#define PACKER_UNPACKER_TYPE	1
+//1-default packer and unpacker, head(length) + body
+//2-fixed length packer and unpacker
+//3-prefix and suffix packer and unpacker
+
+#if 2 == PACKER_UNPACKER_TYPE
+#define DEFAULT_PACKER	fixed_legnth_packer
+#define DEFAULT_UNPACKER fixed_length_unpacker
+#endif
+#if 3 == PACKER_UNPACKER_TYPE
+#define DEFAULT_PACKER prefix_suffix_packer
+#define DEFAULT_UNPACKER prefix_suffix_unpacker
+#endif
+
 #include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
 
@@ -56,7 +71,16 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 SHARED_OBJECT(test_socket, st_connector)
 {
 public:
-	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0) {}
+	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0)
+	{
+#if PACKER_UNPACKER_TYPE == 2
+		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
+#endif
+#if PACKER_UNPACKER_TYPE == 3
+		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
+		dynamic_cast<prefix_suffix_packer*>(&*inner_packer())->prefix_suffix("begin", "end");
+#endif
+	}
 
 	boost::uint64_t get_recv_bytes() const {return recv_bytes;}
 	operator boost::uint64_t() const {return recv_bytes;}
@@ -188,8 +212,18 @@ int main(int argc, const char* argv[])
 			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
 			BOOST_AUTO(iter, tok.begin());
 			if (iter != tok.end()) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
-			if (iter != tok.end()) msg_len = std::min(i_packer::get_max_msg_size(),
+#if 1 == PACKER_UNPACKER_TYPE
+			if (iter != tok.end()) msg_len = std::min(packer::get_max_msg_size(),
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq
+#endif
+#if 2 == PACKER_UNPACKER_TYPE
+			if (iter != tok.end()) ++iter;
+			msg_len = 1024;
+#endif
+#if 3 == PACKER_UNPACKER_TYPE
+			if (iter != tok.end()) msg_len = std::min((size_t) MAX_MSG_LEN,
+				std::max((size_t) atoi(iter++->data()), sizeof(size_t)));
+#endif
 			if (iter != tok.end()) msg_fill = *iter++->data();
 			if (iter != tok.end()) model = *iter++->data() - '0';
 

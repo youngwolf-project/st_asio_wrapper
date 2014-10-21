@@ -97,7 +97,7 @@ public:
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
 
 	//get or change the packer at runtime
-	boost::shared_ptr<i_packer> inner_packer() const {return packer_;}
+	boost::shared_ptr<i_packer> inner_packer() {return packer_;}
 	void inner_packer(const boost::shared_ptr<i_packer>& _packer_) {packer_ = _packer_;}
 
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed

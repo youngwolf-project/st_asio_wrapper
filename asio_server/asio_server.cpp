@@ -5,6 +5,21 @@
 //#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ENHANCED_STABILITY
 
+//use the following macro to control the type of packer and unpacker
+#define PACKER_UNPACKER_TYPE	1
+//1-default packer and unpacker, head(length) + body
+//2-fixed length packer and unpacker
+//3-prefix and suffix packer and unpacker
+
+#if 2 == PACKER_UNPACKER_TYPE
+#define DEFAULT_PACKER	fixed_legnth_packer
+#define DEFAULT_UNPACKER fixed_length_unpacker
+#endif
+#if 3 == PACKER_UNPACKER_TYPE
+#define DEFAULT_PACKER prefix_suffix_packer
+#define DEFAULT_UNPACKER prefix_suffix_unpacker
+#endif
+
 //the following three macro demonstrate how to support huge msg(exceed 65535 - 2).
 //huge msg consume huge memory, for example, if we support 1M msg size, because every st_tcp_socket has a
 //private unpacker which has a buffer at lest 1M size, so 1K st_tcp_socket will consume 1G memory.
@@ -29,7 +44,15 @@ using namespace st_asio_wrapper;
 //in the default behavior, each st_tcp_socket has their own packer, and cause memory waste
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
+#if 1 == PACKER_UNPACKER_TYPE
 auto global_packer(boost::make_shared<packer>());
+#endif
+#if 2 == PACKER_UNPACKER_TYPE
+auto global_packer(boost::make_shared<fixed_legnth_packer>());
+#endif
+#if 3 == PACKER_UNPACKER_TYPE
+auto global_packer(boost::make_shared<prefix_suffix_packer>());
+#endif
 
 //demonstrates how to control the type of st_server_socket_base::server from template parameters
 class i_echo_server : public i_server
@@ -41,7 +64,17 @@ public:
 class echo_socket : public st_server_socket_base<boost::asio::ip::tcp::socket, i_echo_server>
 {
 public:
-	echo_socket(i_echo_server& server_) : st_server_socket_base(server_) {inner_packer(global_packer);}
+	echo_socket(i_echo_server& server_) : st_server_socket_base(server_)
+	{
+		inner_packer(global_packer);
+#if 2 == PACKER_UNPACKER_TYPE
+		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
+#endif
+#if 3 == PACKER_UNPACKER_TYPE
+		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
+		dynamic_cast<prefix_suffix_packer*>(&*inner_packer())->prefix_suffix("begin", "end");
+#endif
+	}
 
 public:
 	//because we use objects pool(REUSE_OBJECT been defined), so, strictly speaking, this virtual
