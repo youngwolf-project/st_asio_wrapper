@@ -191,7 +191,12 @@ protected:
 			ST_THIS dispatch_msg();
 
 			if (!unpack_ok)
+			{
 				on_unpack_error();
+				//reset unpacker's state after on_unpack_error(),
+				//so user can get the left half-baked msg in on_unpack_error()
+				unpacker_->reset_unpacker_state();
+			}
 		}
 		else
 			on_recv_error(ec);
