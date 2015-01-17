@@ -39,7 +39,7 @@ class st_connector_base : public st_tcp_socket_base<Socket>
 {
 public:
 	st_connector_base(boost::asio::io_service& io_service_) :
-		st_tcp_socket_base<Socket>(io_service_), connected(false), reconnecting(false)
+		st_tcp_socket_base<Socket>(io_service_), connected(false), reconnecting(true)
 #ifdef RE_CONNECT_CONTROL
 		, re_connect_times(-1)
 #endif
@@ -47,7 +47,7 @@ public:
 
 	template<typename Arg>
 	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) :
-		st_tcp_socket_base<Socket>(io_service_, arg), connected(false), reconnecting(false)
+		st_tcp_socket_base<Socket>(io_service_, arg), connected(false), reconnecting(true)
 #ifdef RE_CONNECT_CONTROL
 		, re_connect_times(-1)
 #endif
@@ -57,7 +57,7 @@ public:
 	//notice, when resue this st_connector_base, st_object_pool will invoke reset(), child must re-write this to init
 	//all member variables, and then do not forget to invoke st_connector_base::reset() to init father's
 	//member variables
-	virtual void reset() {connected = false; reconnecting = false; st_tcp_socket_base<Socket>::reset();}
+	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<Socket>::reset();}
 
 	void set_server_addr(unsigned short port, const std::string& ip)
 	{
@@ -95,7 +95,7 @@ protected:
 	{
 		if (!ST_THIS get_io_service().stopped())
 		{
-			if (!is_connected())
+			if (reconnecting && !is_connected())
 				boost::asio::async_connect(ST_THIS lowest_layer(), server_addr_iter,
 					boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error));
 			else
@@ -120,8 +120,8 @@ protected:
 		else
 		{
 			force_close(reconnecting);
-			if (ec && boost::asio::error::operation_aborted != ec && RE_CONNECT_CHECK)
-				reconnect = true;
+			if (reconnect && (!ec || boost::asio::error::operation_aborted == ec || !RE_CONNECT_CHECK))
+				reconnect = false;
 		}
 
 		if (reconnect)
@@ -149,8 +149,7 @@ protected:
 	{
 		if (!ec)
 		{
-			connected = true;
-			reconnecting = false;
+			connected = reconnecting = true;
 			on_connect();
 			ST_THIS send_msg(); //send msg buffer may have msgs, send them
 			do_start();

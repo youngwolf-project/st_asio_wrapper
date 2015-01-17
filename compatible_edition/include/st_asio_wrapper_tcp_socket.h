@@ -179,7 +179,6 @@ protected:
 		}
 
 		ST_THIS stop_all_timer();
-		ST_THIS direct_dispatch_all_msg();
 		reset_state();
 	}
 

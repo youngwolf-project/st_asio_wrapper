@@ -253,8 +253,6 @@ protected:
 		return false;
 	}
 
-	//can only be invoked after socket closed
-	void direct_dispatch_all_msg() {suspend_dispatch_msg(false);}
 	void dispatch_msg()
 	{
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
@@ -305,9 +303,8 @@ protected:
 	//must mutex recv_msg_buffer before invoke this function
 	void do_dispatch_msg(bool need_lock)
 	{
-		boost::mutex::scoped_lock lock;
-		if (need_lock)
-			lock = boost::mutex::scoped_lock(recv_msg_buffer_mutex);
+		boost::mutex::scoped_lock lock(recv_msg_buffer_mutex, boost::defer_lock);
+		if (need_lock) lock.lock();
 
 		if (suspend_dispatch_msg_)
 		{
@@ -341,8 +338,7 @@ protected:
 				//the msgs in temp_msg_buffer are discarded, it's very hard to resolve this defect,
 				//so, please be very carefully if you decide to resolve this issue;
 				//the biggest problem is calling force_close in on_msg.
-				st_asio_wrapper::do_something_to_all(recv_msg_buffer,
-					boost::bind(&st_socket::on_msg_handle, this, _1));
+				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&st_socket::on_msg_handle, this, _1));
 				recv_msg_buffer.clear();
 			}
 		}
