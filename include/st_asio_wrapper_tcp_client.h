@@ -7,7 +7,7 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * this class only used at tcp client endpoint
+ * this class only used at TCP client endpoint
  */
 
 #ifndef ST_ASIO_WRAPPER_TCP_CLIENT_H_

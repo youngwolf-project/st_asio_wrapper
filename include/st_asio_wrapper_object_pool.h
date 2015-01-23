@@ -7,8 +7,8 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * this class used at both client and server endpoint, and in both tcp and udp socket
- * this class can only manage objects that inheirt from boost::asio::tcp::socket
+ * this class used at both client and server endpoint, and in both TCP and UDP socket
+ * this class can only manage objects that inherit from boost::asio::tcp::socket
  */
 
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
@@ -179,7 +179,7 @@ protected:
 
 public:
 	//this method simply create a class derived from st_socket from heap, secondly you must invoke
-	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or recv msgs.
+	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or receive msgs.
 	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
 	object_type create_client()
 	{
@@ -215,9 +215,9 @@ public:
 
 	void list_all_object() {do_something_to_all(boost::bind(&Socket::show_info, _1, "", ""));}
 
-	//Empty ip means don't care, any ip will match
+	//Empty IP means don't care, any IP will match
 	//Zero port means don't care, any port will match
-	//this function only used with tcp socket, because for udp socket, remote endpoint means nothing.
+	//this function only used with TCP socket, because for UDP socket, remote endpoint means nothing.
 	void find_object(const std::string& ip, unsigned short port, container_type& objects)
 	{
 		if (ip.empty() && 0 == port)
@@ -287,7 +287,7 @@ protected:
 	container_type object_can;
 	boost::mutex object_can_mutex;
 
-	//because all objects are dynamic created and stored in object_can, maybe when the recv error occur
+	//because all objects are dynamic created and stored in object_can, maybe when the receiving error occur
 	//(at this point, your standard practice is deleting the object from object_can), some other
 	//asynchronous calls are still queued in boost::asio::io_service, and will be dequeued in the future,
 	//we must guarantee these objects not be freed from the heap, so, we move these objects from

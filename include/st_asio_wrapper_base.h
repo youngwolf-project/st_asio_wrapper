@@ -32,7 +32,7 @@
 #ifndef MAX_MSG_LEN
 #define MAX_MSG_LEN			4000
 #endif
-//msg send and recv buffer's max size
+//msg send and recv buffer's maximum size
 //big buffer size won't occupy big memory if you store a little msgs
 #ifndef MAX_MSG_NUM
 #define MAX_MSG_NUM	1024
@@ -92,7 +92,7 @@ namespace st_asio_wrapper
 		auto size = dest_can.size();
 		if (size < max_size) //dest_can's buffer available
 		{
-			size = max_size - size; //max items this time can handle
+			size = max_size - size; //maximum items this time can handle
 			auto begin_iter = std::begin(src_can), end_iter = std::end(src_can);
 			if (src_can.size() > size) //some items left behind
 			{
@@ -156,7 +156,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) const \
 	{for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;}
 
-//used by both tcp and udp
+//used by both TCP and UDP
 #define SAFE_SEND_MSG_CHECK \
 { \
 	if (!ST_THIS is_send_allowed() || ST_THIS get_io_service().stopped()) return false; \
@@ -164,7 +164,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const \
 }
 
 ///////////////////////////////////////////////////
-//tcp msg sending interface
+//TCP msg sending interface
 #define TCP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
 TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow = false) {return FUNNAME(&pstr, &len, 1, can_overflow);} \
 TYPE FUNNAME(const std::string& str, bool can_overflow = false) {return FUNNAME(str.data(), str.size(), can_overflow);}
@@ -200,11 +200,11 @@ bool FUNNAME(std::string&& str, bool can_overflow = false) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 	{ST_THIS do_something_to_all(boost::bind(&Socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
-//tcp msg sending interface
+//TCP msg sending interface
 ///////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////
-//udp msg sending interface
+//UDP msg sending interface
 #define UDP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
 TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, &pstr, &len, 1, can_overflow);} \
@@ -266,7 +266,7 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const 
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, std::string&& str, bool can_overflow = false) \
 	{while (!SEND_FUNNAME(peer_addr, std::move(str), can_overflow)) SAFE_SEND_MSG_CHECK return true;}
-//udp msg sending interface
+//UDP msg sending interface
 ///////////////////////////////////////////////////
 
 class log_formater

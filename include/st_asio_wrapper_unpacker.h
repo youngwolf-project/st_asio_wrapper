@@ -50,7 +50,7 @@ public:
 	virtual void reset_unpacker_state() {cur_msg_len = -1; cur_data_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
 	{
-		//len + msg
+		//length + msg
 		cur_data_len += bytes_transferred;
 
 		auto pnext = std::begin(raw_buff);
@@ -93,7 +93,7 @@ public:
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
-	//read as many as possible to reduce async call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
+	//read as many as possible to reduce asynchronous call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
 	//stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
@@ -143,7 +143,7 @@ public:
 	virtual void reset_unpacker_state() {cur_data_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
 	{
-		//len + msg
+		//length + msg
 		cur_data_len += bytes_transferred;
 		if (cur_data_len < _fixed_length)
 		{
@@ -168,7 +168,7 @@ public:
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
-	//read as many as possible to reduce async call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
+	//read as many as possible to reduce asynchronous call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
 	//stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
@@ -221,7 +221,7 @@ public:
 	virtual void reset_unpacker_state() {cur_data_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
 	{
-		//len + msg
+		//length + msg
 		cur_data_len += bytes_transferred;
 
 		auto min_len = _prefix.size() + _suffix.size();
@@ -265,7 +265,7 @@ public:
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
-	//read as many as possible to reduce async call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
+	//read as many as possible to reduce asynchronous call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
 	//stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{

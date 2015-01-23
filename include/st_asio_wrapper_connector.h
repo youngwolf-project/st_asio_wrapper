@@ -54,8 +54,8 @@ public:
 		{set_server_addr(SERVER_PORT, SERVER_IP);}
 
 	//reset all, be ensure that there's no any operations performed on this st_connector_base when invoke it
-	//notice, when resue this st_connector_base, st_object_pool will invoke reset(), child must re-write this to init
-	//all member variables, and then do not forget to invoke st_connector_base::reset() to init father's
+	//notice, when reusing this st_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
+	//all member variables, and then do not forget to invoke st_connector_base::reset() to initialize father's
 	//member variables
 	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<Socket>::reset();}
 
@@ -73,7 +73,7 @@ public:
 #endif
 	bool is_connected() const {return connected;}
 
-	//the following three functions can only be used when the connection is ok and you want to reconnect to the server.
+	//the following three functions can only be used when the connection is OK and you want to reconnect to the server.
 	//if the connection is broken unexpectedly, st_connector will try to reconnect to the server automatically.
 	void disconnect(bool reconnect = false) {force_close(reconnect);}
 	void force_close(bool reconnect = false)
@@ -91,7 +91,7 @@ public:
 	}
 
 protected:
-	virtual bool do_start() //connect or recv
+	virtual bool do_start() //connect or receive
 	{
 		if (!ST_THIS get_io_service().stopped())
 		{

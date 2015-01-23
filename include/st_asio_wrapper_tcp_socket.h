@@ -17,7 +17,7 @@
 #include "st_asio_wrapper_unpacker.h"
 
 #ifndef GRACEFUL_CLOSE_MAX_DURATION
-	#define GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, max waiting seconds while graceful closing
+	#define GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, maximum waiting seconds while graceful closing
 #endif
 
 #ifndef DEFAULT_UNPACKER
@@ -55,7 +55,7 @@ public:
 
 	void disconnect() {force_close();}
 	void force_close() {clean_up();}
-	void graceful_close() //will block until closing success or timeout
+	void graceful_close() //will block until closing success or time out
 	{
 		closing = true;
 
@@ -128,18 +128,18 @@ protected:
 	//the link can continue to use, but need not close the st_tcp_socket_base at both client and server endpoint
 	virtual void on_unpack_error() = 0;
 
-	//recv error or peer endpoint quit(false ec means ok)
+	//receiving error or peer endpoint quit(false ec means ok)
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	//if you want to use your own recv buffer, you can move the msg to your own recv buffer,
+	//if you want to use your own receive buffer, you can move the msg to your own receive buffer,
 	//and return false, then, handle the msg as your own strategy(may be you'll need a msg dispatch thread)
 	//or, you can handle the msg at here and return false, but this will reduce efficiency(
 	//because this msg handling block the next msg receiving on the same st_tcp_socket_base) unless you can
-	//handle the msg very fast(which will inversely more efficient, because msg recv buffer and msg dispatching
+	//handle the msg very fast(which will inversely more efficient, because msg receive buffer and msg dispatching
 	//are not needed any more).
 	//
-	//return true means use the msg recv buffer, you must handle the msgs in on_msg_handle()
+	//return true means use the msg receive buffer, you must handle the msgs in on_msg_handle()
 	//notice: on_msg_handle() will not be invoked from within this function
 	//
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
@@ -153,7 +153,7 @@ protected:
 	virtual void on_msg_handle(msg_type& msg)
 		{unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data());}
 
-	//start the async read
+	//start the asynchronous read
 	//it's child's responsibility to invoke this properly,
 	//because st_tcp_socket_base doesn't know any of the connection status
 	void do_recv_msg()

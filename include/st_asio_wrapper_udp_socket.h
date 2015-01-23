@@ -17,8 +17,8 @@
 
 #include "st_asio_wrapper_socket.h"
 
-//in set_local_addr, if the ip is empty, UDP_DEFAULT_IP_VERSION will define the ip version,
-//or, the ip version will be deduced by the ip address.
+//in set_local_addr, if the IP is empty, UDP_DEFAULT_IP_VERSION will define the IP version,
+//or, the IP version will be deduced by the IP address.
 //boost::asio::ip::udp::v4() means ipv4 and boost::asio::ip::udp::v6() means ipv6.
 #ifndef UDP_DEFAULT_IP_VERSION
 #define UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
@@ -51,8 +51,8 @@ public:
 		st_socket<msg_type, Socket>(io_service_) {ST_THIS reset_state();}
 
 	//reset all, be ensure that there's no any operations performed on this st_udp_socket when invoke it
-	//notice, when resue this st_udp_socket, st_object_pool will invoke reset(), child must re-write this to init
-	//all member variables, and then do not forget to invoke st_udp_socket::reset() to init father's
+	//notice, when reuse this st_udp_socket, st_object_pool will invoke reset(), child must re-write this to initialize
+	//all member variables, and then do not forget to invoke st_udp_socket::reset() to initialize father's
 	//member variables
 	virtual void reset()
 	{
@@ -86,7 +86,7 @@ public:
 	void force_close() {clean_up();}
 	void graceful_close() {clean_up();}
 
-	//udp does not need a unpacker
+	//UDP does not need a unpacker
 
 	using st_socket<msg_type, Socket>::send_msg;
 	///////////////////////////////////////////////////
@@ -152,14 +152,14 @@ protected:
 		{unified_out::error_out("recv msg error: %d %s", ec.value(), ec.message().data());}
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	//if you want to use your own recv buffer, you can move the msg to your own recv buffer,
+	//if you want to use your own receive buffer, you can move the msg to your own receive buffer,
 	//and return false, then, handle the msg as your own strategy(may be you'll need a msg dispatch thread)
 	//or, you can handle the msg at here and return false, but this will reduce efficiency(
 	//because this msg handling block the next msg receiving on the same st_udp_socket) unless you can
-	//handle the msg very fast(which will inversely more efficient, because msg recv buffer and msg dispatching
+	//handle the msg very fast(which will inversely more efficient, because msg receive buffer and msg dispatching
 	//are not needed any more).
 	//
-	//return true means use the msg recv buffer, you must handle the msgs in on_msg_handle()
+	//return true means use the msg receive buffer, you must handle the msgs in on_msg_handle()
 	//notice: on_msg_handle() will not be invoked from within this function
 	//
 	//notice: using inconstant is for the convenience of swapping
@@ -220,7 +220,7 @@ protected:
 
 		//send msg sequentially, that means second send only after first send success
 		//under windows, send a msg to addr_any may cause sending errors, please note
-		//for udp in st_asio_wrapper, sending error will not stop the following sending.
+		//for UDP in st_asio_wrapper, sending error will not stop the following sending.
 		if (!do_send_msg())
 		{
 #ifdef WANT_ALL_MSG_SEND_NOTIFY
