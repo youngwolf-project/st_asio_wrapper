@@ -40,13 +40,13 @@
 namespace st_asio_wrapper
 {
 
-//timers are indentified by id.
+//timers are identified by id.
 //for the same timer in the same st_timer, set_timer and stop_timer are not thread safe,
 //please pay special attention. to resolve this defect, we must add a mutex member variable to timer_info,
 //it's not worth
 //
 //suppose you have more than one service thread(see st_service_pump for service thread number control), then:
-//same st_timer, same timer, on_timer is called sequently
+//same st_timer, same timer, on_timer is called sequentially
 //same st_timer, different timer, on_timer is called concurrently
 //different st_timer, on_timer is always called concurrently
 class st_timer

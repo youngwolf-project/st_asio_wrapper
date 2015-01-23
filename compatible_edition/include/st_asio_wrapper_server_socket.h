@@ -38,8 +38,8 @@ public:
 		st_tcp_socket_base<Socket>(server_.get_service_pump(), arg), server(server_) {}
 
 	//reset all, be ensure that there's no any operations performed on this st_server_socket_base when invoke it
-	//notice, when resue this st_server_socket_base, st_object_pool will invoke reset(), child must re-write this
-	//to init all member variables, and then do not forget to invoke st_server_socket_base::reset() to init father's
+	//notice, when reuse this st_server_socket_base, st_object_pool will invoke reset(), child must re-write this
+	//to initialize all member variables, and then do not forget to invoke st_server_socket_base::reset() to initialize father's
 	//member variables
 	virtual void reset() {st_tcp_socket_base<Socket>::reset();}
 

@@ -17,8 +17,8 @@
 
 #include "st_asio_wrapper_base.h"
 
-//io thread number
-//listen, all msg send and recv, msg handle(on_msg_handle() and on_msg()) will use these threads
+//IO thread number
+//listen, all msg send and receive, msg handle(on_msg_handle() and on_msg()) will use these threads
 //keep big enough, empirical value need you to try to find out in your own environment
 #ifndef ST_SERVICE_THREAD_NUM
 #define ST_SERVICE_THREAD_NUM 8

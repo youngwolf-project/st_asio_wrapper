@@ -7,7 +7,7 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * this class only used at tcp client endpoint
+ * this class only used at TCP client endpoint
  */
 
 #ifndef ST_ASIO_WRAPPER_TCP_CLIENT_H_
@@ -40,7 +40,7 @@ public:
 		return size;
 	}
 
-    using st_client<Socket, Pool>::add_client;
+	using st_client<Socket, Pool>::add_client;
 	typename st_client<Socket, Pool>::object_type add_client()
 	{
 		BOOST_AUTO(client_ptr, ST_THIS create_client());

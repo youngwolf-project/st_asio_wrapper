@@ -24,7 +24,7 @@
  * st_server support change listen address, and, of course, you need re-start_service
  * add set_server_addr for this purpose
  *
- * fix bug: after re-start_service, some member variables of st_socket not been reseted
+ * fix bug: after re-start_service, some member variables of st_socket not been reset
  * add reset_unpacker_state for this purpose
  *
  * add a helper function list_all_client to show all the clients in server endpoint
@@ -56,10 +56,10 @@
  * Add some helper functions
  *
  * 1.6	2012.8.7
- * Add msg recv buffer
+ * Add msg receive buffer
  *
  * Change the virtual function on_msg's semantics, it return a boolean value to indicate whether
- * to use recv buffer. msgs in recv buffer will be dispatched asynchronously in on_msg_handle()
+ * to use receive buffer. msgs in receive buffer will be dispatched asynchronously in on_msg_handle()
  *
  * change some internal variable's names
  *
@@ -81,13 +81,13 @@
  * 1.8	2012.8.21
  * Increase the robustness
  * Add is_listening() member function to st_server, which is used to check the server's listening status
- * Graceful stop service: wait all async call finish
+ * Graceful stop service: wait all asynchronous call finish
  * Clean the clients list at server endpoint automatically and periodically for memory saving
  * Decompose on_socket_close to on_recv_error and on_send_error
  *
  * 1.9	2012.8.28
  * Use array instead of char[] in default unpacker for more safety
- * Use placeholders instead of _1 and _2 for more compatibility
+ * Use place holders instead of _1 and _2 for more compatibility
  * Support more than one async_accept delivery concurrently, see ASYNC_ACCEPT_NUM macro in st_server class
  * BUG fix: use async_write instead of tcp::socket::async_send, which may cause data sending incomplete
  *
@@ -121,14 +121,14 @@
  *
  * Add performance test project, see performance_test folder
  * Fix st_client bug: after stop_server(), st_client may still try to re-connect to the server
- * Change the default behavior of on_msg_handle() and on_msg(), see the comments of them for more details
+ * Change the default behaviour of on_msg_handle() and on_msg(), see the comments of them for more details
  *
  * Drop create_packer() and create_unpacker() virtual function because call them in constructor
  * can not reach the purpose of be rewritten, now, if you want to use custom packer and unpacker,
  * you must use inner_packer() and inner_unpacker() to set the custom packer and unpacker at runtime,
  * see echo_server in asio_server.
  *
- * Drop on_recv_buffer_overflow(), now st_socket can guarantee working aright when the recv buffer overflow
+ * Drop on_recv_buffer_overflow(), now st_socket can guarantee working aright when the receive buffer overflow
  *
  * Add a parameter can_overflow to send_msg, send_vative_msg, broadcast_msg and broadcast_native_msg to
  * indicate weather can ignore the send buffer limitation, this is useful when need send msgs but can't
@@ -154,19 +154,19 @@
  * Demo with timer please refer to file_server, an application based on st_asio_wrapper for
  * file transfer and simple talk.
  *
- * Add FORCE_TO_USE_MSG_RECV_BUFFER macro to force to use the msg recv buffer at compile time for
+ * Add FORCE_TO_USE_MSG_RECV_BUFFER macro to force to use the msg receive buffer at compile time for
  * performance improvement, see FORCE_TO_USE_MSG_RECV_BUFFER for more details
  *
  * 2.3	2012.10.7
  * Drop overuse of shared_ptr on msgs
- * Add vc2010 support and vc compiler version verification
+ * Add VC2010 support and VC compiler version verification
  * Strip connection logic from st_client to st_connector
  *
  * Add a test framework st_test_client to client endpoint for server pressure test, and a demo
  * test_client base on it.
  *
  * Fix bug: std::advance can't move the iterator to the head direction in this context. by the way,
- * there's no problem under linux
+ * there's no problem under Linux
  *
  * 2.4	2012.10.19
  * Use decltype to reduce input.
@@ -195,17 +195,17 @@
  * Fix warning: under 32bit gcc, use %lu(d) to print size_t raise warnings.
  *
  * Fix warning: under 32bit gcc, use %ld(d) to print uint_64_t raise warnings
- * (personal behavior of performance/asio_client and performance/test_client).
+ * (personal behaviour of performance/asio_client and performance/test_client).
  *
  * Fix warning: under 32bit gcc, use %ld(d) to print __off64_t raise warnings
- * (personal behavior of file_client).
+ * (personal behaviour of file_client).
  *
  * Add vc2008 support, which means not require c++0x any more, and I call it compatible edition against
  * normal edition. In order to achieve high efficiency(as std::move does), I use shared_ptr to avoid memory
- * copys, so, the interface has been changed; And, in order to keep the conciseness of normal edition,
+ * copies, so, the interface has been changed; And, in order to keep the conciseness of normal edition,
  * I strip it from normal edition and put it into compatible_edition folder.
  *
- * Fix bug: container::set does not have front() member function(personal behavior of vc2010).
+ * Fix bug: container::set does not have front() member function(personal behaviour of VC2010).
  *
  * 2.6	2012.11.19
  * Unify some interfaces of compatible edition's st_socket to normal edition, please do remember to change
@@ -217,7 +217,7 @@
  * st_socket::on_all_msg_send
  *
  * 2.7	2012.12.5
- * Add udp support, st_udp_socket encapsulate data sending and receiving, st_udp_client is the service.
+ * Add UDP support, st_udp_socket encapsulate data sending and receiving, st_udp_client is the service.
  * The following virtual function's signature have been changed for more compact, if you have rewrote some of
  * these virtual functions(include indirect inheritance, for example, server_socket, test_socket), do not forget
  * to change them. I'm sorry for these changes:
@@ -245,7 +245,7 @@
  * Change virtual function is_ok() to is_send_allowed() for more readable
  *
  * 2.9	2013.1.21
- * Fix st_udp_client bug: call send_msg() before service startup will cause the msg been buffered until next send_msg().
+ * Fix st_udp_client bug: call send_msg() before service start-up will cause the msg been buffered until next send_msg().
  * Add multi-link support to st_client and st_udp_client, like test_client.
  * Drop demo performance_test/asio_client.
  * Drop test_client class(replaced by st_client).
@@ -293,7 +293,7 @@
  * Other small changes please refer to svn or git logs.
  *
  * 3.5	2013.7.28
- * Code refactoring.
+ * Code re-factoring.
  *
  * Add safe_send_msg and safe_broadcast_msg, they can guarantee send msg successfully just like use can_overflow
  * equal to true to invoke send_msg or broadcast_msg, except that when the send buffer is full, they will wait until
@@ -333,16 +333,16 @@
  * Forbid using some classes(eg st_timer) directly.
  * Correct some error comments in st_asio_wrapper_timer.h.
  *
- * Forbid invoding st_socket::start() repeatedly, this is always forbidden, but it's the user's responsiblity
+ * Forbid invoking st_socket::start() repeatedly, this is always forbidden, but it's the user's responsibility
  * to avoid this before this release.
  *
  * Move the logic of suspending sending msg to st_socket for code conciseness, to approach this, add two pure virtual
  * functions: do_start and do_send_msg to st_socket.
  *
  * Fix bug: Invoking suspend_dispatch_msg() in on_msg cause dead lock.
- * Fix bug: st_socket may stop continue recv msg in certain situations.
- * Fix bug: Invode st_server::del_client may cause mutex problem on recv buffer.
- * Add some helper function to get the recv buffer size, peek the recv buffer, etc.
+ * Fix bug: st_socket may stop continue receive msg in certain situations.
+ * Fix bug: Invoke st_server::del_client may cause mutex problem on receive buffer.
+ * Add some helper function to get the receive buffer size, peek the receive buffer, etc.
  *
  * 3.8	2013.9.15
  * Fix bug: Invoking safe_send_msg in on_msg may cause dead lock, on_msg_handle also has this problem when all
