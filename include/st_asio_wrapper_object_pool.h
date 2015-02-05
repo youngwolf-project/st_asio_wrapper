@@ -129,7 +129,7 @@ protected:
 		boost::mutex::scoped_lock lock(temp_object_can_mutex);
 		//objects are order by time, so we can use this feature to improve the performance
 		for (auto iter = std::begin(temp_object_can); iter != std::end(temp_object_can) && iter->is_timeout(); ++iter)
-			if (iter->object_ptr.unique() && !iter->object_ptr->started())
+			if (iter->object_ptr.unique() && iter->object_ptr->reusable())
 			{
 				auto object_ptr(std::move(iter->object_ptr));
 				temp_object_can.erase(iter);

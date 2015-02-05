@@ -72,6 +72,17 @@ public:
 	typename Socket::lowest_layer_type& lowest_layer() {return next_layer().lowest_layer();}
 	const typename Socket::lowest_layer_type& lowest_layer() const {return next_layer().lowest_layer();}
 
+#ifdef REUSE_OBJECT
+	virtual bool reusable()
+	{
+		if (started())
+			return false;
+
+		boost::mutex::scoped_lock lock(recv_msg_buffer_mutex, boost::try_to_lock);
+		return lock.owns_lock(); //if recv_msg_buffer_mutex has been locked, then this socket should not be reused.
+	}
+#endif
+
 	bool started() const {return started_;}
 	void start()
 	{
@@ -178,7 +189,7 @@ protected:
 	virtual bool is_send_allowed() const {return !suspend_send_msg_;}
 	//can send data or not(just put into send buffer)
 
-	//generally, you need not re-write this for link broken judgement(TCP)
+	//generally, you need not re-write this for link broken judgment(TCP)
 	virtual void on_send_error(const boost::system::error_code& ec)
 		{unified_out::error_out("send msg error: %d %s", ec.value(), ec.message().data());}
 
@@ -331,12 +342,14 @@ protected:
 			if (dispatch_all)
 			{
 #ifdef FORCE_TO_USE_MSG_RECV_BUFFER
-				recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
-#endif
-				//the msgs in temp_msg_buffer are discarded, it's very hard to resolve this defect,
+				//the msgs in temp_msg_buffer are discarded if we don't used msg receive buffer, it's very hard to resolve this defect,
 				//so, please be very carefully if you decide to resolve this issue;
 				//the biggest problem is calling force_close in on_msg.
+				recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
+#endif
+#ifndef DISCARD_MSG_WHEN_LINK_DOWN
 				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&st_socket::on_msg_handle, this, _1));
+#endif
 				recv_msg_buffer.clear();
 			}
 		}
