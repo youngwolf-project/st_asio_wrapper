@@ -195,23 +195,27 @@ protected:
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//if you want to use your own receive buffer, you can move the msg to your own receive buffer,
-	//and return false, then, handle the msg as your own strategy(may be you'll need a msg dispatch thread)
-	//or, you can handle the msg at here and return false, but this will reduce efficiency(
-	//because this msg handling block the next msg receiving on the same st_tcp_socket) unless you can
-	//handle the msg very fast(which will inversely more efficient, because msg receive buffer and msg dispatching
-	//are not needed any more).
+	//then, handle the msg as your own strategy(may be you'll need a msg dispatch thread)
+	//or, you can handle the msg at here, but this will reduce efficiency(because this msg handling block
+	//the next msg receiving on the same st_socket) unless you can handle the msg very fast(which will
+	//inversely more efficient, because msg receive buffer and msg dispatching are not needed any more).
 	//
-	//return true means use the msg receive buffer, you must handle the msgs in on_msg_handle()
+	//return true means msg been handled, st_socket will not maintain it anymore, return false means
+	//msg cannot be handled right now, you must handle it in on_msg_handle()
 	//notice: on_msg_handle() will not be invoked from within this function
 	//
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
 	virtual bool on_msg(MsgType& msg) = 0;
 #endif
 
-	//handling msg at here will not block msg receiving
-	//if on_msg() return false, this function will not be invoked due to no msgs need to dispatch
+	//handling msg in om_msg_handle() will not block msg receiving on the same st_socket
+	//return true means msg been handled, false means msg cannot be handled right now, and st_socket will
+	//re-dispatch it asynchronously
+	//if link_down is true, no matter return true or false, st_socket will not maintain this msg anymore,
+	//and continue dispatch the next msg continuously
+	//
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
-	virtual void on_msg_handle(MsgType& msg) = 0;
+	virtual bool on_msg_handle(MsgType& msg, bool link_down) = 0;
 
 #ifdef WANT_MSG_SEND_NOTIFY
 	//one msg has sent to the kernel buffer, msg is the right msg(remain in packed)
@@ -228,7 +232,7 @@ protected:
 	{
 		switch (id)
 		{
-		case 0: //delay put msgs into receive buffer because of receive buffer overflow
+		case 0: //delay put msgs into receive buffer cause of receive buffer overflow
 			dispatch_msg();
 			break;
 		case 1: //suspend dispatch msgs
@@ -252,7 +256,10 @@ protected:
 				return !empty; //continue the timer if not empty
 			}
 			break;
-		case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
+		case 3: //re-dispatch
+			do_dispatch_msg(true);
+			break;
+		case 4: case 5: case 6: case 7: case 8: case 9: //reserved
 			break;
 		default:
 			return st_timer::on_timer(id, user_data);
@@ -268,7 +275,7 @@ protected:
 		auto dispatch = false;
 		for (auto iter = std::begin(temp_msg_buffer);
 			!suspend_dispatch_msg_ && !posting && iter != std::end(temp_msg_buffer);)
-			if (!on_msg(*iter))
+			if (on_msg(*iter))
 				temp_msg_buffer.erase(iter++);
 			else
 			{
@@ -295,18 +302,24 @@ protected:
 #endif
 
 		if (temp_msg_buffer.empty())
-			do_start(); //receive msg sequentially, that means second receiving only after first receiving success
+			do_start(); //receive msg sequentially, which means second receiving only after first receiving success
 		else
 			set_timer(0, 50, nullptr);
 	}
 
 	void msg_handler()
 	{
-		on_msg_handle(last_dispatch_msg); //must before next msg dispatch to keep sequence
+		bool re = on_msg_handle(last_dispatch_msg, false); //must before next msg dispatch to keep sequence
 		boost::mutex::scoped_lock lock(recv_msg_buffer_mutex);
 		dispatching = false;
-		//dispatch msg sequentially, that means second dispatch only after first dispatch success
-		do_dispatch_msg(false);
+		if (!re) //dispatch failed, re-dispatch
+		{
+			recv_msg_buffer.push_front(MsgType());
+			recv_msg_buffer.front().swap(last_dispatch_msg);
+			set_timer(3, 50, nullptr);
+		}
+		else //dispatch msg sequentially, which means second dispatch only after first dispatch success
+			do_dispatch_msg(false);
 	}
 
 	//must mutex recv_msg_buffer before invoke this function
@@ -348,7 +361,7 @@ protected:
 				recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
 #endif
 #ifndef DISCARD_MSG_WHEN_LINK_DOWN
-				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&st_socket::on_msg_handle, this, _1));
+				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&st_socket::on_msg_handle, this, _1, true));
 #endif
 				recv_msg_buffer.clear();
 			}
@@ -394,7 +407,7 @@ protected:
 	container_type msg_buffer[4];
 	//if on_msg() return true, which means use the msg receive buffer,
 	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't push into recv_msg_buffer
-	//because of receive buffer overflow, st_socket will delay 50 milliseconds(non-blocking) to invoke
+	//cause of receive buffer overflow, st_socket will delay 50 milliseconds(non-blocking) to invoke
 	//dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
 	boost::mutex msg_buffer_mutex[3];
 

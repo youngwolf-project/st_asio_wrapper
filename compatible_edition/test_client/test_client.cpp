@@ -93,10 +93,10 @@ protected:
 	//msg handling
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER //not force to use msg recv buffer(so on_msg() will make the decision)
 	//we can handle the msg very fast, so we don't use the recv buffer(return false)
-	virtual bool on_msg(msg_type& msg) {handle_msg(msg); return false;}
+	virtual bool on_msg(msg_type& msg) {handle_msg(msg); return true;}
 #endif
 	//we should handle the msg in on_msg_handle for time-consuming task like this:
-	virtual void on_msg_handle(msg_type& msg) {handle_msg(msg);}
+	virtual bool on_msg_handle(msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
 
 private:

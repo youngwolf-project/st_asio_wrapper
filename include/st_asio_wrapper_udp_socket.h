@@ -152,26 +152,12 @@ protected:
 		{unified_out::error_out("recv msg error: %d %s", ec.value(), ec.message().data());}
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	//if you want to use your own receive buffer, you can move the msg to your own receive buffer,
-	//and return false, then, handle the msg as your own strategy(may be you'll need a msg dispatch thread)
-	//or, you can handle the msg at here and return false, but this will reduce efficiency(
-	//because this msg handling block the next msg receiving on the same st_udp_socket) unless you can
-	//handle the msg very fast(which will inversely more efficient, because msg receive buffer and msg dispatching
-	//are not needed any more).
-	//
-	//return true means use the msg receive buffer, you must handle the msgs in on_msg_handle()
-	//notice: on_msg_handle() will not be invoked from within this function
-	//
-	//notice: using inconstant is for the convenience of swapping
 	virtual bool on_msg(msg_type& msg)
-		{unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data()); return false;}
+		{unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data()); return true;}
 #endif
 
-	//handling msg at here will not block msg receiving
-	//if on_msg() return false, this function will not be invoked due to no msgs need to dispatch
-	//notice: using inconstant is for the convenience of swapping
-	virtual void on_msg_handle(msg_type& msg)
-		{unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data());}
+	virtual bool on_msg_handle(msg_type& msg, bool link_down)
+		{unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data()); return true;}
 
 	void clean_up()
 	{
