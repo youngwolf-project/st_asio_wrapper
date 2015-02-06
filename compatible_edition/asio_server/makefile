@@ -18,7 +18,7 @@ ${shell mkdir -p ${dir}}
 
 release debug : ${target}
 ${target} : ${objects}
-	g++ -o ${target} ${objects} ${lflag} -lboost_system -lboost_thread
+	g++ -o ${target} ${objects} ${lflag} -pthread -lboost_system -lboost_thread
 ${objects} : ${dir}/%.o : %.cpp ${headers}
 	g++ -Wall -fexceptions ${cflag} -c $< -o $@
 
