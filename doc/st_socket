@@ -1,4 +1,4 @@
-
+﻿
 namespace st_asio_wrapper
 {
 
@@ -104,11 +104,13 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	virtual bool on_msg(MsgType& msg) = 0;
-收到一条消息时回调，如果返回true，则消息进入接收缓存。
+收到一条消息时回调，返回true表示消息被成功处理，返回false表示消息无法立即处理，于是进入接收缓存，通过on_msg_handle再次派发。
 #endif
 
-	virtual void on_msg_handle(MsgType& msg) = 0;
-从接收缓存派发一条消息。
+	virtual bool on_msg_handle(MsgType& msg, bool link_down) = 0;
+从接收缓存派发一条消息，返回true表示消息被成功处理，返回false表示消息无法立即处理，于是将暂停一小段时间之后继续重试（异步地）；
+如果link_down，则无论返回true还是false，都将当成消息已经处理，将继续派发下一条消息（同步地），在连接断开时，会值link_down为真，
+此时需要尽快的派发完所有剩余的消息。
 
 #ifdef WANT_MSG_SEND_NOTIFY
 	virtual void on_msg_send(MsgType& msg);

@@ -1,4 +1,4 @@
-
+﻿
 namespace st_asio_wrapper
 {
 namespace st_udp
@@ -90,7 +90,7 @@ protected:
 重写st_socket的on_msg，功能是打印消息到控制台，使用者重写这个函数以处理消息。
 #endif
 
-	virtual void on_msg_handle(msg_type& msg);
+	virtual bool on_msg_handle(msg_type& msg, bool link_down);
 重写st_socket的on_msg_handle，功能是打印消息到控制台，使用者重写这个函数以处理消息。
 
 	void clean_up();
