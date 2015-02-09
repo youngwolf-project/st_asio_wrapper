@@ -45,7 +45,7 @@ protected:
 
 public:
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
-	void reset() {ST_THIS reset_state(); ST_THIS clear_buffer();}
+	void reset() {reset_state(); ST_THIS clear_buffer();}
 	void reset_state()
 	{
 		reset_unpacker_state();
