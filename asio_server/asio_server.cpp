@@ -94,7 +94,7 @@ protected:
 	//msg handling: send the original msg back(echo server)
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
-	virtual bool on_msg(msg_type& msg) {return send_msg(msg);}
+	virtual bool on_msg(msg_type& msg) {post_msg(msg); return true;}
 #endif
 	//we should handle the msg in on_msg_handle for time-consuming task like this:
 	virtual bool on_msg_handle(msg_type& msg, bool link_down) {return send_msg(msg);}
