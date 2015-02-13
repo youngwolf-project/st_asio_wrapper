@@ -120,13 +120,13 @@ public:
 	//this method simply create a class derived from st_socket from heap, secondly you must invoke
 	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or receive msgs.
 	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
-	typename st_ssl_object_pool::object_type create_client()
+	typename st_ssl_object_pool::object_type create_object()
 	{
 		auto client_ptr = ST_THIS reuse_object();
 		return client_ptr ? client_ptr : boost::make_shared<Object>(ST_THIS service_pump, ctx);
 	}
 	template<typename Arg>
-	typename st_ssl_object_pool::object_type create_client(Arg& arg)
+	typename st_ssl_object_pool::object_type create_object(Arg& arg)
 	{
 		auto client_ptr = ST_THIS reuse_object();
 		return client_ptr ? client_ptr : boost::make_shared<Object>(arg, ctx);
@@ -165,7 +165,7 @@ protected:
 
 	virtual void start_next_accept()
 	{
-		auto client_ptr = ST_THIS create_client(boost::ref(*this));
+		auto client_ptr = ST_THIS create_object(boost::ref(*this));
 		ST_THIS acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_ssl_server_base::accept_handler, this,
 			boost::asio::placeholders::error, client_ptr));
 	}

@@ -43,7 +43,13 @@ public:
 	using st_client<Socket, Pool>::add_client;
 	typename st_client<Socket, Pool>::object_type add_client()
 	{
-		auto client_ptr(ST_THIS create_client());
+		auto client_ptr(ST_THIS create_object());
+		return ST_THIS add_client(client_ptr) ? client_ptr : typename st_client<Socket, Pool>::object_type();
+	}
+	typename st_client<Socket, Pool>::object_type add_client(unsigned short port, const std::string& ip = std::string())
+	{
+		auto client_ptr(ST_THIS create_object());
+		client_ptr->set_server_addr(port, ip);
 		return ST_THIS add_client(client_ptr) ? client_ptr : typename st_client<Socket, Pool>::object_type();
 	}
 

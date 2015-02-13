@@ -52,11 +52,11 @@
 namespace st_asio_wrapper
 {
 
-template<typename Socket>
+template<typename Object>
 class st_object_pool : public st_service_pump::i_service, public st_timer
 {
 public:
-	typedef boost::shared_ptr<Socket> object_type;
+	typedef boost::shared_ptr<Object> object_type;
 	typedef const object_type object_ctype;
 	typedef boost::container::list<object_type> container_type;
 
@@ -178,19 +178,19 @@ protected:
 	}
 
 public:
-	//this method simply create a class derived from st_socket from heap, secondly you must invoke
+	//this method simply create an Object from heap, then you must invoke
 	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or receive msgs.
 	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
-	object_type create_client()
+	object_type create_object()
 	{
 		BOOST_AUTO(client_ptr, reuse_object());
-		return client_ptr ? client_ptr : boost::make_shared<Socket>(boost::ref(service_pump));
+		return client_ptr ? client_ptr : boost::make_shared<Object>(boost::ref(service_pump));
 	}
 	template<typename Arg>
-	object_type create_client(Arg& arg)
+	object_type create_object(Arg& arg)
 	{
 		BOOST_AUTO(client_ptr, reuse_object());
-		return client_ptr ? client_ptr : boost::make_shared<Socket>(arg);
+		return client_ptr ? client_ptr : boost::make_shared<Object>(arg);
 	}
 
 	size_t size()
@@ -213,7 +213,7 @@ public:
 			*(boost::next(object_can.begin(), index)) : object_type();
 	}
 
-	void list_all_object() {do_something_to_all(boost::bind(&Socket::show_info, _1, "", ""));}
+	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}
 
 	//Empty IP means don't care, any IP will match
 	//Zero port means don't care, any port will match

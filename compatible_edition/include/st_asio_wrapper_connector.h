@@ -160,7 +160,17 @@ protected:
 	}
 
 #ifdef RE_CONNECT_CONTROL
-	bool prepare_re_connect() {return 0 == re_connect_times ? false : (--re_connect_times, true);}
+	bool prepare_re_connect()
+	{
+		if (0 == re_connect_times)
+		{
+			unified_out::info_out("re-connecting abandoned!");
+			return false;
+		}
+
+		--re_connect_times;
+		return true;
+	}
 #endif
 
 protected:

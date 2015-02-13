@@ -27,6 +27,13 @@ class st_udp_client_base : public st_client<Socket, Pool>
 public:
 	st_udp_client_base(st_service_pump& service_pump_) : st_client<Socket, Pool>(service_pump_) {}
 
+	typename st_client<Socket, Pool>::object_type add_client(unsigned short port, const std::string& ip = std::string())
+	{
+		BOOST_AUTO(client_ptr, ST_THIS create_object());
+		client_ptr->set_local_addr(port, ip);
+		return ST_THIS add_client(client_ptr) ? client_ptr : typename st_client<Socket, Pool>::object_type();
+	}
+
 protected:
 	virtual void uninit()
 		{ST_THIS stop(); ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_close));}

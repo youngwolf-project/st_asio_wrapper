@@ -34,7 +34,7 @@ int main(int argc, const char* argv[])
 	file_client client(service_pump);
 	for (int i = 0; i < link_num; ++i)
 	{
-		BOOST_AUTO(client_ptr, client.create_client());
+		BOOST_AUTO(client_ptr, client.create_object());
 //		client_ptr->set_server_addr(SERVER_PORT, "::1"); //ipv6
 //		client_ptr->set_server_addr(SERVER_PORT, "127.0.0.1"); //ipv4
 		client_ptr->set_index(i);

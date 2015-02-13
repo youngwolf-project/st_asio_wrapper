@@ -67,13 +67,6 @@ public:
 		return false;
 	}
 
-	typename st_client::object_type add_client(unsigned short port, const std::string& ip = std::string())
-	{
-		BOOST_AUTO(client_ptr, ST_THIS create_client());
-		client_ptr->set_server_addr(port, ip);
-		return add_client(client_ptr) ? client_ptr : typename st_client::object_type();
-	}
-
 	void disconnect(typename st_client::object_ctype& client_ptr) {force_close(client_ptr);}
 	void force_close(typename st_client::object_ctype& client_ptr)
 		{if (ST_THIS del_object(client_ptr)) client_ptr->force_close();}
