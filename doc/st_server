@@ -17,16 +17,20 @@
 namespace st_asio_wrapper
 {
 
-服务端服务器类，主要功能是监听和接受连接，连接管理继承于st_object_pool
-template<typename Socket = st_server_socket, typename Server = i_server>
-class st_server_base : public Server, public st_object_pool<Socket>
+服务端服务器类，主要功能是监听和接受连接，连接管理继承于Pool
+template<typename Socket = st_server_socket, typename Pool = st_object_pool<Socket>, typename Server = i_server>
+class st_server_base : public Server, public Pool
 {
 public:
 	st_server_base(st_service_pump& service_pump_);
+	template<typename Arg>
+	st_server_base(st_service_pump& service_pump_, Arg arg);
+ssl使用。
 
 public:
 	void set_server_addr(unsigned short port, const std::string& ip = std::string());
 设置监听地址。
+	const boost::asio::ip::tcp::endpoint& get_server_addr() const;
 
 	void stop_listen();
 停止监听。
@@ -36,15 +40,11 @@ public:
 
 	virtual st_service_pump& get_service_pump();
 	virtual const st_service_pump& get_service_pump() const;
-	virtual void del_client(const boost::shared_ptr<st_tcp_socket>& client_ptr);
+	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr);
 实现i_server中的三个纯虚接口。del_client的功能主要是调用st_object_pool的del_object函数，并输出一些信息，主要用于连接断开时。
 
 	void close_all_client();
 关闭所有连接，退出服务器时使用。
-
-	boost::shared_ptr<Socket> create_client();
-创建一个服务端套接字，它应该是st_server_socket或者其继承者。新创建套接字时不要涉及到业务的东西，比如给它设置一个id什么的，
-因为这个新创建的套接字对应哪个客户端还不确定，正确的做法是在on_accept里面做。
 
 	bool broadcast_msg(const char* pstr, size_t len, bool can_overflow = false);
 	bool broadcast_msg(const std::string& str, bool can_overflow = false);
@@ -58,32 +58,31 @@ public:
 	bool safe_broadcast_native_msg(const char* pstr, size_t len, bool can_overflow = false);
 	bool safe_broadcast_native_msg(const std::string& str, bool can_overflow = false);
 	bool safe_broadcast_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-对每一个连接调用（st_tcp_socket或者st_udp_socket）其同名函数。
+对每一个连接调用相应的函数。
 
 protected:
 	virtual void init();
 	virtual void uninit();
-实现i_service纯虚接口，st_object_pool继承自i_service，而st_server_base又继承于st_object_pool。
-在启动和关闭service的时候，由st_service_pump调用。
+实现i_service纯虚接口，在启动和关闭service的时候，由st_service_pump调用。
 
-	virtual bool on_accept(const boost::shared_ptr<Socket>& client_ptr);
+	virtual bool on_accept(typename st_server_base::object_ctype& client_ptr);
 一个连接成功被接受，如果你想不接受这个连接，返回false（这之前你应该先关闭这个st_socket）；当然，返回flase不一定就是真的不接受
 这个连接，如果你想自己管理这个连接，可以把它放入自己的容器，然后一定要记得调用client_ptr->start()以开始数据接收。
 
-protected:
 	void start_next_accept();
 内部使用，开始下一次异步接受连接。
 
-	bool add_client(const boost::shared_ptr<Socket>& client_ptr);
+protected:
+	bool add_client(typename st_server_base::object_ctype& client_ptr);
 内部使用，添加一个连接到链表里面。
 
-	void accept_handler(const error_code& ec, const boost::shared_ptr<Socket>& client_ptr);
+	void accept_handler(const error_code& ec, typename st_server_base::object_ctype& client_ptr);
 异步接受连接回调，asio使用，如果出错（ec为真），将调用stop_listen。
 
 protected:
-	tcp::endpoint server_addr;
+	boost::asio::ip::tcp::endpoint server_addr;
 监听地址。
-	tcp::acceptor acceptor;
+	boost::asio::ip::tcp::acceptor acceptor;
 接受器。
 };
 typedef st_server_base<> st_server;

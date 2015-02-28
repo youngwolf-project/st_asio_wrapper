@@ -8,7 +8,7 @@ namespace st_asio_wrapper
 {
 
 对io_service的包装，用于启动st_asio_wrapper里面的service
-class st_service_pump : public io_service
+class st_service_pump : public boost::asio::io_service
 {
 public:
 	class i_service
@@ -54,13 +54,16 @@ service的id，st_service_pump会在find和remove函数里面使用，如果使�
 	};
 
 public:
+	typedef i_service* object_type;
+	typedef const object_type object_ctype;
+	typedef boost::container::list<object_type> container_type;
+
 	st_service_pump();
-	virtual ~st_service_pump();
 
 	i_service* find(int id);
 根据id查找service。
 
-	void remove(i_service* i_service_);
+	void remove(object_type i_service_);
 	void remove(int id);
 删除指定的service（调用stop_and_free）。
 
@@ -71,8 +74,8 @@ public:
 	void stop_service();
 启动／停止service，thread_num是线程数量（用于调用io_service::run）。
 
-	void start_service(i_service* i_service_, int thread_num = ST_SERVICE_THREAD_NUM);
-	void stop_service(i_service* i_service_);
+	void start_service(object_type i_service_, int thread_num = ST_SERVICE_THREAD_NUM);
+	void stop_service(object_type i_service_);
 如果某个service是在start_service之后才分配的，则调用这个启动它；停止的话，无论service是怎么启动的，都可以对某一个service做停止操作。
 
 	void force_stop_service();
@@ -89,10 +92,10 @@ public:
 同start_service和stop_service，但是会阻塞，直到所有线程（调用io_service::run的线程）都退出，所以end_service必须在另外的线程中调用。
 
 protected:
-	void stop_and_free(i_service* i_service_);
+	void stop_and_free(object_type i_service_);
 调用i_service::uninit，然后调用st_service_pump::free。
 
-	virtual void free(i_service* i_service_);
+	virtual void free(object_type i_service_);
 重写这个以释放指定的i_service，如果需要的话。注意，就算你是在堆上分配的i_service，也不一定需要释放它，只要你的service的生命周期跟
 进程一样，就不需要释放。
 
@@ -111,19 +114,19 @@ protected:
 与do_something_to_all类型，只是当__pred()返回真时就不再继续循环处理后面的i_service，跟查找功能类似。
 
 private:
-	void add(i_service* i_service_);
+	void add(object_type i_service_);
 添加一个service，由i_service使用。
 
 void do_service(int thread_num);
 start_service使用。
 
 protected:
-container::list<i_service*> service_can;
-mutex service_can_mutex;
+	container_type service_can;
+	boost::mutex service_can_mutex;
 service链表。
-thread service_thread;
+	boost::thread service_thread;
 用于管理所有service线程。
-bool started;
+	bool started;
 是否已经启动了所有service。
 };
 

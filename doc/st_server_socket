@@ -9,7 +9,7 @@ public:
 	virtual st_service_pump& get_service_pump() = 0;
 	virtual const st_service_pump& get_service_pump() const = 0;
 获取st_service_pump。
-	virtual void del_client(const boost::shared_ptr<st_tcp_socket>& client_ptr) = 0;
+	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
 关闭一个连接，并从st_server_socket_base的客户链表里面删除。
 一般来说，当出现on_recv_error的时候，这个连接已经无法使用，此时从客户链表里面删除；客户端必然也会出现连接断开，此时它要么退出程序，
 要么重新连接，重新连接成功时，会得到另一个st_server_socket_base，所以这里的删除是没有问题的。
@@ -17,11 +17,14 @@ public:
 
 
 服务端套接字类
-template<typename Server = i_server>
-SHARED_OBJECT_T(st_server_socket_base, st_tcp_socket, Server)
+template<typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket, typename Server = i_server>
+SHARED_OBJECT_T(st_server_socket_base, st_tcp_socket_base, MstType, Socket, Server)
 {
 public:
 	st_server_socket_base(Server& server_);
+	template<typename Arg>
+	st_server_socket_base(Server& server_, Arg& arg);
+ssl使用。
 
 	virtual void reset();
 重置所有，st_object_pool在重用时会调用。重写它以重置子类的状态，记得最后需要调用父类的同名函数。

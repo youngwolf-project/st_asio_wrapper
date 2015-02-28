@@ -12,21 +12,19 @@ namespace st_asio_wrapper
 {
 
 打包器接口
+template<typename MsgType>
 class i_packer
 {
 public:
-	static size_t get_max_msg_size();
-支持最大的消息长度，除去打包器添加的内容（例如包头什么的）。
-
-	virtual std::string pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+	virtual MsgType pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
 打包函数，如果使用者调用send_msg, broadcast_msg, post_msg，则会以native为false调用本函数；
 如果使用都调用send_native_msg, broadcast_native_msg, post_native_msg，则会以native为true调用本函数。
 };
 
 
 默认的打包器，如果你需要的消息格式与默认打包器的消息格式不相同，那么显然的，你需要实现自己的打包器；
-默认打包器的消息格式是：长度（２字节）＋　消息内容，所以其支持的消息长度为１至(65535-2)。
-class packer : public i_packer;
+默认打包器的消息格式是：长度（２字节）＋　消息内容，所以其支持的消息长度为1至(65535-2)。
+class packer : public i_packer<std::string>;
 
 } //namespace
 

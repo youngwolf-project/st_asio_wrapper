@@ -17,35 +17,29 @@ protected:
 
 
 支持多条连接的客户端（或者说一个套接字），tcp和udp通用，其实它更像一个容器，只是在st_object_pool上扩展了一些helper函数
-template<typename Socket>
-class st_client : public st_object_pool<Socket>
+template<typename Socket, typename Pool>
+class st_client : public Pool
 {
 protected:
 	st_client(st_service_pump& service_pump_);
+	template<typename Arg>
+	st_client(st_service_pump& service_pump_, Arg arg);
+后者由ssl使用。
 
 protected:
 	virtual void init();
 实现i_service的纯虚接口，供st_service_pump使用（start_service时调用）。
 
 public:
-	bool add_client(const boost::shared_ptr<Socket>& client_ptr, bool reset = true);
-添加一个连接到链表，并调用client_ptr->start()，如果reset为true，那么这在之前还会先调用client_ptr->reset。
+	bool add_client(typename st_client::object_ctype& client_ptr, bool reset = true);
+添加一个连接到链表，并调用client_ptr->start()，如果reset为true，那么在这之前还会先调用client_ptr->reset。
 
-	boost::shared_ptr<Socket> add_client(unsigned short port, const std::string& ip = std::string());
-调用create_client，然后设置服务器地址，最后调用add_client。
-
-	boost::shared_ptr<Socket> add_client();
-调用create_client，然后调用add_client。
-
-	boost::shared_ptr<Socket> create_client();
-创建一个连接，就是简单的new一个c++对象而已（具体对象由模板参数Socket而定）。
-
-	void disconnect(const boost::shared_ptr<Socket>& client_ptr);
+	void disconnect(typename st_client::object_ctype& client_ptr);
 直接调用force_close。
 
-	void force_close(const boost::shared_ptr<Socket>& client_ptr);
-	void graceful_close(const boost::shared_ptr<Socket>& client_ptr);
-先将指定的连接从连接链表（由st_object_pool提供）里面删除，然后调用这个连接的force_close或者graceful_close。
+	void force_close(typename st_client::object_ctype& client_ptr);
+	void graceful_close(typename st_client::object_ctype& client_ptr);
+先将指定的连接从连接链表（由Pool提供）里面删除，然后调用这个连接的graceful_close。
 };
 
 } //namespace

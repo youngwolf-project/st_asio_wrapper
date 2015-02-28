@@ -6,11 +6,23 @@ typedef st_sclient<st_connector> st_tcp_sclient;
 一个只支持一条连接的tcp客户端
 
 支持多条连接的tcp客户端
-template<typename Socket = st_connector>
-class st_tcp_client_base : public st_client<Socket>
+template<typename Socket = st_connector, typename Pool = st_object_pool<Socket>>
+class st_tcp_client_base : public st_client<Socket, Pool>
 {
 public:
 	st_tcp_client_base(st_service_pump& service_pump_);
+	template<typename Arg>
+	st_tcp_client_base(st_service_pump& service_pump_, Arg arg);
+ssl使用。
+
+	size_t valid_size();
+有效的连接数量。
+
+	using st_client<Socket, Pool>::add_client;
+	typename st_client<Socket, Pool>::object_type add_client();
+创建一个对象并添加到对象池，但还未设置服务端地址。
+	typename st_client<Socket, Pool>::object_type add_client(unsigned short port, const std::string& ip = std::string());
+创建一个对象，设置服务端地址，并添加到对象池。
 
 	bool broadcast_msg(const char* pstr, size_t len, bool can_overflow = false);
 	bool broadcast_msg(const std::string& str, bool can_overflow = false);

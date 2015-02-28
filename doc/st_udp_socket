@@ -1,29 +1,29 @@
-﻿
+
 namespace st_asio_wrapper
 {
 namespace st_udp
 {
 
 //udp消息结构，包括对方地址和消息内容
+template<typename MsgType>
 struct udp_msg
 {
 	udp::endpoint peer_addr;
-	std::string str;
+	MsgType str;
 
 	void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); str.swap(other.str);}
-	void swap(const udp::endpoint& addr, std::string& tmp_str) {peer_addr = addr; str.swap(tmp_str);}
+	void swap(const udp::endpoint& addr, MsgType& tmp_str) {peer_addr = addr; str.swap(tmp_str);}
 	void clear() {peer_addr = udp::endpoint(); str.clear();}
 	bool empty() const {return str.empty();}
 	bool operator==(const udp_msg& other) const {return this == &other;}
 };
-typedef udp_msg msg_type;
-typedef const msg_type msg_ctype;
 
 udp套接字类，实现udp数据的收发
-class st_udp_socket : public st_socket<msg_type, udp::socket>
+template <typename MsgType = std::string, typename Socket = boost::asio::ip::udp::socket>
+class st_udp_socket_base : public st_socket<udp_msg<MsgType>, Socket, MsgType>
 {
 public:
-	st_udp_socket(io_service& io_service_);
+	st_udp_socket_base(boost::asio::io_service& io_service_);
 
 public:
 	virtual void reset();
@@ -37,6 +37,7 @@ public:
 	void graceful_close();
 调用clean_up，这三个函数功能完全一样，为了与st_tcp_socket在接口上保持一致才设计成三个的。
 
+	using st_socket<udp_msg<MsgType>, Socket, MsgType>::send_msg;
 	bool send_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
 	bool send_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
 	bool send_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
@@ -104,8 +105,12 @@ protected:
 
 protected:
 	array<char, MAX_MSG_LEN> raw_buff;
-	udp::endpoint peer_addr, local_addr;
+	boost::asio::ip::udp::endpoint peer_addr, local_addr;
 };
+typedef st_udp_socket_base<> st_udp_socket;
+
+using namespace st_asio_wrapper::st_udp;
+兼容老版本。
 
 } //namespace st_udp
 } //namespace st_asio_wrapper

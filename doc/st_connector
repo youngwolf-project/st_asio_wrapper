@@ -19,10 +19,14 @@ namespace st_asio_wrapper
 {
 
 带连接功能的st_tcp_socket，算是一个真正的客户端了
-class st_connector : public st_tcp_socket
+template <typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket>
+class st_connector_base : public st_tcp_socket_base<MsgType, Socket>
 {
 public:
-	st_connector(io_service& io_service_);
+	st_connector_base(boost::asio::io_service& io_service_);
+	template<typename Arg>
+	st_connector_base(boost::asio::io_service& io_service_, Arg& arg);
+ssl使用。
 
 public:
 	virtual void reset();
@@ -76,7 +80,7 @@ protected:
 连接失败之后，调用这个函数以判断是否可以继续再次连接服务器。
 
 protected:
-	tcp::endpoint server_addr;
+	boost::asio::ip::tcp::endpoint server_addr;
 服务器地址。
 	bool connected;
 是否已经连接成功。
@@ -87,7 +91,10 @@ protected:
 	size_t re_connect_times;
 重连接次数，达到该次数时如果还未连接成功，将放弃重连接；注意需要开启RE_CONNECT_CONTROL才有此功能。
 #endif
+
+	boost::asio::ip::tcp::resolver::iterator server_addr_iter;
 };
+typedef st_connector_base<> st_connector;
 
 } //namespace
 

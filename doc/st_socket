@@ -1,4 +1,4 @@
-﻿
+
 namespace st_asio_wrapper
 {
 
@@ -16,11 +16,17 @@ on_msg_handle里面发送消息时，可能出现的发送缓存溢出和死锁�
 #define temp_msg_buffer msg_buffer[3]
 
 套接字类，st_tcp_socket和st_udp_socket的公共基类（具体是tcp还是upd根据模板参数Socket而定），主要实现消息派发暂停等功能
-template<typename MsgType, typename Socket>
-class st_socket: public Socket, public st_timer
+template<typename MsgType, typename Socket, typename MsgDataType = MsgType>
+class st_socket: public st_timer
 {
+public:
+	typedef boost::container::list<MsgType> container_type;
+
 protected:
-	st_socket(io_service& io_service_);
+	st_socket(boost::asio::io_service& io_service_);
+	template<typename Arg>
+	st_socket(boost::asio::io_service& io_service_, Arg& arg);
+ssl使用。
 
 	void reset_state();
 重置所有状态。
@@ -29,6 +35,15 @@ protected:
 清空所有buffer。
 
 public:
+	Socket& next_layer();
+	const Socket& next_layer() const;
+	typename Socket::lowest_layer_type& lowest_layer();
+	const typename Socket::lowest_layer_type& lowest_layer() const;
+
+#ifdef REUSE_OBJECT
+	virtual bool reusable();
+#endif
+
 	bool started() const;
 是否已经开始，已经开始意思是已经调用过start()了，多次调用start()会有严重的包乱顺问题，好在我在某个版本
 增加了防止多次调用start()的功能，之前靠用户保证，现在st_asio_wrapper库可以保证，即使用户多次调用也没问题。
@@ -58,8 +73,8 @@ post_msg不受这个属性的影响，所以post_msg一定只能在on_msg和on_m
 消息派发，这样就不会消息乱序，否则由于你开启线程之后，马上退出了on_msg或者on_msg_handle，那么下一条消息（如果有的话）将马上被
 派发，这样就出现了乱序问题（前一条消息还未处理完，后一条消息就被派发了）。
 
-	boost::shared_ptr<i_packer> inner_packer() const;
-	void inner_packer(const boost::shared_ptr<i_packer>& _packer_);
+	boost::shared_ptr<i_packer<MsgDataType>> inner_packer() const;
+	void inner_packer(const boost::shared_ptr<i_packer<MsgDataType>>& _packer_);
 获取／修改打包器。
 
 	bool is_send_buffer_available();
@@ -125,9 +140,6 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 	virtual bool on_timer(unsigned char id, const void* user_data);
 重写st_timer的on_timer。
 
-	void direct_dispatch_all_msg();
-直接派发所有接收缓存里面的消息，在关闭连接之前会调用。请看st_tcp_socket和st_udp_socket在clean_up里面的使用。
-
 	void dispatch_msg();
 派发消息，它要么直接调用on_msg，要么把消息放入消息接收缓存，最后调用do_dispatch_msg，如果消息处理完毕（调用on_msg）
 或者都放入了消息接收缓存，则调用do_start以继承接收数据。
@@ -143,13 +155,15 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 把消息直接放入消息发送缓存，在direct_send_msg和direct_post_msg中调用。
 
 protected:
+	Socket next_layer_;
+
 	MsgType last_send_msg, last_dispatch_msg;
 由于是异步发送和派发消息，这两个成员变量保证其在异步处理过程中的有效性。
-	boost::shared_ptr<i_packer> packer_;
+	boost::shared_ptr<i_packer<MsgDataType>> packer_;
 打包器。
 
-	container::list<MsgType> msg_buffer[4];
-	mutex msg_buffer_mutex[3];
+	container_type msg_buffer[4];
+	boost::mutex msg_buffer_mutex[3];
 缓存，最后一个缓存叫temp_msg_buffer，内部使用。
 
 	bool posting;
@@ -158,7 +172,7 @@ protected:
 内部使用的一些状态。
 
 	bool started_;
-	mutex start_mutex;
+	boost::mutex start_mutex;
 是否已经开始，开始的概念由子类具体实现，st_socket只是记录是否已经调用过start函数而已。
 };
 

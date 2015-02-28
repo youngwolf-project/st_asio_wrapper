@@ -12,17 +12,15 @@ namespace st_asio_wrapper
 {
 
 解包器接口
+template<typename MsgType>
 class i_unpacker
 {
 public:
 	virtual void reset_unpacker_state() = 0;
 重置解包器状态。
-	virtual size_t used_buffer_size() const;
-解包器缓存中还有多少数据未解析，不重写它就恒返回0。
-	virtual size_t current_msg_length() const;
-如果当前消息未接收全，但已经知道了长度（比如用包头表示长度，且包头已经收到），则返回长度，不重写它就恒返回-1。
-	virtual bool parse_msg(size_t bytes_transferred, container::list<std::string>& msg_can) = 0;
-st_socket收到任意数据之后，会调用本接口，以便让unpacker尝试解析消息，成功解析出来的消息通过msg_can返回。
+	virtual bool parse_msg(size_t bytes_transferred, container::list<MsgType>& msg_can) = 0;
+st_socket收到适当数据之后（completion_condition返回0）会调用本接口，以便让unpacker尝试解析消息，
+成功解析出来的消息通过msg_can返回。
 	virtual size_t completion_condition(const error_code& ec, size_t bytes_transferred) = 0;
 用于在数据接收过程中，判断是否一个完整的消息已经收到（那就可以解析了），这个函数直接由asio使用。
 请小心设计你的协议和解包器，否则可能性能瓶颈就会出现在它们之上，推荐的协议格式是：长度＋数据。
@@ -33,8 +31,8 @@ st_socket收到任意数据之后，会调用本接口，以便让unpacker尝试
 
 
 默认的解包器，如果你需要的消息格式与默认解包器的消息格式不相同，那么显然的，你需要实现自己的解包器；
-默认解包器的消息格式是：长度（２字节）＋　消息内容，所以其支持的消息长度为１至(65535-2)。
-class unpacker : public i_unpacker;
+默认解包器的消息格式是：长度（２字节）＋　消息内容，所以其支持的消息长度为1至(65535-2)。
+class unpacker : public i_unpacker<std::string>;
 
 } //namespace
 

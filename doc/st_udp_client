@@ -6,11 +6,14 @@ typedef st_sclient<st_udp_socket> st_udp_sclient;
 一个只支持一个套接字的udp客户端（也可以说是服务端，udp不区分服务端还是客户端）
 
 支持多个套接字的udp客户端
-template<typename Socket = st_udp_socket>
-class st_udp_client_base : public st_client<Socket>
+template<typename Socket = st_udp_socket, typename Pool = st_object_pool<Socket>>
+class st_udp_client_base : public st_client<Socke, Poolt>
 {
 public:
 	st_udp_client_base(st_service_pump& service_pump_);
+
+	typename st_client<Socket, Pool>::object_type add_client(unsigned short port, const std::string& ip = std::string());
+创建一个对象，设置本地地址，并添加到对象池。
 
 protected:
 	virtual void uninit();
