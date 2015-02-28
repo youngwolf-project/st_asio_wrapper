@@ -227,7 +227,7 @@ public:
 			for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter)
 				if ((*iter)->lowest_layer().is_open())
 				{
-					boost::asio::ip::tcp::endpoint ep = (*iter)->lowest_layer().remote_endpoint();
+					BOOST_AUTO(ep, (*iter)->lowest_layer().remote_endpoint());
 					if ((0 == port || port == ep.port()) && (ip.empty() || ip == ep.address().to_string()))
 						objects.push_back((*iter));
 				}

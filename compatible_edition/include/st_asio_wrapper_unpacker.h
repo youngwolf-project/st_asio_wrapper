@@ -30,16 +30,17 @@
 namespace st_asio_wrapper
 {
 
+template<typename MsgType>
 class i_unpacker
 {
 public:
 	virtual void reset_unpacker_state() = 0;
-	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can) = 0;
+	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<MsgType>& msg_can) = 0;
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) = 0;
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
 };
 
-class unpacker : public i_unpacker
+class unpacker : public i_unpacker<std::string>
 {
 public:
 	unpacker() {reset_unpacker_state();}
@@ -131,7 +132,7 @@ private:
 	size_t cur_data_len; //include head
 };
 
-class fixed_length_unpacker : public i_unpacker
+class fixed_length_unpacker : public i_unpacker<std::string>
 {
 public:
 	fixed_length_unpacker() {reset_unpacker_state();}
@@ -193,7 +194,7 @@ private:
 	size_t _fixed_length;
 };
 
-class prefix_suffix_unpacker : public i_unpacker
+class prefix_suffix_unpacker : public i_unpacker<std::string>
 {
 public:
 	prefix_suffix_unpacker() {reset_unpacker_state();}

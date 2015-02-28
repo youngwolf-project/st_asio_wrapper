@@ -61,7 +61,7 @@ public:
 	virtual void test() = 0;
 };
 
-class echo_socket : public st_server_socket_base<boost::asio::ip::tcp::socket, i_echo_server>
+class echo_socket : public st_server_socket_base<std::string, boost::asio::ip::tcp::socket, i_echo_server>
 {
 public:
 	echo_socket(i_echo_server& server_) : st_server_socket_base(server_)
@@ -94,10 +94,10 @@ protected:
 	//msg handling: send the original msg back(echo server)
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
-	virtual bool on_msg(msg_type& msg) {post_msg(msg); return true;}
+	virtual bool on_msg(std::string& msg) {post_msg(msg); return true;}
 #endif
 	//we should handle the msg in on_msg_handle for time-consuming task like this:
-	virtual bool on_msg_handle(msg_type& msg, bool link_down) {return send_msg(msg);}
+	virtual bool on_msg_handle(std::string& msg, bool link_down) {return send_msg(msg);}
 	//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_tcp_socket will directly
 	//use the msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
 	//msg handling end
@@ -153,7 +153,7 @@ int main() {
 			echo_server_.list_all_object();
 		}
 		else
-			server_.broadcast_msg(str);
+			server_.broadcast_msg(str.data(), str.size() + 1);
 	}
 
 	return 0;

@@ -27,13 +27,14 @@
 namespace st_asio_wrapper
 {
 
+template<typename MsgType>
 class i_packer
 {
 public:
-	virtual std::string pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+	virtual MsgType pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
 };
 
-class packer : public i_packer
+class packer : public i_packer<std::string>
 {
 public:
 	static size_t get_max_msg_size() {return MAX_MSG_LEN - HEAD_LEN;}
@@ -84,7 +85,7 @@ public:
 	}
 };
 
-class fixed_legnth_packer : public i_packer
+class fixed_legnth_packer : public i_packer<std::string>
 {
 public:
 	virtual std::string pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
@@ -119,7 +120,7 @@ public:
 	}
 };
 
-class prefix_suffix_packer : public i_packer
+class prefix_suffix_packer : public i_packer<std::string>
 {
 public:
 	void prefix_suffix(const std::string& prefix, const std::string& suffix)

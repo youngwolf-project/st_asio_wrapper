@@ -357,6 +357,11 @@
  *
  * 3.9	2014.3.9
  * Add support for asio.ssl.
+ *
+ * 4.0	2015.3.1
+ * Add support for msg customization.
+ * The most representative usage of this new feature is send memory-mapped files with stream protocol.
+ * Demonstrated how to use custom msg buffer(default buffer is std::string) in demo asio_client.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_

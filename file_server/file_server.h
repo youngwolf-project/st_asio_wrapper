@@ -46,9 +46,9 @@ protected:
 	//msg handling
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//we can handle the msg very fast, so we don't use the recv buffer
-	virtual bool on_msg(msg_type& msg) {handle_msg(msg); return true;}
+	virtual bool on_msg(std::string& msg) {handle_msg(msg); return true;}
 #endif
-	virtual bool on_msg_handle(msg_type& msg, bool link_down) {handle_msg(msg); return true;}
+	virtual bool on_msg_handle(std::string& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
 
 	virtual bool on_timer(unsigned char id, const void* user_data)
