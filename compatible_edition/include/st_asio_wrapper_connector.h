@@ -59,7 +59,7 @@ public:
 	//member variables
 	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<MsgType, Socket>::reset();}
 
-	void set_server_addr(unsigned short port, const std::string& ip)
+	void set_server_addr(unsigned short port, const std::string& ip = SERVER_IP)
 	{
 		boost::system::error_code ec;
 		server_addr = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(ip, ec), port); assert(!ec);

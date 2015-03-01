@@ -15,14 +15,20 @@
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
 
-int main()
+int main(int argc, const char* argv[])
 {
+	puts("this is a file server.");
+	printf("usage: file_server [<port=%d> [ip=0.0.0.0]]\n", SERVER_PORT);
+	puts("type quit to end this server.");
+
 	std::string str;
 	st_service_pump service_pump;
 	file_server file_server_(service_pump);
 
-	puts("\nthis is a file server.");
-	puts("type quit to end this server.");
+	if (argc > 2)
+		file_server_.set_server_addr(atoi(argv[1]), argv[2]);
+	else if (argc > 1)
+		file_server_.set_server_addr(atoi(argv[1]));
 
 	service_pump.start_service();
 	while(service_pump.is_running())

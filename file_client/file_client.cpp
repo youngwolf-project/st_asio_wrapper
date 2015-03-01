@@ -22,23 +22,27 @@ __off64_t file_size;
 
 int main(int argc, const char* argv[])
 {
-	puts("usage: asio_client [link num=1]");
-	if (argc > 1)
-		link_num = std::min(256, std::max(atoi(argv[1]), 1));
-
-	puts("\nthis is a file client.");
+	puts("this is a file client.");
+	printf("usage: asio_client [<port=%d> [<ip=%s> [link num=1]]]\n", SERVER_PORT, SERVER_IP);
 	puts("type quit to end this client.");
 
 	std::string str;
 	st_service_pump service_pump;
 	file_client client(service_pump);
+
+	if (argc > 3)
+		link_num = std::min(256, std::max(atoi(argv[3]), 1));
+
 	for (auto i = 0; i < link_num; ++i)
 	{
-		auto client_ptr = client.create_object();
-//		client_ptr->set_server_addr(SERVER_PORT, "::1"); //ipv6
-//		client_ptr->set_server_addr(SERVER_PORT, "127.0.0.1"); //ipv4
-		client_ptr->set_index(i);
-		client.add_client(client_ptr);
+//		argv[2] = "::1" //ipv6
+//		argv[2] = "127.0.0.1" //ipv4
+		if (argc > 2)
+			client.add_client(atoi(argv[1]), argv[2])->set_index(i);
+		else if (argc > 1)
+			client.add_client(atoi(argv[1]))->set_index(i);
+		else
+			client.add_client()->set_index(i);
 	}
 
 	service_pump.start_service();
