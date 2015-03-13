@@ -229,7 +229,7 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const 
 	bool can_overflow = false) \
 { \
 	udp_msg<MsgType> msg = {peer_addr}; \
-	return ST_THIS packer_->pack_msg(msg.str, pstr, len, num, NATIVE) : ST_THIS direct_post_msg(msg, can_overflow) : false; \
+	return ST_THIS packer_->pack_msg(msg.str, pstr, len, num, NATIVE) ? ST_THIS direct_post_msg(msg, can_overflow) : false; \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, MsgType& str, bool can_overflow = false) \
