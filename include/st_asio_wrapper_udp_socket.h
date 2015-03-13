@@ -42,12 +42,12 @@ struct udp_msg
 	bool operator==(const udp_msg& other) const {return this == &other;}
 };
 
-template <typename MsgType = std::string, typename Socket = boost::asio::ip::udp::socket>
-class st_udp_socket_base : public st_socket<udp_msg<MsgType>, Socket, MsgType>
+template <typename MsgType = std::string, typename Socket = boost::asio::ip::udp::socket, typename Packer = DEFAULT_PACKER>
+class st_udp_socket_base : public st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>
 {
 public:
 	st_udp_socket_base(boost::asio::io_service& io_service_) :
-		st_socket<udp_msg<MsgType>, Socket, MsgType>(io_service_) {ST_THIS reset_state();}
+		st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>(io_service_) {ST_THIS reset_state();}
 
 	//reset all, be ensure that there's no any operations performed on this st_udp_socket when invoke it
 	//notice, when reuse this st_udp_socket, st_object_pool will invoke reset(), child must re-write this to initialize
@@ -87,7 +87,7 @@ public:
 
 	//UDP does not need a unpacker
 
-	using st_socket<udp_msg<MsgType>, Socket, MsgType>::send_msg;
+	using st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>::send_msg;
 	///////////////////////////////////////////////////
 	//msg sending interface
 	UDP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
@@ -145,8 +145,8 @@ protected:
 		return ST_THIS sending;
 	}
 
-	virtual bool is_send_allowed() const
-		{return ST_THIS lowest_layer().is_open() && st_socket<udp_msg<MsgType>, Socket, MsgType>::is_send_allowed();}
+	virtual bool is_send_allowed() const {return ST_THIS lowest_layer().is_open() &&
+		st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
 	virtual void on_recv_error(const boost::system::error_code& ec)
@@ -196,7 +196,7 @@ protected:
 		{
 			assert(bytes_transferred > 0);
 #ifdef WANT_MSG_SEND_NOTIFY
-			ST_THIS on_msg_send(last_send_msg);
+			ST_THIS on_msg_send(ST_THIS last_send_msg);
 #endif
 		}
 		else
@@ -212,7 +212,7 @@ protected:
 		{
 #ifdef WANT_ALL_MSG_SEND_NOTIFY
 			lock.unlock();
-			on_all_msg_send(last_send_msg);
+			ST_THIS on_all_msg_send(ST_THIS last_send_msg);
 #endif
 		}
 	}

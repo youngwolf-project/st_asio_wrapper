@@ -26,18 +26,19 @@
 namespace st_asio_wrapper
 {
 
-template <typename MsgType = std::string, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket> >
-class st_ssl_connector_base : public st_connector_base<MsgType, Socket>
+template <typename MsgType = std::string, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
+class st_ssl_connector_base : public st_connector_base<MsgType, Socket, Packer, Unpacker>
 {
 public:
 	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) :
-		st_connector_base<MsgType, Socket>(io_service_, ctx), authorized_(false) {}
+		st_connector_base<MsgType, Socket, Packer, Unpacker>(io_service_, ctx), authorized_(false) {}
 
 	//reset all, be ensure that there's no any operations performed on this st_ssl_connector_base when invoke it
 	//notice, when reuse this st_ssl_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
 	//all member variables, and then do not forget to invoke st_ssl_connector_base::reset() to initialize father's
 	//member variables
-	virtual void reset() {authorized_ = false; st_connector_base<MsgType, Socket>::reset();}
+	virtual void reset() {authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::reset();}
 
 	bool authorized() const {return authorized_;}
 
@@ -61,9 +62,10 @@ protected:
 		return false;
 	}
 
-	virtual void on_unpack_error() {authorized_ = false; st_connector_base<MsgType, Socket>::on_unpack_error();}
+	virtual void on_unpack_error()
+		{authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::on_unpack_error();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
-		{authorized_ = false; st_connector_base<MsgType, Socket>::on_recv_error(ec);}
+		{authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::on_recv_error(ec);}
 	virtual void on_handshake(bool result)
 	{
 		if (result)
@@ -74,7 +76,8 @@ protected:
 			ST_THIS force_close(false);
 		}
 	}
-	virtual bool is_send_allowed() const {return authorized() && st_connector_base<MsgType, Socket>::is_send_allowed();}
+	virtual bool is_send_allowed() const
+		{return authorized() && st_connector_base<MsgType, Socket, Packer, Unpacker>::is_send_allowed();}
 
 	void connect_handler(const boost::system::error_code& ec)
 	{
@@ -86,7 +89,7 @@ protected:
 			do_start();
 		}
 		else
-			st_connector_base<MsgType, Socket>::connect_handler(ec);
+			st_connector_base<MsgType, Socket, Packer, Unpacker>::connect_handler(ec);
 	}
 
 	void handshake_handler(const boost::system::error_code& ec)
@@ -138,12 +141,12 @@ protected:
 typedef st_tcp_client_base<st_ssl_connector, st_ssl_object_pool<st_ssl_connector> > st_ssl_tcp_client;
 
 template<typename MsgType = std::string, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
-	typename Server = i_server>
-class st_ssl_server_socket_base : public st_server_socket_base<MsgType, Socket, Server>
+	typename Server = i_server, typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
+class st_ssl_server_socket_base : public st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>
 {
 public:
 	st_ssl_server_socket_base(Server& server_, boost::asio::ssl::context& ctx) :
-		st_server_socket_base<MsgType, Socket, Server>(server_, ctx) {}
+		st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>(server_, ctx) {}
 };
 typedef st_ssl_server_socket_base<> st_ssl_server_socket;
 

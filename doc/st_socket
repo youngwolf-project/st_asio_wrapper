@@ -16,7 +16,7 @@ on_msg_handle里面发送消息时，可能出现的发送缓存溢出和死锁�
 #define temp_msg_buffer msg_buffer[3]
 
 套接字类，st_tcp_socket和st_udp_socket的公共基类（具体是tcp还是upd根据模板参数Socket而定），主要实现消息派发暂停等功能
-template<typename MsgType, typename Socket, typename MsgDataType = MsgType>
+template<typename MsgType, typename Socket, typename MsgDataType = MsgType, typename Packer>
 class st_socket: public st_timer
 {
 public:

@@ -5,8 +5,8 @@ namespace st_tcp
 {
 
 tcp套接字类，实现tcp数据的收发
-template <typename MsgType, typename Socket>
-class st_tcp_socket : public st_socket<MsgType, Socket>
+template <typename MsgType, typename Socket, typename Packer, typename Unpacker>
+class st_tcp_socket : public st_socket<MsgType, Socket, MsgType, Packer>
 {
 protected:
 	st_tcp_socket(boost::asio::io_service& io_service_);

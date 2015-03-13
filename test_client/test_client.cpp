@@ -1,4 +1,5 @@
 
+#include <boost/timer/timer.hpp>
 #include <boost/tokenizer.hpp>
 
 //configuration
@@ -37,12 +38,6 @@ using namespace st_asio_wrapper;
 #define atoll _atoi64
 #endif
 
-#if defined(_WIN64) || 64 == __WORDSIZE
-#define uint64_t_format "%lu"
-#else
-#define uint64_t_format "%llu"
-#endif
-
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
@@ -67,7 +62,7 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //msg sending interface
 ///////////////////////////////////////////////////
 
-SHARED_OBJECT(test_socket, st_connector)
+class test_socket : public st_connector
 {
 public:
 	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0)
@@ -247,7 +242,7 @@ int main(int argc, const char* argv[])
 				client.restart();
 
 				total_msg_bytes *= msg_len;
-				auto begin_time = boost::get_system_time().time_of_day().total_seconds();
+				boost::timer::cpu_timer begin_time;
 				auto buff = new char[msg_len];
 				memset(buff, msg_fill, msg_len);
 				uint64_t send_bytes = 0;
@@ -277,11 +272,9 @@ int main(int argc, const char* argv[])
 				while(client.get_total_recv_bytes() != total_msg_bytes)
 					boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
-				auto used_time = boost::get_system_time().time_of_day().total_seconds() - begin_time;
-				printf("\r100%%\ntime spent statistics: %d hours, %d minutes, %d seconds.\n",
-					used_time / 60 / 60, (used_time / 60) % 60, used_time % 60);
-				if (used_time > 0)
-					printf("speed: " uint64_t_format "(*2)kB/s.\n", total_msg_bytes / 1024 / used_time);
+				auto used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
+				printf("\r100%%\ntime spent statistics: %.1f seconds.\n", used_time);
+				printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
 			} // if (total_data_num > 0)
 		}
 	}

@@ -34,12 +34,13 @@
 namespace st_asio_wrapper
 {
 
-template <typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket>
-class st_connector_base : public st_tcp_socket_base<MsgType, Socket>
+template <typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket,
+	typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
+class st_connector_base : public st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>
 {
 public:
 	st_connector_base(boost::asio::io_service& io_service_) :
-		st_tcp_socket_base<MsgType, Socket>(io_service_), connected(false), reconnecting(true)
+		st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>(io_service_), connected(false), reconnecting(true)
 #ifdef RE_CONNECT_CONTROL
 		, re_connect_times(-1)
 #endif
@@ -47,7 +48,7 @@ public:
 
 	template<typename Arg>
 	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) :
-		st_tcp_socket_base<MsgType, Socket>(io_service_, arg), connected(false), reconnecting(true)
+		st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>(io_service_, arg), connected(false), reconnecting(true)
 #ifdef RE_CONNECT_CONTROL
 		, re_connect_times(-1)
 #endif
@@ -57,7 +58,8 @@ public:
 	//notice, when reusing this st_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
 	//all member variables, and then do not forget to invoke st_connector_base::reset() to initialize father's
 	//member variables
-	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<MsgType, Socket>::reset();}
+	virtual void reset()
+		{connected = false; reconnecting = true; st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>::reset();}
 
 	void set_server_addr(unsigned short port, const std::string& ip = SERVER_IP)
 	{
@@ -77,7 +79,7 @@ public:
 	//if the connection is broken unexpectedly, st_connector will try to reconnect to the server automatically.
 	void disconnect(bool reconnect = false) {force_close(reconnect);}
 	void force_close(bool reconnect = false)
-		{reconnecting = reconnect; connected = false; st_tcp_socket_base<MsgType, Socket>::force_close();}
+		{reconnecting = reconnect; connected = false; st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>::force_close();}
 	void graceful_close(bool reconnect = false)
 	{
 		if (!is_connected())
@@ -86,7 +88,7 @@ public:
 		{
 			reconnecting = reconnect;
 			connected = false;
-			st_tcp_socket_base<MsgType, Socket>::graceful_close();
+			st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>::graceful_close();
 		}
 	}
 
@@ -108,7 +110,8 @@ protected:
 	}
 
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
-	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket_base<MsgType, Socket>::is_send_allowed();}
+	virtual bool is_send_allowed() const
+		{return is_connected() && st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>::is_send_allowed();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
@@ -138,7 +141,7 @@ protected:
 		case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
 			break;
 		default:
-			return st_tcp_socket_base<MsgType, Socket>::on_timer(id, user_data);
+			return st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>::on_timer(id, user_data);
 			break;
 		}
 

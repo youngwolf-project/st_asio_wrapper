@@ -48,12 +48,6 @@
 #define ST_THIS this->
 #endif
 
-#define SHARED_OBJECT(CLASS_NAME, FATHER_NAME) \
-class CLASS_NAME : public FATHER_NAME, public boost::enable_shared_from_this<CLASS_NAME>
-
-#define SHARED_OBJECT_T(CLASS_NAME, FATHER_NAME, MSGTYPE, SOCKET, SERVER) \
-class CLASS_NAME : public FATHER_NAME<MSGTYPE, SOCKET>, public boost::enable_shared_from_this<CLASS_NAME<MSGTYPE, SOCKET, SERVER> >
-
 namespace st_asio_wrapper
 {
 	//free functions, used to do something to any container optionally with any mutex
@@ -158,8 +152,8 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 	boost::mutex::scoped_lock lock(send_msg_buffer_mutex); \
 	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
 	{ \
-		MsgType msg = ST_THIS packer_->pack_msg(pstr, len, num, NATIVE); \
-		return ST_THIS do_direct_send_msg(msg); \
+		MsgType msg; \
+		return ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE) ? ST_THIS do_direct_send_msg(msg) : false; \
 	} \
 	return false; \
 } \
@@ -170,8 +164,8 @@ bool FUNNAME(MsgType& str, bool can_overflow = false) \
 #define TCP_POST_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	MsgType msg = ST_THIS packer_->pack_msg(pstr, len, num, NATIVE); \
-	return ST_THIS direct_post_msg(msg, can_overflow); \
+	MsgType msg; \
+	return ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE) ? ST_THIS direct_post_msg(msg, can_overflow) : false; \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
 bool FUNNAME(MsgType& str, bool can_overflow = false) \
@@ -208,8 +202,8 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, \
 	boost::mutex::scoped_lock lock(send_msg_buffer_mutex); \
 	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
 	{ \
-		udp_msg<MsgType> msg = {peer_addr, ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)}; \
-		return ST_THIS do_direct_send_msg(msg); \
+	udp_msg<MsgType> msg = {peer_addr}; \
+	return ST_THIS packer_->pack_msg(msg.str, pstr, len, num, NATIVE) ? ST_THIS do_direct_send_msg(msg) : false; \
 	} \
 	return false; \
 } \
@@ -234,8 +228,8 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, MsgType& str, bool
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
 	bool can_overflow = false) \
 { \
-	udp_msg<MsgType> msg = {peer_addr, ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)}; \
-	return ST_THIS direct_post_msg(msg, can_overflow); \
+	udp_msg<MsgType> msg = {peer_addr}; \
+	return ST_THIS packer_->pack_msg(msg.str, pstr, len, num, NATIVE) : ST_THIS direct_post_msg(msg, can_overflow) : false; \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool) \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, MsgType& str, bool can_overflow = false) \

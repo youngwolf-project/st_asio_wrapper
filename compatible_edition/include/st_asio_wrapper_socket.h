@@ -35,7 +35,7 @@ enum BufferType {POST_BUFFER, SEND_BUFFER, RECV_BUFFER};
 #define recv_msg_buffer_mutex ST_THIS msg_buffer_mutex[2]
 #define temp_msg_buffer ST_THIS msg_buffer[3]
 
-template<typename MsgType, typename Socket, typename MsgDataType = MsgType>
+template<typename MsgType, typename Socket, typename MsgDataType, typename Packer>
 class st_socket: public st_timer
 {
 public:
@@ -44,11 +44,11 @@ public:
 
 protected:
 	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), next_layer_(io_service_),
-		packer_(boost::make_shared<DEFAULT_PACKER>()) {reset_state();}
+		packer_(boost::make_shared<Packer>()) {reset_state();}
 
 	template<typename Arg>
 	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), next_layer_(io_service_, arg),
-		packer_(boost::make_shared<DEFAULT_PACKER>()) {reset_state();}
+		packer_(boost::make_shared<Packer>()) {reset_state();}
 
 	void reset_state()
 	{

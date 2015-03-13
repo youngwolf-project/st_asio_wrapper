@@ -29,16 +29,17 @@ namespace st_asio_wrapper
 namespace st_tcp
 {
 
-template <typename MsgType, typename Socket>
-class st_tcp_socket_base : public st_socket<MsgType, Socket>
+template <typename MsgType, typename Socket, typename Packer, typename Unpacker>
+class st_tcp_socket_base : public st_socket<MsgType, Socket, MsgType, Packer>
 {
 protected:
-	st_tcp_socket_base(boost::asio::io_service& io_service_) :
-		st_socket<MsgType, Socket>(io_service_), unpacker_(boost::make_shared<DEFAULT_UNPACKER>()) {reset_state();}
+	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<MsgType, Socket, MsgType, Packer>(io_service_),
+		unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
 
 	template<typename Arg>
 	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) :
-		st_socket<MsgType, Socket>(io_service_, arg), unpacker_(boost::make_shared<DEFAULT_UNPACKER>()) {reset_state();}
+		st_socket<MsgType, Socket, MsgType, Packer>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>())
+		{reset_state();}
 
 public:
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
@@ -46,7 +47,7 @@ public:
 	void reset_state()
 	{
 		reset_unpacker_state();
-		st_socket<MsgType, Socket>::reset_state();
+		st_socket<MsgType, Socket, MsgType, Packer>::reset_state();
 		closing = false;
 	}
 
@@ -75,7 +76,7 @@ public:
 	boost::shared_ptr<i_unpacker<MsgType> > inner_unpacker() {return unpacker_;}
 	void inner_unpacker(const boost::shared_ptr<i_unpacker<MsgType> >& _unpacker_) {unpacker_ = _unpacker_;}
 
-	using st_socket<MsgType, Socket>::send_msg;
+	using st_socket<MsgType, Socket, MsgType, Packer>::send_msg;
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
@@ -119,7 +120,7 @@ protected:
 	}
 
 	virtual bool is_send_allowed() const
-		{return !is_closing() && st_socket<MsgType, Socket>::is_send_allowed();}
+		{return !is_closing() && st_socket<MsgType, Socket, MsgType, Packer>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
 	//msg can not be unpacked
@@ -191,7 +192,7 @@ protected:
 		{
 			assert(bytes_transferred > 0);
 #ifdef WANT_MSG_SEND_NOTIFY
-			on_msg_send(last_send_msg);
+			ST_THIS on_msg_send(ST_THIS last_send_msg);
 #endif
 		}
 		else
@@ -205,7 +206,7 @@ protected:
 		{
 #ifdef WANT_ALL_MSG_SEND_NOTIFY
 			lock.unlock();
-			on_all_msg_send(last_send_msg);
+			ST_THIS on_all_msg_send(ST_THIS last_send_msg);
 #endif
 		}
 	}

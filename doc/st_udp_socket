@@ -19,8 +19,8 @@ struct udp_msg
 };
 
 udp套接字类，实现udp数据的收发
-template <typename MsgType = std::string, typename Socket = boost::asio::ip::udp::socket>
-class st_udp_socket_base : public st_socket<udp_msg<MsgType>, Socket, MsgType>
+template <typename MsgType = std::string, typename Socket = boost::asio::ip::udp::socket, typename Packer = DEFAULT_PACKER>
+class st_udp_socket_base : public st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>
 {
 public:
 	st_udp_socket_base(boost::asio::io_service& io_service_);

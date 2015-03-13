@@ -43,15 +43,9 @@ public:
 class my_msg_buffer
 {
 public:
-	//the following two functions are needed by st_asio_wrapper
-	my_msg_buffer() {detach();}
-	my_msg_buffer(const char* _buff, size_t _len) {detach(); assign(_buff, _len);}
+	my_msg_buffer() {do_detach();}
+	~my_msg_buffer() {detach();}
 
-	my_msg_buffer(const my_msg_buffer& other) {detach(); assign(other);}
-	~my_msg_buffer() {free();}
-
-	void operator=(my_msg_buffer& other) {attach(other.buff, other.len); other.detach();}
-	void assign(const my_msg_buffer& other) {if (!other.empty()) assign(other.buff, other.len); else free();}
 	void assign(const char* _buff, size_t _len)
 	{
 		assert(_len > 0 && NULL != _buff);
@@ -60,13 +54,12 @@ public:
 
 		attach(_buff_, _len);
 	}
-	void attach(const char* _buff, size_t _len)
-	{
-		free();
-		do_attach(_buff, _len);
-	}
+
+	void attach(const char* _buff, size_t _len) {detach(); do_attach(_buff, _len);}
+	void detach() {delete buff; do_detach();}
 
 	//the following four functions are needed by st_asio_wrapper
+	//for other functions, depends on the implementation of your packer and unpacker
 	bool empty() const {return 0 == len || NULL == buff;}
 	const char* data() const {return buff;}
 	size_t size() const {return len;}
@@ -74,8 +67,7 @@ public:
 
 protected:
 	void do_attach(const char* _buff, size_t _len) {buff = _buff; len = _len;}
-	void detach() {buff = NULL; len = 0;}
-	void free() {delete buff; detach();}
+	void do_detach() {buff = NULL; len = 0;}
 
 protected:
 	const char* buff;
@@ -86,9 +78,9 @@ class my_packer : public i_packer<my_msg_buffer>
 {
 public:
 	static size_t get_max_msg_size() {return MAX_MSG_LEN - HEAD_LEN;}
-	virtual my_msg_buffer pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
+	virtual bool pack_msg(my_msg_buffer& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
-		my_msg_buffer str;
+		msg.detach();
 		if (NULL != pstr && NULL != len)
 		{
 			size_t total_len = native ? 0 : HEAD_LEN;
@@ -100,7 +92,7 @@ public:
 					if (last_total_len > total_len || total_len > MAX_MSG_LEN) //overflow
 					{
 						unified_out::error_out("pack msg error: length exceeds the MAX_MSG_LEN!");
-						return str;
+						return false;
 					}
 					last_total_len = total_len;
 				}
@@ -115,7 +107,7 @@ public:
 						if (total_len != head_len)
 						{
 							unified_out::error_out("pack msg error: length exceeds the header's range!");
-							return str;
+							return false;
 						}
 
 						head_len = HEAD_H2N(head_len);
@@ -133,11 +125,11 @@ public:
 							pos += len[i];
 						}
 
-					str.attach(buff, total_len);
+					msg.attach(buff, total_len);
 				}
 		} //if (NULL != pstr && NULL != len)
 
-		return str;
+		return true;
 	}
 };
 
@@ -145,92 +137,76 @@ class my_unpacker : public i_unpacker<my_msg_buffer>
 {
 public:
 	my_unpacker() {reset_unpacker_state();}
-	size_t used_buffer_size() const {return cur_data_len;} //how many data have been received
-	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means don't know
+	size_t current_msg_length() const {return raw_buff.size();} //current msg's total length(not include the head), 0 means don't know
 
 public:
-	virtual void reset_unpacker_state() {cur_msg_len = -1; cur_data_len = 0;}
+	virtual void reset_unpacker_state() {raw_buff.detach(); step = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<my_msg_buffer>& msg_can)
 	{
-		//length + msg
-		cur_data_len += bytes_transferred;
+		if (0 == step)
+		{
+			assert(!raw_buff.empty());
+			step = 1;
+		}
+		else if (1 == step)
+		{
+			step = 0;
 
-		char* pnext = raw_buff.begin();
-		bool unpack_ok = true;
-		while (unpack_ok) //considering stick package problem, we need a loop
-			if ((size_t) -1 != cur_msg_len)
-			{
-				//cur_msg_len now can be assigned in the completion_condition function, or in the following 'else if',
-				//so, we must verify cur_msg_len at the very beginning of using it, not at the assignment as we do
-				//before, please pay special attention
-				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN)
-					unpack_ok = false;
-				else if (cur_data_len >= cur_msg_len) //one msg received
-				{
-					msg_can.resize(msg_can.size() + 1);
-					msg_can.back().assign(pnext + HEAD_LEN, cur_msg_len - HEAD_LEN);
-					cur_data_len -= cur_msg_len;
-					std::advance(pnext, cur_msg_len);
-					cur_msg_len = -1;
-				}
-				else
-					break;
-			}
-			else if (cur_data_len >= HEAD_LEN) //the msg's head been received, stick package found
-				cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) pnext);
-			else
-				break;
+			assert(!raw_buff.empty());
+			if (bytes_transferred != raw_buff.size())
+				return false;
 
-			if (pnext == raw_buff.begin()) //we should have at lest got one msg.
-				unpack_ok = false;
-			else if (unpack_ok && cur_data_len > 0)
-				memcpy(raw_buff.begin(), pnext, cur_data_len); //left behind unparsed msg
+			msg_can.resize(msg_can.size() + 1);
+			msg_can.back().swap(raw_buff);
+		}
+		else
+			return false;
 
-			//when unpack failed, some successfully parsed msgs may still returned via msg_can(stick package), please note.
-			if (!unpack_ok)
-				reset_unpacker_state();
-
-			return unpack_ok;
+		return true;
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
-	//read as many as possible to reduce asynchronous call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
-	//stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (ec)
 			return 0;
 
-		size_t data_len = cur_data_len + bytes_transferred;
-		assert(data_len <= MAX_MSG_LEN);
-
-		if ((size_t) -1 == cur_msg_len)
+		if (0 == step) //the msg's head been received
 		{
-			if (data_len >= HEAD_LEN) //the msg's head been received
-			{
-				cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) raw_buff.begin());
-				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN) //invalid msg, stop reading
-					return 0;
-			}
+			assert(raw_buff.empty());
+
+			if (bytes_transferred < HEAD_LEN)
+				return HEAD_LEN - bytes_transferred;
+
+			assert(HEAD_LEN == bytes_transferred);
+			BOOST_AUTO(cur_msg_len, HEAD_N2H(*(HEAD_TYPE*) head_buff) - HEAD_LEN);
+			if (cur_msg_len > MAX_MSG_LEN - HEAD_LEN) //invalid msg, stop reading
+				step = -1;
 			else
-				return MAX_MSG_LEN - data_len; //read as many as possible
+				raw_buff.attach(new char[cur_msg_len], cur_msg_len);
+
+			return 0;
 		}
-
-		return data_len >= cur_msg_len ? 0 : MAX_MSG_LEN - data_len;
-		//read as many as possible except that we have already got a entire msg
+		else if (1 == step)
+		{
+			assert(!raw_buff.empty());
+			return raw_buff.size() - bytes_transferred;
+		}
+		else
+		{
+			assert(false);
+			return 0;
+		}
 	}
 
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
-	{
-		assert(cur_data_len < MAX_MSG_LEN);
-		return boost::asio::buffer(boost::asio::buffer(raw_buff) + cur_data_len);
-	}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return raw_buff.empty() ? boost::asio::buffer(head_buff) :
+		boost::asio::buffer(const_cast<char*>(raw_buff.data()), raw_buff.size());}
 
 private:
-	boost::array<char, MAX_MSG_LEN> raw_buff;
-	size_t cur_msg_len; //-1 means head has not received, so, doesn't know the whole msg length.
-	size_t cur_data_len; //include head
+	char head_buff[HEAD_LEN]; //for head only
+	my_msg_buffer raw_buff;
+	int step; //-1-error format, 0-want the head, 1-want the body
 };
 
 #include "../include/st_asio_wrapper_tcp_client.h"
@@ -281,6 +257,9 @@ int main() {
 //restore configuration
 #undef SERVER_PORT
 #undef FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+#undef CUSTOM_LOG
+#undef DEFAULT_PACKER
+#undef DEFAULT_UNPACKER
 
 //#undef HUGE_MSG
 //#undef MAX_MSG_LEN

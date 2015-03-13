@@ -46,12 +46,6 @@
 #define ST_THIS this->
 #endif
 
-#define SHARED_OBJECT(CLASS_NAME, FATHER_NAME) \
-class CLASS_NAME : public FATHER_NAME, public boost::enable_shared_from_this<CLASS_NAME>
-
-#define SHARED_OBJECT_T(CLASS_NAME, FATHER_NAME, MSGTYPE, SOCKET, SERVER) \
-class CLASS_NAME : public FATHER_NAME<MSGTYPE, SOCKET>, public boost::enable_shared_from_this<CLASS_NAME<MSGTYPE, SOCKET, SERVER>>
-
 namespace st_asio_wrapper
 {
 	//free functions, used to do something to any container optionally with any mutex

@@ -44,15 +44,14 @@ class unpacker : public i_unpacker<std::string>
 {
 public:
 	unpacker() {reset_unpacker_state();}
-	size_t used_buffer_size() const {return cur_data_len;} //how many data have been received
 	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means don't know
 
 public:
-	virtual void reset_unpacker_state() {cur_msg_len = -1; cur_data_len = 0;}
+	virtual void reset_unpacker_state() {cur_msg_len = -1; remain_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
 	{
 		//length + msg
-		cur_data_len += bytes_transferred;
+		remain_len += bytes_transferred;
 
 		auto pnext = std::begin(raw_buff);
 		auto unpack_ok = true;
@@ -64,26 +63,26 @@ public:
 				//before, please pay special attention
 				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN)
 					unpack_ok = false;
-				else if (cur_data_len >= cur_msg_len) //one msg received
+				else if (remain_len >= cur_msg_len) //one msg received
 				{
 					msg_can.resize(msg_can.size() + 1);
 					msg_can.back().assign(std::next(pnext, HEAD_LEN), cur_msg_len - HEAD_LEN);
-					cur_data_len -= cur_msg_len;
+					remain_len -= cur_msg_len;
 					std::advance(pnext, cur_msg_len);
 					cur_msg_len = -1;
 				}
 				else
 					break;
 			}
-			else if (cur_data_len >= HEAD_LEN) //the msg's head been received, stick package found
+			else if (remain_len >= HEAD_LEN) //the msg's head been received, stick package found
 				cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) pnext);
 			else
 				break;
 
 		if (pnext == std::begin(raw_buff)) //we should have at lest got one msg.
 			unpack_ok = false;
-		else if (unpack_ok && cur_data_len > 0)
-			memcpy(std::begin(raw_buff), pnext, cur_data_len); //left behind unparsed msg
+		else if (unpack_ok && remain_len > 0)
+			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
 
 		//when unpack failed, some successfully parsed msgs may still returned via msg_can(stick package), please note.
 		if (!unpack_ok)
@@ -101,7 +100,7 @@ public:
 		if (ec)
 			return 0;
 
-		auto data_len = cur_data_len + bytes_transferred;
+		auto data_len = remain_len + bytes_transferred;
 		assert(data_len <= MAX_MSG_LEN);
 
 		if ((size_t) -1 == cur_msg_len)
@@ -122,14 +121,14 @@ public:
 
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		assert(cur_data_len < MAX_MSG_LEN);
-		return boost::asio::buffer(boost::asio::buffer(raw_buff) + cur_data_len);
+		assert(remain_len < MAX_MSG_LEN);
+		return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
 	}
 
 private:
 	boost::array<char, MAX_MSG_LEN> raw_buff;
 	size_t cur_msg_len; //-1 means head has not received, so, doesn't know the whole msg length.
-	size_t cur_data_len; //include head
+	size_t remain_len; //half-baked msg
 };
 
 class fixed_length_unpacker : public i_unpacker<std::string>

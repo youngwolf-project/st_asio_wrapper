@@ -27,21 +27,24 @@ public:
 	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
 };
 
-template<typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket, typename Server = i_server>
-SHARED_OBJECT_T(st_server_socket_base, st_tcp_socket_base, MsgType, Socket, Server)
+template<typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket,
+	typename Server = i_server, typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
+class st_server_socket_base : public st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>,
+	public boost::enable_shared_from_this<st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker> >
 {
 public:
-	st_server_socket_base(Server& server_) : st_tcp_socket_base<MsgType, Socket>(server_.get_service_pump()), server(server_) {}
+	st_server_socket_base(Server& server_) :
+		st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>(server_.get_service_pump()), server(server_) {}
 
 	template<typename Arg>
 	st_server_socket_base(Server& server_, Arg& arg) :
-		st_tcp_socket_base<MsgType, Socket>(server_.get_service_pump(), arg), server(server_) {}
+		st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>(server_.get_service_pump(), arg), server(server_) {}
 
 	//reset all, be ensure that there's no any operations performed on this st_server_socket_base when invoke it
 	//notice, when reuse this st_server_socket_base, st_object_pool will invoke reset(), child must re-write this
 	//to initialize all member variables, and then do not forget to invoke st_server_socket_base::reset() to initialize father's
 	//member variables
-	virtual void reset() {st_tcp_socket_base<MsgType, Socket>::reset();}
+	virtual void reset() {st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>::reset();}
 
 protected:
 	virtual bool do_start()
@@ -56,7 +59,7 @@ protected:
 	}
 
 	virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); ST_THIS force_close();}
-	//do not forget to force_close this st_tcp_socket_base<MsgType, Socket>(in del_client(), there's a force_close() invocation)
+	//do not forget to force_close this st_tcp_socket_base(in del_client(), there's a force_close() invocation)
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 #ifdef AUTO_CLEAR_CLOSED_SOCKET

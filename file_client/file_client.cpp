@@ -1,4 +1,5 @@
 
+#include <boost/timer/timer.hpp>
 #include <boost/tokenizer.hpp>
 
 //configuration
@@ -66,7 +67,7 @@ int main(int argc, const char* argv[])
 			do_something_to_all(tok, [&](decltype(*std::begin(tok))& item) {
 				completed_client_num.store(0);
 				file_size = 0;
-				auto begin_time = boost::get_system_time().time_of_day().total_seconds();
+				boost::timer::cpu_timer begin_time;
 				if (client.at(0)->get_file(item))
 				{
 					for (auto i = 1; i < link_num; ++i)
@@ -82,8 +83,7 @@ int main(int argc, const char* argv[])
 							auto total_rest_size = client.get_total_rest_size();
 							if (total_rest_size > 0)
 							{
-								auto new_percent =
-									(unsigned) ((file_size - total_rest_size) * 100 / file_size);
+								auto new_percent = (unsigned) ((file_size - total_rest_size) * 100 / file_size);
 								if (percent != new_percent)
 								{
 									percent = new_percent;
@@ -93,12 +93,9 @@ int main(int argc, const char* argv[])
 							}
 						}
 					}
-					auto used_time = boost::get_system_time().time_of_day().total_seconds() - begin_time;
-					if (used_time > 0)
-						printf("\r100%%\ntransfer %s end, speed: " __off64_t_format "kB/s.\n",
-							item.data(), file_size / 1024 / used_time);
-					else
-						printf("\r100%%\ntransfer %s end.\n", item.data());
+
+					auto used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
+					printf("\r100%%\ntransfer %s end, speed: %.0f kB/s.\n", item.data(), file_size / used_time / 1024);
 				}
 			});
 		}
