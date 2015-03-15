@@ -27,6 +27,29 @@
 namespace st_asio_wrapper
 {
 
+//return (size_t) -1 means length exceeded the MAX_MSG_LEN
+size_t msg_size_check(size_t pre_len, const char* const pstr[], const size_t len[], size_t num)
+{
+	if (NULL == pstr || NULL == len)
+		return -1;
+
+	size_t total_len = pre_len;
+	size_t last_total_len = total_len;
+	for (size_t i = 0; i < num; ++i)
+		if (NULL != pstr[i])
+		{
+			total_len += len[i];
+			if (last_total_len > total_len || total_len > MAX_MSG_LEN) //overflow
+			{
+				unified_out::error_out("pack msg error: length exceeded the MAX_MSG_LEN!");
+				return -1;
+			}
+			last_total_len = total_len;
+		}
+
+	return total_len;
+}
+
 template<typename MsgType>
 class i_packer
 {
@@ -41,45 +64,32 @@ public:
 	virtual bool pack_msg(std::string& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg.clear();
-		if (NULL != pstr && NULL != len)
+		size_t pre_len = native ? 0 : HEAD_LEN;
+		size_t total_len = msg_size_check(pre_len, pstr, len, num);
+		if ((size_t) -1 == total_len)
+			return false;
+		else if (total_len > pre_len)
 		{
-			size_t total_len = native ? 0 : HEAD_LEN;
-			size_t last_total_len = total_len;
+			if (!native)
+			{
+				HEAD_TYPE head_len = (HEAD_TYPE) total_len;
+				if (total_len != head_len)
+				{
+					unified_out::error_out("pack msg error: length exceeded the header's range!");
+					return false;
+				}
+
+				head_len = HEAD_H2N(head_len);
+				msg.reserve(total_len);
+				msg.append((const char*) &head_len, HEAD_LEN);
+			}
+			else
+				msg.reserve(total_len);
+
 			for (size_t i = 0; i < num; ++i)
 				if (NULL != pstr[i])
-				{
-					total_len += len[i];
-					if (last_total_len > total_len || total_len > MAX_MSG_LEN) //overflow
-					{
-						unified_out::error_out("pack msg error: length exceeds the MAX_MSG_LEN!");
-						return false;
-					}
-					last_total_len = total_len;
-				}
-
-			if (total_len > (native ? 0 : HEAD_LEN))
-			{
-				if (!native)
-				{
-					HEAD_TYPE head_len = (HEAD_TYPE) total_len;
-					if (total_len != head_len)
-					{
-						unified_out::error_out("pack msg error: length exceeds the header's range!");
-						return false;
-					}
-
-					head_len = HEAD_H2N(head_len);
-					msg.reserve(total_len);
-					msg.append((const char*) &head_len, HEAD_LEN);
-				}
-				else
-					msg.reserve(total_len);
-
-				for (size_t i = 0; i < num; ++i)
-					if (NULL != pstr[i])
-						msg.append(pstr[i], len[i]);
-			}
-		} //if (NULL != pstr && NULL != len)
+					msg.append(pstr[i], len[i]);
+		} //if (total_len > pre_len)
 
 		return true;
 	}
@@ -132,32 +142,21 @@ public:
 	virtual bool pack_msg(std::string& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg.clear();
-		if (NULL != pstr && NULL != len)
+		size_t pre_len = native ? 0 : _prefix.size() + _suffix.size();
+		size_t total_len = msg_size_check(pre_len, pstr, len, num);
+		if ((size_t) -1 == total_len)
+			return false;
+		else if (total_len > pre_len)
 		{
-			size_t total_len = _prefix.size() + _suffix.size();
-			size_t last_total_len = total_len;
+			msg.reserve(total_len);
+			if (!native)
+				msg.append(_prefix);
 			for (size_t i = 0; i < num; ++i)
 				if (NULL != pstr[i])
-				{
-					total_len += len[i];
-					if (last_total_len > total_len || total_len > MAX_MSG_LEN) //overflow
-					{
-						unified_out::error_out("pack msg error: length exceeds the MAX_MSG_LEN!");
-						return false;
-					}
-					last_total_len = total_len;
-				}
-
-			if (total_len > 0)
-			{
-				msg.reserve(total_len);
-				msg.append(_prefix);
-				for (size_t i = 0; i < num; ++i)
-					if (NULL != pstr[i])
-						msg.append(pstr[i], len[i]);
+					msg.append(pstr[i], len[i]);
+			if (!native)
 				msg.append(_suffix);
-			}
-		} //if (NULL != pstr && NULL != len)
+		} //if (total_len > pre_len)
 
 		return true;
 	}

@@ -46,9 +46,7 @@ public:
 	unpacker() {reset_unpacker_state();}
 	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means don't know
 
-public:
-	virtual void reset_unpacker_state() {cur_msg_len = -1; remain_len = 0;}
-	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
+	bool parse_msg(size_t bytes_transferred, boost::container::list<std::pair<const char*, size_t>>& msg_can)
 	{
 		//length + msg
 		remain_len += bytes_transferred;
@@ -65,8 +63,7 @@ public:
 					unpack_ok = false;
 				else if (remain_len >= cur_msg_len) //one msg received
 				{
-					msg_can.resize(msg_can.size() + 1);
-					msg_can.back().assign(std::next(pnext, HEAD_LEN), cur_msg_len - HEAD_LEN);
+					msg_can.push_back(std::make_pair(std::next(pnext, HEAD_LEN), cur_msg_len - HEAD_LEN));
 					remain_len -= cur_msg_len;
 					std::advance(pnext, cur_msg_len);
 					cur_msg_len = -1;
@@ -81,13 +78,27 @@ public:
 
 		if (pnext == std::begin(raw_buff)) //we should have at lest got one msg.
 			unpack_ok = false;
-		else if (unpack_ok && remain_len > 0)
+
+		return unpack_ok;
+	}
+
+public:
+	virtual void reset_unpacker_state() {cur_msg_len = -1; remain_len = 0;}
+	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
+	{
+		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
+		auto unpack_ok = parse_msg(bytes_transferred, msg_pos_can);
+		do_something_to_all(msg_pos_can, [&](decltype(*std::begin(msg_pos_can))& item) {
+			msg_can.resize(msg_can.size() + 1);
+			msg_can.back().assign(item.first, item.second);
+		});
+		if (unpack_ok && remain_len > 0)
+		{
+			auto pnext = std::next(msg_pos_can.back().first, msg_pos_can.back().second);
 			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
+		}
 
 		//when unpack failed, some successfully parsed msgs may still returned via msg_can(stick package), please note.
-		if (!unpack_ok)
-			reset_unpacker_state();
-
 		return unpack_ok;
 	}
 
@@ -125,7 +136,7 @@ public:
 		return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
 	}
 
-private:
+protected:
 	boost::array<char, MAX_MSG_LEN> raw_buff;
 	size_t cur_msg_len; //-1 means head has not received, so, doesn't know the whole msg length.
 	size_t remain_len; //half-baked msg

@@ -81,58 +81,47 @@ public:
 	virtual bool pack_msg(my_msg_buffer& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg.detach();
-		if (NULL != pstr && NULL != len)
+
+		size_t pre_len = native ? 0 : HEAD_LEN;
+		size_t total_len = msg_size_check(pre_len, pstr, len, num);
+		if ((size_t) -1 == total_len)
+			return false;
+		else if (total_len > pre_len)
 		{
-			size_t total_len = native ? 0 : HEAD_LEN;
-			size_t last_total_len = total_len;
+			char* buff = NULL;
+			size_t pos = 0;
+			if (!native)
+			{
+				HEAD_TYPE head_len = (HEAD_TYPE) total_len;
+				if (total_len != head_len)
+				{
+					unified_out::error_out("pack msg error: length exceeds the header's range!");
+					return false;
+				}
+
+				head_len = HEAD_H2N(head_len);
+				buff = new char[total_len];
+				memcpy(buff, (const char*) &head_len, HEAD_LEN);
+				pos = HEAD_LEN;
+			}
+			else
+				buff = new char[total_len];
+
 			for (size_t i = 0; i < num; ++i)
 				if (NULL != pstr[i])
 				{
-					total_len += len[i];
-					if (last_total_len > total_len || total_len > MAX_MSG_LEN) //overflow
-					{
-						unified_out::error_out("pack msg error: length exceeds the MAX_MSG_LEN!");
-						return false;
-					}
-					last_total_len = total_len;
+					memcpy(buff + pos, pstr[i], len[i]);
+					pos += len[i];
 				}
 
-				if (total_len > (native ? 0 : HEAD_LEN))
-				{
-					char* buff = NULL;
-					size_t pos = 0;
-					if (!native)
-					{
-						HEAD_TYPE head_len = (HEAD_TYPE) total_len;
-						if (total_len != head_len)
-						{
-							unified_out::error_out("pack msg error: length exceeds the header's range!");
-							return false;
-						}
-
-						head_len = HEAD_H2N(head_len);
-						buff = new char[total_len];
-						memcpy(buff, (const char*) &head_len, HEAD_LEN);
-						pos = HEAD_LEN;
-					}
-					else
-						buff = new char[total_len];
-
-					for (size_t i = 0; i < num; ++i)
-						if (NULL != pstr[i])
-						{
-							memcpy(buff + pos, pstr[i], len[i]);
-							pos += len[i];
-						}
-
-					msg.attach(buff, total_len);
-				}
-		} //if (NULL != pstr && NULL != len)
+			msg.attach(buff, total_len);
+		} //if (total_len > pre_len)
 
 		return true;
 	}
 };
 
+//this unpacker demonstrate how to forbid memory copy while parsing msgs.
 class my_unpacker : public i_unpacker<my_msg_buffer>
 {
 public:
