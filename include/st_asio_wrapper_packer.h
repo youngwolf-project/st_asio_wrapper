@@ -67,7 +67,7 @@ public:
 		auto pre_len = native ? 0 : HEAD_LEN;
 		auto total_len = msg_size_check(pre_len, pstr, len, num);
 		if ((size_t) -1 == total_len)
-			return false;
+			return str;
 		else if (total_len > pre_len)
 		{
 			if (!native)
@@ -145,7 +145,7 @@ public:
 		auto pre_len = native ? 0 : _prefix.size() + _suffix.size();
 		auto total_len = msg_size_check(pre_len, pstr, len, num);
 		if ((size_t) -1 == total_len)
-			return false;
+			return str;
 		else if (total_len > pre_len)
 		{
 			str.reserve(total_len);
