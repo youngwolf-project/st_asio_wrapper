@@ -1,6 +1,6 @@
 
 ifeq (${MAKECMDGOALS}, debug)
-	cflag = -g
+	cflag = -g -DDEBUE
 	dir = ./debug
 else
 	cflag = -O2 -DNDEBUG

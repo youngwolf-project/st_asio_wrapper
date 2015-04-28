@@ -27,6 +27,7 @@ class st_udp_client_base : public st_client<Socket, Pool>
 public:
 	st_udp_client_base(st_service_pump& service_pump_) : st_client<Socket, Pool>(service_pump_) {}
 
+	using st_client<Socket, Pool>::add_client;
 	typename st_client<Socket, Pool>::object_type add_client(unsigned short port, const std::string& ip = std::string())
 	{
 		BOOST_AUTO(client_ptr, ST_THIS create_object());

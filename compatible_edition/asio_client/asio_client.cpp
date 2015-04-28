@@ -83,7 +83,7 @@ public:
 		msg.detach();
 
 		size_t pre_len = native ? 0 : HEAD_LEN;
-		size_t total_len = msg_size_check(pre_len, pstr, len, num);
+		size_t total_len = packer_helper::msg_size_check(pre_len, pstr, len, num);
 		if ((size_t) -1 == total_len)
 			return false;
 		else if (total_len > pre_len)

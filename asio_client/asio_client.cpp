@@ -82,8 +82,9 @@ public:
 	virtual my_msg_buffer pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		my_msg_buffer str;
+
 		auto pre_len = native ? 0 : HEAD_LEN;
-		auto total_len = msg_size_check(pre_len, pstr, len, num);
+		auto total_len = packer_helper::msg_size_check(pre_len, pstr, len, num);
 		if ((size_t) -1 == total_len)
 			return str;
 		else if (total_len > pre_len)
