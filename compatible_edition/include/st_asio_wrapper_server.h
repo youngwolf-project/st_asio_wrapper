@@ -44,16 +44,21 @@ public:
 	st_server_base(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg),
 		acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
 
-	void set_server_addr(unsigned short port, const std::string& ip = std::string())
+	bool set_server_addr(unsigned short port, const std::string& ip = std::string())
 	{
 		if (ip.empty())
 			server_addr = boost::asio::ip::tcp::endpoint(TCP_DEFAULT_IP_VERSION, port);
 		else
 		{
 			boost::system::error_code ec;
-			server_addr = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(ip, ec), port);
-			assert(!ec);
+			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec));
+			if (ec)
+				return false;
+
+			server_addr = boost::asio::ip::tcp::endpoint(addr, port);
 		}
+
+		return true;
 	}
 	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
 

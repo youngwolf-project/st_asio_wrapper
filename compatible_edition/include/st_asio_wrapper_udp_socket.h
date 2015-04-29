@@ -68,16 +68,21 @@ public:
 		if (ec) {unified_out::error_out("bind failed.");}
 	}
 
-	void set_local_addr(unsigned short port, const std::string& ip = std::string())
+	bool set_local_addr(unsigned short port, const std::string& ip = std::string())
 	{
-		boost::system::error_code ec;
 		if (ip.empty())
 			local_addr = boost::asio::ip::udp::endpoint(UDP_DEFAULT_IP_VERSION, port);
 		else
 		{
-			local_addr = boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(ip, ec), port);
-			assert(!ec);
+			boost::system::error_code ec;
+			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec));
+			if (ec)
+				return false;
+
+			local_addr = boost::asio::ip::udp::endpoint(addr, port);
 		}
+
+		return true;
 	}
 	const boost::asio::ip::udp::endpoint& get_local_addr() const {return local_addr;}
 
