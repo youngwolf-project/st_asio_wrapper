@@ -61,12 +61,15 @@ public:
 	virtual void reset()
 		{connected = false; reconnecting = true; st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>::reset();}
 
-	void set_server_addr(unsigned short port, const std::string& ip = SERVER_IP)
+	bool set_server_addr(unsigned short port, const std::string& ip = SERVER_IP)
 	{
 		boost::system::error_code ec;
-		server_addr = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(ip, ec), port); assert(!ec);
-		boost::asio::ip::tcp::resolver resolver(ST_THIS get_io_service());
-		server_addr_iter = resolver.resolve(server_addr, ec); assert(!ec);
+		auto addr = boost::asio::ip::address::from_string(ip, ec);
+		if (ec)
+			return false;
+
+		server_addr = boost::asio::ip::tcp::endpoint(addr, port);
+		return true;
 	}
 	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
 
@@ -98,7 +101,7 @@ protected:
 		if (!ST_THIS get_io_service().stopped())
 		{
 			if (reconnecting && !is_connected())
-				boost::asio::async_connect(ST_THIS lowest_layer(), server_addr_iter,
+				ST_THIS lowest_layer().async_connect(server_addr,
 					boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error));
 			else
 				ST_THIS do_recv_msg();
@@ -183,8 +186,6 @@ protected:
 #ifdef RE_CONNECT_CONTROL
 	size_t re_connect_times;
 #endif
-
-	boost::asio::ip::tcp::resolver::iterator server_addr_iter;
 };
 typedef st_connector_base<> st_connector;
 

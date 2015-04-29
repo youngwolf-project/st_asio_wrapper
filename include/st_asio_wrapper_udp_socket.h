@@ -150,7 +150,10 @@ protected:
 	//can send data or not(just put into send buffer)
 
 	virtual void on_recv_error(const boost::system::error_code& ec)
-		{unified_out::error_out("recv msg error: %d %s", ec.value(), ec.message().data());}
+	{
+		if (boost::asio::error::operation_aborted != ec)
+			unified_out::error_out("recv msg error: %d %s", ec.value(), ec.message().data());
+	}
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	virtual bool on_msg(udp_msg<MsgType>& msg)
