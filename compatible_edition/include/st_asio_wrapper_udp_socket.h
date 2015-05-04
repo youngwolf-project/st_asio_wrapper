@@ -191,7 +191,7 @@ protected:
 			ST_THIS dispatch_msg();
 		}
 #ifdef _MSC_VER
-		else if (WSAECONNREFUSED == ec.value())
+		else if (boost::asio::error::connection_refused == ec || boost::asio::error::connection_reset == ec)
 			do_start();
 #endif
 		else
