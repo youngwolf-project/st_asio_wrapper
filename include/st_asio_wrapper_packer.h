@@ -58,6 +58,7 @@ template<typename MsgType>
 class i_packer
 {
 public:
+	virtual void reset_state() {}
 	virtual MsgType pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
 };
 
@@ -105,30 +106,16 @@ public:
 	virtual std::string pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		std::string str;
-		if (nullptr != pstr && nullptr != len)
+		auto total_len = packer_helper::msg_size_check(0, pstr, len, num);
+		if ((size_t) -1 == total_len)
+			return str;
+		else if (total_len > 0)
 		{
-			size_t total_len = 0;
-			auto last_total_len = total_len;
+			str.reserve(total_len);
 			for (size_t i = 0; i < num; ++i)
 				if (nullptr != pstr[i])
-				{
-					total_len += len[i];
-					if (last_total_len > total_len || total_len > MAX_MSG_LEN) //overflow
-					{
-						unified_out::error_out("pack msg error: length exceeds the MAX_MSG_LEN!");
-						return str;
-					}
-					last_total_len = total_len;
-				}
-
-			if (total_len > 0)
-			{
-				str.reserve(total_len);
-				for (size_t i = 0; i < num; ++i)
-					if (nullptr != pstr[i])
-						str.append(pstr[i], len[i]);
-			}
-		} //if (nullptr != pstr && nullptr != len)
+					str.append(pstr[i], len[i]);
+		} //if (total_len > 0)
 
 		return str;
 	}
@@ -138,7 +125,7 @@ class prefix_suffix_packer : public i_packer<std::string>
 {
 public:
 	void prefix_suffix(const std::string& prefix, const std::string& suffix)
-		{_prefix = prefix;  _suffix = suffix; assert(!suffix.empty()); assert(MAX_MSG_LEN > _prefix.size() + _suffix.size());}
+		{assert(!suffix.empty() && prefix.size() + suffix.size() < MAX_MSG_LEN); _prefix = prefix;  _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
 	const std::string& suffix() const {return _suffix;}
 

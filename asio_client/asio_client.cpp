@@ -126,33 +126,30 @@ public:
 class my_unpacker : public i_unpacker<my_msg_buffer>
 {
 public:
-	my_unpacker() {reset_unpacker_state();}
+	my_unpacker() {reset_state();}
 	size_t current_msg_length() const {return raw_buff.size();} //current msg's total length(not include the head), 0 means don't know
 
 public:
-	virtual void reset_unpacker_state() {raw_buff.detach(); step = 0;}
+	virtual void reset_state() {raw_buff.detach(); step = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<my_msg_buffer>& msg_can)
 	{
-		if (0 == step)
+		if (0 == step) //the head been received
 		{
 			assert(!raw_buff.empty());
 			step = 1;
 		}
-		else if (1 == step)
+		else if (1 == step) //the body been received
 		{
-			step = 0;
-
 			assert(!raw_buff.empty());
 			if (bytes_transferred != raw_buff.size())
 				return false;
 
 			msg_can.resize(msg_can.size() + 1);
 			msg_can.back().swap(raw_buff);
+			step = 0;
 		}
-		else
-			return false;
 
-		return true;
+		return -1 != step;
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
@@ -162,12 +159,12 @@ public:
 		if (ec)
 			return 0;
 
-		if (0 == step) //the msg's head been received
+		if (0 == step) //want the head
 		{
 			assert(raw_buff.empty());
 
 			if (bytes_transferred < HEAD_LEN)
-				return HEAD_LEN - bytes_transferred;
+				return boost::asio::detail::default_max_transfer_size;
 
 			assert(HEAD_LEN == bytes_transferred);
 			auto cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) head_buff) - HEAD_LEN;
@@ -175,19 +172,16 @@ public:
 				step = -1;
 			else
 				raw_buff.attach(new char[cur_msg_len], cur_msg_len);
-
-			return 0;
 		}
-		else if (1 == step)
+		else if (1 == step) //want the body
 		{
 			assert(!raw_buff.empty());
-			return raw_buff.size() - bytes_transferred;
+			return boost::asio::detail::default_max_transfer_size;
 		}
 		else
-		{
 			assert(false);
-			return 0;
-		}
+
+		return 0;
 	}
 
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return raw_buff.empty() ? boost::asio::buffer(head_buff) :
@@ -195,6 +189,12 @@ public:
 
 private:
 	char head_buff[HEAD_LEN]; //for head only
+	//please notice that we don't have a fixed size array with maximum size any more(like the default unpacker).
+	//this is very useful if you have very few but very large msgs, fox example:
+	//you have a very large msg(1M size), but all others are very samll, if you use a fixed size array to hold msgs in the unpackers,
+	//all the unpackers must have an array with at least 1M size, each st_socket will have a unpacker, this will cause your application occupy very large memory but with
+	//very low utilization rate.
+	//this my_unpacker will resolve the above problem, and with another benefit: no memory copying needed any more.
 	my_msg_buffer raw_buff;
 	int step; //-1-error format, 0-want the head, 1-want the body
 };

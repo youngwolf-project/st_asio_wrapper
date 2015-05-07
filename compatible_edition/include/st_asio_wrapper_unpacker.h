@@ -34,7 +34,7 @@ template<typename MsgType>
 class i_unpacker
 {
 public:
-	virtual void reset_unpacker_state() = 0;
+	virtual void reset_state() = 0;
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<MsgType>& msg_can) = 0;
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) = 0;
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
@@ -43,15 +43,16 @@ public:
 class unpacker : public i_unpacker<std::string>
 {
 public:
-	unpacker() {reset_unpacker_state();}
+	unpacker() {reset_state();}
 	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means don't know
 
 	bool parse_msg(size_t bytes_transferred, boost::container::list<std::pair<const char*, size_t> >& msg_can)
 	{
 		//length + msg
 		remain_len += bytes_transferred;
+		assert(remain_len <= MAX_MSG_LEN);
 
-		char* pnext = raw_buff.begin();
+		const char* pnext = raw_buff.begin();
 		bool unpack_ok = true;
 		while (unpack_ok) //considering stick package problem, we need a loop
 			if ((size_t) -1 != cur_msg_len)
@@ -76,14 +77,14 @@ public:
 			else
 				break;
 
-		if (pnext == raw_buff.begin()) //we should have at lest got one msg.
+		if (pnext == raw_buff.begin()) //we should have at least got one msg.
 			unpack_ok = false;
 
 		return unpack_ok;
 	}
 
 public:
-	virtual void reset_unpacker_state() {cur_msg_len = -1; remain_len = 0;}
+	virtual void reset_state() {cur_msg_len = -1; remain_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
 	{
 		boost::container::list<std::pair<const char*, size_t> > msg_pos_can;
@@ -93,13 +94,14 @@ public:
 			msg_can.resize(msg_can.size() + 1);
 			msg_can.back().assign(iter->first, iter->second);
 		}
+
 		if (unpack_ok && remain_len > 0)
 		{
 			const char* pnext = msg_pos_can.back().first + msg_pos_can.back().second;
 			memcpy(raw_buff.begin(), pnext, remain_len); //left behind unparsed msg
 		}
 
-		//when unpack failed, some successfully parsed msgs may still returned via msg_can(stick package), please note.
+		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
 		return unpack_ok;
 	}
 
@@ -115,20 +117,15 @@ public:
 		size_t data_len = remain_len + bytes_transferred;
 		assert(data_len <= MAX_MSG_LEN);
 
-		if ((size_t) -1 == cur_msg_len)
+		if ((size_t) -1 == cur_msg_len && data_len >= HEAD_LEN) //the msg's head been received
 		{
-			if (data_len >= HEAD_LEN) //the msg's head been received
-			{
-				cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) raw_buff.begin());
-				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN) //invalid msg, stop reading
-					return 0;
-			}
-			else
-				return MAX_MSG_LEN - data_len; //read as many as possible
+			cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) raw_buff.begin());
+			if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN) //invalid msg, stop reading
+				return 0;
 		}
 
-		return data_len >= cur_msg_len ? 0 : MAX_MSG_LEN - data_len;
-		//read as many as possible except that we have already got a entire msg
+		return data_len >= cur_msg_len ? 0 : boost::asio::detail::default_max_transfer_size;
+		//read as many as possible except that we have already got an entire msg
 	}
 
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
@@ -146,34 +143,33 @@ protected:
 class fixed_length_unpacker : public i_unpacker<std::string>
 {
 public:
-	fixed_length_unpacker() {reset_unpacker_state();}
+	fixed_length_unpacker() {reset_state();}
 
-	void fixed_length(size_t length) {assert(length > 0); _fixed_length = length;}
+	void fixed_length(size_t fixed_length)
+		{assert(0 < fixed_length && fixed_length <= MAX_MSG_LEN); _fixed_length = fixed_length;}
 	size_t fixed_length() const {return _fixed_length;}
 
 public:
-	virtual void reset_unpacker_state() {cur_data_len = 0;}
+	virtual void reset_state() {remain_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
 	{
 		//length + msg
-		cur_data_len += bytes_transferred;
-		if (cur_data_len < _fixed_length)
-		{
-			reset_unpacker_state();
-			return false;
-		}
+		remain_len += bytes_transferred;
+		assert(remain_len <= MAX_MSG_LEN);
 
-		char* pnext = raw_buff.begin();
-		while (cur_data_len >= _fixed_length) //considering stick package problem, we need a loop
+		const char* pnext = raw_buff.begin();
+		while (remain_len >= _fixed_length) //considering stick package problem, we need a loop
 		{
 			msg_can.resize(msg_can.size() + 1);
 			msg_can.back().assign(pnext, _fixed_length);
-			cur_data_len -= _fixed_length;
+			remain_len -= _fixed_length;
 			std::advance(pnext, _fixed_length);
 		}
 
-		if (cur_data_len > 0) //left behind unparsed msg
-			memcpy(raw_buff.begin(), pnext, cur_data_len);
+		if (pnext == raw_buff.begin()) //we should have at least got one msg.
+			return false;
+		else if (remain_len > 0) //left behind unparsed msg
+			memcpy(raw_buff.begin(), pnext, remain_len);
 
 		return true;
 	}
@@ -187,41 +183,71 @@ public:
 		if (ec)
 			return 0;
 
-		size_t data_len = cur_data_len + bytes_transferred;
+		size_t data_len = remain_len + bytes_transferred;
 		assert(data_len <= MAX_MSG_LEN);
 
-		return data_len >= _fixed_length ? 0 : _fixed_length - data_len;
+		return data_len >= _fixed_length ? 0 : boost::asio::detail::default_max_transfer_size;
+		//read as many as possible except that we have already got an entire msg
 	}
 
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		assert(cur_data_len < MAX_MSG_LEN);
-		return boost::asio::buffer(boost::asio::buffer(raw_buff) + cur_data_len);
+		assert(remain_len < MAX_MSG_LEN);
+		return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
 	}
 
 private:
 	boost::array<char, MAX_MSG_LEN> raw_buff;
-	size_t cur_data_len;
 	size_t _fixed_length;
+	size_t remain_len; //half-baked msg
 };
 
 class prefix_suffix_unpacker : public i_unpacker<std::string>
 {
 public:
-	prefix_suffix_unpacker() {reset_unpacker_state();}
+	prefix_suffix_unpacker() {reset_state();}
 
 	void prefix_suffix(const std::string& prefix, const std::string& suffix)
-		{_prefix = prefix; _suffix = suffix; assert(!suffix.empty()); assert(MAX_MSG_LEN > _prefix.size() + _suffix.size());}
+		{assert(!suffix.empty() && prefix.size() + suffix.size() < MAX_MSG_LEN); _prefix = prefix; _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
 	const std::string& suffix() const {return _suffix;}
 
+	size_t peek_msg(size_t data_len, const char* buff)
+	{
+		assert(NULL != buff);
+
+		if ((size_t) -1 == first_msg_len && data_len >= _prefix.size())
+		{
+			if (0 != memcmp(_prefix.data(), buff, _prefix.size()))
+				return 0; //invalid msg, stop reading
+			else
+				first_msg_len = 0; //prefix been checked.
+		}
+
+		size_t min_len = _prefix.size() + _suffix.size();
+		if (data_len > min_len)
+		{
+			const char* end = (const char*) memmem(buff + _prefix.size(), data_len - _prefix.size(),
+				_suffix.data(), _suffix.size());
+			if (NULL != end)
+			{
+				first_msg_len = end - buff + _suffix.size(); //got a msg
+				return 0;
+			}
+			else if (data_len >= MAX_MSG_LEN)
+				return 0; //invalid msg, stop reading
+		}
+
+		return boost::asio::detail::default_max_transfer_size; //read as many as possible
+	}
+
 	//like strstr, except support \0 in the middle of mem and sub_mem
-	static void* memmem(void* mem, size_t len, const void* sub_mem, size_t sub_len)
+	static const void* memmem(const void* mem, size_t len, const void* sub_mem, size_t sub_len)
 	{
 		if (NULL != mem && NULL != sub_mem && sub_len <= len)
 		{
 			size_t valid_len = len - sub_len;
-			for (size_t i = 0; i <= valid_len; ++i, mem = (char*) mem + 1)
+			for (size_t i = 0; i <= valid_len; ++i, mem = (const char*) mem + 1)
 				if (0 == memcmp(mem, sub_mem, sub_len))
 					return mem;
 		}
@@ -230,48 +256,39 @@ public:
 	}
 
 public:
-	virtual void reset_unpacker_state() {cur_data_len = 0;}
+	virtual void reset_state() {first_msg_len = -1; remain_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
 	{
 		//length + msg
-		cur_data_len += bytes_transferred;
+		remain_len += bytes_transferred;
+		assert(remain_len <= MAX_MSG_LEN);
 
 		size_t min_len = _prefix.size() + _suffix.size();
 		bool unpack_ok = true;
-		char* pnext = raw_buff.begin();
-		while (true)
+		const char* pnext = raw_buff.begin();
+		while ((size_t) -1 != first_msg_len && 0 != first_msg_len)
 		{
-			if (cur_data_len >= _prefix.size() && 0 != memcmp(_prefix.data(), pnext, _prefix.size()))
-			{
-				unpack_ok = false;
-				break;
-			}
-			else if (cur_data_len < min_len)
-				break; //half-baked msg
+			assert(first_msg_len > min_len);
+			size_t msg_len = first_msg_len - min_len;
 
-			const char* end = (char*) memmem(pnext + _prefix.size(), cur_data_len - _prefix.size(),
-				_suffix.data(), _suffix.size());
-			if (NULL == end)
-				break; //half-baked msg
-			else
-			{
-				msg_can.resize(msg_can.size() + 1);
-				size_t msg_len = pnext - end - _prefix.size();
-				msg_can.back().assign(pnext + _prefix.size(), msg_len);
-				cur_data_len -= min_len + msg_len;
-				std::advance(pnext, min_len + msg_len);
-			}
+			msg_can.resize(msg_can.size() + 1);
+			msg_can.back().assign(pnext + _prefix.size(), msg_len);
+			remain_len -= first_msg_len;
+			std::advance(pnext, first_msg_len);
+			first_msg_len = -1;
+
+			if (boost::asio::detail::default_max_transfer_size == peek_msg(remain_len, pnext))
+				break;
+			else if ((size_t) -1 == first_msg_len)
+				unpack_ok = false;
 		}
 
-		if (pnext == raw_buff.begin()) //we should have at lest got one msg.
-			unpack_ok = false;
-		else if (unpack_ok && cur_data_len > 0)
-			memcpy(raw_buff.begin(), pnext, cur_data_len); //left behind unparsed msg
+		if (pnext == raw_buff.begin()) //we should have at least got one msg.
+			return false;
+		else if (unpack_ok && remain_len > 0)
+			memcpy(raw_buff.begin(), pnext, remain_len); //left behind unparsed msg
 
-		//when unpack failed, some successfully parsed msgs may still returned via msg_can(stick package), please note.
-		if (!unpack_ok)
-			reset_unpacker_state();
-
+		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
 		return unpack_ok;
 	}
 
@@ -284,32 +301,23 @@ public:
 		if (ec)
 			return 0;
 
-		size_t data_len = cur_data_len + bytes_transferred;
+		size_t data_len = remain_len + bytes_transferred;
 		assert(data_len <= MAX_MSG_LEN);
 
-		if (data_len >= _prefix.size() && 0 != memcmp(_prefix.data(), raw_buff.begin(), _prefix.size()))
-			return 0; //invalid msg, stop reading
-
-		size_t min_len = _prefix.size() + _suffix.size();
-		if (data_len >= min_len &&
-			(NULL != memmem(raw_buff.begin() + _prefix.size(), data_len - _prefix.size(),
-				_suffix.data(), _suffix.size()) || //got a msg
-			data_len >= MAX_MSG_LEN)) //invalid msg, stop reading
-			return 0;
-
-		return MAX_MSG_LEN - data_len; //read as many as possible except that we have already got a entire msg
+		return peek_msg(data_len, raw_buff.begin());
 	}
 
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		assert(cur_data_len < MAX_MSG_LEN);
-		return boost::asio::buffer(boost::asio::buffer(raw_buff) + cur_data_len);
+		assert(remain_len < MAX_MSG_LEN);
+		return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
 	}
 
 private:
 	boost::array<char, MAX_MSG_LEN> raw_buff;
-	size_t cur_data_len;
 	std::string _prefix, _suffix;
+	size_t first_msg_len;
+	size_t remain_len; //half-baked msg
 };
 
 } //namespace

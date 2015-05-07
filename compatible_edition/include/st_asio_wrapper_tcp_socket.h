@@ -46,7 +46,7 @@ public:
 	void reset() {reset_state(); ST_THIS clear_buffer();}
 	void reset_state()
 	{
-		reset_unpacker_state();
+		unpacker_->reset_state();
 		st_socket<MsgType, Socket, MsgType, Packer>::reset_state();
 		closing = false;
 	}
@@ -151,9 +151,6 @@ protected:
 					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 	}
 
-	//reset unpacker's state, generally used when unpack error occur
-	void reset_unpacker_state() {unpacker_->reset_unpacker_state();}
-
 	void clean_up()
 	{
 		if (ST_THIS lowest_layer().is_open())
@@ -179,7 +176,7 @@ protected:
 				on_unpack_error();
 				//reset unpacker's state after on_unpack_error(),
 				//so user can get the left half-baked msg in on_unpack_error()
-				unpacker_->reset_unpacker_state();
+				unpacker_->reset_state();
 			}
 		}
 		else
