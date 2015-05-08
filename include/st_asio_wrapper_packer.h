@@ -57,6 +57,9 @@ public:
 template<typename MsgType>
 class i_packer
 {
+protected:
+	virtual ~i_packer() {}
+
 public:
 	virtual void reset_state() {}
 	virtual MsgType pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;

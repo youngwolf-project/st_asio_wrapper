@@ -33,6 +33,9 @@ namespace st_asio_wrapper
 template<typename MsgType>
 class i_unpacker
 {
+protected:
+	virtual ~i_unpacker() {}
+
 public:
 	virtual void reset_state() = 0;
 	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<MsgType>& msg_can) = 0;
