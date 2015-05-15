@@ -77,6 +77,8 @@ public:
 	}
 
 	uint64_t get_recv_bytes() const {return recv_bytes;}
+	operator uint64_t() const {return recv_bytes;}
+
 	void restart() {recv_bytes = recv_index = 0;}
 
 protected:
@@ -112,9 +114,8 @@ public:
 	uint64_t get_total_recv_bytes()
 	{
 		uint64_t total_recv_bytes = 0;
-		do_something_to_all([&](test_client::object_ctype& item) {
-			total_recv_bytes += item->get_recv_bytes();
-		});
+		do_something_to_all([&](test_client::object_ctype& item) {total_recv_bytes += *item;});
+//		do_something_to_all([&](test_client::object_ctype& item) {total_recv_bytes += item->get_recv_bytes();});
 
 		return total_recv_bytes;
 	}

@@ -1,6 +1,7 @@
 
 #include <boost/timer/timer.hpp>
 #include <boost/tokenizer.hpp>
+#include <boost/lambda/bind.hpp>
 #include <boost/lambda/lambda.hpp>
 
 //configuration
@@ -79,8 +80,6 @@ public:
 
 	boost::uint64_t get_recv_bytes() const {return recv_bytes;}
 	operator boost::uint64_t() const {return recv_bytes;}
-	//workaround for boost::lambda
-	//how to invoke get_recv_bytes() directly, please tell me if somebody knows!
 
 	void restart() {recv_bytes = recv_index = 0;}
 
@@ -117,8 +116,8 @@ public:
 	boost::uint64_t get_total_recv_bytes()
 	{
 		boost::uint64_t total_recv_bytes = 0;
-		do_something_to_all(boost::ref(total_recv_bytes) += boost::lambda::ret<boost::uint64_t>(*boost::lambda::_1));
-		//how to invoke the test_socket::get_recv_bytes() directly, please tell me if somebody knows!
+		do_something_to_all(boost::ref(total_recv_bytes) += *boost::lambda::_1);
+//		do_something_to_all(boost::ref(total_recv_bytes) += boost::lambda::bind(&test_socket::get_recv_bytes, &*boost::lambda::_1));
 
 		return total_recv_bytes;
 	}
