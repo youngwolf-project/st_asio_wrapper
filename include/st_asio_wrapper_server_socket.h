@@ -27,18 +27,14 @@ public:
 	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
 };
 
-template<typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket,
-	typename Server = i_server, typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
-class st_server_socket_base : public st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>,
-	public boost::enable_shared_from_this<st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>>
+template<typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket, typename Server = i_server, typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
+class st_server_socket_base : public st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>, public boost::enable_shared_from_this<st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>>
 {
 public:
-	st_server_socket_base(Server& server_) :
-		st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>(server_.get_service_pump()), server(server_) {}
+	st_server_socket_base(Server& server_) : st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>(server_.get_service_pump()), server(server_) {}
 
 	template<typename Arg>
-	st_server_socket_base(Server& server_, Arg& arg) :
-		st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>(server_.get_service_pump(), arg), server(server_) {}
+	st_server_socket_base(Server& server_, Arg& arg) : st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>(server_.get_service_pump(), arg), server(server_) {}
 
 	//reset all, be ensure that there's no any operations performed on this st_server_socket_base when invoke it
 	//notice, when reuse this st_server_socket_base, st_object_pool will invoke reset(), child must re-write this

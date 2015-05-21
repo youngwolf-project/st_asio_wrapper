@@ -184,8 +184,7 @@ public:
 		return 0;
 	}
 
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return raw_buff.empty() ? boost::asio::buffer(head_buff) :
-		boost::asio::buffer(const_cast<char*>(raw_buff.data()), raw_buff.size());}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return raw_buff.empty() ? boost::asio::buffer(head_buff) : boost::asio::buffer(const_cast<char*>(raw_buff.data()), raw_buff.size());}
 
 private:
 	char head_buff[HEAD_LEN]; //for head only

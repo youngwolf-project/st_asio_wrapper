@@ -147,8 +147,7 @@ class fixed_length_unpacker : public i_unpacker<std::string>
 public:
 	fixed_length_unpacker() {reset_state();}
 
-	void fixed_length(size_t fixed_length)
-		{assert(0 < fixed_length && fixed_length <= MAX_MSG_LEN); _fixed_length = fixed_length;}
+	void fixed_length(size_t fixed_length) {assert(0 < fixed_length && fixed_length <= MAX_MSG_LEN); _fixed_length = fixed_length;}
 	size_t fixed_length() const {return _fixed_length;}
 
 public:
@@ -209,8 +208,7 @@ class prefix_suffix_unpacker : public i_unpacker<std::string>
 public:
 	prefix_suffix_unpacker() {reset_state();}
 
-	void prefix_suffix(const std::string& prefix, const std::string& suffix)
-		{assert(!suffix.empty() && prefix.size() + suffix.size() < MAX_MSG_LEN); _prefix = prefix; _suffix = suffix;}
+	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < MAX_MSG_LEN); _prefix = prefix; _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
 	const std::string& suffix() const {return _suffix;}
 
@@ -229,8 +227,7 @@ public:
 		auto min_len = _prefix.size() + _suffix.size();
 		if (data_len > min_len)
 		{
-			auto end = (const char*) memmem(std::next(buff, _prefix.size()), data_len - _prefix.size(),
-				_suffix.data(), _suffix.size());
+			auto end = (const char*) memmem(std::next(buff, _prefix.size()), data_len - _prefix.size(), _suffix.data(), _suffix.size());
 			if (nullptr != end)
 			{
 				first_msg_len = std::distance(buff, end) + _suffix.size(); //got a msg

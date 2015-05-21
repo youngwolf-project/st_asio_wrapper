@@ -38,11 +38,9 @@ template<typename Socket = st_server_socket, typename Pool = st_object_pool<Sock
 class st_server_base : public Server, public Pool
 {
 public:
-	st_server_base(st_service_pump& service_pump_) : Pool(service_pump_),
-		acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
+	st_server_base(st_service_pump& service_pump_) : Pool(service_pump_), acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
 	template<typename Arg>
-	st_server_base(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg),
-		acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
+	st_server_base(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg), acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = std::string())
 	{
@@ -125,8 +123,7 @@ protected:
 	virtual void start_next_accept()
 	{
 		auto client_ptr = ST_THIS create_object(boost::ref(*this));
-		acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_server_base::accept_handler, this,
-			boost::asio::placeholders::error, client_ptr));
+		acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_server_base::accept_handler, this, boost::asio::placeholders::error, client_ptr));
 	}
 
 protected:

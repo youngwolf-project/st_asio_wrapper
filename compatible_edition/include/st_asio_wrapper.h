@@ -367,7 +367,7 @@
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VERSION 30900
+#define ST_ASIO_WRAPPER_VERSION 40000
 
 #if !defined _MSC_VER && !defined __GNUC__
 #error st_asio_wrapper only support vc and gcc.

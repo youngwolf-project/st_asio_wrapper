@@ -57,9 +57,7 @@ int main(int argc, const char* argv[])
 			service_pump.stop_service();
 			service_pump.start_service();
 		}
-		else if (str.size() > sizeof(REQUEST_FILE) &&
-			!strncmp(REQUEST_FILE, str.data(), sizeof(REQUEST_FILE) - 1) &&
-			isspace(str[sizeof(REQUEST_FILE) - 1]))
+		else if (str.size() > sizeof(REQUEST_FILE) && !strncmp(REQUEST_FILE, str.data(), sizeof(REQUEST_FILE) - 1) && isspace(str[sizeof(REQUEST_FILE) - 1]))
 		{
 			str.erase(0, sizeof(REQUEST_FILE));
 			boost::char_separator<char> sep(" \t");

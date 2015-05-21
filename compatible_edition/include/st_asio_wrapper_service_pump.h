@@ -33,8 +33,7 @@ public:
 	class i_service
 	{
 	protected:
-		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), started(false), id_(0), data(NULL)
-			{service_pump_.add(this);}
+		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), started(false), id_(0), data(NULL) {service_pump_.add(this);}
 		virtual ~i_service() {}
 
 	public:
@@ -76,8 +75,7 @@ public:
 	object_type find(int id)
 	{
 		boost::mutex::scoped_lock lock(service_can_mutex);
-		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(),
-			std::bind2nd(std::mem_fun(&i_service::is_equal_to), id)));
+		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), std::bind2nd(std::mem_fun(&i_service::is_equal_to), id)));
 		return iter == service_can.end() ? NULL : *iter;
 	}
 
@@ -95,8 +93,7 @@ public:
 	void remove(int id)
 	{
 		boost::mutex::scoped_lock lock(service_can_mutex);
-		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(),
-			std::bind2nd(std::mem_fun(&i_service::is_equal_to), id)));
+		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), std::bind2nd(std::mem_fun(&i_service::is_equal_to), id)));
 		if (iter != service_can.end())
 		{
 			object_type i_service_ = *iter;
@@ -233,11 +230,8 @@ private:
 		boost::thread_group tg;
 		for (int i = 0; i < thread_num; ++i)
 			tg.create_thread(boost::bind(&st_service_pump::run, this, boost::system::error_code()));
-		boost::system::error_code ec;
-		run(ec);
-
-		if (thread_num > 0)
-			tg.join_all();
+		boost::system::error_code ec; run(ec);
+		tg.join_all();
 
 		unified_out::info_out("service pump end.");
 		started = false;

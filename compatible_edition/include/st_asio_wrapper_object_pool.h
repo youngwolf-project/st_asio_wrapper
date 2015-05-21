@@ -66,8 +66,7 @@ protected:
 		const time_t closed_time;
 		object_ctype object_ptr;
 
-		temp_object(object_ctype& object_ptr_) :
-			closed_time(time(NULL)), object_ptr(object_ptr_) {}
+		temp_object(object_ctype& object_ptr_) : closed_time(time(NULL)), object_ptr(object_ptr_) {}
 
 		bool is_timeout() const {return is_timeout(time(NULL));}
 		bool is_timeout(time_t now) const {return closed_time <= now - CLOSED_SOCKET_MAX_DURATION;}
@@ -209,8 +208,7 @@ public:
 	{
 		boost::mutex::scoped_lock lock(object_can_mutex);
 		assert(index < object_can.size());
-		return index < object_can.size() ?
-			*(boost::next(object_can.begin(), index)) : object_type();
+		return index < object_can.size() ? *(boost::next(object_can.begin(), index)) : object_type();
 	}
 
 	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}

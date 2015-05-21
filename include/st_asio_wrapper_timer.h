@@ -112,8 +112,7 @@ public:
 	DO_SOMETHING_TO_ALL_MUTEX(timer_can, timer_can_mutex)
 	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex)
 
-	void stop_all_timer()
-		{do_something_to_all(boost::bind((void (st_timer::*) (object_type&)) &st_timer::stop_timer, this, _1));}
+	void stop_all_timer() {do_something_to_all(boost::bind((void (st_timer::*) (object_type&)) &st_timer::stop_timer, this, _1));}
 
 protected:
 	//return true to continue the timer, or the timer will stop
@@ -122,8 +121,7 @@ protected:
 	void start_timer(object_ctype& ti)
 	{
 		ti.timer->expires_from_now(boost::posix_time::milliseconds(ti.milliseconds));
-		ti.timer->async_wait(boost::bind(&st_timer::timer_handler, this,
-			boost::asio::placeholders::error, boost::ref(ti)));
+		ti.timer->async_wait(boost::bind(&st_timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti)));
 	}
 
 	void stop_timer(object_type& ti)

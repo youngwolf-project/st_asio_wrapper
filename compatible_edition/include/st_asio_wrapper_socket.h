@@ -43,12 +43,10 @@ public:
 	typedef boost::container::list<MsgType> container_type;
 
 protected:
-	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), next_layer_(io_service_),
-		packer_(boost::make_shared<Packer>()) {reset_state();}
+	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {reset_state();}
 
 	template<typename Arg>
-	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), next_layer_(io_service_, arg),
-		packer_(boost::make_shared<Packer>()) {reset_state();}
+	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {reset_state();}
 
 	void reset_state()
 	{
@@ -60,10 +58,8 @@ protected:
 
 	void clear_buffer()
 	{
-		post_msg_buffer.clear();
-		send_msg_buffer.clear();
-		recv_msg_buffer.clear();
-		temp_msg_buffer.clear();
+		for (size_t i = 0; i < sizeof(msg_buffer) / sizeof(container_type); ++i)
+			msg_buffer[i].clear();
 	}
 
 public:
@@ -120,8 +116,7 @@ public:
 	}
 
 	//don't use the packer but insert into the send_msg_buffer directly
-	bool direct_send_msg(const MsgType& msg, bool can_overflow = false)
-		{MsgType tmp_msg(msg); return direct_send_msg(tmp_msg, can_overflow);}
+	bool direct_send_msg(const MsgType& msg, bool can_overflow = false) {MsgType tmp_msg(msg); return direct_send_msg(tmp_msg, can_overflow);}
 	//after this call, msg becomes empty, please note.
 	bool direct_send_msg(MsgType& msg, bool can_overflow = false)
 	{
@@ -132,8 +127,7 @@ public:
 		return false;
 	}
 
-	bool direct_post_msg(const MsgType& msg, bool can_overflow = false)
-		{MsgType tmp_msg(msg); return direct_post_msg(tmp_msg, can_overflow);}
+	bool direct_post_msg(const MsgType& msg, bool can_overflow = false) {MsgType tmp_msg(msg); return direct_post_msg(tmp_msg, can_overflow);}
 	//after this call, msg becomes empty, please note.
 	bool direct_post_msg(MsgType& msg, bool can_overflow = false)
 	{
@@ -192,8 +186,7 @@ protected:
 	//can send data or not(just put into send buffer)
 
 	//generally, you need not re-write this for link broken judgment(TCP)
-	virtual void on_send_error(const boost::system::error_code& ec)
-		{unified_out::error_out("send msg error: %d %s", ec.value(), ec.message().data());}
+	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error: %d %s", ec.value(), ec.message().data());}
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//if you want to use your own receive buffer, you can move the msg to your own receive buffer,
@@ -275,8 +268,7 @@ protected:
 	{
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 		bool dispatch = false;
-		for (BOOST_AUTO(iter, temp_msg_buffer.begin());
-			!suspend_dispatch_msg_ && !posting && iter != temp_msg_buffer.end();)
+		for (BOOST_AUTO(iter, temp_msg_buffer.begin()); !suspend_dispatch_msg_ && !posting && iter != temp_msg_buffer.end();)
 			if (on_msg(*iter))
 				temp_msg_buffer.erase(iter++);
 			else

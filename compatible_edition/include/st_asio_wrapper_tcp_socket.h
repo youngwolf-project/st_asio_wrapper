@@ -33,13 +33,10 @@ template <typename MsgType, typename Socket, typename Packer, typename Unpacker>
 class st_tcp_socket_base : public st_socket<MsgType, Socket, MsgType, Packer>
 {
 protected:
-	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<MsgType, Socket, MsgType, Packer>(io_service_),
-		unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
+	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<MsgType, Socket, MsgType, Packer>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
 
 	template<typename Arg>
-	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) :
-		st_socket<MsgType, Socket, MsgType, Packer>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>())
-		{reset_state();}
+	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<MsgType, Socket, MsgType, Packer>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
 
 public:
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
@@ -109,18 +106,15 @@ protected:
 		{
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(send_msg_buffer.front());
-			boost::asio::async_write(ST_THIS next_layer(),
-				boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()),
-				boost::bind(&st_tcp_socket_base::send_handler, this,
-					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+			boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()),
+				boost::bind(&st_tcp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 			send_msg_buffer.pop_front();
 		}
 
 		return ST_THIS sending;
 	}
 
-	virtual bool is_send_allowed() const
-		{return !is_closing() && st_socket<MsgType, Socket, MsgType, Packer>::is_send_allowed();}
+	virtual bool is_send_allowed() const {return !is_closing() && st_socket<MsgType, Socket, MsgType, Packer>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
 	//msg can not be unpacked
@@ -131,12 +125,10 @@ protected:
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	virtual bool on_msg(MsgType& msg)
-		{unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
+	virtual bool on_msg(MsgType& msg) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
 #endif
 
-	virtual bool on_msg_handle(MsgType& msg, bool link_down)
-		{unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
+	virtual bool on_msg_handle(MsgType& msg, bool link_down) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
 
 	//start the asynchronous read
 	//it's child's responsibility to invoke this properly,
@@ -145,10 +137,9 @@ protected:
 	{
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
 		if (boost::asio::buffer_size(recv_buff) > 0)
-			boost::asio::async_read(ST_THIS next_layer(), recv_buff, boost::bind(&i_unpacker<MsgType>::completion_condition,
-				unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
-				boost::bind(&st_tcp_socket_base::recv_handler, this,
-					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
+				boost::bind(&i_unpacker<MsgType>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
+				boost::bind(&st_tcp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 	}
 
 	void clean_up()

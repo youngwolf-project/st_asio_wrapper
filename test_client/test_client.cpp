@@ -95,7 +95,7 @@ private:
 	void handle_msg(const std::string& msg)
 	{
 		recv_bytes += msg.size();
-		if (::check_msg && (msg.size() < sizeof(size_t) || recv_index != *(size_t*) msg.data()))
+		if (check_msg && (msg.size() < sizeof(size_t) || recv_index != *(size_t*) msg.data()))
 			printf("check msg error: " size_t_format ".\n", recv_index);
 		++recv_index;
 	}
@@ -161,10 +161,7 @@ int main(int argc, const char* argv[])
 			service_pump.start_service(1);
 		}
 		else if (str == LIST_STATUS)
-		{
-			printf("valid links: " size_t_format ", closed links: " size_t_format "\n",
-				client.valid_size(), client.closed_object_size());
-		}
+			printf("valid links: " size_t_format ", closed links: " size_t_format "\n", client.valid_size(), client.closed_object_size());
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
 			client.do_something_to_all(boost::bind(&test_socket::suspend_dispatch_msg, _1, true));
@@ -236,8 +233,7 @@ int main(int argc, const char* argv[])
 
 			if (total_msg_bytes > 0)
 			{
-				printf("test parameters after adjustment: " size_t_format " " size_t_format " %c %d\n",
-					msg_num, msg_len, msg_fill, model);
+				printf("test parameters after adjustment: " size_t_format " " size_t_format " %c %d\n", msg_num, msg_len, msg_fill, model);
 				puts("performance test begin, this application will have no response during the test!");
 
 				client.restart();

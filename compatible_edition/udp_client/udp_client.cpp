@@ -13,8 +13,7 @@ int main(int argc, const char* argv[]) {
 
 	BOOST_AUTO(local_port, (unsigned short) atoi(argv[1]));
 	boost::system::error_code ec;
-	BOOST_AUTO(peer_addr, boost::asio::ip::udp::endpoint(
-		boost::asio::ip::address::from_string(argc >= 4 ? argv[3] : "127.0.0.1", ec), (unsigned short) atoi(argv[2])));
+	BOOST_AUTO(peer_addr, boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(argc >= 4 ? argv[3] : "127.0.0.1", ec), (unsigned short) atoi(argv[2])));
 	assert(!ec);
 
 	std::string str;

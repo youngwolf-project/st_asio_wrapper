@@ -59,8 +59,7 @@ protected:
 			if (!is_send_buffer_available()) //continue this timer
 				return true;
 
-			get_io_service().post(boost::bind(&file_socket::read_file_handler, this,
-				*static_cast<const __off64_t*>(user_data)));
+			get_io_service().post(boost::bind(&file_socket::read_file_handler, this, *static_cast<const __off64_t*>(user_data)));
 			delete static_cast<const __off64_t*>(user_data); //free this memory, because we newed it in set_timer.
 			break;
 		default:
@@ -95,8 +94,7 @@ private:
 				set_timer(10, 50, new __off64_t(length));
 			else
 			{
-				size_t read_size = (size_t) std::min(
-					(__off64_t) packer::get_max_msg_size(), (__off64_t) ORDER_LEN + length);
+				size_t read_size = (size_t) std::min((__off64_t) packer::get_max_msg_size(), (__off64_t) ORDER_LEN + length);
 				read_size -= ORDER_LEN;
 
 				char* buffer = new char[ORDER_LEN + read_size];
@@ -159,8 +157,7 @@ private:
 			}
 			break;
 		case 1:
-			if (TRANS_PREPARE == state && NULL != file &&
-				ORDER_LEN + OFFSET_LEN + DATA_LEN == str.size())
+			if (TRANS_PREPARE == state && NULL != file && ORDER_LEN + OFFSET_LEN + DATA_LEN == str.size())
 			{
 				__off64_t offset = *(__off64_t*) (str.data() + ORDER_LEN);
 				__off64_t length = *(__off64_t*) (str.data() + ORDER_LEN + OFFSET_LEN);
@@ -201,7 +198,5 @@ public:
 		}
 	}
 };
-
-#undef HOW_USE_MSG_RECV_BUFFER
 
 #endif //#ifndef FILE_SERVER_H_

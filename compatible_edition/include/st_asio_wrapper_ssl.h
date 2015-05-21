@@ -26,13 +26,11 @@
 namespace st_asio_wrapper
 {
 
-template <typename MsgType = std::string, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
-	typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
+template <typename MsgType = std::string, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
 class st_ssl_connector_base : public st_connector_base<MsgType, Socket, Packer, Unpacker>
 {
 public:
-	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) :
-		st_connector_base<MsgType, Socket, Packer, Unpacker>(io_service_, ctx), authorized_(false) {}
+	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : st_connector_base<MsgType, Socket, Packer, Unpacker>(io_service_, ctx), authorized_(false) {}
 
 	//reset all, be ensure that there's no any operations performed on this st_ssl_connector_base when invoke it
 	//notice, when reuse this st_ssl_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
@@ -48,11 +46,9 @@ protected:
 		if (!ST_THIS get_io_service().stopped())
 		{
 			if (ST_THIS reconnecting && !ST_THIS is_connected())
-				ST_THIS lowest_layer().async_connect(ST_THIS server_addr,
-					boost::bind(&st_ssl_connector_base::connect_handler, this, boost::asio::placeholders::error));
+				ST_THIS lowest_layer().async_connect(ST_THIS server_addr, boost::bind(&st_ssl_connector_base::connect_handler, this, boost::asio::placeholders::error));
 			else if (!authorized_)
-				ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client,
-					boost::bind(&st_ssl_connector_base::handshake_handler, this, boost::asio::placeholders::error));
+				ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client, boost::bind(&st_ssl_connector_base::handshake_handler, this, boost::asio::placeholders::error));
 			else
 				ST_THIS do_recv_msg();
 
@@ -62,10 +58,8 @@ protected:
 		return false;
 	}
 
-	virtual void on_unpack_error()
-		{authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::on_unpack_error();}
-	virtual void on_recv_error(const boost::system::error_code& ec)
-		{authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::on_recv_error(ec);}
+	virtual void on_unpack_error() {authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::on_unpack_error();}
+	virtual void on_recv_error(const boost::system::error_code& ec) {authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::on_recv_error(ec);}
 	virtual void on_handshake(bool result)
 	{
 		if (result)
@@ -76,8 +70,7 @@ protected:
 			ST_THIS force_close(false);
 		}
 	}
-	virtual bool is_send_allowed() const
-		{return authorized() && st_connector_base<MsgType, Socket, Packer, Unpacker>::is_send_allowed();}
+	virtual bool is_send_allowed() const {return authorized() && st_connector_base<MsgType, Socket, Packer, Unpacker>::is_send_allowed();}
 
 	void connect_handler(const boost::system::error_code& ec)
 	{
@@ -113,10 +106,8 @@ template<typename Object>
 class st_ssl_object_pool : public st_object_pool<Object>
 {
 public:
-	st_ssl_object_pool(st_service_pump& service_pump_) :
-		st_object_pool<Object>(service_pump_), ctx(DEFAULT_SSL_METHOD) {}
-	st_ssl_object_pool(st_service_pump& service_pump_, boost::asio::ssl::context::method m) :
-		st_object_pool<Object>(service_pump_), ctx(m) {}
+	st_ssl_object_pool(st_service_pump& service_pump_) : st_object_pool<Object>(service_pump_), ctx(DEFAULT_SSL_METHOD) {}
+	st_ssl_object_pool(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_object_pool<Object>(service_pump_), ctx(m) {}
 
 	boost::asio::ssl::context& ssl_context() {return ctx;}
 
@@ -140,13 +131,12 @@ protected:
 };
 typedef st_tcp_client_base<st_ssl_connector, st_ssl_object_pool<st_ssl_connector> > st_ssl_tcp_client;
 
-template<typename MsgType = std::string, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
-	typename Server = i_server, typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
+template<typename MsgType = std::string, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, typename Server = i_server,
+	typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
 class st_ssl_server_socket_base : public st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>
 {
 public:
-	st_ssl_server_socket_base(Server& server_, boost::asio::ssl::context& ctx) :
-		st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>(server_, ctx) {}
+	st_ssl_server_socket_base(Server& server_, boost::asio::ssl::context& ctx) : st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>(server_, ctx) {}
 };
 typedef st_ssl_server_socket_base<> st_ssl_server_socket;
 
@@ -155,8 +145,7 @@ class st_ssl_server_base : public st_server_base<Socket, Pool, Server>
 {
 public:
 	st_ssl_server_base(st_service_pump& service_pump_) : st_server_base<Socket, Pool, Server>(service_pump_) {}
-	st_ssl_server_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) :
-		st_server_base<Socket, Pool, Server>(service_pump_, m) {}
+	st_ssl_server_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_server_base<Socket, Pool, Server>(service_pump_, m) {}
 
 protected:
 	virtual void on_handshake(bool result, typename st_ssl_server_base::object_ctype& client_ptr)
@@ -170,8 +159,7 @@ protected:
 	virtual void start_next_accept()
 	{
 		BOOST_TYPEOF(ST_THIS create_object()) client_ptr = ST_THIS create_object(boost::ref(*this));
-		ST_THIS acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_ssl_server_base::accept_handler, this,
-			boost::asio::placeholders::error, client_ptr));
+		ST_THIS acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_ssl_server_base::accept_handler, this, boost::asio::placeholders::error, client_ptr));
 	}
 
 protected:
@@ -181,8 +169,7 @@ protected:
 		{
 			if (ST_THIS on_accept(client_ptr))
 				client_ptr->next_layer().async_handshake(boost::asio::ssl::stream_base::server,
-					boost::bind(&st_ssl_server_base::handshake_handler, this,
-					boost::asio::placeholders::error, client_ptr));
+					boost::bind(&st_ssl_server_base::handshake_handler, this, boost::asio::placeholders::error, client_ptr));
 
 			start_next_accept();
 		}

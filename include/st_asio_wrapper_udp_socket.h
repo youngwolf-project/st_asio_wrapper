@@ -39,15 +39,13 @@ struct udp_msg
 	void swap(const boost::asio::ip::udp::endpoint& addr, MsgType& tmp_str) {peer_addr = addr; str.swap(tmp_str);}
 	void clear() {peer_addr = boost::asio::ip::udp::endpoint(); str.clear();}
 	bool empty() const {return str.empty();}
-	bool operator==(const udp_msg& other) const {return this == &other;}
 };
 
 template <typename MsgType = std::string, typename Socket = boost::asio::ip::udp::socket, typename Packer = DEFAULT_PACKER>
 class st_udp_socket_base : public st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>
 {
 public:
-	st_udp_socket_base(boost::asio::io_service& io_service_) :
-		st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>(io_service_) {ST_THIS reset_state();}
+	st_udp_socket_base(boost::asio::io_service& io_service_) : st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>(io_service_) {ST_THIS reset_state();}
 
 	//reset all, be ensure that there's no any operations performed on this st_udp_socket when invoke it
 	//notice, when reuse this st_udp_socket, st_object_pool will invoke reset(), child must re-write this to initialize
@@ -65,7 +63,8 @@ public:
 		ST_THIS lowest_layer().set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
 #endif
 		ST_THIS lowest_layer().bind(local_addr, ec); assert(!ec);
-		if (ec) {unified_out::error_out("bind failed.");}
+		if (ec)
+			unified_out::error_out("bind failed.");
 	}
 
 	bool set_local_addr(unsigned short port, const std::string& ip = std::string())
@@ -121,8 +120,7 @@ protected:
 		if (!ST_THIS get_io_service().stopped())
 		{
 			ST_THIS next_layer().async_receive_from(boost::asio::buffer(raw_buff), peer_addr,
-				boost::bind(&st_udp_socket_base::recv_handler, this,
-				boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+				boost::bind(&st_udp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 
 			return true;
 		}
@@ -139,19 +137,15 @@ protected:
 		{
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(send_msg_buffer.front());
-			ST_THIS next_layer().async_send_to(
-				boost::asio::buffer(ST_THIS last_send_msg.str.data(), ST_THIS last_send_msg.str.size()),
-				ST_THIS last_send_msg.peer_addr,
-				boost::bind(&st_udp_socket_base::send_handler, this,
-					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+			ST_THIS next_layer().async_send_to(boost::asio::buffer(ST_THIS last_send_msg.str.data(), ST_THIS last_send_msg.str.size()), ST_THIS last_send_msg.peer_addr,
+				boost::bind(&st_udp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 			send_msg_buffer.pop_front();
 		}
 
 		return ST_THIS sending;
 	}
 
-	virtual bool is_send_allowed() const {return ST_THIS lowest_layer().is_open() &&
-		st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>::is_send_allowed();}
+	virtual bool is_send_allowed() const {return ST_THIS lowest_layer().is_open() && st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
 	virtual void on_recv_error(const boost::system::error_code& ec)
@@ -161,12 +155,10 @@ protected:
 	}
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	virtual bool on_msg(udp_msg<MsgType>& msg)
-		{unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data()); return true;}
+	virtual bool on_msg(udp_msg<MsgType>& msg) {unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data()); return true;}
 #endif
 
-	virtual bool on_msg_handle(udp_msg<MsgType>& msg, bool link_down)
-		{unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data()); return true;}
+	virtual bool on_msg_handle(udp_msg<MsgType>& msg, bool link_down) {unified_out::debug_out("recv(" size_t_format "): %s", msg.str.size(), msg.str.data()); return true;}
 
 	void clean_up()
 	{

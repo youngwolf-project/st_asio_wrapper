@@ -127,8 +127,7 @@ public:
 class prefix_suffix_packer : public i_packer<std::string>
 {
 public:
-	void prefix_suffix(const std::string& prefix, const std::string& suffix)
-		{assert(!suffix.empty() && prefix.size() + suffix.size() < MAX_MSG_LEN); _prefix = prefix;  _suffix = suffix;}
+	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < MAX_MSG_LEN); _prefix = prefix;  _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
 	const std::string& suffix() const {return _suffix;}
 

@@ -46,8 +46,7 @@ extern __off64_t file_size;
 class file_socket : public st_connector
 {
 public:
-	file_socket(boost::asio::io_service& io_service_) : st_connector(io_service_),
-		state(TRANS_IDLE), index(-1), file(nullptr), my_length(0) {}
+	file_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), state(TRANS_IDLE), index(-1), file(nullptr), my_length(0) {}
 	virtual ~file_socket() {clear();}
 
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
