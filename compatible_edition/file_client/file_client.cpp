@@ -25,9 +25,8 @@ int main(int argc, const char* argv[])
 {
 	puts("this is a file client.");
 	printf("usage: asio_client [<port=%d> [<ip=%s> [link num=1]]]\n", SERVER_PORT, SERVER_IP);
-	puts("type quit to end this client.");
+	puts("type " QUIT_COMMAND " to end.");
 
-	std::string str;
 	st_service_pump service_pump;
 	file_client client(service_pump);
 
@@ -49,6 +48,7 @@ int main(int argc, const char* argv[])
 	service_pump.start_service();
 	while(service_pump.is_running())
 	{
+		std::string str;
 		std::getline(std::cin, str);
 		if (str == QUIT_COMMAND)
 			service_pump.stop_service();

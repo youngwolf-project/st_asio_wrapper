@@ -112,18 +112,33 @@ public:
 	virtual void test() {/*puts("in echo_server::test()");*/}
 };
 
-int main() {
-	puts("type quit to end these two servers.");
+int main(int argc, const char* argv[])
+{
+	printf("usage: asio_server [<port=%d> [ip=0.0.0.0]]\n", SERVER_PORT);
+	puts("normal server's port will be 100 larger.");
+	puts("type " QUIT_COMMAND " quit to end.");
 
-	std::string str;
 	st_service_pump service_pump;
 	st_server server_(service_pump); //only need a simple server? you can directly use st_server
-	server_.set_server_addr(SERVER_PORT + 100);
 	echo_server echo_server_(service_pump); //echo server
+
+	if (argc > 2)
+	{
+		server_.set_server_addr(atoi(argv[1]) + 100, argv[2]);
+		echo_server_.set_server_addr(atoi(argv[1]), argv[2]);
+	}
+	else if (argc > 1)
+	{
+		server_.set_server_addr(atoi(argv[1]) + 100);
+		echo_server_.set_server_addr(atoi(argv[1]));
+	}
+	else
+		server_.set_server_addr(SERVER_PORT + 100);
 
 	service_pump.start_service(1);
 	while(service_pump.is_running())
 	{
+		std::string str;
 		std::cin >> str;
 		if (str == QUIT_COMMAND)
 			service_pump.stop_service();

@@ -130,7 +130,7 @@ public:
 
 public:
 	virtual void reset_state() {raw_buff.detach(); step = 0;}
-	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<my_msg_buffer>& msg_can)
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		if (0 == step) //the head been received
 		{
@@ -205,21 +205,32 @@ private:
 #define SUSPEND_COMMAND	"suspend"
 #define RESUME_COMMAND	"resume"
 
-int main() {
-	std::string str;
+int main(int argc, const char* argv[])
+{
+	///////////////////////////////////////////////////////////
+	printf("usage: asio_client [<port=%d> [ip=%s]]\n", SERVER_PORT + 100, SERVER_IP);
+	puts("type " QUIT_COMMAND " quit to end.");
+	///////////////////////////////////////////////////////////
+
 	st_service_pump service_pump;
 	//st_tcp_sclient client(service_pump);
 	st_sclient<st_connector_base<my_msg_buffer> > client(service_pump);
 	//there is no corresponding echo client demo as server endpoint
 	//because echo server with echo client made dead loop, and occupy almost all the network resource
 
-	client.set_server_addr(SERVER_PORT + 100, SERVER_IP);
-//	client.set_server_addr(SERVER_PORT, "::1"); //ipv6
-//	client.set_server_addr(SERVER_PORT, "127.0.0.1"); //ipv4
+//	argv[2] = "::1" //ipv6
+//	argv[2] = "127.0.0.1" //ipv4
+	if (argc > 2)
+		client.set_server_addr(atoi(argv[1]), argv[2]);
+	else if (argc > 1)
+		client.set_server_addr(atoi(argv[1]), SERVER_IP);
+	else
+		client.set_server_addr(SERVER_PORT + 100, SERVER_IP);
 
 	service_pump.start_service();
 	while(service_pump.is_running())
 	{
+		std::string str;
 		std::cin >> str;
 		if (str == QUIT_COMMAND)
 			service_pump.stop_service();

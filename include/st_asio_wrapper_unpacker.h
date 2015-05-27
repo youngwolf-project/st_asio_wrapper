@@ -33,12 +33,15 @@ namespace st_asio_wrapper
 template<typename MsgType>
 class i_unpacker
 {
+public:
+	typedef boost::container::list<MsgType> container_type;
+
 protected:
 	virtual ~i_unpacker() {}
 
 public:
 	virtual void reset_state() = 0;
-	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<MsgType>& msg_can) = 0;
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) = 0;
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
 };
@@ -88,7 +91,7 @@ public:
 
 public:
 	virtual void reset_state() {cur_msg_len = -1; remain_len = 0;}
-	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
 		auto unpack_ok = parse_msg(bytes_transferred, msg_pos_can);
@@ -152,7 +155,7 @@ public:
 
 public:
 	virtual void reset_state() {remain_len = 0;}
-	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		//length + msg
 		remain_len += bytes_transferred;
@@ -256,7 +259,7 @@ public:
 
 public:
 	virtual void reset_state() {first_msg_len = -1; remain_len = 0;}
-	virtual bool parse_msg(size_t bytes_transferred, boost::container::list<std::string>& msg_can)
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		//length + msg
 		remain_len += bytes_transferred;

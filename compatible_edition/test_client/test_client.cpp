@@ -97,7 +97,7 @@ private:
 	void handle_msg(const std::string& msg)
 	{
 		recv_bytes += msg.size();
-		if (::check_msg && (msg.size() < sizeof(size_t) || recv_index != *(size_t*) msg.data()))
+		if (check_msg && (msg.size() < sizeof(size_t) || recv_index != *(size_t*) msg.data()))
 			printf("check msg error: " size_t_format ".\n", recv_index);
 		++recv_index;
 	}
@@ -136,24 +136,31 @@ int main(int argc, const char* argv[])
 {
 	///////////////////////////////////////////////////////////
 	puts("usage: test_client [link num=16]");
+	printf("usage: test_client [<port=%d> [<ip=%s> [link num=1]]]\n", SERVER_PORT, SERVER_IP);
 
 	size_t link_num = 16;
-	if (argc > 1) link_num = std::min((size_t) MAX_OBJECT_NUM, std::max((size_t) atoi(argv[1]), (size_t) 1));
+	if (argc > 3)
+		link_num = std::min(MAX_OBJECT_NUM, std::max(atoi(argv[3]), 1));
 
 	printf("exec: test_client " size_t_format "\n", link_num);
 	///////////////////////////////////////////////////////////
 
-	std::string str;
 	st_service_pump service_pump;
 	test_client client(service_pump);
 	for (size_t i = 0; i < link_num; ++i)
 		client.add_client();
-//	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, SERVER_PORT, "::1")); //ipv6
-//	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, SERVER_PORT, "127.0.0.1")); //ipv4
+
+//	argv[2] = "::1" //ipv6
+//	argv[2] = "127.0.0.1" //ipv4
+	if (argc > 2)
+		client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, atoi(argv[1]), argv[2]));
+	else if (argc > 1)
+		client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, atoi(argv[1]), SERVER_IP));
 
 	service_pump.start_service(1);
 	while(service_pump.is_running())
 	{
+		std::string str;
 		std::getline(std::cin, str);
 		if (str == QUIT_COMMAND)
 			service_pump.stop_service();

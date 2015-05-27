@@ -15,9 +15,8 @@ using namespace st_asio_wrapper;
 #define RECONNECT_COMMAND "reconnect"
 
 int main() {
-	puts("type quit to end.");
+	puts("type " QUIT_COMMAND " to end.");
 
-	std::string str;
 	st_service_pump service_pump;
 
 	st_ssl_server server_(service_pump);
@@ -57,6 +56,7 @@ int main() {
 	service_pump.start_service();
 	while(service_pump.is_running())
 	{
+		std::string str;
 		std::cin >> str;
 		if (str == QUIT_COMMAND)
 			service_pump.stop_service();
