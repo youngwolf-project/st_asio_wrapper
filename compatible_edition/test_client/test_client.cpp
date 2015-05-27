@@ -135,7 +135,6 @@ public:
 int main(int argc, const char* argv[])
 {
 	///////////////////////////////////////////////////////////
-	puts("usage: test_client [link num=16]");
 	printf("usage: test_client [<port=%d> [<ip=%s> [link num=1]]]\n", SERVER_PORT, SERVER_IP);
 
 	size_t link_num = 16;
