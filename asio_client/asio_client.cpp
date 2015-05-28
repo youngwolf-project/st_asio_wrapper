@@ -210,7 +210,7 @@ int main(int argc, const char* argv[])
 {
 	///////////////////////////////////////////////////////////
 	printf("usage: asio_client [<port=%d> [ip=%s]]\n", SERVER_PORT + 100, SERVER_IP);
-	puts("type " QUIT_COMMAND " quit to end.");
+	puts("type " QUIT_COMMAND " to end.");
 	///////////////////////////////////////////////////////////
 
 	st_service_pump service_pump;
