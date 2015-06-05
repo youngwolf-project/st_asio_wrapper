@@ -30,7 +30,7 @@ namespace st_asio_wrapper
 class packer_helper
 {
 public:
-	//return (size_t) -1 means length exceeded the MAX_MSG_LEN
+	//return (size_t) -1 means length exceeded the MSG_BUFFER_SIZE
 	static size_t msg_size_check(size_t pre_len, const char* const pstr[], const size_t len[], size_t num)
 	{
 		if (NULL == pstr || NULL == len)
@@ -42,9 +42,9 @@ public:
 			if (NULL != pstr[i])
 			{
 				total_len += len[i];
-				if (last_total_len > total_len || total_len > MAX_MSG_LEN) //overflow
+				if (last_total_len > total_len || total_len > MSG_BUFFER_SIZE) //overflow
 				{
-					unified_out::error_out("pack msg error: length exceeded the MAX_MSG_LEN!");
+					unified_out::error_out("pack msg error: length exceeded the MSG_BUFFER_SIZE!");
 					return -1;
 				}
 				last_total_len = total_len;
@@ -68,7 +68,7 @@ public:
 class packer : public i_packer<std::string>
 {
 public:
-	static size_t get_max_msg_size() {return MAX_MSG_LEN - HEAD_LEN;}
+	static size_t get_max_msg_size() {return MSG_BUFFER_SIZE - HEAD_LEN;}
 	virtual bool pack_msg(std::string& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg.clear();
@@ -127,7 +127,7 @@ public:
 class prefix_suffix_packer : public i_packer<std::string>
 {
 public:
-	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < MAX_MSG_LEN); _prefix = prefix;  _suffix = suffix;}
+	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < MSG_BUFFER_SIZE); _prefix = prefix;  _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
 	const std::string& suffix() const {return _suffix;}
 

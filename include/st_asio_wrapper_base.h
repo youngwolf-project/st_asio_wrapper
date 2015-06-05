@@ -29,11 +29,15 @@
 #ifndef UNIFIED_OUT_BUF_NUM
 #define UNIFIED_OUT_BUF_NUM	2048
 #endif
-#ifndef MAX_MSG_LEN
-#define MAX_MSG_LEN			4000
+//buffer size used when receiving msg, must equal to or larger than the biggest msg size,
+//the bigger this buffer is, the more msgs can be received in one time if there are enough msgs buffered in the SOCKET.
+//every unpackers have a fixed buffer with this size, every st_tcp_sockets have an unpacker, so, this size is not the bigger the better.
+//if you customized the packer and unpacker, the above principle maybe not right anymore, it should depends on your implementations.
+#ifndef MSG_BUFFER_SIZE
+#define MSG_BUFFER_SIZE			4000
 #endif
-//msg send and recv buffer's maximum size
-//big buffer size won't occupy big memory if you store a little msgs
+//msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamicly, 
+//which means only allocate memories when needed.
 #ifndef MAX_MSG_NUM
 #define MAX_MSG_NUM	1024
 #endif

@@ -218,7 +218,7 @@ protected:
 	}
 
 protected:
-	boost::array<char, MAX_MSG_LEN> raw_buff;
+	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
 	boost::asio::ip::udp::endpoint peer_addr, local_addr;
 };
 typedef st_udp_socket_base<> st_udp_socket;

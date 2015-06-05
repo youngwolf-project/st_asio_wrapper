@@ -77,7 +77,7 @@ protected:
 class my_packer : public i_packer<my_msg_buffer>
 {
 public:
-	static size_t get_max_msg_size() {return MAX_MSG_LEN - HEAD_LEN;}
+	static size_t get_max_msg_size() {return MSG_BUFFER_SIZE - HEAD_LEN;}
 	virtual bool pack_msg(my_msg_buffer& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg.detach();
@@ -167,7 +167,7 @@ public:
 
 			assert(HEAD_LEN == bytes_transferred);
 			BOOST_AUTO(cur_msg_len, HEAD_N2H(*(HEAD_TYPE*) head_buff) - HEAD_LEN);
-			if (cur_msg_len > MAX_MSG_LEN - HEAD_LEN) //invalid msg, stop reading
+			if (cur_msg_len > MSG_BUFFER_SIZE - HEAD_LEN) //invalid msg, stop reading
 				step = -1;
 			else
 				raw_buff.attach(new char[cur_msg_len], cur_msg_len);
@@ -189,7 +189,7 @@ private:
 	char head_buff[HEAD_LEN]; //for head only
 	//please notice that we don't have a fixed size array with maximum size any more(like the default unpacker).
 	//this is very useful if you have very few but very large msgs, fox example:
-	//you have a very large msg(1M size), but all others are very samll, if you use a fixed size array to hold msgs in the unpackers,
+	//you have a very large msg(1M size), but all others are very small, if you use a fixed size array to hold msgs in the unpackers,
 	//all the unpackers must have an array with at least 1M size, each st_socket will have a unpacker, this will cause your application occupy very large memory but with
 	//very low utilization rate.
 	//this my_unpacker will resolve the above problem, and with another benefit: no memory copying needed any more.

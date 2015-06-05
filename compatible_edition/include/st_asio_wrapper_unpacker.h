@@ -56,7 +56,7 @@ public:
 	{
 		//length + msg
 		remain_len += bytes_transferred;
-		assert(remain_len <= MAX_MSG_LEN);
+		assert(remain_len <= MSG_BUFFER_SIZE);
 
 		const char* pnext = raw_buff.begin();
 		bool unpack_ok = true;
@@ -66,7 +66,7 @@ public:
 				//cur_msg_len now can be assigned in the completion_condition function, or in the following 'else if',
 				//so, we must verify cur_msg_len at the very beginning of using it, not at the assignment as we do
 				//before, please pay special attention
-				if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN)
+				if (cur_msg_len > MSG_BUFFER_SIZE || cur_msg_len <= HEAD_LEN)
 					unpack_ok = false;
 				else if (remain_len >= cur_msg_len) //one msg received
 				{
@@ -121,12 +121,12 @@ public:
 			return 0;
 
 		size_t data_len = remain_len + bytes_transferred;
-		assert(data_len <= MAX_MSG_LEN);
+		assert(data_len <= MSG_BUFFER_SIZE);
 
 		if ((size_t) -1 == cur_msg_len && data_len >= HEAD_LEN) //the msg's head been received
 		{
 			cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) raw_buff.begin());
-			if (cur_msg_len > MAX_MSG_LEN || cur_msg_len <= HEAD_LEN) //invalid msg, stop reading
+			if (cur_msg_len > MSG_BUFFER_SIZE || cur_msg_len <= HEAD_LEN) //invalid msg, stop reading
 				return 0;
 		}
 
@@ -136,12 +136,12 @@ public:
 
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		assert(remain_len < MAX_MSG_LEN);
+		assert(remain_len < MSG_BUFFER_SIZE);
 		return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
 	}
 
 protected:
-	boost::array<char, MAX_MSG_LEN> raw_buff;
+	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
 	size_t cur_msg_len; //-1 means head has not received, so, doesn't know the whole msg length.
 	size_t remain_len; //half-baked msg
 };
@@ -151,7 +151,7 @@ class fixed_length_unpacker : public i_unpacker<std::string>
 public:
 	fixed_length_unpacker() {reset_state();}
 
-	void fixed_length(size_t fixed_length) {assert(0 < fixed_length && fixed_length <= MAX_MSG_LEN); _fixed_length = fixed_length;}
+	void fixed_length(size_t fixed_length) {assert(0 < fixed_length && fixed_length <= MSG_BUFFER_SIZE); _fixed_length = fixed_length;}
 	size_t fixed_length() const {return _fixed_length;}
 
 public:
@@ -160,7 +160,7 @@ public:
 	{
 		//length + msg
 		remain_len += bytes_transferred;
-		assert(remain_len <= MAX_MSG_LEN);
+		assert(remain_len <= MSG_BUFFER_SIZE);
 
 		const char* pnext = raw_buff.begin();
 		while (remain_len >= _fixed_length) //considering stick package problem, we need a loop
@@ -189,7 +189,7 @@ public:
 			return 0;
 
 		size_t data_len = remain_len + bytes_transferred;
-		assert(data_len <= MAX_MSG_LEN);
+		assert(data_len <= MSG_BUFFER_SIZE);
 
 		return data_len >= _fixed_length ? 0 : boost::asio::detail::default_max_transfer_size;
 		//read as many as possible except that we have already got an entire msg
@@ -197,12 +197,12 @@ public:
 
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		assert(remain_len < MAX_MSG_LEN);
+		assert(remain_len < MSG_BUFFER_SIZE);
 		return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
 	}
 
 private:
-	boost::array<char, MAX_MSG_LEN> raw_buff;
+	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
 	size_t _fixed_length;
 	size_t remain_len; //half-baked msg
 };
@@ -212,7 +212,7 @@ class prefix_suffix_unpacker : public i_unpacker<std::string>
 public:
 	prefix_suffix_unpacker() {reset_state();}
 
-	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < MAX_MSG_LEN); _prefix = prefix; _suffix = suffix;}
+	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < MSG_BUFFER_SIZE); _prefix = prefix; _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
 	const std::string& suffix() const {return _suffix;}
 
@@ -237,7 +237,7 @@ public:
 				first_msg_len = end - buff + _suffix.size(); //got a msg
 				return 0;
 			}
-			else if (data_len >= MAX_MSG_LEN)
+			else if (data_len >= MSG_BUFFER_SIZE)
 				return 0; //invalid msg, stop reading
 		}
 
@@ -264,7 +264,7 @@ public:
 	{
 		//length + msg
 		remain_len += bytes_transferred;
-		assert(remain_len <= MAX_MSG_LEN);
+		assert(remain_len <= MSG_BUFFER_SIZE);
 
 		size_t min_len = _prefix.size() + _suffix.size();
 		bool unpack_ok = true;
@@ -305,19 +305,19 @@ public:
 			return 0;
 
 		size_t data_len = remain_len + bytes_transferred;
-		assert(data_len <= MAX_MSG_LEN);
+		assert(data_len <= MSG_BUFFER_SIZE);
 
 		return peek_msg(data_len, raw_buff.begin());
 	}
 
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		assert(remain_len < MAX_MSG_LEN);
+		assert(remain_len < MSG_BUFFER_SIZE);
 		return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
 	}
 
 private:
-	boost::array<char, MAX_MSG_LEN> raw_buff;
+	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
 	std::string _prefix, _suffix;
 	size_t first_msg_len;
 	size_t remain_len; //half-baked msg
