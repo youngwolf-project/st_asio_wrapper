@@ -4,11 +4,8 @@
 
 //configuration
 #define SERVER_PORT		5050
-#define FORCE_TO_USE_MSG_RECV_BUFFER
-#define MAX_MSG_LEN		(HEAD_LEN + 1 + 4096)
-	//reading 4096 bytes from disk file one time will gain the best I/O performance
-	//HEAD_LEN is used by the default packer
-	//1 is the head length(see the protocol in file_client.h)
+#define DEFAULT_PACKER	command_packer
+#define DEFAULT_UNPACKER command_unpacker
 //configuration
 
 #include "file_client.h"
@@ -106,6 +103,6 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef SERVER_PORT
-#undef FORCE_TO_USE_MSG_RECV_BUFFER
-#undef MAX_MSG_LEN
+#undef DEFAULT_PACKER
+#undef DEFAULT_UNPACKER
 //restore configuration

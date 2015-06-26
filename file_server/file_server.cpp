@@ -3,13 +3,12 @@
 #define SERVER_PORT		5050
 #define AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
 #define ENHANCED_STABILITY
-#define MAX_MSG_LEN		(HEAD_LEN + 1 + 4096)
-	//reading 4096 bytes from disk file one time will gain the best I/O performance
-	//HEAD_LEN is used by the default packer
-	//1 is the head length(see the protocol in file_server.h)
+#define WANT_MSG_SEND_NOTIFY
 //configuration
 
-#include "file_server.h"
+#include "../include/st_asio_wrapper_server.h"
+using namespace st_asio_wrapper;
+#include "file_socket.h"
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
@@ -22,7 +21,7 @@ int main(int argc, const char* argv[])
 	puts("type " QUIT_COMMAND " to end.");
 
 	st_service_pump service_pump;
-	file_server file_server_(service_pump);
+	st_server_base<file_socket> file_server_(service_pump);
 
 	if (argc > 2)
 		file_server_.set_server_addr(atoi(argv[1]), argv[2]);
@@ -43,8 +42,6 @@ int main(int argc, const char* argv[])
 		}
 		else if (str == LIST_ALL_CLIENT)
 			file_server_.list_all_object();
-		else
-			file_server_.talk(str);
 	}
 
 	return 0;
@@ -54,5 +51,5 @@ int main(int argc, const char* argv[])
 #undef SERVER_PORT
 #undef AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
 #undef ENHANCED_STABILITY
-#undef MAX_MSG_LEN
+#undef WANT_MSG_SEND_NOTIFY
 //restore configuration

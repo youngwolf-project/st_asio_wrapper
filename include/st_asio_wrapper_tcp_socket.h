@@ -71,6 +71,7 @@ public:
 
 	//get or change the unpacker at runtime
 	boost::shared_ptr<i_unpacker<MsgType>> inner_unpacker() {return unpacker_;}
+	boost::shared_ptr<const i_unpacker<MsgType>> inner_unpacker() const {return unpacker_;}
 	void inner_unpacker(const boost::shared_ptr<i_unpacker<MsgType>>& _unpacker_) {unpacker_ = _unpacker_;}
 
 	using st_socket<MsgType, Socket, MsgType, Packer>::send_msg;
