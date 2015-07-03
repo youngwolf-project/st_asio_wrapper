@@ -12,7 +12,7 @@
 //if we consider the send buffer and recv buffer, the buffer's default max size is 1K, so, every st_tcp_socket
 //can consume 2G(2 * 1M * 1K) memory when performance testing(both send buffer and recv buffer are full).
 //#define HUGE_MSG
-//#define MAX_MSG_LEN (1024 * 1024)
+//#define MSG_BUFFER_SIZE (1024 * 1024)
 //#define MAX_MSG_NUM 8 //reduce buffer size to reduce memory occupation
 //configuration
 
@@ -61,8 +61,8 @@ public:
 	//the following four functions are needed by st_asio_wrapper
 	//for other functions, depends on the implementation of your packer and unpacker
 	bool empty() const {return 0 == len || NULL == buff;}
-	const char* data() const {return buff;}
 	size_t size() const {return len;}
+	const char* data() const {return buff;}
 	void swap(my_msg_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len);}
 
 protected:
@@ -76,6 +76,9 @@ protected:
 
 class my_packer : public i_packer<my_msg_buffer>
 {
+public:
+	typedef my_msg_buffer msg_type;
+
 public:
 	static size_t get_max_msg_size() {return MSG_BUFFER_SIZE - HEAD_LEN;}
 	virtual bool pack_msg(my_msg_buffer& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
@@ -214,7 +217,7 @@ int main(int argc, const char* argv[])
 
 	st_service_pump service_pump;
 	//st_tcp_sclient client(service_pump);
-	st_sclient<st_connector_base<my_msg_buffer> > client(service_pump);
+	st_sclient<st_connector> client(service_pump);
 	//there is no corresponding echo client demo as server endpoint
 	//because echo server with echo client made dead loop, and occupy almost all the network resource
 
@@ -255,7 +258,7 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef SERVER_PORT
-#undef FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+#undef FORCE_TO_USE_MSG_RECV_BUFFER
 #undef CUSTOM_LOG
 #undef DEFAULT_PACKER
 #undef DEFAULT_UNPACKER

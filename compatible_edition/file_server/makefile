@@ -1,29 +1,31 @@
 
 ifeq (${MAKECMDGOALS}, debug)
 	cflag = -g -DDEBUG
-	dir = ./debug
+	dir = debug
 else
 	cflag = -O -DNDEBUG
 	lflag = -s
-	dir = ./release
+	dir = release
 endif
+cflags = -Wall -fexceptions -std=c++11 ${cflag}
 
 module = file_server
 target = ${dir}/${module}
 sources = ${shell ls *.cpp}
-objects = ${patsubst %.cpp, ${dir}/%.o, ${sources}}
+objects = ${patsubst %.cpp,${dir}/%.o,${sources}}
+deps = ${patsubst %.cpp,%.d,${sources}}
 headers = ${shell ls *.h 2>/dev/null}
 ${shell mkdir -p ${dir}}
 
-
 release debug : ${target}
+-include ${deps}
 ${target} : ${objects}
 	g++ -o ${target} ${objects} ${lflag} -pthread -lboost_system -lboost_thread
-${objects} : ${dir}/%.o : %.cpp ${headers}
-	g++ -Wall -fexceptions ${cflag} -c $< -o $@
-
+${objects} : ${dir}/%.o : %.cpp
+	g++ ${cflags} -E -MMD -MT '${subst .cpp,.o,${dir}/$<}' $< 1>/dev/null
+	g++ ${cflags} -c $< -o $@
 
 .PHONY : clean
 clean:
-	-rm -rf ./debug ./release
+	-rm -rf ${deps} debug release
 

@@ -4,8 +4,7 @@
 
 //configuration
 #define SERVER_PORT		5051
-#define DEFAULT_PACKER command_packer
-#define DEFAULT_UNPACKER command_unpacker
+#define REPLACEABLE_BUFFER
 //configuration
 
 #include "file_client.h"
@@ -104,6 +103,5 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef SERVER_PORT
-#undef DEFAULT_PACKER
-#undef DEFAULT_UNPACKER
+#undef REPLACEABLE_BUFFER
 //restore configuration

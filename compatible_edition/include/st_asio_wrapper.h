@@ -362,6 +362,15 @@
  * Add support for msg customization.
  * The most representative usage of this new feature is send memory-mapped files with stream protocol.
  * Demonstrated how to use custom msg buffer(default buffer is std::string) in demo asio_client.
+ *
+ * 5.0	2015.7.5
+ * Dropped DEFAULT_SSL_METHOD macro, now you must explicitly specify the SSL method for st_tcp_client_base and st_ssl_server_socket_base.
+ * More conveniences for replacing packer and unpacker at runtime (please define REPLACEABLE_BUFFER macro), see demo file_client and file_server for more details.
+ * Added msg type definition to the packer, so all classes who need msg type template parameters were simplified (not need msg type template parameters any more).
+ * Added more functions to i_packer for better suing (like send_msg series functions).
+ * Added udp unpacker, actually udp msg doesn't need unpacking, but we may need different msg types, not only std::string.
+ * Perfected makefiles: generate dependences automatically.
+ * Upgraded the pem files from 512 bits to 1024 bits to satisfy newer OpenSSL.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_

@@ -63,13 +63,20 @@ protected:
 public:
 	virtual void reset_state() {}
 	virtual bool pack_msg(MsgType& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+
+	bool pack_msg(MsgType& msg, const char* pstr, size_t len, bool native = false) {return pack_msg(msg, &pstr, &len, 1, native);}
+	bool pack_msg(MsgType& msg, const std::string& str, bool native = false) {return pack_msg(msg, str.data(), str.size(), native);}
 };
 
 class packer : public i_packer<std::string>
 {
 public:
+	typedef std::string msg_type;
 	static size_t get_max_msg_size() {return MSG_BUFFER_SIZE - HEAD_LEN;}
-	virtual bool pack_msg(std::string& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
+
+public:
+	using i_packer<msg_type>::pack_msg;
+	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg.clear();
 		size_t pre_len = native ? 0 : HEAD_LEN;
@@ -103,10 +110,39 @@ public:
 	}
 };
 
+class replaceable_packer : public i_packer<replaceable_buffer>
+{
+public:
+	typedef replaceable_buffer msg_type;
+
+public:
+	using i_packer<msg_type>::pack_msg;
+	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
+	{
+		msg.clear();
+		packer p;
+		packer::msg_type str;
+		if (p.pack_msg(str, pstr, len, num, native))
+		{
+			BOOST_AUTO(com, boost::make_shared<buffer>());
+			com->swap(str);
+			msg.raw_buffer(com);
+
+			return true;
+		}
+
+		return false;
+	}
+};
+
 class fixed_legnth_packer : public i_packer<std::string>
 {
 public:
-	virtual bool pack_msg(std::string& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
+	typedef std::string msg_type;
+
+public:
+	using i_packer<msg_type>::pack_msg;
+	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg.clear();
 		size_t total_len = packer_helper::msg_size_check(0, pstr, len, num);
@@ -127,12 +163,16 @@ public:
 class prefix_suffix_packer : public i_packer<std::string>
 {
 public:
+	typedef std::string msg_type;
+
+public:
 	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < MSG_BUFFER_SIZE); _prefix = prefix;  _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
 	const std::string& suffix() const {return _suffix;}
 
 public:
-	virtual bool pack_msg(std::string& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
+	using i_packer<msg_type>::pack_msg;
+	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg.clear();
 		size_t pre_len = native ? 0 : _prefix.size() + _suffix.size();

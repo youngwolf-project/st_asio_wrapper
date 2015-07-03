@@ -12,14 +12,14 @@ extern boost::atomic_ushort completed_client_num;
 extern int link_num;
 extern __off64_t file_size;
 
-class file_socket : public base_socket, public st_connector_base<file_buffer>
+class file_socket : public base_socket, public st_connector
 {
 public:
-	file_socket(boost::asio::io_service& io_service_) : st_connector_base<file_buffer>(io_service_), index(-1) {}
+	file_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), index(-1) {}
 	virtual ~file_socket() {clear();}
 
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
-	virtual void reset() {clear(); st_connector_base<file_buffer>::reset();}
+	virtual void reset() {clear(); st_connector::reset();}
 
 	void set_index(int index_) {index = index_;}
 	__off64_t get_rest_size() const
@@ -68,9 +68,9 @@ protected:
 	//msg handling
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//we can handle the msg very fast, so we don't use the recv buffer
-	virtual bool on_msg(file_buffer& msg) {handle_msg(msg); return true;}
+	virtual bool on_msg(msg_type& msg) {handle_msg(msg); return true;}
 #endif
-	virtual bool on_msg_handle(file_buffer& msg, bool link_down) {handle_msg(msg); return true;}
+	virtual bool on_msg_handle(msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
 
 private:
@@ -83,30 +83,30 @@ private:
 			file = nullptr;
 		}
 
-		inner_unpacker(boost::make_shared<command_unpacker>());
+		inner_unpacker(boost::make_shared<DEFAULT_UNPACKER>());
 	}
 	void trans_end() {clear(); ++completed_client_num;}
 
-	void handle_msg(const file_buffer& str)
+	void handle_msg(const msg_type& msg)
 	{
 		if (TRANS_BUSY == state)
 		{
-			assert(str.empty());
+			assert(msg.empty());
 			trans_end();
 			return;
 		}
-		else if (str.size() <= ORDER_LEN)
+		else if (msg.size() <= ORDER_LEN)
 		{
-			printf("wrong order length: " size_t_format ".\n", str.size());
+			printf("wrong order length: " size_t_format ".\n", msg.size());
 			return;
 		}
 
-		switch (*str.data())
+		switch (*msg.data())
 		{
 		case 0:
-			if (ORDER_LEN + DATA_LEN == str.size() && nullptr != file && TRANS_PREPARE == state)
+			if (ORDER_LEN + DATA_LEN == msg.size() && nullptr != file && TRANS_PREPARE == state)
 			{
-				auto length = *(__off64_t*) std::next(str.data(), ORDER_LEN);
+				auto length = *(__off64_t*) std::next(msg.data(), ORDER_LEN);
 				if (-1 == length)
 				{
 					if (0 == index)
@@ -144,7 +144,7 @@ private:
 			break;
 		case 2:
 			if (0 == index)
-				printf("server says: %s\n", std::next(str.data(), ORDER_LEN));
+				printf("server says: %s\n", std::next(msg.data(), ORDER_LEN));
 			break;
 		default:
 			break;

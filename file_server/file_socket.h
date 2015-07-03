@@ -6,8 +6,7 @@
 using namespace st_asio_wrapper;
 #include "packer_unpacker.h"
 
-#define st_server_socket_customized(MsgType, Packer, Unpacker) st_asio_wrapper::st_server_socket_base<MsgType, boost::asio::ip::tcp::socket, st_asio_wrapper::i_server, Packer, Unpacker>
-class file_socket : public base_socket, public st_server_socket_customized(file_buffer, command_packer, command_unpacker)
+class file_socket : public base_socket, public st_server_socket
 {
 public:
 	file_socket(i_server& server_);
@@ -22,18 +21,18 @@ protected:
 	//msg handling
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//we can handle the msg very fast, so we don't use the recv buffer
-	virtual bool on_msg(file_buffer& msg);
+	virtual bool on_msg(msg_type& msg);
 #endif
-	virtual bool on_msg_handle(file_buffer& msg, bool link_down);
+	virtual bool on_msg_handle(msg_type& msg, bool link_down);
 	//msg handling end
 
 #ifdef WANT_MSG_SEND_NOTIFY
-	virtual void on_msg_send(file_buffer& msg);
+	virtual void on_msg_send(msg_type& msg);
 #endif
 
 private:
 	void trans_end();
-	void handle_msg(const file_buffer& str);
+	void handle_msg(const msg_type& msg);
 };
 
 #endif //#ifndef FILE_SOCKET_H_

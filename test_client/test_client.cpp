@@ -22,6 +22,9 @@
 //2-fixed length packer and unpacker
 //3-prefix and suffix packer and unpacker
 
+#if 1 == PACKER_UNPACKER_TYPE
+//#define REPLACEABLE_BUFFER
+#endif
 #if 2 == PACKER_UNPACKER_TYPE
 #define DEFAULT_PACKER	fixed_legnth_packer
 #define DEFAULT_UNPACKER fixed_length_unpacker
@@ -85,14 +88,14 @@ protected:
 	//msg handling
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER //not force to use msg recv buffer(so on_msg() will make the decision)
 	//we can handle the msg very fast, so we don't use the recv buffer(return false)
-	virtual bool on_msg(std::string& msg) {handle_msg(msg); return true;}
+	virtual bool on_msg(msg_type& msg) {handle_msg(msg); return true;}
 #endif
 	//we should handle the msg in on_msg_handle for time-consuming task like this:
-	virtual bool on_msg_handle(std::string& msg, bool link_down) {handle_msg(msg); return true;}
+	virtual bool on_msg_handle(msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
 
 private:
-	void handle_msg(const std::string& msg)
+	void handle_msg(const msg_type& msg)
 	{
 		recv_bytes += msg.size();
 		if (check_msg && (msg.size() < sizeof(size_t) || recv_index != *(size_t*) msg.data()))
@@ -288,6 +291,7 @@ int main(int argc, const char* argv[])
 //restore configuration
 #undef SERVER_PORT
 //#undef REUSE_OBJECT
+//#undef REPLACEABLE_BUFFER
 
 //#undef HUGE_MSG
 //#undef MAX_MSG_LEN

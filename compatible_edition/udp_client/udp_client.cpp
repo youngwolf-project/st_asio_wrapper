@@ -1,4 +1,8 @@
 
+//configuration
+//#define REPLACEABLE_BUFFER
+//configuration
+
 #include "../include/st_asio_wrapper_udp_client.h"
 using namespace st_asio_wrapper;
 
@@ -38,3 +42,7 @@ int main(int argc, const char* argv[]) {
 
 	return 0;
 }
+
+//restore configuration
+//#undef REPLACEABLE_BUFFER
+//restore configuration

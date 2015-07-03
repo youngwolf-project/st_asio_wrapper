@@ -11,6 +11,9 @@
 //2-fixed length packer and unpacker
 //3-prefix and suffix packer and unpacker
 
+#if 1 == PACKER_UNPACKER_TYPE
+//#define REPLACEABLE_BUFFER
+#endif
 #if 2 == PACKER_UNPACKER_TYPE
 #define DEFAULT_PACKER	fixed_legnth_packer
 #define DEFAULT_UNPACKER fixed_length_unpacker
@@ -45,7 +48,7 @@ using namespace st_asio_wrapper;
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
 #if 1 == PACKER_UNPACKER_TYPE
-auto global_packer(boost::make_shared<packer>());
+auto global_packer(boost::make_shared<DEFAULT_PACKER>());
 #endif
 #if 2 == PACKER_UNPACKER_TYPE
 auto global_packer(boost::make_shared<fixed_legnth_packer>());
@@ -61,12 +64,14 @@ public:
 	virtual void test() = 0;
 };
 
-class echo_socket : public st_server_socket_base<std::string, boost::asio::ip::tcp::socket, i_echo_server>
+class echo_socket : public st_server_socket_base<DEFAULT_PACKER, DEFAULT_UNPACKER, i_echo_server>
 {
 public:
 	echo_socket(i_echo_server& server_) : st_server_socket_base(server_)
 	{
+#if 1 == PACKER_UNPACKER_TYPE
 		inner_packer(global_packer);
+#endif
 #if 2 == PACKER_UNPACKER_TYPE
 		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
 #endif
@@ -94,10 +99,10 @@ protected:
 	//msg handling: send the original msg back(echo server)
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
-	virtual bool on_msg(std::string& msg) {post_msg(msg); return true;}
+	virtual bool on_msg(msg_type& msg) {post_msg(msg.data(), msg.size()); return true;}
 #endif
 	//we should handle the msg in on_msg_handle for time-consuming task like this:
-	virtual bool on_msg_handle(std::string& msg, bool link_down) {return send_msg(msg);}
+	virtual bool on_msg_handle(msg_type& msg, bool link_down) {return send_msg(msg.data(), msg.size());}
 	//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_tcp_socket will directly
 	//use the msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
 	//msg handling end
@@ -165,7 +170,18 @@ int main(int argc, const char* argv[])
 			echo_server_.list_all_object();
 		}
 		else
-			server_.broadcast_msg(str.data(), str.size() + 1);
+		{
+			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
+			//server_.safe_broadcast_msg(str.data(), str.size() + 1); //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
+
+#if 1 == PACKER_UNPACKER_TYPE
+			//if all clients used the same protocol, we can pack msg one time, and use it repeatedly like this:
+			DEFAULT_PACKER packer;
+			auto msg = packer.pack_msg(str.data(), str.size() + 1); //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
+			if (!msg.empty())
+				server_.do_something_to_all(boost::bind((bool (st_server_socket::*) (const st_server_socket::msg_type&, bool)) &st_server_socket::direct_send_msg, _1, boost::cref(msg), false));
+#endif
+		}
 	}
 
 	return 0;
@@ -173,9 +189,10 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef SERVER_PORT
-#undef REUSE_OBJECT //use objects pool
-//#undef FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+#undef REUSE_OBJECT
+//#undef FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ENHANCED_STABILITY
+//#undef REPLACEABLE_BUFFER
 
 //#undef HUGE_MSG
 //#undef MAX_MSG_LEN

@@ -4,6 +4,7 @@
 #define AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
 #define ENHANCED_STABILITY
 #define WANT_MSG_SEND_NOTIFY
+#define REPLACEABLE_BUFFER
 //configuration
 
 #include "../include/st_asio_wrapper_server.h"
@@ -49,7 +50,8 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef SERVER_PORT
-#undef AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
+#undef AUTO_CLEAR_CLOSED_SOCKET
 #undef ENHANCED_STABILITY
 #undef WANT_MSG_SEND_NOTIFY
+#undef REPLACEABLE_BUFFER
 //restore configuration

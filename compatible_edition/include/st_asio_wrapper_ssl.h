@@ -19,24 +19,20 @@
 #include "st_asio_wrapper_tcp_client.h"
 #include "st_asio_wrapper_server.h"
 
-#ifndef DEFAULT_SSL_METHOD
-#define DEFAULT_SSL_METHOD boost::asio::ssl::context::sslv3
-#endif
-
 namespace st_asio_wrapper
 {
 
-template <typename MsgType = std::string, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
-class st_ssl_connector_base : public st_connector_base<MsgType, Socket, Packer, Unpacker>
+template <typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket> >
+class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket>
 {
 public:
-	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : st_connector_base<MsgType, Socket, Packer, Unpacker>(io_service_, ctx), authorized_(false) {}
+	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : st_connector_base<Packer, Unpacker, Socket>(io_service_, ctx), authorized_(false) {}
 
 	//reset all, be ensure that there's no any operations performed on this st_ssl_connector_base when invoke it
 	//notice, when reuse this st_ssl_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
 	//all member variables, and then do not forget to invoke st_ssl_connector_base::reset() to initialize father's
 	//member variables
-	virtual void reset() {authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::reset();}
+	virtual void reset() {authorized_ = false; st_connector_base<Packer, Unpacker, Socket>::reset();}
 
 	bool authorized() const {return authorized_;}
 
@@ -58,8 +54,8 @@ protected:
 		return false;
 	}
 
-	virtual void on_unpack_error() {authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::on_unpack_error();}
-	virtual void on_recv_error(const boost::system::error_code& ec) {authorized_ = false; st_connector_base<MsgType, Socket, Packer, Unpacker>::on_recv_error(ec);}
+	virtual void on_unpack_error() {authorized_ = false; st_connector_base<Packer, Unpacker, Socket>::on_unpack_error();}
+	virtual void on_recv_error(const boost::system::error_code& ec) {authorized_ = false; st_connector_base<Packer, Unpacker, Socket>::on_recv_error(ec);}
 	virtual void on_handshake(bool result)
 	{
 		if (result)
@@ -70,7 +66,7 @@ protected:
 			ST_THIS force_close(false);
 		}
 	}
-	virtual bool is_send_allowed() const {return authorized() && st_connector_base<MsgType, Socket, Packer, Unpacker>::is_send_allowed();}
+	virtual bool is_send_allowed() const {return authorized() && st_connector_base<Packer, Unpacker, Socket>::is_send_allowed();}
 
 	void connect_handler(const boost::system::error_code& ec)
 	{
@@ -82,13 +78,15 @@ protected:
 			do_start();
 		}
 		else
-			st_connector_base<MsgType, Socket, Packer, Unpacker>::connect_handler(ec);
+			st_connector_base<Packer, Unpacker, Socket>::connect_handler(ec);
 	}
 
 	void handshake_handler(const boost::system::error_code& ec)
 	{
 		on_handshake(!ec);
-		if (!ec)
+		if (ec)
+			unified_out::error_out("handshake failed: %s", ec.message().data());
+		else
 		{
 			authorized_ = true;
 			ST_THIS send_msg(); //send msg buffer may have msgs, send them
@@ -106,9 +104,7 @@ template<typename Object>
 class st_ssl_object_pool : public st_object_pool<Object>
 {
 public:
-	st_ssl_object_pool(st_service_pump& service_pump_) : st_object_pool<Object>(service_pump_), ctx(DEFAULT_SSL_METHOD) {}
 	st_ssl_object_pool(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_object_pool<Object>(service_pump_), ctx(m) {}
-
 	boost::asio::ssl::context& ssl_context() {return ctx;}
 
 	//this method simply create a class derived from st_socket from heap, secondly you must invoke
@@ -131,12 +127,11 @@ protected:
 };
 typedef st_tcp_client_base<st_ssl_connector, st_ssl_object_pool<st_ssl_connector> > st_ssl_tcp_client;
 
-template<typename MsgType = std::string, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, typename Server = i_server,
-	typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
-class st_ssl_server_socket_base : public st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>
+template<typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket> >
+class st_ssl_server_socket_base : public st_server_socket_base<Packer, Unpacker, Server, Socket>
 {
 public:
-	st_ssl_server_socket_base(Server& server_, boost::asio::ssl::context& ctx) : st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>(server_, ctx) {}
+	st_ssl_server_socket_base(Server& server_, boost::asio::ssl::context& ctx) : st_server_socket_base<Packer, Unpacker, Server, Socket>(server_, ctx) {}
 };
 typedef st_ssl_server_socket_base<> st_ssl_server_socket;
 
@@ -144,7 +139,6 @@ template<typename Socket = st_ssl_server_socket, typename Pool = st_ssl_object_p
 class st_ssl_server_base : public st_server_base<Socket, Pool, Server>
 {
 public:
-	st_ssl_server_base(st_service_pump& service_pump_) : st_server_base<Socket, Pool, Server>(service_pump_) {}
 	st_ssl_server_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_server_base<Socket, Pool, Server>(service_pump_, m) {}
 
 protected:
@@ -180,16 +174,15 @@ protected:
 	void handshake_handler(const boost::system::error_code& ec, typename st_ssl_server_base::object_ctype& client_ptr)
 	{
 		on_handshake(!ec, client_ptr);
-		if (!ec)
+		if (ec)
+			unified_out::error_out("handshake failed: %s", ec.message().data());
+		else if (ST_THIS add_client(client_ptr))
 		{
-			if (ST_THIS add_client(client_ptr))
-			{
-				client_ptr->start();
-				return;
-			}
-			else
-				client_ptr->show_info("client:", "been refused cause of too many clients.");
+			client_ptr->start();
+			return;
 		}
+		else
+			client_ptr->show_info("client:", "been refused cause of too many clients.");
 
 		client_ptr->force_close();
 	}

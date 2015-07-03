@@ -146,6 +146,52 @@ protected:
 	size_t remain_len; //half-baked msg
 };
 
+class udp_unpacker
+{
+public:
+	void to_msg(std::string& msg, size_t bytes_transferred) const {assert(bytes_transferred <= MSG_BUFFER_SIZE); msg.assign(raw_buff.data(), bytes_transferred);}
+	boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
+
+protected:
+	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
+};
+
+class replaceable_unpacker : public i_unpacker<replaceable_buffer>, public unpacker
+{
+public:
+	virtual void reset_state() {unpacker::reset_state();}
+	virtual bool parse_msg(size_t bytes_transferred, i_unpacker<replaceable_buffer>::container_type& msg_can)
+	{
+		unpacker::container_type tmp_can;
+		bool unpack_ok = unpacker::parse_msg(bytes_transferred, tmp_can);
+		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
+		{
+			BOOST_AUTO(com, boost::make_shared<buffer>());
+			com->swap(*iter);
+			msg_can.resize(msg_can.size() + 1);
+			msg_can.back().raw_buffer(com);
+		}
+
+		//when unpack failed, some successfully parsed msgs may still returned via msg_can(stick package), please note.
+		return unpack_ok;
+	}
+
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return unpacker::completion_condition(ec, bytes_transferred);}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return unpacker::prepare_next_recv();}
+};
+
+class replaceable_udp_unpacker : public udp_unpacker
+{
+public:
+	void to_msg(replaceable_buffer& msg, size_t bytes_transferred) const
+	{
+		assert(bytes_transferred <= MSG_BUFFER_SIZE);
+		BOOST_AUTO(com, boost::make_shared<buffer>());
+		com->assign(raw_buff.data(), bytes_transferred);
+		msg.raw_buffer(com);
+	}
+};
+
 class fixed_length_unpacker : public i_unpacker<std::string>
 {
 public:

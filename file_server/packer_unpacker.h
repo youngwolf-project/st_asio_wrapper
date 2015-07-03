@@ -38,87 +38,10 @@ if head equal:
 */
 
 //demonstrate how to change packer and unpacker at runtime.
-class i_file_buffer
-{
-protected:
-	virtual ~i_file_buffer() {}
-
-public:
-	virtual bool empty() const = 0;
-	virtual size_t size() const = 0;
-	virtual const char* data() const = 0;
-};
-
-class file_buffer
+class file_buffer : public i_buffer
 {
 public:
-	file_buffer() {}
-	file_buffer(const boost::shared_ptr<i_file_buffer>& _buffer) : buffer(_buffer) {}
-
-	void raw_buffer(const boost::shared_ptr<i_file_buffer>& _buffer) {buffer = _buffer;}
-	boost::shared_ptr<i_file_buffer> raw_buffer() {return buffer;}
-
-	//the following five functions are needed by st_asio_wrapper
-	//for other functions, depends on the implementation of your packer and unpacker
-	bool empty() const {return !buffer || buffer->empty();}
-	size_t size() const {return buffer ? buffer->size() : 0;}
-	const char* data() const {return buffer ? buffer->data() : nullptr;}
-	void swap(file_buffer& other) {buffer.swap(other.buffer);}
-
-protected:
-	boost::shared_ptr<i_file_buffer> buffer;
-};
-
-class command : public std::string, public i_file_buffer
-{
-public:
-	virtual bool empty() const {return std::string::empty();}
-	virtual size_t size() const {return std::string::size();}
-	virtual const char* data() const {return std::string::data();}
-};
-
-class command_packer : public i_packer<file_buffer>
-{
-public:
-	virtual file_buffer pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
-	{
-		packer p;
-		std::string str = p.pack_msg(pstr, len, num, native);
-
-		auto com = boost::make_shared<command>();
-		com->swap(str);
-
-		return file_buffer(com);
-	}
-};
-
-class command_unpacker : public i_unpacker<file_buffer>, public unpacker
-{
-public:
-	virtual void reset_state() {unpacker::reset_state();}
-	virtual bool parse_msg(size_t bytes_transferred, i_unpacker<file_buffer>::container_type& msg_can)
-	{
-		unpacker::container_type tmp_can;
-		auto unpack_ok = unpacker::parse_msg(bytes_transferred, tmp_can);
-		do_something_to_all(tmp_can, [&](decltype(*std::begin(tmp_can))& item) {
-			auto com = boost::make_shared<command>();
-			com->swap(item);
-			msg_can.resize(msg_can.size() + 1);
-			msg_can.back().raw_buffer(com);
-		});
-
-		//when unpack failed, some successfully parsed msgs may still returned via msg_can(stick package), please note.
-		return unpack_ok;
-	}
-
-	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return unpacker::completion_condition(ec, bytes_transferred);}
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return unpacker::prepare_next_recv();}
-};
-
-class data_buffer : public i_file_buffer
-{
-public:
-	data_buffer(FILE* file, __off64_t offset, __off64_t data_len)  : _file(file), _offset(offset), _data_len(data_len)
+	file_buffer(FILE* file, __off64_t offset, __off64_t data_len) : _file(file), _offset(offset), _data_len(data_len)
 	{
 		assert(nullptr != _file);
 
@@ -128,8 +51,7 @@ public:
 		fseeko64(_file, _offset, SEEK_SET);
 		read();
 	}
-
-	~data_buffer() {delete[] buffer;}
+	~file_buffer() {delete[] buffer;}
 
 public:
 	virtual bool empty() const {return 0 == buffer_len;}
@@ -160,7 +82,7 @@ protected:
 	__off64_t _offset, _data_len;
 };
 
-class data_unpacker : public i_unpacker<file_buffer>
+class data_unpacker : public i_unpacker<replaceable_buffer>
 {
 public:
 	data_unpacker(FILE* file, __off64_t offset, __off64_t data_len)  : _file(file), _offset(offset), _data_len(data_len)
@@ -177,9 +99,9 @@ public:
 	__off64_t get_rest_size() const {return _data_len;}
 
 	virtual void reset_state() {_file = nullptr; delete[] buffer; buffer = nullptr; _offset = _data_len = 0;}
-	virtual bool parse_msg(size_t bytes_transferred, i_unpacker<file_buffer>::container_type& msg_can)
+	virtual bool parse_msg(size_t bytes_transferred, i_unpacker<replaceable_buffer>::container_type& msg_can)
 	{
-		assert(_data_len >= bytes_transferred && bytes_transferred > 0);
+		assert(_data_len >= (__off64_t) bytes_transferred && bytes_transferred > 0);
 		_data_len -= bytes_transferred;
 
 		if (bytes_transferred != fwrite(buffer, 1, bytes_transferred, _file))

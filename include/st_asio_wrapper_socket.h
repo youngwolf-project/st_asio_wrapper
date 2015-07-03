@@ -19,7 +19,11 @@
 #include "st_asio_wrapper_timer.h"
 
 #ifndef DEFAULT_PACKER
+#ifdef REPLACEABLE_BUFFER
+#define DEFAULT_PACKER replaceable_packer
+#else
 #define DEFAULT_PACKER packer
+#endif
 #endif
 
 namespace st_asio_wrapper
@@ -35,7 +39,7 @@ enum BufferType {POST_BUFFER, SEND_BUFFER, RECV_BUFFER};
 #define recv_msg_buffer_mutex ST_THIS msg_buffer_mutex[2]
 #define temp_msg_buffer ST_THIS msg_buffer[3]
 
-template<typename MsgType, typename Socket, typename MsgDataType, typename Packer>
+template<typename Socket, typename Packer, typename MsgType = typename Packer::msg_type>
 class st_socket: public st_timer
 {
 public:
@@ -100,9 +104,9 @@ public:
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
 
 	//get or change the packer at runtime
-	boost::shared_ptr<i_packer<MsgDataType>> inner_packer() {return packer_;}
-	boost::shared_ptr<const i_packer<MsgDataType>> inner_packer() const {return packer_;}
-	void inner_packer(const boost::shared_ptr<i_packer<MsgDataType>>& _packer_) {packer_ = _packer_;}
+	boost::shared_ptr<i_packer<typename Packer::msg_type>> inner_packer() {return packer_;}
+	boost::shared_ptr<const i_packer<typename Packer::msg_type>> inner_packer() const {return packer_;}
+	void inner_packer(const boost::shared_ptr<i_packer<typename Packer::msg_type>>& _packer_) {packer_ = _packer_;}
 
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed
 	//no matter whether the send buffer is available
@@ -391,7 +395,7 @@ protected:
 	Socket next_layer_;
 
 	MsgType last_send_msg, last_dispatch_msg;
-	boost::shared_ptr<i_packer<MsgDataType>> packer_;
+	boost::shared_ptr<i_packer<typename Packer::msg_type>> packer_;
 
 	container_type msg_buffer[4];
 	//if on_msg() return true, which means use the msg receive buffer,
