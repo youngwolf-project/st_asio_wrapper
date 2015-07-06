@@ -7,7 +7,7 @@ else
 	lflag = -s
 	dir = release
 endif
-cflags = -Wall -fexceptions -std=c++11 ${cflag}
+cflags = -Wall -fexceptions ${cflag}
 
 module = test_client
 target = ${dir}/${module}
