@@ -33,7 +33,7 @@ public:
 	size_t valid_size()
 	{
 		size_t size = 0;
-		ST_THIS do_something_to_all([&](typename st_tcp_client_base::object_ctype& item) {
+		ST_THIS do_something_to_all([&size](typename st_tcp_client_base::object_ctype& item) {
 			if (item->is_connected())
 				++size;
 		});

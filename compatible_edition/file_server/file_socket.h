@@ -32,7 +32,7 @@ protected:
 
 private:
 	void trans_end();
-	void handle_msg(const msg_type& msg);
+	void handle_msg(msg_ctype& msg);
 };
 
 #endif //#ifndef FILE_SOCKET_H_

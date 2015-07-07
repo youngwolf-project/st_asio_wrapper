@@ -38,6 +38,7 @@ class st_tcp_socket_base : public st_socket<Socket, Packer>
 {
 public:
 	typedef typename Packer::msg_type msg_type;
+	typedef typename Packer::msg_ctype msg_ctype;
 
 protected:
 	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state();}

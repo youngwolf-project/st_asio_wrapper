@@ -179,7 +179,7 @@ int main(int argc, const char* argv[])
 			DEFAULT_PACKER packer;
 			auto msg = packer.pack_msg(str.data(), str.size() + 1); //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
 			if (!msg.empty())
-				server_.do_something_to_all(boost::bind((bool (st_server_socket::*) (const st_server_socket::msg_type&, bool)) &st_server_socket::direct_send_msg, _1, boost::cref(msg), false));
+				server_.do_something_to_all(boost::bind((bool (st_server_socket::*) (st_server_socket::msg_ctype&, bool)) &st_server_socket::direct_send_msg, _1, boost::cref(msg), false));
 #endif
 		}
 	}

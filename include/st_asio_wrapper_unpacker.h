@@ -46,6 +46,17 @@ public:
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
 };
 
+template<typename MsgType>
+class i_udp_unpacker
+{
+protected:
+	virtual ~i_udp_unpacker() {}
+
+public:
+	virtual MsgType parse_msg(size_t bytes_transferred) = 0;
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
+};
+
 class unpacker : public i_unpacker<std::string>
 {
 public:
@@ -95,7 +106,7 @@ public:
 	{
 		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
 		auto unpack_ok = parse_msg(bytes_transferred, msg_pos_can);
-		do_something_to_all(msg_pos_can, [&](decltype(*std::begin(msg_pos_can))& item) {
+		do_something_to_all(msg_pos_can, [&msg_can](decltype(*std::begin(msg_pos_can))& item) {
 			msg_can.resize(msg_can.size() + 1);
 			msg_can.back().assign(item.first, item.second);
 		});
@@ -145,11 +156,11 @@ protected:
 	size_t remain_len; //half-baked msg
 };
 
-class udp_unpacker
+class udp_unpacker : public i_udp_unpacker<std::string>
 {
 public:
-	std::string to_msg(size_t bytes_transferred) const {assert(bytes_transferred <= MSG_BUFFER_SIZE); return std::string(raw_buff.data(), bytes_transferred);}
-	boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
+	virtual std::string parse_msg(size_t bytes_transferred) {assert(bytes_transferred <= MSG_BUFFER_SIZE); return std::string(raw_buff.data(), bytes_transferred);}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
 
 protected:
 	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
@@ -163,7 +174,7 @@ public:
 	{
 		unpacker::container_type tmp_can;
 		auto unpack_ok = unpacker::parse_msg(bytes_transferred, tmp_can);
-		do_something_to_all(tmp_can, [&](decltype(*std::begin(tmp_can))& item) {
+		do_something_to_all(tmp_can, [&msg_can](decltype(*std::begin(tmp_can))& item) {
 			auto com = boost::make_shared<buffer>();
 			com->swap(item);
 			msg_can.resize(msg_can.size() + 1);
@@ -178,16 +189,20 @@ public:
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return unpacker::prepare_next_recv();}
 };
 
-class replaceable_udp_unpacker : public udp_unpacker
+class replaceable_udp_unpacker : public i_udp_unpacker<replaceable_buffer>
 {
 public:
-	replaceable_buffer to_msg(size_t bytes_transferred) const
+	replaceable_buffer parse_msg(size_t bytes_transferred)
 	{
 		assert(bytes_transferred <= MSG_BUFFER_SIZE);
 		auto com = boost::make_shared<buffer>();
 		com->assign(raw_buff.data(), bytes_transferred);
 		return replaceable_buffer(com);
 	}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
+
+protected:
+	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
 };
 
 class fixed_length_unpacker : public i_unpacker<std::string>

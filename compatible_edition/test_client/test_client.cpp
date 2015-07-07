@@ -97,7 +97,7 @@ protected:
 	//msg handling end
 
 private:
-	void handle_msg(const msg_type& msg)
+	void handle_msg(msg_ctype& msg)
 	{
 		recv_bytes += msg.size();
 		if (check_msg && (msg.size() < sizeof(size_t) || recv_index != *(size_t*) msg.data()))

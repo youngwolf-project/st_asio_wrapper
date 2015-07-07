@@ -89,7 +89,7 @@ private:
 	}
 	void trans_end() {clear(); ++completed_client_num;}
 
-	void handle_msg(const msg_type& msg)
+	void handle_msg(msg_ctype& msg)
 	{
 		if (TRANS_BUSY == state)
 		{

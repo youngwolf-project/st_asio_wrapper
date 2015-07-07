@@ -78,6 +78,7 @@ class my_packer : public i_packer<my_msg_buffer>
 {
 public:
 	typedef my_msg_buffer msg_type;
+	typedef const msg_type msg_ctype;
 
 public:
 	static size_t get_max_msg_size() {return MSG_BUFFER_SIZE - HEAD_LEN;}

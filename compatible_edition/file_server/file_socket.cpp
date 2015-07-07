@@ -44,7 +44,7 @@ void file_socket::trans_end()
 	}
 }
 
-void file_socket::handle_msg(const msg_type& msg)
+void file_socket::handle_msg(msg_ctype& msg)
 {
 	if (msg.size() <= ORDER_LEN)
 	{

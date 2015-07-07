@@ -82,7 +82,7 @@ public:
 		//because in this function, object_can_mutex has been locked,
 		//graceful_close will wait until on_recv_error() been invoked,
 		//in on_recv_error(), we need to lock object_can_mutex too(in del_object()), which made dead lock
-		ST_THIS do_something_to_all([this](typename st_server_base::object_ctype& item) {
+		ST_THIS do_something_to_all([](typename st_server_base::object_ctype& item) {
 			item->show_info("client:", "been closed.");
 			item->force_close();
 		});

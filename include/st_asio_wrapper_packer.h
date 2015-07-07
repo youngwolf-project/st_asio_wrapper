@@ -72,6 +72,8 @@ class packer : public i_packer<std::string>
 {
 public:
 	typedef std::string msg_type;
+	typedef const msg_type msg_ctype;
+
 	static size_t get_max_msg_size() {return MSG_BUFFER_SIZE - HEAD_LEN;}
 
 public:
@@ -114,6 +116,7 @@ class replaceable_packer : public i_packer<replaceable_buffer>
 {
 public:
 	typedef replaceable_buffer msg_type;
+	typedef const msg_type msg_ctype;
 
 public:
 	using i_packer<msg_type>::pack_msg;
@@ -132,6 +135,7 @@ class fixed_legnth_packer : public i_packer<std::string>
 {
 public:
 	typedef std::string msg_type;
+	typedef const msg_type msg_ctype;
 
 public:
 	using i_packer<msg_type>::pack_msg;
@@ -157,6 +161,7 @@ class prefix_suffix_packer : public i_packer<std::string>
 {
 public:
 	typedef std::string msg_type;
+	typedef const msg_type msg_ctype;
 
 public:
 	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < MSG_BUFFER_SIZE); _prefix = prefix;  _suffix = suffix;}

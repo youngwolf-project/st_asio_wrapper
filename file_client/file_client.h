@@ -87,7 +87,7 @@ private:
 	}
 	void trans_end() {clear(); ++completed_client_num;}
 
-	void handle_msg(const msg_type& msg)
+	void handle_msg(msg_ctype& msg)
 	{
 		if (TRANS_BUSY == state)
 		{
@@ -163,8 +163,8 @@ public:
 	__off64_t get_total_rest_size()
 	{
 		__off64_t total_rest_size = 0;
-		do_something_to_all([&](file_client::object_ctype& item) {total_rest_size += *item;});
-//		do_something_to_all([&](file_client::object_ctype& item) {total_rest_size += item->get_rest_size();});
+		do_something_to_all([&total_rest_size](file_client::object_ctype& item) {total_rest_size += *item;});
+//		do_something_to_all([&total_rest_size](file_client::object_ctype& item) {total_rest_size += item->get_rest_size();});
 
 		return total_rest_size;
 	}

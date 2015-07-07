@@ -55,6 +55,7 @@ class st_udp_socket_base : public st_socket<Socket, Packer, udp_msg<typename Pac
 {
 public:
 	typedef udp_msg<typename Packer::msg_type> msg_type;
+	typedef const msg_type msg_ctype;
 
 public:
 	st_udp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, msg_type>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {ST_THIS reset_state();}
@@ -102,9 +103,9 @@ public:
 	void graceful_close() {clean_up();}
 
 	//get or change the unpacker at runtime
-	boost::shared_ptr<Unpacker> inner_unpacker() {return unpacker_;}
-	boost::shared_ptr<const Unpacker> inner_unpacker() const {return unpacker_;}
-	void inner_unpacker(const boost::shared_ptr<Unpacker>& _unpacker_) {unpacker_ = _unpacker_;}
+	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type> > inner_unpacker() {return unpacker_;}
+	boost::shared_ptr<const i_udp_unpacker<typename Packer::msg_type> > inner_unpacker() const {return unpacker_;}
+	void inner_unpacker(const boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
 
 	using st_socket<Socket, Packer, msg_type>::send_msg;
 	///////////////////////////////////////////////////
@@ -193,7 +194,7 @@ protected:
 		if (!ec && bytes_transferred > 0)
 		{
 			temp_msg_buffer.push_back(udp_msg<typename Packer::msg_type>(peer_addr));
-			unpacker_->to_msg(temp_msg_buffer.back(), bytes_transferred);
+			unpacker_->parse_msg(temp_msg_buffer.back(), bytes_transferred);
 			ST_THIS dispatch_msg();
 		}
 #ifdef _MSC_VER
@@ -232,7 +233,7 @@ protected:
 	}
 
 protected:
-	boost::shared_ptr<Unpacker> unpacker_;
+	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type> > unpacker_;
 	boost::asio::ip::udp::endpoint peer_addr, local_addr;
 };
 typedef st_udp_socket_base<> st_udp_socket;
