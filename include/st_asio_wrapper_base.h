@@ -104,11 +104,7 @@ namespace st_asio_wrapper
 	void do_something_to_all(_Can& __can, const _Predicate& __pred) {for (auto& item : __can) __pred(item);}
 #else
 	template<typename _Can, typename _Mutex, typename _Predicate>
-	void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
-	{
-		boost::mutex::scoped_lock lock(__mutex);
-		std::for_each(std::begin(__can), std::end(__can), __pred);
-	}
+	void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred) {boost::mutex::scoped_lock lock(__mutex); std::for_each(std::begin(__can), std::end(__can), __pred);}
 
 	template<typename _Can, typename _Predicate>
 	void do_something_to_all(_Can& __can, const _Predicate& __pred) {std::for_each(std::begin(__can), std::end(__can), __pred);}
@@ -162,11 +158,7 @@ namespace st_asio_wrapper
 	template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (auto& item : CAN) __pred(item);}
 #else
 	#define DO_SOMETHING_TO_ALL_MUTEX_NAME(NAME, CAN, MUTEX) \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) \
-	{ \
-		boost::mutex::scoped_lock lock(MUTEX); \
-		std::for_each(std::begin(CAN), std::end(CAN), __pred); \
-	}
+	template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::mutex::scoped_lock lock(MUTEX); std::for_each(std::begin(CAN), std::end(CAN), __pred);}
 
 	#define DO_SOMETHING_TO_ALL_NAME(NAME, CAN) \
 	template<typename _Predicate> void NAME(const _Predicate& __pred) {std::for_each(std::begin(CAN), std::end(CAN), __pred);} \
@@ -177,11 +169,7 @@ namespace st_asio_wrapper
 #define DO_SOMETHING_TO_ONE(CAN) DO_SOMETHING_TO_ONE_NAME(do_something_to_one, CAN)
 
 #define DO_SOMETHING_TO_ONE_MUTEX_NAME(NAME, CAN, MUTEX) \
-template<typename _Predicate> void NAME(const _Predicate& __pred) \
-{ \
-	boost::mutex::scoped_lock lock(MUTEX); \
-	for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break; \
-}
+template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::mutex::scoped_lock lock(MUTEX); for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;}
 
 #define DO_SOMETHING_TO_ONE_NAME(NAME, CAN) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) {for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;} \
@@ -218,7 +206,8 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
 #define TCP_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
-void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) {ST_THIS do_something_to_all(boost::bind(&Socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
+void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+	{ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->SEND_FUNNAME(pstr, len, num, can_overflow);});} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //TCP msg sending interface
 ///////////////////////////////////////////////////

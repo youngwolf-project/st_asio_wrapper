@@ -149,11 +149,7 @@ namespace st_asio_wrapper
 #define DO_SOMETHING_TO_ALL(CAN) DO_SOMETHING_TO_ALL_NAME(do_something_to_all, CAN)
 
 #define DO_SOMETHING_TO_ALL_MUTEX_NAME(NAME, CAN, MUTEX) \
-template<typename _Predicate> void NAME(const _Predicate& __pred) \
-{ \
-	boost::mutex::scoped_lock lock(MUTEX); \
-	for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter); \
-}
+template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::mutex::scoped_lock lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter);}
 
 #define DO_SOMETHING_TO_ALL_NAME(NAME, CAN) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) {for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter);} \
@@ -163,11 +159,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 #define DO_SOMETHING_TO_ONE(CAN) DO_SOMETHING_TO_ONE_NAME(do_something_to_one, CAN)
 
 #define DO_SOMETHING_TO_ONE_MUTEX_NAME(NAME, CAN, MUTEX) \
-template<typename _Predicate> void NAME(const _Predicate& __pred) \
-{ \
-	boost::mutex::scoped_lock lock(MUTEX); \
-	for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break; \
-}
+template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::mutex::scoped_lock lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;}
 
 #define DO_SOMETHING_TO_ONE_NAME(NAME, CAN) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) {for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;} \
@@ -267,16 +259,16 @@ public:
 #endif
 		size_t len = strlen(buff);
 		assert(len > 0);
-		if ('\n' == buff[len - 1])
+		if ('\n' == *boost::next(buff, len - 1))
 			--len;
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-		strcpy_s(buff + len, UNIFIED_OUT_BUF_NUM - len, " -> ");
+		strcpy_s(boost::next(buff, len), UNIFIED_OUT_BUF_NUM - len, " -> ");
 		len += 4;
-		vsnprintf_s(buff + len,  UNIFIED_OUT_BUF_NUM - len, _TRUNCATE, fmt, ap);
+		vsnprintf_s(boost::next(buff, len),  UNIFIED_OUT_BUF_NUM - len, _TRUNCATE, fmt, ap);
 #else
-		strcpy(buff + len, " -> ");
+		strcpy(boost::next(buff, len), " -> ");
 		len += 4;
-		vsnprintf(buff + len, UNIFIED_OUT_BUF_NUM - len, fmt, ap);
+		vsnprintf(boost::next(buff, len), UNIFIED_OUT_BUF_NUM - len, fmt, ap);
 #endif
 	}
 };

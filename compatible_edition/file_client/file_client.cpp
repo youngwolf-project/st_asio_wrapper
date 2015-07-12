@@ -65,8 +65,7 @@ int main(int argc, const char* argv[])
 				boost::timer::cpu_timer begin_time;
 				if (client.at(0)->get_file(*iter))
 				{
-					for (int i = 1; i < link_num; ++i)
-						client.at(i)->get_file(*iter);
+					client.do_something_to_all(boost::bind(&file_socket::get_file, _1, boost::cref(*iter)));
 
 					printf("transfer %s begin.\n", iter->data());
 					unsigned percent = -1;

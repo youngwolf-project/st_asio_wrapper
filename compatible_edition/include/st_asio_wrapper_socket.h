@@ -47,10 +47,10 @@ public:
 	typedef boost::container::list<MsgType> container_type;
 
 protected:
-	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {reset_state();}
+	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {reset_state();}
 
 	template<typename Arg>
-	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {reset_state();}
+	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {reset_state();}
 
 	void reset_state()
 	{
@@ -67,6 +67,11 @@ protected:
 	}
 
 public:
+	//please do not change id at runtime via the following function, except this st_socket is not managed by st_object_pool,
+	//it should only be used by st_object_pool when this st_socket being reused or creating new st_socket.
+	void id(unsigned long id) {_id = id;}
+	unsigned long id() const {return _id;}
+
 	Socket& next_layer() {return next_layer_;}
 	const Socket& next_layer() const {return next_layer_;}
 	typename Socket::lowest_layer_type& lowest_layer() {return next_layer().lowest_layer();}
@@ -398,6 +403,7 @@ protected:
 	}
 
 protected:
+	unsigned long _id;
 	Socket next_layer_;
 
 	MsgType last_send_msg, last_dispatch_msg;

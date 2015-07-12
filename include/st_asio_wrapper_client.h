@@ -42,9 +42,9 @@ protected:
 
 	virtual void init()
 	{
-		ST_THIS do_something_to_all(boost::mem_fn(&Socket::reset));
-		ST_THIS do_something_to_all(boost::mem_fn(&Socket::start));
-		ST_THIS do_something_to_all(boost::mem_fn((bool (Socket::*)()) &Socket::send_msg));
+		ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->reset();});
+		ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->start();});
+		ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->send_msg();});
 
 		ST_THIS start();
 	}

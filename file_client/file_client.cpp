@@ -58,14 +58,13 @@ int main(int argc, const char* argv[])
 			str.erase(0, sizeof(REQUEST_FILE));
 			boost::char_separator<char> sep(" \t");
 			boost::tokenizer<boost::char_separator<char>> tok(str, sep);
-			do_something_to_all(tok, [&](decltype(*std::begin(tok))& item) {
+			do_something_to_all(tok, [&](boost::tokenizer<boost::char_separator<char>>::const_reference item) {
 				completed_client_num.store(0);
 				file_size = 0;
 				boost::timer::cpu_timer begin_time;
 				if (client.at(0)->get_file(item))
 				{
-					for (auto i = 1; i < link_num; ++i)
-						client.at(i)->get_file(item);
+					client.do_something_to_all([&item](file_client::object_ctype& item2) {item2->get_file(item);});
 
 					printf("transfer %s begin.\n", item.data());
 					unsigned percent = -1;

@@ -199,13 +199,13 @@ protected:
 		ST_THIS sending = false;
 
 		//send msg sequentially, that means second send only after first send success
-		if (!ec && !do_send_msg())
-		{
+		if (!ec)
 #ifdef WANT_ALL_MSG_SEND_NOTIFY
-			lock.unlock();
-			ST_THIS on_all_msg_send(ST_THIS last_send_msg);
+			if (!do_send_msg())
+				ST_THIS on_all_msg_send(ST_THIS last_send_msg);
+#else
+			do_send_msg();
 #endif
-		}
 	}
 
 protected:

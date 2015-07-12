@@ -111,14 +111,14 @@ public:
 		temp_service_can.splice(std::end(temp_service_can), service_can);
 		lock.unlock();
 
-		st_asio_wrapper::do_something_to_all(temp_service_can, boost::bind(&st_service_pump::stop_and_free, this, _1));
+		st_asio_wrapper::do_something_to_all(temp_service_can, [this](object_type& item) {ST_THIS stop_and_free(item);});
 	}
 
 	void start_service(int thread_num = ST_SERVICE_THREAD_NUM)
 	{
 		if (!is_service_started())
 		{
-			service_thread = boost::thread(boost::bind(&st_service_pump::run_service, this, thread_num));
+			service_thread = boost::thread([this, thread_num]() {ST_THIS run_service(thread_num);});
 			auto loop_num = 10;
 			while (--loop_num >= 0 && !is_service_started())
 				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
@@ -131,7 +131,7 @@ public:
 	{
 		if (is_service_started())
 		{
-			do_something_to_all(boost::mem_fn(&i_service::stop_service));
+			do_something_to_all([](object_type& item) {item->stop_service();});
 			auto loop_num = 20; //one second
 			while (is_service_started())
 			{
@@ -166,7 +166,7 @@ public:
 		if (!is_service_started())
 		{
 			reset(); //this is needed when restart service
-			do_something_to_all(boost::mem_fn(&i_service::start_service));
+			do_something_to_all([](object_type& item) {item->start_service();});
 			do_service(thread_num);
 		}
 	}
@@ -175,7 +175,7 @@ public:
 	{
 		if (is_service_started())
 		{
-			do_something_to_all(boost::mem_fn(&i_service::stop_service));
+			do_something_to_all([](object_type& item) {item->stop_service();});
 			while (is_service_started())
 				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 		}
@@ -228,7 +228,7 @@ private:
 		--thread_num;
 		boost::thread_group tg;
 		for (auto i = 0; i < thread_num; ++i)
-			tg.create_thread(boost::bind(&st_service_pump::run, this, boost::system::error_code()));
+			tg.create_thread([this]() {boost::system::error_code ec; ST_THIS run(ec);});
 		boost::system::error_code ec; run(ec);
 		tg.join_all();
 

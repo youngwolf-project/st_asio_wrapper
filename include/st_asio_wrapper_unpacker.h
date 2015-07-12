@@ -192,7 +192,7 @@ public:
 class replaceable_udp_unpacker : public i_udp_unpacker<replaceable_buffer>
 {
 public:
-	replaceable_buffer parse_msg(size_t bytes_transferred)
+	virtual replaceable_buffer parse_msg(size_t bytes_transferred)
 	{
 		assert(bytes_transferred <= MSG_BUFFER_SIZE);
 		auto com = boost::make_shared<buffer>();

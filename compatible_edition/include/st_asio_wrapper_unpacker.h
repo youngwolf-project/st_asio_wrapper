@@ -81,7 +81,7 @@ public:
 					unpack_ok = false;
 				else if (remain_len >= cur_msg_len) //one msg received
 				{
-					msg_can.push_back(std::make_pair(pnext + HEAD_LEN, cur_msg_len - HEAD_LEN));
+					msg_can.push_back(std::make_pair(boost::next(pnext, HEAD_LEN), cur_msg_len - HEAD_LEN));
 					remain_len -= cur_msg_len;
 					std::advance(pnext, cur_msg_len);
 					cur_msg_len = -1;
@@ -114,7 +114,7 @@ public:
 
 		if (unpack_ok && remain_len > 0)
 		{
-			const char* pnext = msg_pos_can.back().first + msg_pos_can.back().second;
+			const char* pnext = boost::next(msg_pos_can.back().first, msg_pos_can.back().second);
 			memcpy(raw_buff.begin(), pnext, remain_len); //left behind unparsed msg
 		}
 
@@ -292,7 +292,7 @@ public:
 		size_t min_len = _prefix.size() + _suffix.size();
 		if (data_len > min_len)
 		{
-			const char* end = (const char*) memmem(buff + _prefix.size(), data_len - _prefix.size(), _suffix.data(), _suffix.size());
+			const char* end = (const char*) memmem(boost::next(buff, _prefix.size()), data_len - _prefix.size(), _suffix.data(), _suffix.size());
 			if (NULL != end)
 			{
 				first_msg_len = end - buff + _suffix.size(); //got a msg
@@ -336,7 +336,7 @@ public:
 			size_t msg_len = first_msg_len - min_len;
 
 			msg_can.resize(msg_can.size() + 1);
-			msg_can.back().assign(pnext + _prefix.size(), msg_len);
+			msg_can.back().assign(boost::next(pnext, _prefix.size()), msg_len);
 			remain_len -= first_msg_len;
 			std::advance(pnext, first_msg_len);
 			first_msg_len = -1;

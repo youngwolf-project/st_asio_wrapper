@@ -159,9 +159,9 @@ int main(int argc, const char* argv[])
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
-			echo_server_.do_something_to_all(boost::bind(&echo_socket::suspend_dispatch_msg, _1, true));
+			echo_server_.do_something_to_all([](echo_server::object_ctype& item) {item->suspend_dispatch_msg(true);});
 		else if (str == RESUME_COMMAND)
-			echo_server_.do_something_to_all(boost::bind(&echo_socket::suspend_dispatch_msg, _1, false));
+			echo_server_.do_something_to_all([](echo_server::object_ctype& item) {item->suspend_dispatch_msg(false);});
 		else if (str == LIST_ALL_CLIENT)
 		{
 			puts("clients from normal server:");
@@ -179,7 +179,7 @@ int main(int argc, const char* argv[])
 			DEFAULT_PACKER packer;
 			auto msg = packer.pack_msg(str.data(), str.size() + 1); //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
 			if (!msg.empty())
-				server_.do_something_to_all(boost::bind((bool (st_server_socket::*) (st_server_socket::msg_ctype&, bool)) &st_server_socket::direct_send_msg, _1, boost::cref(msg), false));
+				server_.do_something_to_all([&msg](st_server::object_ctype& item) {item->direct_send_msg(msg);});
 #endif
 		}
 	}

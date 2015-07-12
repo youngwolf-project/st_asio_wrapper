@@ -47,10 +47,10 @@ public:
 	typedef boost::container::list<MsgType> container_type;
 
 protected:
-	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {reset_state();}
+	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {reset_state();}
 
 	template<typename Arg>
-	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {reset_state();}
+	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {reset_state();}
 
 	void reset_state()
 	{
@@ -60,9 +60,14 @@ protected:
 		started_ = false;
 	}
 
-	void clear_buffer() {st_asio_wrapper::do_something_to_all(msg_buffer, boost::bind(&container_type::clear, _1));}
+	void clear_buffer() {st_asio_wrapper::do_something_to_all(msg_buffer, [](container_type& can) {can.clear();});}
 
 public:
+	//please do not change id at runtime via the following function, except this st_socket is not managed by st_object_pool,
+	//it should only be used by st_object_pool when this st_socket being reused or creating new st_socket.
+	void id(unsigned long id) {_id = id;}
+	unsigned long id() const {return _id;}
+
 	Socket& next_layer() {return next_layer_;}
 	const Socket& next_layer() const {return next_layer_;}
 	typename Socket::lowest_layer_type& lowest_layer() {return next_layer().lowest_layer();}
@@ -340,7 +345,7 @@ protected:
 				{
 					dispatching = true;
 					last_dispatch_msg.swap(recv_msg_buffer.front());
-					io_service_.post(boost::bind(&st_socket::msg_handler, this));
+					io_service_.post([this]() {ST_THIS msg_handler();});
 					recv_msg_buffer.pop_front();
 				}
 			}
@@ -354,7 +359,7 @@ protected:
 				recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
 #endif
 #ifndef DISCARD_MSG_WHEN_LINK_DOWN
-				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&st_socket::on_msg_handle, this, _1, true));
+				st_asio_wrapper::do_something_to_all(recv_msg_buffer, [this](MsgType& msg) {ST_THIS on_msg_handle(msg, true);});
 #endif
 				recv_msg_buffer.clear();
 			}
@@ -392,6 +397,7 @@ protected:
 	}
 
 protected:
+	unsigned long _id;
 	Socket next_layer_;
 
 	MsgType last_send_msg, last_dispatch_msg;

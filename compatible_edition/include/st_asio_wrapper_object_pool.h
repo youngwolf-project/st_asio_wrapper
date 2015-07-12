@@ -14,6 +14,8 @@
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
 #define ST_ASIO_WRAPPER_OBJECT_POOL_H_
 
+#include <boost/container/set.hpp>
+
 #include "st_asio_wrapper_timer.h"
 #include "st_asio_wrapper_service_pump.h"
 
@@ -58,7 +60,15 @@ class st_object_pool : public st_service_pump::i_service, public st_timer
 public:
 	typedef boost::shared_ptr<Object> object_type;
 	typedef const object_type object_ctype;
-	typedef boost::container::list<object_type> container_type;
+
+protected:
+	struct object_cmp
+	{
+		bool operator ()(object_ctype& left, object_ctype& right) const {return left->id() < right->id();}
+	};
+
+public:
+	typedef boost::container::set<object_type, object_cmp> container_type;
 
 protected:
 	struct temp_object
@@ -66,14 +76,14 @@ protected:
 		const time_t closed_time;
 		object_ctype object_ptr;
 
-		temp_object(object_ctype& object_ptr_) : closed_time(time(NULL)), object_ptr(object_ptr_) {}
+		temp_object(object_ctype& object_ptr_) : closed_time(time(NULL)), object_ptr(object_ptr_) {assert(object_ptr);}
 
 		bool is_timeout() const {return is_timeout(time(NULL));}
 		bool is_timeout(time_t now) const {return closed_time <= now - CLOSED_SOCKET_MAX_DURATION;}
 	};
 
 protected:
-	st_object_pool(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_) {}
+	st_object_pool(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_), cur_id(-1) {}
 
 	void start()
 	{
@@ -90,22 +100,24 @@ protected:
 	bool add_object(object_ctype& object_ptr)
 	{
 		assert(object_ptr && &object_ptr->get_io_service() == &get_service_pump());
+		bool re = false;
+
 		boost::mutex::scoped_lock lock(object_can_mutex);
 		size_t object_num = object_can.size();
 		if (object_num < MAX_OBJECT_NUM)
-			object_can.push_back(object_ptr);
-		lock.unlock();
+			re = object_can.insert(object_ptr).second;
 
-		return object_num < MAX_OBJECT_NUM;
+		return re;
 	}
 
 	bool del_object(object_ctype& object_ptr)
 	{
+		assert(object_ptr);
 		bool found = false;
 
 		boost::mutex::scoped_lock lock(object_can_mutex);
 		//object_can does not contain any duplicate items
-		BOOST_AUTO(iter, std::find(object_can.begin(), object_can.end(), object_ptr));
+		BOOST_AUTO(iter, object_can.find(object_ptr));
 		if (iter != object_can.end())
 		{
 			found = true;
@@ -177,19 +189,50 @@ protected:
 	}
 
 public:
+	unsigned long generate_id()
+	{
+		boost::mutex::scoped_lock lock(cur_id_mutex);
+		return ++cur_id;
+	}
+
 	//this method simply create an Object from heap, then you must invoke
 	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or receive msgs.
 	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
 	object_type create_object()
 	{
-		BOOST_AUTO(client_ptr, reuse_object());
-		return client_ptr ? client_ptr : boost::make_shared<Object>(boost::ref(service_pump));
+		BOOST_AUTO(object_ptr, reuse_object());
+		if (!object_ptr)
+			object_ptr = boost::make_shared<Object>(boost::ref(service_pump));
+		if (object_ptr)
+			object_ptr->id(generate_id());
+
+		if (!dummy_object)
+		{
+			boost::mutex::scoped_lock lock(cur_id_mutex);
+			if (!dummy_object)
+				dummy_object = boost::make_shared<Object>(boost::ref(service_pump));
+		}
+
+		return object_ptr;
 	}
+
 	template<typename Arg>
 	object_type create_object(Arg& arg)
 	{
-		BOOST_AUTO(client_ptr, reuse_object());
-		return client_ptr ? client_ptr : boost::make_shared<Object>(arg);
+		BOOST_AUTO(object_ptr, reuse_object());
+		if (!object_ptr)
+			object_ptr = boost::make_shared<Object>(arg);
+		if (object_ptr)
+			object_ptr->id(generate_id());
+
+		if (!dummy_object)
+		{
+			boost::mutex::scoped_lock lock(cur_id_mutex);
+			if (!dummy_object)
+				dummy_object = boost::make_shared<Object>(arg);
+		}
+
+		return object_ptr;
 	}
 
 	size_t size()
@@ -204,11 +247,32 @@ public:
 		return temp_object_can.size();
 	}
 
+	//this method has linear complexity, please notice.
 	object_type at(size_t index)
 	{
 		boost::mutex::scoped_lock lock(object_can_mutex);
 		assert(index < object_can.size());
 		return index < object_can.size() ? *(boost::next(object_can.begin(), index)) : object_type();
+	}
+
+	object_type find(unsigned long id)
+	{
+		if (!dummy_object)
+			return object_type();
+
+		boost::mutex::scoped_lock lock(object_can_mutex);
+		dummy_object->id(id);
+		BOOST_AUTO(iter, object_can.find(dummy_object));
+		return iter != object_can.end() ? *iter : object_type();
+	}
+
+	object_type find(object_ctype object_ptr)
+	{
+		assert(object_ptr);
+
+		boost::mutex::scoped_lock lock(object_can_mutex);
+		BOOST_AUTO(iter, object_can.find(object_ptr));
+		return iter != object_can.end() ? *iter : object_type();
 	}
 
 	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}
@@ -231,7 +295,7 @@ public:
 				}
 	}
 
-	//Clear all closed objects from the list
+	//Clear all closed objects from the set
 	//Consider the following conditions:
 	//1.You don't invoke del_object in on_recv_error and on_send_error, or close the socket in on_unpack_error
 	//2.For some reason(I haven't met yet), on_recv_error, on_send_error and on_unpack_error
@@ -243,8 +307,7 @@ public:
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
 			if (!(*iter)->lowest_layer().is_open())
 			{
-				objects.resize(objects.size() + 1);
-				objects.back().swap(*iter);
+				objects.insert(*iter);
 				iter = object_can.erase(iter);
 			}
 			else
@@ -278,7 +341,10 @@ public:
 	DO_SOMETHING_TO_ONE_MUTEX(object_can, object_can_mutex)
 
 protected:
-	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
+	unsigned long cur_id;
+	object_type dummy_object;
+	boost::mutex cur_id_mutex;
+
 	container_type object_can;
 	boost::mutex object_can_mutex;
 

@@ -112,12 +112,12 @@ protected:
 		acceptor.listen(boost::asio::ip::tcp::acceptor::max_connections, ec); assert(!ec);
 		if (ec) {get_service_pump().stop(); unified_out::error_out("listen failed."); return;}
 
-		st_object_pool<Socket>::start();
+		ST_THIS start();
 
 		for (auto i = 0; i < ASYNC_ACCEPT_NUM; ++i)
 			start_next_accept();
 	}
-	virtual void uninit() {Pool::stop(); stop_listen(); close_all_client();}
+	virtual void uninit() {ST_THIS stop(); stop_listen(); close_all_client();}
 	virtual bool on_accept(typename st_server_base::object_ctype& client_ptr) {return true;}
 
 	virtual void start_next_accept()
@@ -129,7 +129,7 @@ protected:
 protected:
 	bool add_client(typename st_server_base::object_ctype& client_ptr)
 	{
-		if (Pool::add_object(client_ptr))
+		if (ST_THIS add_object(client_ptr))
 		{
 			client_ptr->show_info("client:", "arrive.");
 			return true;

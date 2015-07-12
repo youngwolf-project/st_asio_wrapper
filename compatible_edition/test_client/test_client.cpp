@@ -7,6 +7,8 @@
 //configuration
 #define SERVER_PORT		9528
 //#define REUSE_OBJECT //use objects pool
+//#define AUTO_CLEAR_CLOSED_SOCKET
+//#define CLEAR_CLOSED_SOCKET_INTERVAL	1
 
 //the following three macro demonstrate how to support huge msg(exceed 65535 - 2).
 //huge msg consume huge memory, for example, if we support 1M msg size, because every st_tcp_socket has a
@@ -57,11 +59,8 @@ static bool check_msg;
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	size_t index = (size_t) ((boost::uint64_t) rand() * (object_can.size() - 1) / RAND_MAX); \
-	boost::mutex::scoped_lock lock(object_can_mutex); \
-	BOOST_AUTO(iter, object_can.begin()); \
-	std::advance(iter, index); \
-	(*iter)->SEND_FUNNAME(pstr, len, num, can_overflow); \
+	size_t index = (size_t) ((boost::uint64_t) rand() * (size() - 1) / RAND_MAX); \
+	at(index)->SEND_FUNNAME(pstr, len, num, can_overflow); \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //msg sending interface
@@ -125,6 +124,24 @@ public:
 		return total_recv_bytes;
 	}
 
+	void close_some_client(size_t n)
+	{
+		//close some clients
+		//method #1
+//		do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(), false : true;});
+		//notice: this method need to define AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL macro, because it just closed the st_socket,
+		//not really removed them from object pool, this will cause test_client still send data to them, and wait responses from them.
+		//for this scenario, the smaller CLEAR_CLOSED_SOCKET_INTERVAL is, the better experience you will get, so set it to 1 second.
+
+		//method #2
+		while (n-- > 0)
+			graceful_close(at(0));
+		//notice: this method directly remove the client from object pool (and insert into list temp_object_can), and close the st_socket.
+		//clients in list temp_object_can will be reused if new clients needed (REUSE_OBJECT macro been defined), or be truly freed from memory
+		//CLOSED_SOCKET_MAX_DURATION seconds later (but check interval is SOCKET_FREE_INTERVAL seconds, so the maximum delay is CLOSED_SOCKET_MAX_DURATION + SOCKET_FREE_INTERVAL).
+		//this is a equivalence of calling i_server::del_client in st_server_socket_base::on_recv_error (see st_server_socket_base for more details).
+	}
+
 	///////////////////////////////////////////////////
 	//msg sending interface
 	//guarantee send msg successfully even if can_overflow equal to false
@@ -159,7 +176,12 @@ int main(int argc, const char* argv[])
 	else if (argc > 1)
 		client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, atoi(argv[1]), SERVER_IP));
 
-	service_pump.start_service(1);
+	int min_thread_num = 1;
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
+	++min_thread_num;
+#endif
+
+	service_pump.start_service(min_thread_num);
 	while(service_pump.is_running())
 	{
 		std::string str;
@@ -169,7 +191,7 @@ int main(int argc, const char* argv[])
 		else if (str == RESTART_COMMAND)
 		{
 			service_pump.stop_service();
-			service_pump.start_service(1);
+			service_pump.start_service(min_thread_num);
 		}
 		else if (str == LIST_STATUS)
 			printf("valid links: " size_t_format ", closed links: " size_t_format "\n", client.valid_size(), client.closed_object_size());
@@ -184,7 +206,7 @@ int main(int argc, const char* argv[])
 		{
 			if ('+' == str[0] || '-' == str[0])
 			{
-				size_t n = (size_t) atoi(str.data() + 1);
+				size_t n = (size_t) atoi(boost::next(str.data()));
 				if (0 == n)
 					n = 1;
 
@@ -196,10 +218,15 @@ int main(int argc, const char* argv[])
 						n = client.size();
 					link_num -= n;
 
-					while (n-- > 0)
-						client.graceful_close(client.at(0));
+					client.close_some_client(n);
 				}
 
+				continue;
+			}
+
+			if (client.size() != link_num)
+			{
+				puts("some closed links have not been cleared, did you defined AUTO_CLEAR_CLOSED_SOCKET macro?");
 				continue;
 			}
 
@@ -293,6 +320,8 @@ int main(int argc, const char* argv[])
 //restore configuration
 #undef SERVER_PORT
 //#undef REUSE_OBJECT
+//#undef AUTO_CLEAR_CLOSED_SOCKET
+//#undef CLEAR_CLOSED_SOCKET_INTERVAL
 //#undef REPLACEABLE_BUFFER
 
 //#undef HUGE_MSG

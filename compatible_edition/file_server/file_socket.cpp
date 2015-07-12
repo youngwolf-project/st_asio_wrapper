@@ -62,18 +62,18 @@ void file_socket::handle_msg(msg_ctype& msg)
 			char buffer[ORDER_LEN + DATA_LEN];
 			*buffer = 0; //head
 
-			file = fopen(msg.data() + ORDER_LEN, "rb");
+			file = fopen(boost::next(msg.data(), ORDER_LEN), "rb");
 			if (NULL != file)
 			{
 				fseeko64(file, 0, SEEK_END);
 				__off64_t length = ftello64(file);
-				memcpy(buffer + ORDER_LEN, &length, DATA_LEN);
+				memcpy(boost::next(buffer, ORDER_LEN), &length, DATA_LEN);
 				state = TRANS_PREPARE;
 			}
 			else
 			{
-				*(__off64_t*) (buffer + ORDER_LEN) = -1;
-				printf("can't not open file %s!\n", msg.data() + ORDER_LEN);
+				*(__off64_t*) boost::next(buffer, ORDER_LEN) = -1;
+				printf("can't not open file %s!\n", boost::next(msg.data(), ORDER_LEN));
 			}
 
 			send_msg(buffer, sizeof(buffer), true);
@@ -82,8 +82,8 @@ void file_socket::handle_msg(msg_ctype& msg)
 	case 1:
 		if (TRANS_PREPARE == state && NULL != file && ORDER_LEN + OFFSET_LEN + DATA_LEN == msg.size())
 		{
-			__off64_t offset = *(__off64_t*) (msg.data() + ORDER_LEN);
-			__off64_t length = *(__off64_t*) (msg.data() + ORDER_LEN + OFFSET_LEN);
+			__off64_t offset = *(__off64_t*) boost::next(msg.data(), ORDER_LEN);
+			__off64_t length = *(__off64_t*) boost::next(msg.data(), ORDER_LEN + OFFSET_LEN);
 			if (offset >= 0 && length > 0 && offset + length <= ftello64(file))
 			{
 				state = TRANS_BUSY;
@@ -92,7 +92,7 @@ void file_socket::handle_msg(msg_ctype& msg)
 		}
 		break;
 	case 2:
-		printf("client says: %s\n", msg.data() + ORDER_LEN);
+		printf("client says: %s\n", boost::next(msg.data(), ORDER_LEN));
 		break;
 	default:
 		break;

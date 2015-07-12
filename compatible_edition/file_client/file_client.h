@@ -108,7 +108,7 @@ private:
 		case 0:
 			if (ORDER_LEN + DATA_LEN == msg.size() && NULL != file && TRANS_PREPARE == state)
 			{
-				__off64_t length = *(__off64_t*) (msg.data() + ORDER_LEN);
+				__off64_t length = *(__off64_t*) boost::next(msg.data(), ORDER_LEN);
 				if (-1 == length)
 				{
 					if (0 == index)
@@ -131,8 +131,8 @@ private:
 
 						char buffer[ORDER_LEN + OFFSET_LEN + DATA_LEN];
 						*buffer = 1; //head
-						*(__off64_t*) (buffer + ORDER_LEN) = offset;
-						*(__off64_t*) (buffer + ORDER_LEN + OFFSET_LEN) = my_length;
+						*(__off64_t*) boost::next(buffer, ORDER_LEN) = offset;
+						*(__off64_t*) boost::next(buffer, ORDER_LEN + OFFSET_LEN) = my_length;
 
 						state = TRANS_BUSY;
 						send_msg(buffer, sizeof(buffer), true);
@@ -146,7 +146,7 @@ private:
 			break;
 		case 2:
 			if (0 == index)
-				printf("server says: %s\n", msg.data() + ORDER_LEN);
+				printf("server says: %s\n", boost::next(msg.data(), ORDER_LEN));
 			break;
 		default:
 			break;

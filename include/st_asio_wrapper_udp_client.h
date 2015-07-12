@@ -36,7 +36,7 @@ public:
 	}
 
 protected:
-	virtual void uninit() {ST_THIS stop(); ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_close));}
+	virtual void uninit() {ST_THIS stop(); ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->graceful_close();});}
 };
 typedef st_udp_client_base<> st_udp_client;
 
