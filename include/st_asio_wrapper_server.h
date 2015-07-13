@@ -82,7 +82,7 @@ public:
 		//because in this function, object_can_mutex has been locked,
 		//graceful_close will wait until on_recv_error() been invoked,
 		//in on_recv_error(), we need to lock object_can_mutex too(in del_object()), which made dead lock
-		ST_THIS do_something_to_all([](typename st_server_base::object_ctype& item) {
+		ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {
 			item->show_info("client:", "been closed.");
 			item->force_close();
 		});
@@ -118,7 +118,7 @@ protected:
 			start_next_accept();
 	}
 	virtual void uninit() {ST_THIS stop(); stop_listen(); close_all_client();}
-	virtual bool on_accept(typename st_server_base::object_ctype& client_ptr) {return true;}
+	virtual bool on_accept(typename Pool::object_ctype& client_ptr) {return true;}
 
 	virtual void start_next_accept()
 	{
@@ -127,7 +127,7 @@ protected:
 	}
 
 protected:
-	bool add_client(typename st_server_base::object_ctype& client_ptr)
+	bool add_client(typename Pool::object_ctype& client_ptr)
 	{
 		if (ST_THIS add_object(client_ptr))
 		{
@@ -138,7 +138,7 @@ protected:
 		return false;
 	}
 
-	void accept_handler(const boost::system::error_code& ec, typename st_server_base::object_ctype& client_ptr)
+	void accept_handler(const boost::system::error_code& ec, typename Pool::object_ctype& client_ptr)
 	{
 		if (!ec)
 		{

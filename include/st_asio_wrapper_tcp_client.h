@@ -33,7 +33,7 @@ public:
 	size_t valid_size()
 	{
 		size_t size = 0;
-		ST_THIS do_something_to_all([&size](typename st_tcp_client_base::object_ctype& item) {
+		ST_THIS do_something_to_all([&size](typename Pool::object_ctype& item) {
 			if (item->is_connected())
 				++size;
 		});
@@ -41,16 +41,16 @@ public:
 	}
 
 	using st_client<Socket, Pool>::add_client;
-	typename st_client<Socket, Pool>::object_type add_client()
+	typename Pool::object_type add_client()
 	{
 		auto client_ptr(ST_THIS create_object());
-		return ST_THIS add_client(client_ptr) ? client_ptr : typename st_client<Socket, Pool>::object_type();
+		return ST_THIS add_client(client_ptr) ? client_ptr : typename Pool::object_type();
 	}
-	typename st_client<Socket, Pool>::object_type add_client(unsigned short port, const std::string& ip = SERVER_IP)
+	typename Pool::object_type add_client(unsigned short port, const std::string& ip = SERVER_IP)
 	{
 		auto client_ptr(ST_THIS create_object());
 		client_ptr->set_server_addr(port, ip);
-		return ST_THIS add_client(client_ptr) ? client_ptr : typename st_client<Socket, Pool>::object_type();
+		return ST_THIS add_client(client_ptr) ? client_ptr : typename Pool::object_type();
 	}
 
 	///////////////////////////////////////////////////

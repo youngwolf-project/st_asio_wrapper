@@ -50,7 +50,7 @@ protected:
 	}
 
 public:
-	bool add_client(typename st_client::object_ctype& client_ptr, bool reset = true)
+	bool add_client(typename Pool::object_ctype& client_ptr, bool reset = true)
 	{
 		if (ST_THIS add_object(client_ptr))
 		{
@@ -67,9 +67,9 @@ public:
 		return false;
 	}
 
-	void disconnect(typename st_client::object_ctype& client_ptr) {force_close(client_ptr);}
-	void force_close(typename st_client::object_ctype& client_ptr) {if (ST_THIS del_object(client_ptr)) client_ptr->force_close();}
-	void graceful_close(typename st_client::object_ctype& client_ptr) {if (ST_THIS del_object(client_ptr)) client_ptr->graceful_close();}
+	void disconnect(typename Pool::object_ctype& client_ptr) {force_close(client_ptr);}
+	void force_close(typename Pool::object_ctype& client_ptr) {if (ST_THIS del_object(client_ptr)) client_ptr->force_close();}
+	void graceful_close(typename Pool::object_ctype& client_ptr) {if (ST_THIS del_object(client_ptr)) client_ptr->graceful_close();}
 };
 
 } //namespace

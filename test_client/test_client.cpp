@@ -116,8 +116,8 @@ public:
 	uint64_t get_total_recv_bytes()
 	{
 		uint64_t total_recv_bytes = 0;
-		do_something_to_all([&total_recv_bytes](test_client::object_ctype& item) {total_recv_bytes += *item;});
-//		do_something_to_all([&total_recv_bytes](test_client::object_ctype& item) {total_recv_bytes += item->get_recv_bytes();});
+		do_something_to_all([&total_recv_bytes](object_ctype& item) {total_recv_bytes += *item;});
+//		do_something_to_all([&total_recv_bytes](object_ctype& item) {total_recv_bytes += item->get_recv_bytes();});
 
 		return total_recv_bytes;
 	}

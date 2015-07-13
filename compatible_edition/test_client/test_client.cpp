@@ -128,7 +128,8 @@ public:
 	{
 		//close some clients
 		//method #1
-//		do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(), false : true;});
+//		for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter)
+//			(*iter)->graceful_close();
 		//notice: this method need to define AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL macro, because it just closed the st_socket,
 		//not really removed them from object pool, this will cause test_client still send data to them, and wait responses from them.
 		//for this scenario, the smaller CLEAR_CLOSED_SOCKET_INTERVAL is, the better experience you will get, so set it to 1 second.

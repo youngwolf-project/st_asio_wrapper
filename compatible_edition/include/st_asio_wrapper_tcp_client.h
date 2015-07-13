@@ -41,16 +41,16 @@ public:
 	}
 
 	using st_client<Socket, Pool>::add_client;
-	typename st_client<Socket, Pool>::object_type add_client()
+	typename Pool::object_type add_client()
 	{
 		BOOST_AUTO(client_ptr, ST_THIS create_object());
-		return ST_THIS add_client(client_ptr) ? client_ptr : typename st_client<Socket, Pool>::object_type();
+		return ST_THIS add_client(client_ptr) ? client_ptr : typename Pool::object_type();
 	}
-	typename st_client<Socket, Pool>::object_type add_client(unsigned short port, const std::string& ip = SERVER_IP)
+	typename Pool::object_type add_client(unsigned short port, const std::string& ip = SERVER_IP)
 	{
 		BOOST_AUTO(client_ptr, ST_THIS create_object());
 		client_ptr->set_server_addr(port, ip);
-		return ST_THIS add_client(client_ptr) ? client_ptr : typename st_client<Socket, Pool>::object_type();
+		return ST_THIS add_client(client_ptr) ? client_ptr : typename Pool::object_type();
 	}
 
 	///////////////////////////////////////////////////

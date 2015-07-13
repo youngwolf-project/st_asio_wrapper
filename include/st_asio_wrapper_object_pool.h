@@ -189,7 +189,7 @@ protected:
 	}
 
 public:
-	unsigned long generate_id()
+	uint64_t generate_id()
 	{
 		boost::mutex::scoped_lock lock(cur_id_mutex);
 		return ++cur_id;
@@ -255,7 +255,7 @@ public:
 		return index < object_can.size() ? *(std::next(std::begin(object_can), index)) : object_type();
 	}
 
-	object_type find(unsigned long id)
+	object_type find(uint64_t id)
 	{
 		if (!dummy_object)
 			return object_type();
@@ -269,10 +269,7 @@ public:
 	object_type find(object_ctype object_ptr)
 	{
 		assert(object_ptr);
-
-		boost::mutex::scoped_lock lock(object_can_mutex);
-		auto iter = object_can.find(object_ptr);
-		return iter != std::end(object_can) ? *iter : object_type();
+		return find(object_ptr->id());
 	}
 
 	void list_all_object() {do_something_to_all([](object_ctype& item) {item->show_info("", "");});}
@@ -301,8 +298,7 @@ public:
 	//Clear all closed objects from the set
 	//Consider the following conditions:
 	//1.You don't invoke del_object in on_recv_error and on_send_error, or close the socket in on_unpack_error
-	//2.For some reason(I haven't met yet), on_recv_error, on_send_error and on_unpack_error
-	// not been invoked
+	//2.For some reason(I haven't met yet), on_recv_error, on_send_error and on_unpack_error not been invoked
 	//st_object_pool will automatically invoke this function if AUTO_CLEAR_CLOSED_SOCKET been defined
 	void clear_all_closed_object(container_type& objects)
 	{
@@ -344,7 +340,7 @@ public:
 	DO_SOMETHING_TO_ONE_MUTEX(object_can, object_can_mutex)
 
 protected:
-	unsigned long cur_id;
+	uint64_t cur_id;
 	object_type dummy_object;
 	boost::mutex cur_id_mutex;
 

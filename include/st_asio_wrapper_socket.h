@@ -65,8 +65,8 @@ protected:
 public:
 	//please do not change id at runtime via the following function, except this st_socket is not managed by st_object_pool,
 	//it should only be used by st_object_pool when this st_socket being reused or creating new st_socket.
-	void id(unsigned long id) {_id = id;}
-	unsigned long id() const {return _id;}
+	void id(uint64_t id) {_id = id;}
+	uint64_t id() const {return _id;}
 
 	Socket& next_layer() {return next_layer_;}
 	const Socket& next_layer() const {return next_layer_;}
@@ -397,7 +397,7 @@ protected:
 	}
 
 protected:
-	unsigned long _id;
+	uint64_t _id;
 	Socket next_layer_;
 
 	MsgType last_send_msg, last_dispatch_msg;

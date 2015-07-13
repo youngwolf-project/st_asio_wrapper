@@ -127,7 +127,7 @@ protected:
 	//can send data or not(just put into send buffer)
 
 	//msg can not be unpacked
-	//the link can continue to use, but need not close the st_tcp_socket_base at both client and server endpoint
+	//the link can continue to use, so don't need to close the st_tcp_socket_base at both client and server endpoint
 	virtual void on_unpack_error() = 0;
 
 	//receiving error or peer endpoint quit(false ec means ok)
@@ -140,8 +140,7 @@ protected:
 	virtual bool on_msg_handle(msg_type& msg, bool link_down) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
 
 	//start the asynchronous read
-	//it's child's responsibility to invoke this properly,
-	//because st_tcp_socket_base doesn't know any of the connection status
+	//it's child's responsibility to invoke this properly, because st_tcp_socket_base doesn't know any of the connection status
 	void do_recv_msg()
 	{
 		auto recv_buff = unpacker_->prepare_next_recv();
