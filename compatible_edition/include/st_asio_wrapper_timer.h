@@ -73,18 +73,23 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::container::set<object_type> container_type;
 
+	//not thread safe for the same timer
 	void set_timer(unsigned char id, size_t milliseconds, const void* user_data)
 	{
 		object_type ti = {id};
 
-		boost::mutex::scoped_lock lock(timer_can_mutex);
+		timer_can_mutex.lock_upgrade();
 		BOOST_AUTO(iter, timer_can.find(ti));
 		if (iter == timer_can.end())
 		{
+			timer_can_mutex.unlock_upgrade_and_lock();
 			iter = timer_can.insert(ti).first;
+			timer_can_mutex.unlock();
+
 			iter->timer = boost::make_shared<boost::asio::deadline_timer>(boost::ref(io_service_));
 		}
-		lock.unlock();
+		else
+			timer_can_mutex.unlock_upgrade();
 
 		iter->status = object_type::TIMER_OK;
 		iter->milliseconds = milliseconds;
@@ -93,11 +98,12 @@ public:
 		start_timer(*iter);
 	}
 
+	//not thread safe for the same timer
 	void stop_timer(unsigned char id)
 	{
 		object_type ti = {id};
 
-		boost::mutex::scoped_lock lock(timer_can_mutex);
+		boost::shared_lock<boost::shared_mutex> lock(timer_can_mutex);
 		BOOST_AUTO(iter, timer_can.find(ti));
 		if (iter != timer_can.end())
 		{
@@ -139,7 +145,7 @@ protected:
 
 	boost::asio::io_service& io_service_;
 	container_type timer_can;
-	boost::mutex timer_can_mutex;
+	boost::shared_mutex timer_can_mutex;
 };
 
 } //namespace

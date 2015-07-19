@@ -14,7 +14,7 @@
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
 #define ST_ASIO_WRAPPER_OBJECT_POOL_H_
 
-#include <boost/container/set.hpp>
+#include <boost/unordered_set.hpp>
 
 #include "st_asio_wrapper_timer.h"
 #include "st_asio_wrapper_service_pump.h"
@@ -62,13 +62,22 @@ public:
 	typedef const object_type object_ctype;
 
 protected:
-	struct object_cmp
+	struct st_object_hasher
 	{
-		bool operator ()(object_ctype& left, object_ctype& right) const {return left->id() < right->id();}
+	public:
+		size_t operator()(object_ctype& object_ptr) const {return (size_t) object_ptr->id();}
+		size_t operator()(uint64_t id) const {return (size_t) id;}
+	};
+
+	struct st_object_equal
+	{
+	public:
+		bool operator()(object_ctype& left, object_ctype& right) const {return left->id() == right->id();}
+		bool operator()(uint64_t id, object_ctype& right) const {return id == right->id();}
 	};
 
 public:
-	typedef boost::container::set<object_type, object_cmp> container_type;
+	typedef boost::unordered::unordered_set<object_type, st_object_hasher, st_object_equal> container_type;
 
 protected:
 	struct temp_object
@@ -102,7 +111,7 @@ protected:
 		assert(object_ptr && &object_ptr->get_io_service() == &get_service_pump());
 		auto re = false;
 
-		boost::mutex::scoped_lock lock(object_can_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
 		auto object_num = object_can.size();
 		if (object_num < MAX_OBJECT_NUM)
 			re = object_can.insert(object_ptr).second;
@@ -110,34 +119,23 @@ protected:
 		return re;
 	}
 
+	//this method will always insert object_ptr into temp_object_can,
+	//but will return false if object_ptr cannot be found in object_can
 	bool del_object(object_ctype& object_ptr)
 	{
 		assert(object_ptr);
-		auto found = false;
 
-		boost::mutex::scoped_lock lock(object_can_mutex);
-		//object_can does not contain any duplicate items
-		auto iter = object_can.find(object_ptr);
-		if (iter != std::end(object_can))
-		{
-			found = true;
-			object_can.erase(iter);
-		}
-		lock.unlock();
+		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
+		temp_object_can.push_back(object_ptr);
 
-		if (found)
-		{
-			boost::mutex::scoped_lock lock(temp_object_can_mutex);
-			temp_object_can.push_back(object_ptr);
-		}
-
-		return found;
+		boost::unique_lock<boost::shared_mutex> lock2(object_can_mutex);
+		return object_can.erase(object_ptr) > 0;
 	}
 
 	virtual object_type reuse_object()
 	{
 #ifdef REUSE_OBJECT
-		boost::mutex::scoped_lock lock(temp_object_can_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
 		//objects are order by time, so we can use this feature to improve the performance
 		for (auto iter = std::begin(temp_object_can); iter != std::end(temp_object_can) && iter->is_timeout(); ++iter)
 			if (iter->object_ptr.unique() && iter->object_ptr->reusable())
@@ -171,7 +169,7 @@ protected:
 				clear_all_closed_object(objects);
 				if (!objects.empty())
 				{
-					boost::mutex::scoped_lock lock(temp_object_can_mutex);
+					boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
 					temp_object_can.insert(std::end(temp_object_can), std::begin(objects), std::end(objects));
 				}
 				return true;
@@ -191,12 +189,12 @@ protected:
 public:
 	uint64_t generate_id()
 	{
-		boost::mutex::scoped_lock lock(cur_id_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(cur_id_mutex);
 		return ++cur_id;
 	}
 
 	//this method simply create an Object from heap, then you must invoke
-	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or receive msgs.
+	//bool add_client(typename Pool::object_ctype&, bool) before this socket can send or receive msgs.
 	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
 	object_type create_object()
 	{
@@ -205,13 +203,6 @@ public:
 			object_ptr = boost::make_shared<Object>(service_pump);
 		if (object_ptr)
 			object_ptr->id(generate_id());
-
-		if (!dummy_object)
-		{
-			boost::mutex::scoped_lock lock(cur_id_mutex);
-			if (!dummy_object)
-				dummy_object = boost::make_shared<Object>(service_pump);
-		}
 
 		return object_ptr;
 	}
@@ -225,64 +216,45 @@ public:
 		if (object_ptr)
 			object_ptr->id(generate_id());
 
-		if (!dummy_object)
-		{
-			boost::mutex::scoped_lock lock(cur_id_mutex);
-			if (!dummy_object)
-				dummy_object = boost::make_shared<Object>(arg);
-		}
-
 		return object_ptr;
 	}
 
 	size_t size()
 	{
-		boost::mutex::scoped_lock lock(object_can_mutex);
+		boost::shared_lock<boost::shared_mutex> lock(object_can_mutex);
 		return object_can.size();
 	}
 
 	size_t closed_object_size()
 	{
-		boost::mutex::scoped_lock lock(temp_object_can_mutex);
+		boost::shared_lock<boost::shared_mutex> lock(temp_object_can_mutex);
 		return temp_object_can.size();
 	}
 
 	//this method has linear complexity, please notice.
 	object_type at(size_t index)
 	{
-		boost::mutex::scoped_lock lock(object_can_mutex);
+		boost::shared_lock<boost::shared_mutex> lock(object_can_mutex);
 		assert(index < object_can.size());
 		return index < object_can.size() ? *(std::next(std::begin(object_can), index)) : object_type();
 	}
 
 	object_type find(uint64_t id)
 	{
-		if (!dummy_object)
-			return object_type();
-
-		boost::mutex::scoped_lock lock(object_can_mutex);
-		dummy_object->id(id);
-		auto iter = object_can.find(dummy_object);
+		boost::shared_lock<boost::shared_mutex> lock(object_can_mutex);
+		auto iter = object_can.find(id, st_object_hasher(), st_object_equal());
 		return iter != std::end(object_can) ? *iter : object_type();
 	}
-
-	object_type find(object_ctype object_ptr)
-	{
-		assert(object_ptr);
-		return find(object_ptr->id());
-	}
-
-	void list_all_object() {do_something_to_all([](object_ctype& item) {item->show_info("", "");});}
 
 	//Empty IP means don't care, any IP will match
 	//Zero port means don't care, any port will match
 	//this function only used with TCP socket, because for UDP socket, remote endpoint means nothing.
-	void find_object(const std::string& ip, unsigned short port, container_type& objects)
+	void find(const std::string& ip, unsigned short port, container_type& objects)
 	{
 		if (ip.empty() && 0 == port)
 		{
-			boost::mutex::scoped_lock lock(object_can_mutex);
-			objects.insert(std::end(objects), std::begin(object_can), std::end(object_can));
+			boost::shared_lock<boost::shared_mutex> lock(object_can_mutex);
+			objects.insert(std::begin(object_can), std::end(object_can));
 		}
 		else
 			do_something_to_all([&](object_ctype& item) {
@@ -290,10 +262,12 @@ public:
 				{
 					auto ep = item->lowest_layer().remote_endpoint();
 					if ((0 == port || port == ep.port()) && (ip.empty() || ip == ep.address().to_string()))
-						objects.push_back(item);
+						objects.insert(item);
 				}
 			});
 	}
+
+	void list_all_object() {do_something_to_all([](object_ctype& item) {item->show_info("", ""); });}
 
 	//Clear all closed objects from the set
 	//Consider the following conditions:
@@ -302,7 +276,7 @@ public:
 	//st_object_pool will automatically invoke this function if AUTO_CLEAR_CLOSED_SOCKET been defined
 	void clear_all_closed_object(container_type& objects)
 	{
-		boost::mutex::scoped_lock lock(object_can_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
 		for (auto iter = std::begin(object_can); iter != std::end(object_can);)
 			if (!(*iter)->lowest_layer().is_open())
 			{
@@ -324,7 +298,7 @@ public:
 		if (0 == num)
 			return;
 
-		boost::mutex::scoped_lock lock(temp_object_can_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
 		//objects are order by time, so we can use this feature to improve the performance
 		for (auto iter = std::begin(temp_object_can); num > 0 && iter != std::end(temp_object_can) && iter->is_timeout();)
 			if (!iter->object_ptr->started())
@@ -341,11 +315,10 @@ public:
 
 protected:
 	uint64_t cur_id;
-	object_type dummy_object;
-	boost::mutex cur_id_mutex;
+	boost::shared_mutex cur_id_mutex;
 
 	container_type object_can;
-	boost::mutex object_can_mutex;
+	boost::shared_mutex object_can_mutex;
 
 	//because all objects are dynamic created and stored in object_can, maybe when the receiving error occur
 	//(at this point, your standard practice is deleting the object from object_can), some other
@@ -356,7 +329,7 @@ protected:
 	//if AUTO_CLEAR_CLOSED_SOCKET been defined, clear_all_closed_object() will be invoked automatically
 	//and periodically to move all closed objects to temp_object_can.
 	boost::container::list<temp_object> temp_object_can;
-	boost::mutex temp_object_can_mutex;
+	boost::shared_mutex temp_object_can_mutex;
 };
 
 } //namespace

@@ -62,7 +62,7 @@ int main(int argc, const char* argv[])
 				completed_client_num.store(0);
 				file_size = 0;
 				boost::timer::cpu_timer begin_time;
-				if (client.at(0)->get_file(item))
+				if (client.find(0)->get_file(item))
 				{
 					client.do_something_to_all([&item](file_client::object_ctype& item2) {item2->get_file(item);});
 

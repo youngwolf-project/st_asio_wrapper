@@ -73,7 +73,7 @@ public:
 
 	object_type find(int id)
 	{
-		boost::mutex::scoped_lock lock(service_can_mutex);
+		boost::shared_lock<boost::shared_mutex> lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can), [id](object_ctype& item) {return id == item->id();});
 		return iter == std::end(service_can) ? nullptr : *iter;
 	}
@@ -82,7 +82,7 @@ public:
 	{
 		assert(nullptr != i_service_);
 
-		boost::mutex::scoped_lock lock(service_can_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(service_can_mutex);
 		service_can.remove(i_service_);
 		lock.unlock();
 
@@ -91,7 +91,7 @@ public:
 
 	void remove(int id)
 	{
-		boost::mutex::scoped_lock lock(service_can_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can), [id](object_ctype& item) {return id == item->id();});
 		if (iter != std::end(service_can))
 		{
@@ -107,7 +107,7 @@ public:
 	{
 		container_type temp_service_can;
 
-		boost::mutex::scoped_lock lock(service_can_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(service_can_mutex);
 		temp_service_can.splice(std::end(temp_service_can), service_can);
 		lock.unlock();
 
@@ -216,7 +216,7 @@ private:
 	{
 		assert(nullptr != i_service_);
 
-		boost::mutex::scoped_lock lock(service_can_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(service_can_mutex);
 		service_can.push_back(i_service_);
 	}
 
@@ -238,7 +238,7 @@ private:
 
 protected:
 	container_type service_can;
-	boost::mutex service_can_mutex;
+	boost::shared_mutex service_can_mutex;
 	boost::thread service_thread;
 	bool started;
 };

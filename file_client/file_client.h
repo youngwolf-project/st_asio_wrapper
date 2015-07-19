@@ -33,7 +33,7 @@ public:
 	{
 		if (TRANS_IDLE == state && !file_name.empty())
 		{
-			if (0 == index)
+			if (0 == id())
 				file = fopen(file_name.data(), "w+b");
 			else
 				file = fopen(file_name.data(), "r+b");

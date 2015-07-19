@@ -78,11 +78,10 @@ public:
 
 	void close_all_client()
 	{
-		//do not use graceful_close() as client endpoint do,
-		//because in this function, object_can_mutex has been locked,
+		//do not use graceful_close() as client endpoint do, because in this function, object_can_mutex has been locked,
 		//graceful_close will wait until on_recv_error() been invoked,
-		//in on_recv_error(), we need to lock object_can_mutex too(in del_object()), which made dead lock
-		boost::mutex::scoped_lock lock(ST_THIS object_can_mutex);
+		//but in on_recv_error(), we need to lock object_can_mutex too(in del_object()), this will cause dead lock
+		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
 		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
 		{
 			(*iter)->show_info("client:", "been closed.");

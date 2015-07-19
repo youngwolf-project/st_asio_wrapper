@@ -100,7 +100,7 @@ namespace st_asio_wrapper
 	template<typename _Can, typename _Mutex, typename _Predicate>
 	void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 	{
-		boost::mutex::scoped_lock lock(__mutex);
+		boost::shared_lock<boost::shared_mutex> lock(__mutex);
 		for(BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);
 	}
 
@@ -110,7 +110,7 @@ namespace st_asio_wrapper
 	template<typename _Can, typename _Mutex, typename _Predicate>
 	void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 	{
-		boost::mutex::scoped_lock lock(__mutex);
+		boost::shared_lock<boost::shared_mutex> lock(__mutex);
 		for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) if (__pred(*iter)) break;
 	}
 
@@ -149,7 +149,7 @@ namespace st_asio_wrapper
 #define DO_SOMETHING_TO_ALL(CAN) DO_SOMETHING_TO_ALL_NAME(do_something_to_all, CAN)
 
 #define DO_SOMETHING_TO_ALL_MUTEX_NAME(NAME, CAN, MUTEX) \
-template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::mutex::scoped_lock lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter);}
+template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::shared_lock<boost::shared_mutex> lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter);}
 
 #define DO_SOMETHING_TO_ALL_NAME(NAME, CAN) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) {for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter);} \
@@ -159,7 +159,8 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 #define DO_SOMETHING_TO_ONE(CAN) DO_SOMETHING_TO_ONE_NAME(do_something_to_one, CAN)
 
 #define DO_SOMETHING_TO_ONE_MUTEX_NAME(NAME, CAN, MUTEX) \
-template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::mutex::scoped_lock lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;}
+template<typename _Predicate> void NAME(const _Predicate& __pred) \
+	{boost::shared_lock<boost::shared_mutex> lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;}
 
 #define DO_SOMETHING_TO_ONE_NAME(NAME, CAN) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) {for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;} \
@@ -181,7 +182,7 @@ TYPE FUNNAME(const std::string& str, bool can_overflow = false) {return FUNNAME(
 #define TCP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	boost::mutex::scoped_lock lock(send_msg_buffer_mutex); \
+	boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex); \
 	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
 	{ \
 		typename Packer::msg_type msg; \
@@ -219,7 +220,7 @@ TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const std::string&
 #define UDP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	boost::mutex::scoped_lock lock(send_msg_buffer_mutex); \
+	boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex); \
 	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
 	{ \
 		udp_msg<typename Packer::msg_type> msg(peer_addr); \

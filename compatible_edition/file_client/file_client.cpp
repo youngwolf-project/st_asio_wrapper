@@ -63,7 +63,7 @@ int main(int argc, const char* argv[])
 				completed_client_num.store(0);
 				file_size = 0;
 				boost::timer::cpu_timer begin_time;
-				if (client.at(0)->get_file(*iter))
+				if (client.find(0)->get_file(*iter))
 				{
 					client.do_something_to_all(boost::bind(&file_socket::get_file, _1, boost::cref(*iter)));
 

@@ -79,21 +79,21 @@ public:
 		if (started())
 			return false;
 
-		boost::mutex::scoped_lock lock(recv_msg_buffer_mutex, boost::try_to_lock);
-		return lock.owns_lock(); //if recv_msg_buffer_mutex has been locked, then this socket should not be reused.
+		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex, boost::try_to_lock);
+		return lock.owns_lock(); //if successfully locked, means this st_socket is idle
 	}
 #endif
 
 	bool started() const {return started_;}
 	void start()
 	{
-		boost::mutex::scoped_lock lock(start_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(start_mutex);
 		if (!started_)
 			started_ = do_start();
 	}
 	bool send_msg() //return false if send buffer is empty or sending not allowed or io_service stopped
 	{
-		boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
 		return do_send_msg();
 	}
 
@@ -117,7 +117,7 @@ public:
 	//no matter whether the send buffer is available
 	bool is_send_buffer_available()
 	{
-		boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
+		boost::shared_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
 		return send_msg_buffer.size() < MAX_MSG_NUM;
 	}
 
@@ -125,7 +125,7 @@ public:
 	bool direct_send_msg(const MsgType& msg, bool can_overflow = false) {return direct_send_msg(MsgType(msg), can_overflow);}
 	bool direct_send_msg(MsgType&& msg, bool can_overflow = false)
 	{
-		boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
 		if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM)
 			return do_direct_send_msg(std::move(msg));
 
@@ -139,7 +139,7 @@ public:
 			return true;
 		else
 		{
-			boost::mutex::scoped_lock lock(post_msg_buffer_mutex);
+			boost::unique_lock<boost::shared_mutex> lock(post_msg_buffer_mutex);
 			return do_direct_post_msg(std::move(msg));
 		}
 	}
@@ -147,7 +147,7 @@ public:
 	//how many msgs waiting for sending(sending_msg = true) or dispatching
 	size_t get_pending_msg_num(BufferType buffer_type = SEND_BUFFER)
 	{
-		boost::mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		boost::shared_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
 		return msg_buffer[buffer_type].size();
 	}
 
@@ -156,7 +156,7 @@ public:
 		msg.clear();
 		//msgs in send buffer and post buffer are packed
 		//msgs in receive buffer are unpacked
-		boost::mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		boost::shared_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
 		if (!msg_buffer[buffer_type].empty())
 			msg = msg_buffer[buffer_type].front();
 	}
@@ -166,7 +166,7 @@ public:
 		msg.clear();
 		//msgs in send buffer and post buffer are packed
 		//msgs in receive buffer are unpacked
-		boost::mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		boost::unique_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
 		if (!msg_buffer[buffer_type].empty())
 		{
 			msg.swap(msg_buffer[buffer_type].front());
@@ -177,7 +177,7 @@ public:
 	//clear all pending msgs
 	void pop_all_pending_msg(container_type& msg_list, BufferType buffer_type = SEND_BUFFER)
 	{
-		boost::mutex::scoped_lock lock(msg_buffer_mutex[buffer_type]);
+		boost::unique_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
 		msg_list.splice(msg_list.end(), msg_buffer[buffer_type]);
 	}
 
@@ -240,9 +240,9 @@ protected:
 		case 2:
 			{
 				bool empty;
-				boost::mutex::scoped_lock lock(post_msg_buffer_mutex);
+				boost::unique_lock<boost::shared_mutex> lock(post_msg_buffer_mutex);
 				{
-					boost::mutex::scoped_lock lock(send_msg_buffer_mutex);
+					boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
 					if (splice_helper(send_msg_buffer, post_msg_buffer))
 						do_send_msg();
 				}
@@ -277,7 +277,7 @@ protected:
 				temp_msg_buffer.erase(iter++);
 			else
 			{
-				boost::mutex::scoped_lock lock(recv_msg_buffer_mutex);
+				boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
 				auto msg_num = recv_msg_buffer.size();
 				if (msg_num < MAX_MSG_NUM) //msg receive buffer available
 				{
@@ -293,7 +293,7 @@ protected:
 #else
 		if (!temp_msg_buffer.empty())
 		{
-			boost::mutex::scoped_lock lock(recv_msg_buffer_mutex);
+			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
 			if (splice_helper(recv_msg_buffer, temp_msg_buffer))
 				do_dispatch_msg(false);
 		}
@@ -308,7 +308,7 @@ protected:
 	void msg_handler()
 	{
 		bool re = on_msg_handle(last_dispatch_msg, false); //must before next msg dispatch to keep sequence
-		boost::mutex::scoped_lock lock(recv_msg_buffer_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
 		dispatching = false;
 		if (!re) //dispatch failed, re-dispatch
 		{
@@ -323,7 +323,7 @@ protected:
 	//must mutex recv_msg_buffer before invoke this function
 	void do_dispatch_msg(bool need_lock)
 	{
-		boost::mutex::scoped_lock lock(recv_msg_buffer_mutex, boost::defer_lock);
+		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex, boost::defer_lock);
 		if (need_lock) lock.lock();
 
 		if (suspend_dispatch_msg_)
@@ -408,14 +408,14 @@ protected:
 	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't push into recv_msg_buffer
 	//cause of receive buffer overflow, st_socket will delay 50 milliseconds(non-blocking) to invoke
 	//dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
-	boost::mutex msg_buffer_mutex[3];
+	boost::shared_mutex msg_buffer_mutex[3];
 
 	bool posting;
 	bool sending, suspend_send_msg_;
 	bool dispatching, suspend_dispatch_msg_;
 
 	bool started_; //has started or not
-	boost::mutex start_mutex;
+	boost::shared_mutex start_mutex;
 };
 
 } //namespace
