@@ -33,7 +33,7 @@ if head equal:
 	request the file content, client->server->client
 	return: file content(no-protocol), repeat until all data requested by client been sent(only need to request one time)
 2: body is talk content
-	talk, client->server or server->client
+	talk, client->server. please notice that server cannot talk to client, this is because server never knows whether it is transmitting a file or not.
 	return: n/a
 */
 
@@ -41,14 +41,13 @@ if head equal:
 class file_buffer : public i_buffer
 {
 public:
-	file_buffer(FILE* file, __off64_t offset, __off64_t data_len) : _file(file), _offset(offset), _data_len(data_len)
+	file_buffer(FILE* file, __off64_t data_len) : _file(file), _data_len(data_len)
 	{
 		assert(NULL != _file);
 
 		buffer = new char[boost::asio::detail::default_max_transfer_size];
 		assert(NULL != buffer);
 
-		fseeko64(_file, _offset, SEEK_SET);
 		read();
 	}
 	~file_buffer() {delete[] buffer;}
@@ -79,26 +78,24 @@ protected:
 	char* buffer;
 	size_t buffer_len;
 
-	__off64_t _offset, _data_len;
+	__off64_t _data_len;
 };
 
 class data_unpacker : public i_unpacker<replaceable_buffer>
 {
 public:
-	data_unpacker(FILE* file, __off64_t offset, __off64_t data_len)  : _file(file), _offset(offset), _data_len(data_len)
+	data_unpacker(FILE* file, __off64_t data_len)  : _file(file), _data_len(data_len)
 	{
 		assert(NULL != _file);
 
 		buffer = new char[boost::asio::detail::default_max_transfer_size];
 		assert(NULL != buffer);
-
-		fseeko64(_file, _offset, SEEK_SET);
 	}
 	~data_unpacker() {delete[] buffer;}
 
 	__off64_t get_rest_size() const {return _data_len;}
 
-	virtual void reset_state() {_file = NULL; delete[] buffer; buffer = NULL; _offset = _data_len = 0;}
+	virtual void reset_state() {_file = NULL; delete[] buffer; buffer = NULL; _data_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		assert(_data_len >= (__off64_t) bytes_transferred && bytes_transferred > 0);
@@ -127,7 +124,7 @@ protected:
 	FILE* _file;
 	char* buffer;
 
-	__off64_t _offset, _data_len;
+	__off64_t _data_len;
 };
 
 class base_socket

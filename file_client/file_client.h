@@ -125,8 +125,6 @@ private:
 						my_length = length - offset;
 					if (my_length > 0)
 					{
-						fseeko64(file, offset, SEEK_SET);
-
 						char buffer[ORDER_LEN + OFFSET_LEN + DATA_LEN];
 						*buffer = 1; //head
 						*(__off64_t*) std::next(buffer, ORDER_LEN) = offset;
@@ -135,7 +133,8 @@ private:
 						state = TRANS_BUSY;
 						send_msg(buffer, sizeof(buffer), true);
 
-						inner_unpacker(boost::make_shared<data_unpacker>(file, offset, my_length));
+						fseeko64(file, offset, SEEK_SET);
+						inner_unpacker(boost::make_shared<data_unpacker>(file, my_length));
 					}
 					else
 						trans_end();

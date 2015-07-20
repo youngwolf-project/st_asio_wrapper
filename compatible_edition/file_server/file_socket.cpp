@@ -87,7 +87,8 @@ void file_socket::handle_msg(msg_ctype& msg)
 			if (offset >= 0 && length > 0 && offset + length <= ftello64(file))
 			{
 				state = TRANS_BUSY;
-				direct_send_msg(replaceable_buffer(boost::make_shared<file_buffer>(file, offset, length)), true);
+				fseeko64(file, offset, SEEK_SET);
+				direct_send_msg(replaceable_buffer(boost::make_shared<file_buffer>(file, length)), true);
 			}
 		}
 		break;
