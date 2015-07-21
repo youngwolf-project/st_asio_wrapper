@@ -371,12 +371,19 @@
  * Added udp unpacker, actually udp msg doesn't need unpacking, but we may need different msg types, not only std::string.
  * Perfected makefiles: generate dependences automatically.
  * Upgraded the pem files from 512 bits to 1024 bits to satisfy newer OpenSSL.
+ *
+ * 5.1	2015.7.12
+ * Added ID (integer type of uint64_t, auto increase) support to objects.
+ * Changed the type of objects container from list to set.
+ *
+ * 5.2	2015.7.19
+ * Replaced boost::container::set by boost::unordered::unordered_set.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VERSION 40000
+#define ST_ASIO_WRAPPER_VERSION 50200
 
 #if !defined _MSC_VER && !defined __GNUC__
 #error st_asio_wrapper only support vc and gcc.

@@ -109,14 +109,9 @@ protected:
 	bool add_object(object_ctype& object_ptr)
 	{
 		assert(object_ptr && &object_ptr->get_io_service() == &get_service_pump());
-		bool re = false;
 
 		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
-		size_t object_num = object_can.size();
-		if (object_num < MAX_OBJECT_NUM)
-			re = object_can.insert(object_ptr).second;
-
-		return re;
+		return object_can.size() < MAX_OBJECT_NUM ? object_can.insert(object_ptr).second : false;
 	}
 
 	//this method will always insert object_ptr into temp_object_can,
@@ -125,10 +120,12 @@ protected:
 	{
 		assert(object_ptr);
 
-		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-		temp_object_can.push_back(object_ptr);
+		{
+			boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
+			temp_object_can.push_back(object_ptr);
+		}
 
-		boost::unique_lock<boost::shared_mutex> lock2(object_can_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
 		return object_can.erase(object_ptr) > 0;
 	}
 

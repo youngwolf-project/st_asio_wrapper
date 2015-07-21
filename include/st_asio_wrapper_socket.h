@@ -126,10 +126,7 @@ public:
 	bool direct_send_msg(MsgType&& msg, bool can_overflow = false)
 	{
 		boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
-		if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM)
-			return do_direct_send_msg(std::move(msg));
-
-		return false;
+		return can_overflow || send_msg_buffer.size() < MAX_MSG_NUM ? do_direct_send_msg(std::move(msg)) : false;
 	}
 
 	bool direct_post_msg(const MsgType& msg, bool can_overflow = false) {return direct_post_msg(MsgType(msg), can_overflow);}
@@ -137,11 +134,9 @@ public:
 	{
 		if (direct_send_msg(std::move(msg), can_overflow))
 			return true;
-		else
-		{
-			boost::unique_lock<boost::shared_mutex> lock(post_msg_buffer_mutex);
-			return do_direct_post_msg(std::move(msg));
-		}
+
+		boost::unique_lock<boost::shared_mutex> lock(post_msg_buffer_mutex);
+		return do_direct_post_msg(std::move(msg));
 	}
 
 	//how many msgs waiting for sending(sending_msg = true) or dispatching
@@ -239,14 +234,15 @@ protected:
 			break;
 		case 2:
 			{
-				bool empty;
 				boost::unique_lock<boost::shared_mutex> lock(post_msg_buffer_mutex);
 				{
 					boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
 					if (splice_helper(send_msg_buffer, post_msg_buffer))
 						do_send_msg();
 				}
-				posting = !(empty = post_msg_buffer.empty());
+
+				auto empty = post_msg_buffer.empty();
+				posting = !empty;
 				lock.unlock();
 
 				if (empty)
@@ -278,8 +274,7 @@ protected:
 			else
 			{
 				boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-				auto msg_num = recv_msg_buffer.size();
-				if (msg_num < MAX_MSG_NUM) //msg receive buffer available
+				if (recv_msg_buffer.size() < MAX_MSG_NUM) //msg receive buffer available
 				{
 					dispatch = true;
 					recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer, iter++);
