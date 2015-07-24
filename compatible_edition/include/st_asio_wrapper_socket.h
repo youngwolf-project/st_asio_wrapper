@@ -319,6 +319,9 @@ protected:
 		}
 		else //dispatch msg sequentially, which means second dispatch only after first dispatch success
 			do_dispatch_msg(false);
+
+		if (!dispatching)
+			last_dispatch_msg.clear();
 	}
 
 	//must mutex recv_msg_buffer before invoke this function

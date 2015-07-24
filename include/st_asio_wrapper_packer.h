@@ -57,26 +57,26 @@ public:
 template<typename MsgType>
 class i_packer
 {
+public:
+	typedef MsgType msg_type;
+	typedef const msg_type msg_ctype;
+
 protected:
 	virtual ~i_packer() {}
 
 public:
 	virtual void reset_state() {}
-	virtual MsgType pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
 
-	MsgType pack_msg(const char* pstr, size_t len, bool native = false) {return pack_msg(&pstr, &len, 1, native);}
-	MsgType pack_msg(const std::string& str, bool native = false) {return pack_msg(str.data(), str.size(), native);}
+	msg_type pack_msg(const char* pstr, size_t len, bool native = false) {return pack_msg(&pstr, &len, 1, native);}
+	msg_type pack_msg(const std::string& str, bool native = false) {return pack_msg(str.data(), str.size(), native);}
 };
 
 class packer : public i_packer<std::string>
 {
 public:
-	typedef std::string msg_type;
-	typedef const msg_type msg_ctype;
-
 	static size_t get_max_msg_size() {return MSG_BUFFER_SIZE - HEAD_LEN;}
 
-public:
 	using i_packer<msg_type>::pack_msg;
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
@@ -115,10 +115,6 @@ public:
 class replaceable_packer : public i_packer<replaceable_buffer>
 {
 public:
-	typedef replaceable_buffer msg_type;
-	typedef const msg_type msg_ctype;
-
-public:
 	using i_packer<msg_type>::pack_msg;
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
@@ -131,27 +127,49 @@ public:
 	}
 };
 
-class fixed_legnth_packer : public i_packer<std::string>
+class inflexible_packer : public i_packer<inflexible_buffer>
 {
 public:
-	typedef std::string msg_type;
-	typedef const msg_type msg_ctype;
+	static size_t get_max_msg_size() {return MSG_BUFFER_SIZE - HEAD_LEN;}
 
-public:
 	using i_packer<msg_type>::pack_msg;
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg_type msg;
-		auto total_len = packer_helper::msg_size_check(0, pstr, len, num);
+		auto pre_len = native ? 0 : HEAD_LEN;
+		auto total_len = packer_helper::msg_size_check(pre_len, pstr, len, num);
 		if ((size_t) -1 == total_len)
 			return msg;
-		else if (total_len > 0)
+		else if (total_len > pre_len)
 		{
-			msg.reserve(total_len);
+			char* buff = nullptr;
+			size_t pos = 0;
+			if (!native)
+			{
+				auto head_len = (HEAD_TYPE) total_len;
+				if (total_len != head_len)
+				{
+					unified_out::error_out("pack msg error: length exceeds the header's range!");
+					return msg;
+				}
+
+				head_len = HEAD_H2N(head_len);
+				buff = new char[total_len];
+				memcpy(buff, (const char*) &head_len, HEAD_LEN);
+				pos = HEAD_LEN;
+			}
+			else
+				buff = new char[total_len];
+
 			for (size_t i = 0; i < num; ++i)
 				if (nullptr != pstr[i])
-					msg.append(pstr[i], len[i]);
-		} //if (total_len > 0)
+				{
+					memcpy(buff + pos, pstr[i], len[i]);
+					pos += len[i];
+				}
+
+			msg.attach(buff, total_len);
+		} //if (total_len > pre_len)
 
 		return msg;
 	}
@@ -159,10 +177,6 @@ public:
 
 class prefix_suffix_packer : public i_packer<std::string>
 {
-public:
-	typedef std::string msg_type;
-	typedef const msg_type msg_ctype;
-
 public:
 	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < MSG_BUFFER_SIZE); _prefix = prefix;  _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}

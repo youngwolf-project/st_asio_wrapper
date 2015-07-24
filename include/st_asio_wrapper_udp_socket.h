@@ -224,13 +224,15 @@ protected:
 		//send msg sequentially, that means second send only after first send success
 		//under windows, send a msg to addr_any may cause sending errors, please note
 		//for UDP in st_asio_wrapper, sending error will not stop the following sending.
-		if (!do_send_msg())
-		{
 #ifdef WANT_ALL_MSG_SEND_NOTIFY
-			lock.unlock();
+		if (!do_send_msg())
 			ST_THIS on_all_msg_send(ST_THIS last_send_msg);
+#else
+		do_send_msg();
 #endif
-		}
+
+		if (!ST_THIS sending)
+			ST_THIS last_send_msg.clear();
 	}
 
 protected:

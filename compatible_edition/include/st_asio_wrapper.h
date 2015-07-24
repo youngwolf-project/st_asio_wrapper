@@ -378,12 +378,18 @@
  *
  * 5.2	2015.7.19
  * Replaced boost::container::set by boost::unordered::unordered_set.
+ *
+ * 5.2.1	2015.7.25
+ * Added a new buffer--inflexible_buffer(its predecessor is my_msg_buffer in asio_client), and corresponding inflexible_packer and inflexible_unpacker.
+ * Moved the typedef of msg_type and msg_ctype from packers and unpackers to i_packer and i_unpacker/i_udp_unpacker.
+ * Fixed the possibility of race condition in on_all_msg_send.
+ * Dropped fixed_length_packer, use packer(the default pakcer) instead.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VERSION 50200
+#define ST_ASIO_WRAPPER_VERSION 50201
 
 #if !defined _MSC_VER && !defined __GNUC__
 #error st_asio_wrapper only support vc and gcc.

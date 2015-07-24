@@ -34,7 +34,9 @@ template<typename MsgType>
 class i_unpacker
 {
 public:
-	typedef boost::container::list<MsgType> container_type;
+	typedef MsgType msg_type;
+	typedef const msg_type msg_ctype;
+	typedef boost::container::list<msg_type> container_type;
 
 protected:
 	virtual ~i_unpacker() {}
@@ -49,11 +51,15 @@ public:
 template<typename MsgType>
 class i_udp_unpacker
 {
+public:
+	typedef MsgType msg_type;
+	typedef const msg_type msg_ctype;
+
 protected:
 	virtual ~i_udp_unpacker() {}
 
 public:
-	virtual MsgType parse_msg(size_t bytes_transferred) = 0;
+	virtual msg_type parse_msg(size_t bytes_transferred) = 0;
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
 };
 
@@ -159,7 +165,7 @@ protected:
 class udp_unpacker : public i_udp_unpacker<std::string>
 {
 public:
-	virtual std::string parse_msg(size_t bytes_transferred) {assert(bytes_transferred <= MSG_BUFFER_SIZE); return std::string(raw_buff.data(), bytes_transferred);}
+	virtual msg_type parse_msg(size_t bytes_transferred) {assert(bytes_transferred <= MSG_BUFFER_SIZE); return msg_type(raw_buff.data(), bytes_transferred);}
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
 
 protected:
@@ -192,17 +198,93 @@ public:
 class replaceable_udp_unpacker : public i_udp_unpacker<replaceable_buffer>
 {
 public:
-	virtual replaceable_buffer parse_msg(size_t bytes_transferred)
+	virtual msg_type parse_msg(size_t bytes_transferred)
 	{
 		assert(bytes_transferred <= MSG_BUFFER_SIZE);
 		auto com = boost::make_shared<buffer>();
 		com->assign(raw_buff.data(), bytes_transferred);
-		return replaceable_buffer(com);
+		return msg_type(com);
 	}
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
 
 protected:
 	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
+};
+
+//this unpacker demonstrate how to forbid memory copy while parsing msgs.
+class inflexible_unpacker : public i_unpacker<inflexible_buffer>
+{
+public:
+	inflexible_unpacker() {reset_state();}
+	size_t current_msg_length() const {return raw_buff.size();} //current msg's total length(not include the head), 0 means don't know
+
+public:
+	virtual void reset_state() {raw_buff.detach(); step = 0;}
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
+	{
+		if (0 == step) //the head been received
+		{
+			assert(!raw_buff.empty());
+			step = 1;
+		}
+		else if (1 == step) //the body been received
+		{
+			assert(!raw_buff.empty());
+			if (bytes_transferred != raw_buff.size())
+				return false;
+
+			msg_can.resize(msg_can.size() + 1);
+			msg_can.back().swap(raw_buff);
+			step = 0;
+		}
+
+		return -1 != step;
+	}
+
+	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
+	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
+	{
+		if (ec)
+			return 0;
+
+		if (0 == step) //want the head
+		{
+			assert(raw_buff.empty());
+
+			if (bytes_transferred < HEAD_LEN)
+				return boost::asio::detail::default_max_transfer_size;
+
+			assert(HEAD_LEN == bytes_transferred);
+			auto cur_msg_len = HEAD_N2H(head_buff) - HEAD_LEN;
+			if (cur_msg_len > MSG_BUFFER_SIZE - HEAD_LEN) //invalid msg, stop reading
+				step = -1;
+			else
+				raw_buff.attach(new char[cur_msg_len], cur_msg_len);
+		}
+		else if (1 == step) //want the body
+		{
+			assert(!raw_buff.empty());
+			return boost::asio::detail::default_max_transfer_size;
+		}
+		else
+			assert(false);
+
+		return 0;
+	}
+
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return raw_buff.empty() ? boost::asio::buffer((char*) &head_buff, HEAD_LEN) : boost::asio::buffer(raw_buff.data(), raw_buff.size());}
+
+private:
+	HEAD_TYPE head_buff;
+	//please notice that we don't have a fixed size array with maximum size any more(like the default unpacker).
+	//this is very useful if you have very few but very large msgs, fox example:
+	//you have a very large msg(1M size), but all others are very small, if you use a fixed size array to hold msgs in the unpackers,
+	//all the unpackers must have an array with at least 1M size, each st_socket will have a unpacker, this will cause your application occupy very large memory but with
+	//very low utilization ratio.
+	//this inflexible_unpacker will resolve the above problem, and with another benefit: no memory copying needed any more.
+	msg_type raw_buff;
+	int step; //-1-error format, 0-want the head, 1-want the body
 };
 
 class fixed_length_unpacker : public i_unpacker<std::string>

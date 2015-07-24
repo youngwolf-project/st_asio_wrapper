@@ -8,17 +8,14 @@
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	1
 //1-default packer and unpacker, head(length) + body
-//2-fixed length packer and unpacker
+//2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
 //#define REPLACEABLE_BUFFER
-#endif
-#if 2 == PACKER_UNPACKER_TYPE
-#define DEFAULT_PACKER	fixed_legnth_packer
+#elif 2 == PACKER_UNPACKER_TYPE
 #define DEFAULT_UNPACKER fixed_length_unpacker
-#endif
-#if 3 == PACKER_UNPACKER_TYPE
+#elif 3 == PACKER_UNPACKER_TYPE
 #define DEFAULT_PACKER prefix_suffix_packer
 #define DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
@@ -47,13 +44,9 @@ using namespace st_asio_wrapper;
 //in the default behavior, each st_tcp_socket has their own packer, and cause memory waste
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
-#if 1 == PACKER_UNPACKER_TYPE
+#if 1 == PACKER_UNPACKER_TYPE || 2 == PACKER_UNPACKER_TYPE
 BOOST_AUTO(global_packer, boost::make_shared<DEFAULT_PACKER>());
-#endif
-#if 2 == PACKER_UNPACKER_TYPE
-BOOST_AUTO(global_packer, boost::make_shared<fixed_legnth_packer>());
-#endif
-#if 3 == PACKER_UNPACKER_TYPE
+#elif 3 == PACKER_UNPACKER_TYPE
 BOOST_AUTO(global_packer, boost::make_shared<prefix_suffix_packer>());
 #endif
 
@@ -69,15 +62,13 @@ class echo_socket : public st_server_socket_base<DEFAULT_PACKER, DEFAULT_UNPACKE
 public:
 	echo_socket(i_echo_server& server_) : st_server_socket_base(server_)
 	{
-#if 1 == PACKER_UNPACKER_TYPE
 		inner_packer(global_packer);
-#endif
+
 #if 2 == PACKER_UNPACKER_TYPE
 		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
-#endif
-#if 3 == PACKER_UNPACKER_TYPE
-		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
+#elif 3 == PACKER_UNPACKER_TYPE
 		dynamic_cast<prefix_suffix_packer*>(&*inner_packer())->prefix_suffix("begin", "end");
+		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
 #endif
 	}
 
@@ -99,10 +90,26 @@ protected:
 	//msg handling: send the original msg back(echo server)
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
-	virtual bool on_msg(msg_type& msg) {post_msg(msg.data(), msg.size()); return true;}
+	virtual bool on_msg(msg_type& msg)
+	{
+	#if 2 == PACKER_UNPACKER_TYPE
+		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+		return post_native_msg(msg.data(), msg.size());
+	#else
+		return post_msg(msg.data(), msg.size());
+	#endif
+	}
 #endif
 	//we should handle the msg in on_msg_handle for time-consuming task like this:
-	virtual bool on_msg_handle(msg_type& msg, bool link_down) {return send_msg(msg.data(), msg.size());}
+	virtual bool on_msg_handle(msg_type& msg, bool link_down)
+	{
+	#if 2 == PACKER_UNPACKER_TYPE
+		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+		return send_native_msg(msg.data(), msg.size());
+	#else
+		return send_msg(msg.data(), msg.size());
+	#endif
+	}
 	//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_tcp_socket will directly
 	//use the msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
 	//msg handling end
@@ -124,7 +131,11 @@ int main(int argc, const char* argv[])
 	puts("type " QUIT_COMMAND " to end.");
 
 	st_service_pump service_pump;
-	st_server server_(service_pump); //only need a simple server? you can directly use st_server
+	//only need a simple server? you can directly use st_server or st_server_base.
+	//because we use st_server_socket_base directly, so this server cannot support fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
+	//the reason is these packer and unpacker need additional initializations that st_server_socket_base not implemented, see echo_socket's constructor for more details.
+	typedef st_server_socket_base<packer, unpacker> normal_server_socket;
+	st_server_base<normal_server_socket> server_(service_pump);
 	echo_server echo_server_(service_pump); //echo server
 
 	if (argc > 2)
@@ -172,15 +183,13 @@ int main(int argc, const char* argv[])
 		else
 		{
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
-			//server_.safe_broadcast_msg(str.data(), str.size() + 1); //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
+			//server_.broadcast_msg(str.data(), str.size() + 1); //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
 
-#if 1 == PACKER_UNPACKER_TYPE
-			//if all clients used the same protocol, we can pack msg one time, and use it repeatedly like this:
-			DEFAULT_PACKER::msg_type msg;
-			DEFAULT_PACKER packer;
-			if (packer.pack_msg(msg, str.data(), str.size() + 1)) //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
-				server_.do_something_to_all(boost::bind((bool (st_server_socket::*) (st_server_socket::msg_ctype&, bool)) &st_server_socket::direct_send_msg, _1, boost::cref(msg), false));
-#endif
+			//if all clients used the same protocol, we can pack msg one time, and send it repeatedly like this:
+			packer::msg_type msg;
+			packer p;
+			if (p.pack_msg(msg, str.data(), str.size() + 1)) //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
+				server_.do_something_to_all(boost::bind((bool (normal_server_socket::*)(normal_server_socket::msg_ctype&, bool)) &normal_server_socket::direct_send_msg, _1, boost::cref(msg), false));
 		}
 	}
 

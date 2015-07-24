@@ -205,6 +205,9 @@ protected:
 #else
 			do_send_msg();
 #endif
+
+		if (!ST_THIS sending)
+			ST_THIS last_send_msg.clear();
 	}
 
 protected:

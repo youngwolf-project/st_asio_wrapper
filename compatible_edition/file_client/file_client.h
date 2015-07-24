@@ -33,27 +33,33 @@ public:
 
 	bool get_file(const std::string& file_name)
 	{
-		if (TRANS_IDLE == state && !file_name.empty())
+		assert(!file_name.empty());
+
+		if (TRANS_IDLE != state)
+			return false;
+		else if (NULL == file)
 		{
 			if (0 == id())
 				file = fopen(file_name.data(), "w+b");
 			else
 				file = fopen(file_name.data(), "r+b");
-			if (NULL != file)
+
+			if (NULL == file)
 			{
-				std::string order("\0", ORDER_LEN);
-				order += file_name;
-
-				state = TRANS_PREPARE;
-				send_msg(order, true);
-
-				return true;
-			}
-			else if (0 == index)
 				printf("can't create file %s.\n", file_name.data());
+				return false;
+			}
+			else if (0 == id())
+				return true;
 		}
 
-		return false;
+		std::string order("\0", ORDER_LEN);
+		order += file_name;
+
+		state = TRANS_PREPARE;
+		send_msg(order, true);
+
+		return true;
 	}
 
 	void talk(const std::string& str)

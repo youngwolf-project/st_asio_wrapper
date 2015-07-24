@@ -96,6 +96,44 @@ namespace st_asio_wrapper
 		boost::shared_ptr<i_buffer> buffer;
 	};
 
+	//this buffer is more efficient than std::string if the memory is already allocated, because the replication been saved.
+	//for example, you are sending memory-mapped files.
+	class inflexible_buffer
+	{
+	public:
+		inflexible_buffer() {do_detach();}
+		~inflexible_buffer() {detach();}
+
+		void assign(const char* _buff, size_t _len)
+		{
+			assert(_len > 0 && NULL != _buff);
+			char* _buff_ = new char[_len];
+			memcpy(_buff_, _buff, _len);
+
+			attach(_buff_, _len);
+		}
+
+		void attach(char* _buff, size_t _len) {detach(); do_attach(_buff, _len);}
+		void detach() {delete buff; do_detach();}
+
+		//the following five functions (char* data() is used by inflexible_unpacker, not counted) are needed by st_asio_wrapper,
+		//for other functions, depends on the implementation of your packer and unpacker.
+		bool empty() const {return 0 == len || NULL == buff;}
+		size_t size() const {return len;}
+		const char* data() const {return buff;}
+		char* data() {return buff;}
+		void swap(inflexible_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len);}
+		void clear() {detach();}
+
+	protected:
+		void do_attach(char* _buff, size_t _len) {buff = _buff; len = _len;}
+		void do_detach() {buff = NULL; len = 0;}
+
+	protected:
+		char* buff;
+		size_t len;
+	};
+
 	//free functions, used to do something to any container optionally with any mutex
 	template<typename _Can, typename _Mutex, typename _Predicate>
 	void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)

@@ -63,11 +63,12 @@ int main(int argc, const char* argv[])
 				completed_client_num.store(0);
 				file_size = 0;
 				boost::timer::cpu_timer begin_time;
+
+				printf("transfer %s begin.\n", iter->data());
 				if (client.find(0)->get_file(*iter))
 				{
 					client.do_something_to_all(boost::bind(&file_socket::get_file, _1, boost::cref(*iter)));
 
-					printf("transfer %s begin.\n", iter->data());
 					unsigned percent = -1;
 					while (completed_client_num.load() != (unsigned short) link_num)
 					{
@@ -91,6 +92,8 @@ int main(int argc, const char* argv[])
 					double used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
 					printf("\r100%%\ntransfer %s end, speed: %.0f kB/s.\n", iter->data(), file_size / used_time / 1024);
 				}
+				else
+					printf("transfer %s failed!\n", iter->data());
 			}
 		}
 		else

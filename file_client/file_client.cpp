@@ -62,11 +62,13 @@ int main(int argc, const char* argv[])
 				completed_client_num.store(0);
 				file_size = 0;
 				boost::timer::cpu_timer begin_time;
+
+				printf("transfer %s begin.\n", item.data());
 				if (client.find(0)->get_file(item))
 				{
-					client.do_something_to_all([&item](file_client::object_ctype& item2) {item2->get_file(item);});
+					//if you always return false, do_something_to_one will be equal to do_something_to_all.
+					client.do_something_to_one([&item](file_client::object_ctype& item2) {if (0 != item2->id()) item2->get_file(item); return false;});
 
-					printf("transfer %s begin.\n", item.data());
 					unsigned percent = -1;
 					while (completed_client_num.load() != (unsigned short) link_num)
 					{
@@ -90,6 +92,8 @@ int main(int argc, const char* argv[])
 					auto used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
 					printf("\r100%%\ntransfer %s end, speed: %.0f kB/s.\n", item.data(), file_size / used_time / 1024);
 				}
+				else
+					printf("transfer %s failed!\n", item.data());
 			});
 		}
 		else

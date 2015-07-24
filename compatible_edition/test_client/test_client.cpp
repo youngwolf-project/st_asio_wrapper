@@ -23,17 +23,14 @@
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	1
 //1-default packer and unpacker, head(length) + body
-//2-fixed length packer and unpacker
+//2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
 //#define REPLACEABLE_BUFFER
-#endif
-#if 2 == PACKER_UNPACKER_TYPE
-#define DEFAULT_PACKER	fixed_legnth_packer
+#elif 2 == PACKER_UNPACKER_TYPE
 #define DEFAULT_UNPACKER fixed_length_unpacker
-#endif
-#if 3 == PACKER_UNPACKER_TYPE
+#elif 3 == PACKER_UNPACKER_TYPE
 #define DEFAULT_PACKER prefix_suffix_packer
 #define DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
@@ -71,12 +68,11 @@ class test_socket : public st_connector
 public:
 	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0)
 	{
-#if PACKER_UNPACKER_TYPE == 2
+#if 2 == PACKER_UNPACKER_TYPE
 		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
-#endif
-#if PACKER_UNPACKER_TYPE == 3
-		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
+#elif 3 == PACKER_UNPACKER_TYPE
 		dynamic_cast<prefix_suffix_packer*>(&*inner_packer())->prefix_suffix("begin", "end");
+		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
 #endif
 	}
 
@@ -240,16 +236,17 @@ int main(int argc, const char* argv[])
 			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
 			BOOST_AUTO(iter, tok.begin());
 			if (iter != tok.end()) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
+
+			bool native = false;
 #if 1 == PACKER_UNPACKER_TYPE
 			if (iter != tok.end()) msg_len = std::min(packer::get_max_msg_size(),
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq
-#endif
-#if 2 == PACKER_UNPACKER_TYPE
+#elif 2 == PACKER_UNPACKER_TYPE
 			if (iter != tok.end()) ++iter;
-			msg_len = 1024;
-#endif
-#if 3 == PACKER_UNPACKER_TYPE
-			if (iter != tok.end()) msg_len = std::min((size_t) MAX_MSG_LEN,
+			msg_len = 1024; //we hard code this because we fixedly initialized the length of fixed_length_unpacker to 1024
+			native = true; //we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+#elif 3 == PACKER_UNPACKER_TYPE
+			if (iter != tok.end()) msg_len = std::min((size_t) MSG_BUFFER_SIZE,
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t)));
 #endif
 			if (iter != tok.end()) msg_fill = *iter++->data();
@@ -289,10 +286,15 @@ int main(int argc, const char* argv[])
 					switch (model)
 					{
 					case 0:
-						client.safe_broadcast_msg(buff, msg_len); send_bytes += link_num * msg_len; break;
+						native ? client.safe_broadcast_native_msg(buff, msg_len) : client.safe_broadcast_msg(buff, msg_len);
+						send_bytes += link_num * msg_len;
+						break;
 					case 1:
-						client.safe_random_send_msg(buff, msg_len); send_bytes += msg_len; break;
-					default: break;
+						native ? client.safe_random_send_native_msg(buff, msg_len) : client.safe_random_send_msg(buff, msg_len);
+						send_bytes += msg_len;
+						break;
+					default:
+						break;
 					}
 
 					unsigned new_percent = (unsigned) (100 * send_bytes / total_msg_bytes);
