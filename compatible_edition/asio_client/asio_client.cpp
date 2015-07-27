@@ -6,21 +6,24 @@
 #define DEFAULT_PACKER	inflexible_packer
 #define DEFAULT_UNPACKER inflexible_unpacker
 
-//the following three macro demonstrate how to support huge msg(exceed 65535 - 2).
-//huge msg consume huge memory, for example, if we support 1M msg size, because every st_tcp_socket has a
-//private unpacker which has a buffer at lest 1M size, so 1K st_tcp_socket will consume 1G memory.
+//the following three macros demonstrate how to support huge msg(exceed 65535 - 2).
+//huge msg will consume huge memory, for example, if we want to support 1M msg size, because every st_tcp_socket has a
+//private unpacker which has a fixed buffer with at lest 1M size, so just for unpackers, 1K st_tcp_socket will consume 1G memory.
 //if we consider the send buffer and recv buffer, the buffer's default max size is 1K, so, every st_tcp_socket
 //can consume 2G(2 * 1M * 1K) memory when performance testing(both send buffer and recv buffer are full).
+//generally speaking, if there are 1K clients connected to the server, the server can consume
+//1G(occupied by unpackers) + 2G(occupied by msg buffer) * 1K = 2049G memory theoretically.
+//please note that the server also need to define at least HUGE_MSG and MSG_BUFFER_SIZE macros too.
+
 //#define HUGE_MSG
 //#define MSG_BUFFER_SIZE (1024 * 1024)
-//#define MAX_MSG_NUM 8 //reduce buffer size to reduce memory occupation
+//#define MAX_MSG_NUM 8 //reduce msg buffer size to reduce memory occupation
 //configuration
 
 //demonstrate how to use custom log system:
 //notice: please don't forget to define the CUSTOM_LOG macro.
-//use your own code to replace all_out_helper2 macro.
-//custom log should be defined(or included) before including any st_asio_wrapper header files except
-//st_asio_wrapper_base.h
+//use your own code to replace all_out_helper2 macro, then you can record logs according to your wishes.
+//custom log should be defined(or included) before including any st_asio_wrapper header files except st_asio_wrapper_base.h
 #include "../include/st_asio_wrapper_base.h"
 using namespace st_asio_wrapper;
 
@@ -50,10 +53,8 @@ int main(int argc, const char* argv[])
 	///////////////////////////////////////////////////////////
 
 	st_service_pump service_pump;
-	//st_tcp_sclient client(service_pump);
-	st_sclient<st_connector> client(service_pump);
-	//there is no corresponding echo client demo as server endpoint
-	//because echo server with echo client made dead loop, and occupy almost all the network resource
+	st_tcp_sclient client(service_pump);
+	//there is no corresponding echo client, because echo server with echo client will cause dead loop, and occupy almost all the network resource
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4

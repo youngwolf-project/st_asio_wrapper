@@ -28,7 +28,7 @@ public:
 	st_sclient(st_service_pump& service_pump_, Arg& arg) : i_service(service_pump_), Socket(service_pump_, arg) {}
 
 protected:
-	virtual void init() {ST_THIS reset(); ST_THIS start(); ST_THIS send_msg();}
+	virtual bool init() {ST_THIS reset(); ST_THIS start(); ST_THIS send_msg(); return Socket::started();}
 	virtual void uninit() {ST_THIS graceful_close();}
 };
 
@@ -40,13 +40,14 @@ protected:
 	template<typename Arg>
 	st_client(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg) {}
 
-	virtual void init()
+	virtual bool init()
 	{
 		ST_THIS do_something_to_all(boost::mem_fn(&Socket::reset));
 		ST_THIS do_something_to_all(boost::mem_fn(&Socket::start));
 		ST_THIS do_something_to_all(boost::mem_fn((bool (Socket::*)()) &Socket::send_msg));
 
 		ST_THIS start();
+		return true;
 	}
 
 public:

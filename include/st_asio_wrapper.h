@@ -383,7 +383,8 @@
  * Added a new buffer--inflexible_buffer(its predecessor is my_msg_buffer in asio_client), and corresponding inflexible_packer and inflexible_unpacker.
  * Moved the typedef of msg_type and msg_ctype from packers and unpackers to i_packer and i_unpacker/i_udp_unpacker.
  * Fixed the possibility of race condition in on_all_msg_send.
- * Dropped fixed_length_packer, use packer(the default pakcer) instead.
+ * Dropped fixed_length_packer, use packer(the default packer) instead.
+ * i_service::init() will now return boolean value to indicate whether the initialization was succeeded or not.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_

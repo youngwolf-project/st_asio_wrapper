@@ -24,8 +24,7 @@
 #define ASYNC_ACCEPT_NUM			1 //how many async_accept delivery concurrently
 #endif
 
-//in set_server_addr, if the IP is empty, TCP_DEFAULT_IP_VERSION will define the IP version,
-//or, the IP version will be deduced by the IP address.
+//in set_server_addr, if the IP is empty, TCP_DEFAULT_IP_VERSION will define the IP version, or the IP version will be deduced by the IP address.
 //boost::asio::ip::tcp::v4() means ipv4 and boost::asio::ip::tcp::v6() means ipv6.
 #ifndef TCP_DEFAULT_IP_VERSION
 #define TCP_DEFAULT_IP_VERSION boost::asio::ip::tcp::v4()
@@ -78,8 +77,7 @@ public:
 
 	void close_all_client()
 	{
-		//do not use graceful_close() as client endpoint do, because in this function, object_can_mutex has been locked,
-		//graceful_close will wait until on_recv_error() been invoked,
+		//do not use graceful_close() as client does, because in this function, object_can_mutex has been locked, graceful_close will wait until on_recv_error() been invoked,
 		//but in on_recv_error(), we need to lock object_can_mutex too(in del_object()), this will cause dead lock
 		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
 		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
@@ -93,15 +91,14 @@ public:
 	//msg sending interface
 	TCP_BROADCAST_MSG(broadcast_msg, send_msg)
 	TCP_BROADCAST_MSG(broadcast_native_msg, send_native_msg)
-	//guarantee send msg successfully even if can_overflow equal to false
-	//success at here just means put the msg into st_tcp_socket_base's send buffer
+	//guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into send buffer successfully
 	TCP_BROADCAST_MSG(safe_broadcast_msg, safe_send_msg)
 	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
 	//msg sending interface
 	///////////////////////////////////////////////////
 
 protected:
-	virtual void init()
+	virtual bool init()
 	{
 		boost::system::error_code ec;
 		acceptor.open(server_addr.protocol(), ec); assert(!ec);
@@ -109,14 +106,16 @@ protected:
 		acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true), ec); assert(!ec);
 #endif
 		acceptor.bind(server_addr, ec); assert(!ec);
-		if (ec) {get_service_pump().stop(); unified_out::error_out("bind failed."); return;}
+		if (ec) {get_service_pump().stop(); unified_out::error_out("bind failed."); return false;}
 		acceptor.listen(boost::asio::ip::tcp::acceptor::max_connections, ec); assert(!ec);
-		if (ec) {get_service_pump().stop(); unified_out::error_out("listen failed."); return;}
+		if (ec) {get_service_pump().stop(); unified_out::error_out("listen failed."); return false;}
 
 		ST_THIS start();
 
 		for (int i = 0; i < ASYNC_ACCEPT_NUM; ++i)
 			start_next_accept();
+
+		return true;
 	}
 	virtual void uninit() {ST_THIS stop(); stop_listen(); close_all_client();}
 	virtual bool on_accept(typename Pool::object_ctype& client_ptr) {return true;}

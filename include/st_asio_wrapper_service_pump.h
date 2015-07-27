@@ -18,8 +18,8 @@
 #include "st_asio_wrapper_base.h"
 
 //IO thread number
-//listen, all msg send and receive, msg handle(on_msg_handle() and on_msg()) will use these threads
-//keep big enough, empirical value need you to try to find out in your own environment
+//listen, msg send and receive, msg handle(on_msg_handle() and on_msg()) will use these threads
+//keep big enough, no empirical value i can suggest, you must try to find it in your own environment
 #ifndef ST_SERVICE_THREAD_NUM
 #define ST_SERVICE_THREAD_NUM 8
 #endif
@@ -37,10 +37,10 @@ public:
 		virtual ~i_service() {}
 
 	public:
-		//for the same i_service, start_service and stop_service are not thread safe, please pay special attention.
+		//for the same i_service, start_service and stop_service are not thread safe,
 		//to resolve this defect, we must add a mutex member variable to i_service, it's not worth
-		void start_service() {if (!started) {started = true; init();}}
-		void stop_service() {if (started) {started = false; uninit();}}
+		void start_service() {if (!started) {started = init();}}
+		void stop_service() {if (started) {uninit(); started = false;}}
 		bool is_started() const {return started;}
 
 		void id(int id) {id_ = id;}
@@ -52,7 +52,7 @@ public:
 		const st_service_pump& get_service_pump() const {return service_pump;}
 
 	protected:
-		virtual void init() = 0;
+		virtual bool init() = 0;
 		virtual void uninit() = 0;
 
 	protected:

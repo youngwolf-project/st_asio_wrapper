@@ -19,15 +19,6 @@
 #define DEFAULT_PACKER prefix_suffix_packer
 #define DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
-
-//the following three macro demonstrate how to support huge msg(exceed 65535 - 2).
-//huge msg consume huge memory, for example, if we support 1M msg size, because every st_tcp_socket has a
-//private unpacker which has a buffer at lest 1M size, so 1K st_tcp_socket will consume 1G memory.
-//if we consider the send buffer and recv buffer, the buffer's default max size is 1K, so, every st_tcp_socket
-//can consume 2G(2 * 1M * 1K) memory when performance testing(both send buffer and recv buffer are full).
-//#define HUGE_MSG
-//#define MAX_MSG_LEN (1024 * 1024)
-//#define MAX_MSG_NUM 8 //reduce buffer size to reduce memory occupation
 //configuration
 
 #include "../include/st_asio_wrapper_server.h"
@@ -40,8 +31,8 @@ using namespace st_asio_wrapper;
 #define SUSPEND_COMMAND	"suspend"
 #define RESUME_COMMAND	"resume"
 
-//demonstrates how to use custom packer
-//in the default behavior, each st_tcp_socket has their own packer, and cause memory waste
+//demonstrate how to use custom packer
+//under the default behavior, each st_tcp_socket has their own packer, and cause memory waste
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
 #if 1 == PACKER_UNPACKER_TYPE || 2 == PACKER_UNPACKER_TYPE
@@ -50,7 +41,7 @@ auto global_packer(boost::make_shared<DEFAULT_PACKER>());
 auto global_packer(boost::make_shared<prefix_suffix_packer>());
 #endif
 
-//demonstrates how to control the type of st_server_socket_base::server from template parameters
+//demonstrate how to control the type of st_server_socket_base::server from template parameter
 class i_echo_server : public i_server
 {
 public:
@@ -100,7 +91,7 @@ protected:
 	#endif
 	}
 #endif
-	//we should handle the msg in on_msg_handle for time-consuming task like this:
+	//we should handle msg in on_msg_handle for time-consuming task like this:
 	virtual bool on_msg_handle(msg_type& msg, bool link_down)
 	{
 	#if 2 == PACKER_UNPACKER_TYPE
@@ -111,7 +102,7 @@ protected:
 	#endif
 	}
 	//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_tcp_socket will directly
-	//use the msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
+	//use msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
 	//msg handling end
 };
 
@@ -134,7 +125,8 @@ int main(int argc, const char* argv[])
 	//only need a simple server? you can directly use st_server or st_server_base.
 	//because we use st_server_socket_base directly, so this server cannot support fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
 	//the reason is these packer and unpacker need additional initializations that st_server_socket_base not implemented, see echo_socket's constructor for more details.
-	st_server_base<st_server_socket_base<packer, unpacker>> server_(service_pump);
+	typedef st_server_socket_base<packer, unpacker> normal_server_socket;
+	st_server_base<normal_server_socket> server_(service_pump);
 	echo_server echo_server_(service_pump); //echo server
 
 	if (argc > 2)
@@ -182,13 +174,17 @@ int main(int argc, const char* argv[])
 		else
 		{
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
-			//server_.broadcast_msg(str.data(), str.size() + 1); //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
+//			server_.broadcast_msg(str.data(), str.size() + 1);
+			//send \0 character too, because asio_client used inflexible_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			//so need \0 character when printing it.
 
 			//if all clients used the same protocol, we can pack msg one time, and send it repeatedly like this:
 			packer p;
-			auto msg = p.pack_msg(str.data(), str.size() + 1); //send the terminator too, because asio_client used a char[] as its msg type, so need the terminator when printing them
+			auto msg = p.pack_msg(str.data(), str.size() + 1);
+			//send \0 character too, because asio_client used inflexible_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			//so need \0 character when printing it.
 			if (!msg.empty())
-				server_.do_something_to_all([&msg](decltype(server_)::object_ctype& item) {item->direct_send_msg(msg);});
+				server_.do_something_to_all([&msg](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(msg);});
 		}
 	}
 
