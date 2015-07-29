@@ -18,7 +18,7 @@ public:
 	file_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), index(-1) {}
 	virtual ~file_socket() {clear();}
 
-	//reset all, be ensure that there's no any operations performed on this st_tcp_socket when invoke it
+	//reset all, be ensure that there's no any operations performed on this file_socket when invoke it
 	virtual void reset() {clear(); st_connector::reset();}
 
 	void set_index(int index_) {index = index_;}
@@ -69,7 +69,7 @@ public:
 protected:
 	//msg handling
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	//we can handle the msg very fast, so we don't use the recv buffer
+	//we can handle msg very fast, so we don't use recv buffer
 	virtual bool on_msg(msg_type& msg) {handle_msg(msg); return true;}
 #endif
 	virtual bool on_msg_handle(msg_type& msg, bool link_down) {handle_msg(msg); return true;}
