@@ -25,19 +25,18 @@ using namespace st_asio_wrapper;
 protocol:
 head(1 byte) + body
 
-if head equal:
+if head equal to:
 0: body is a filename
 	request the file length, client->server->client
 	return: same head + file length(8 bytes)
 1: body is file offset(8 bytes) + data length(8 bytes)
 	request the file content, client->server->client
-	return: file content(no-protocol), repeat until all data requested by client been sent(only need to request one time)
+	return: file content(no-protocol), repeat until all data requested by client been sent(client only need to request one time)
 2: body is talk content
-	talk, client->server. please notice that server cannot talk to client, this is because server never knows whether it is transmitting a file or not.
+	talk, client->server. please note that server cannot talk to client, this is because server never knows whether it is transmitting a file or not.
 	return: n/a
 */
 
-//demonstrate how to change packer and unpacker at runtime.
 class file_buffer : public i_buffer
 {
 public:

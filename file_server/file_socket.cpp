@@ -13,7 +13,7 @@ void file_socket::reset() {trans_end(); st_server_socket::reset();}
 
 //msg handling
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-//we can handle the msg very fast, so we don't use the recv buffer
+//we can handle msg very fast, so we don't use recv buffer
 bool file_socket::on_msg(msg_type& msg) {handle_msg(msg); return true;}
 #endif
 bool file_socket::on_msg_handle(msg_type& msg, bool link_down) {handle_msg(msg); return true;}

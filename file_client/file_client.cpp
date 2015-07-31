@@ -19,8 +19,8 @@ __off64_t file_size;
 
 int main(int argc, const char* argv[])
 {
-	puts("this is a file client.");
-	printf("usage: asio_client [<port=%d> [<ip=%s> [link num=1]]]\n", SERVER_PORT, SERVER_IP);
+	puts("this is a file transfer client.");
+	printf("usage: file_client [<port=%d> [<ip=%s> [link num=1]]]\n", SERVER_PORT, SERVER_IP);
 	puts("type " QUIT_COMMAND " to end.");
 
 	st_service_pump service_pump;
@@ -59,7 +59,7 @@ int main(int argc, const char* argv[])
 			boost::char_separator<char> sep(" \t");
 			boost::tokenizer<boost::char_separator<char>> tok(str, sep);
 			do_something_to_all(tok, [&](boost::tokenizer<boost::char_separator<char>>::const_reference item) {
-				completed_client_num.store(0);
+				completed_client_num = 0;
 				file_size = 0;
 				boost::timer::cpu_timer begin_time;
 
@@ -70,7 +70,7 @@ int main(int argc, const char* argv[])
 					client.do_something_to_one([&item](file_client::object_ctype& item2)->bool {if (0 != item2->id()) item2->get_file(item); return false;});
 
 					unsigned percent = -1;
-					while (completed_client_num.load() != (unsigned short) link_num)
+					while (completed_client_num != (unsigned short) link_num)
 					{
 						boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 						if (file_size > 0)

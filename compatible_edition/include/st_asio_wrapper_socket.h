@@ -69,8 +69,8 @@ protected:
 public:
 	//please do not change id at runtime via the following function, except this st_socket is not managed by st_object_pool,
 	//it should only be used by st_object_pool when this st_socket being reused or creating new st_socket.
-	void id(boost::uint64_t id) {_id = id;}
-	boost::uint64_t id() const {return _id;}
+	void id(boost::uint_fast64_t id) {_id = id;}
+	boost::uint_fast64_t id() const {return _id;}
 
 	Socket& next_layer() {return next_layer_;}
 	const Socket& next_layer() const {return next_layer_;}
@@ -117,15 +117,15 @@ public:
 	boost::shared_ptr<const i_packer<typename Packer::msg_type> > inner_packer() const {return packer_;}
 	void inner_packer(const boost::shared_ptr<i_packer<typename Packer::msg_type> >& _packer_) {packer_ = _packer_;}
 
-	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed
-	//no matter whether the send buffer is available
+	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter whether the send buffer is available or not,
+	//this can exhaust all virtual memory, please pay special attentions.
 	bool is_send_buffer_available()
 	{
 		boost::shared_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
 		return send_msg_buffer.size() < MAX_MSG_NUM;
 	}
 
-	//don't use the packer but insert into the send_msg_buffer directly
+	//don't use the packer but insert into send buffer directly
 	bool direct_send_msg(const MsgType& msg, bool can_overflow = false) {MsgType tmp_msg(msg); return direct_send_msg(tmp_msg, can_overflow);}
 	//after this call, msg becomes empty, please note.
 	bool direct_send_msg(MsgType& msg, bool can_overflow = false)
@@ -145,28 +145,30 @@ public:
 		return do_direct_post_msg(msg);
 	}
 
-	//how many msgs waiting for sending(sending_msg = true) or dispatching
+	//how many msgs waiting for sending or dispatching
 	size_t get_pending_msg_num(BufferType buffer_type = SEND_BUFFER)
 	{
 		boost::shared_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
 		return msg_buffer[buffer_type].size();
 	}
 
+	//msgs in send buffer and post buffer are packed
+	//msgs in receive buffer are unpacked
 	void peek_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER)
 	{
 		msg.clear();
-		//msgs in send buffer and post buffer are packed
-		//msgs in receive buffer are unpacked
+
 		boost::shared_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
 		if (!msg_buffer[buffer_type].empty())
 			msg = msg_buffer[buffer_type].front();
 	}
 
+	//msgs in send buffer and post buffer are packed
+	//msgs in receive buffer are unpacked
 	void pop_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER)
 	{
 		msg.clear();
-		//msgs in send buffer and post buffer are packed
-		//msgs in receive buffer are unpacked
+
 		boost::unique_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
 		if (!msg_buffer[buffer_type].empty())
 		{
@@ -184,24 +186,20 @@ public:
 
 protected:
 	virtual bool do_start() = 0;
-	//must mutex send_msg_buffer before invoke this function
-	virtual bool do_send_msg() = 0;
+	virtual bool do_send_msg() = 0; //must mutex send_msg_buffer before invoke this function
 
-	virtual bool is_send_allowed() const {return !suspend_send_msg_;}
-	//can send data or not(just put into send buffer)
+	virtual bool is_send_allowed() const {return !suspend_send_msg_;} //can send msg or not(just put into send buffer)
 
-	//generally, you need not re-write this for link broken judgment(TCP)
+	//generally, you don't have to rewrite this to maintain the status of connections(TCP)
 	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error: %d %s", ec.value(), ec.message().data());}
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	//if you want to use your own receive buffer, you can move the msg to your own receive buffer,
-	//then, handle the msg as your own strategy(may be you'll need a msg dispatch thread)
-	//or, you can handle the msg at here, but this will reduce efficiency(because this msg handling block
-	//the next msg receiving on the same st_socket) unless you can handle the msg very fast(which will
-	//inversely more efficient, because msg receive buffer and msg dispatching are not needed any more).
+	//if you want to use your own receive buffer, you can move the msg to your own receive buffer, then handle them as your own strategy(may be you'll need a msg dispatch thread),
+	//or you can handle the msg at here, but this will reduce efficiency because this msg handling will block the next msg receiving on the same st_socket,
+	//but if you can handle the msg very fast, you are recommended to handle them at here, which will inversely more efficient,
+	//because msg receive buffer and msg dispatching are not needed any more.
 	//
-	//return true means msg been handled, st_socket will not maintain it anymore, return false means
-	//msg cannot be handled right now, you must handle it in on_msg_handle()
+	//return true means msg been handled, st_socket will not maintain it anymore, return false means msg cannot be handled right now, you must handle it in on_msg_handle()
 	//notice: on_msg_handle() will not be invoked from within this function
 	//
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
@@ -209,22 +207,20 @@ protected:
 #endif
 
 	//handling msg in om_msg_handle() will not block msg receiving on the same st_socket
-	//return true means msg been handled, false means msg cannot be handled right now, and st_socket will
-	//re-dispatch it asynchronously
-	//if link_down is true, no matter return true or false, st_socket will not maintain this msg anymore,
-	//and continue dispatch the next msg continuously
+	//return true means msg been handled, false means msg cannot be handled right now, and st_socket will re-dispatch it asynchronously
+	//if link_down is true, no matter return true or false, st_socket will not maintain this msg anymore, and continue dispatch the next msg continuously
 	//
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
 	virtual bool on_msg_handle(MsgType& msg, bool link_down) = 0;
 
 #ifdef WANT_MSG_SEND_NOTIFY
-	//one msg has sent to the kernel buffer, msg is the right msg(remain in packed)
-	//if the msg is custom packed, then obviously you know it
-	//or the msg is packed as: length(2 bytes) + original msg, see st_asio_wrapper::packer for more details
+	//one msg has sent to the kernel buffer, msg is the right msg
+	//notice: the msg is packed, using inconstant is for the convenience of swapping
 	virtual void on_msg_send(MsgType& msg) {}
 #endif
 #ifdef WANT_ALL_MSG_SEND_NOTIFY
-	//send buffer goes empty, msg remain in packed
+	//send buffer goes empty
+	//notice: the msg is packed, using inconstant is for the convenience of swapping
 	virtual void on_all_msg_send(MsgType& msg) {}
 #endif
 
@@ -232,10 +228,10 @@ protected:
 	{
 		switch (id)
 		{
-		case 0: //delay put msgs into receive buffer cause of receive buffer overflow
+		case 0: //delay putting msgs into receive buffer cause of receive buffer overflow
 			dispatch_msg();
 			break;
-		case 1: //suspend dispatch msgs
+		case 1: //suspend dispatching msgs
 			do_dispatch_msg(true);
 			break;
 		case 2:
@@ -254,7 +250,7 @@ protected:
 				if (empty)
 					do_dispatch_msg(true);
 
-				return !empty; //continue the timer if not empty
+				return !empty; //continue the timer if some msgs still left behind
 			}
 			break;
 		case 3: //re-dispatch
@@ -308,7 +304,7 @@ protected:
 
 	void msg_handler()
 	{
-		bool re = on_msg_handle(last_dispatch_msg, false); //must before next msg dispatch to keep sequence
+		bool re = on_msg_handle(last_dispatch_msg, false); //must before next msg dispatching to keep sequence
 		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
 		dispatching = false;
 		if (!re) //dispatch failed, re-dispatch
@@ -317,7 +313,7 @@ protected:
 			recv_msg_buffer.front().swap(last_dispatch_msg);
 			set_timer(3, 50, NULL);
 		}
-		else //dispatch msg sequentially, which means second dispatch only after first dispatch success
+		else //dispatch msg sequentially, which means second dispatching only after first dispatching success
 			do_dispatch_msg(false);
 
 		if (!dispatching)
@@ -358,8 +354,7 @@ protected:
 			{
 #ifdef FORCE_TO_USE_MSG_RECV_BUFFER
 				//the msgs in temp_msg_buffer are discarded if we don't used msg receive buffer, it's very hard to resolve this defect,
-				//so, please be very carefully if you decide to resolve this issue;
-				//the biggest problem is calling force_close in on_msg.
+				//so, please be very carefully if you decide to resolve this issue, the biggest problem is calling force_close in on_msg.
 				recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer);
 #endif
 #ifndef DISCARD_MSG_WHEN_LINK_DOWN
@@ -401,17 +396,15 @@ protected:
 	}
 
 protected:
-	boost::uint64_t _id;
+	boost::uint_fast64_t _id;
 	Socket next_layer_;
 
 	MsgType last_send_msg, last_dispatch_msg;
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer_;
 
 	container_type msg_buffer[4];
-	//if on_msg() return true, which means use the msg receive buffer,
-	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't push into recv_msg_buffer
-	//cause of receive buffer overflow, st_socket will delay 50 milliseconds(non-blocking) to invoke
-	//dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
+	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't push into recv_msg_buffer cause of receive buffer overflow,
+	//st_socket will delay 50 milliseconds(non-blocking) to invoke dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
 	boost::shared_mutex msg_buffer_mutex[3];
 
 	bool posting;

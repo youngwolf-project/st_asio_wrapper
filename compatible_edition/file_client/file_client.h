@@ -2,7 +2,6 @@
 #ifndef FILE_CLIENT_H_
 #define FILE_CLIENT_H_
 
-#include <boost/atomic.hpp>
 #include <boost/lambda/bind.hpp>
 #include <boost/lambda/lambda.hpp>
 

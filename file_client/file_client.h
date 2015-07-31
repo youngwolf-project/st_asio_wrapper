@@ -2,8 +2,6 @@
 #ifndef FILE_CLIENT_H_
 #define FILE_CLIENT_H_
 
-#include <boost/atomic.hpp>
-
 #include "../file_server/packer_unpacker.h"
 #include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
