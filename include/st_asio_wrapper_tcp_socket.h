@@ -130,9 +130,6 @@ protected:
 	//the link can continue to use, so don't need to close the st_tcp_socket_base at both client and server endpoint
 	virtual void on_unpack_error() = 0;
 
-	//receiving error or peer endpoint quit(false ec means ok)
-	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
-
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	virtual bool on_msg(msg_type& msg) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
 #endif

@@ -292,7 +292,7 @@ public:
 	DO_SOMETHING_TO_ONE_MUTEX(object_can, object_can_mutex)
 
 protected:
-	boost::atomic_int_fast64_t cur_id;
+	boost::atomic_uint_fast64_t cur_id;
 
 	container_type object_can;
 	boost::shared_mutex object_can_mutex;
