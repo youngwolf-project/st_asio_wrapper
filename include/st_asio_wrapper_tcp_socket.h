@@ -176,7 +176,7 @@ protected:
 			}
 		}
 		else
-			on_recv_error(ec);
+			ST_THIS on_recv_error(ec);
 	}
 
 	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
