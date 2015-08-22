@@ -149,7 +149,7 @@ protected:
 		{
 			connected = reconnecting = true;
 			on_connect();
-			ST_THIS send_msg(); //send msg buffer may have msgs, send them
+			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}
 		else if ((boost::asio::error::operation_aborted != ec || reconnecting) && RE_CONNECT_CHECK && !ST_THIS get_io_service().stopped())

@@ -68,9 +68,10 @@ protected:
 	//msg handling
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//we can handle msg very fast, so we don't use recv buffer
-	virtual bool on_msg(msg_type& msg) {handle_msg(msg); return true;}
+	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
-	virtual bool on_msg_handle(msg_type& msg, bool link_down) {handle_msg(msg); return true;}
+	//we will change unpacker at runtime, this operation must be done in on_msg, do not to it in on_msg_handle
+	//virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
 
 private:
@@ -87,7 +88,7 @@ private:
 	}
 	void trans_end() {clear(); ++completed_client_num;}
 
-	void handle_msg(msg_ctype& msg)
+	void handle_msg(out_msg_ctype& msg)
 	{
 		if (TRANS_BUSY == state)
 		{

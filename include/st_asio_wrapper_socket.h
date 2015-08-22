@@ -29,22 +29,13 @@
 namespace st_asio_wrapper
 {
 
-enum BufferType {POST_BUFFER, SEND_BUFFER, RECV_BUFFER};
-
-#define post_msg_buffer ST_THIS msg_buffer[0]
-#define post_msg_buffer_mutex ST_THIS msg_buffer_mutex[0]
-#define send_msg_buffer ST_THIS msg_buffer[1]
-#define send_msg_buffer_mutex ST_THIS msg_buffer_mutex[1]
-#define recv_msg_buffer ST_THIS msg_buffer[2]
-#define recv_msg_buffer_mutex ST_THIS msg_buffer_mutex[2]
-#define temp_msg_buffer ST_THIS msg_buffer[3]
-
-template<typename Socket, typename Packer, typename MsgType = typename Packer::msg_type>
+template<typename Socket, typename Packer, typename Unpacker, typename InMsgType = typename Packer::msg_type, typename OutMsgType = typename Unpacker::msg_type>
 class st_socket: public st_timer
 {
 public:
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-	typedef boost::container::list<MsgType> container_type;
+	typedef boost::container::list<InMsgType> in_container_type;
+	typedef typename Unpacker::container_type out_container_type;
 
 protected:
 	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {reset_state();}
@@ -60,7 +51,13 @@ protected:
 		started_ = false;
 	}
 
-	void clear_buffer() {st_asio_wrapper::do_something_to_all(msg_buffer, [](container_type& can) {can.clear();});}
+	void clear_buffer()
+	{
+		post_msg_buffer.clear();
+		send_msg_buffer.clear();
+		recv_msg_buffer.clear();
+		temp_msg_buffer.clear();
+	}
 
 public:
 	//please do not change id at runtime via the following function, except this st_socket is not managed by st_object_pool,
@@ -122,15 +119,15 @@ public:
 	}
 
 	//don't use the packer but insert into send buffer directly
-	bool direct_send_msg(const MsgType& msg, bool can_overflow = false) {return direct_send_msg(MsgType(msg), can_overflow);}
-	bool direct_send_msg(MsgType&& msg, bool can_overflow = false)
+	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false) {return direct_send_msg(InMsgType(msg), can_overflow);}
+	bool direct_send_msg(InMsgType&& msg, bool can_overflow = false)
 	{
 		boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
 		return can_overflow || send_msg_buffer.size() < MAX_MSG_NUM ? do_direct_send_msg(std::move(msg)) : false;
 	}
 
-	bool direct_post_msg(const MsgType& msg, bool can_overflow = false) {return direct_post_msg(MsgType(msg), can_overflow);}
-	bool direct_post_msg(MsgType&& msg, bool can_overflow = false)
+	bool direct_post_msg(const InMsgType& msg, bool can_overflow = false) {return direct_post_msg(InMsgType(msg), can_overflow);}
+	bool direct_post_msg(InMsgType&& msg, bool can_overflow = false)
 	{
 		if (direct_send_msg(std::move(msg), can_overflow))
 			return true;
@@ -140,43 +137,22 @@ public:
 	}
 
 	//how many msgs waiting for sending or dispatching
-	size_t get_pending_msg_num(BufferType buffer_type = SEND_BUFFER)
-	{
-		boost::shared_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
-		return msg_buffer[buffer_type].size();
-	}
+	GET_PENDING_MSG_NUM(get_pending_post_msg_num, post_msg_buffer, post_msg_buffer_mutex)
+	GET_PENDING_MSG_NUM(get_pending_send_msg_num, send_msg_buffer, send_msg_buffer_mutex)
+	GET_PENDING_MSG_NUM(get_pending_recv_msg_num, recv_msg_buffer, recv_msg_buffer_mutex)
 
-	//msgs in send buffer and post buffer are packed
-	//msgs in receive buffer are unpacked
-	void peek_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER)
-	{
-		msg.clear();
+	PEEK_FIRST_PENDING_MSG(peek_first_pending_post_msg, post_msg_buffer, post_msg_buffer_mutex, InMsgType)
+	PEEK_FIRST_PENDING_MSG(peek_first_pending_send_msg, send_msg_buffer, send_msg_buffer_mutex, InMsgType)
+	PEEK_FIRST_PENDING_MSG(peek_first_pending_recv_msg, recv_msg_buffer, recv_msg_buffer_mutex, OutMsgType)
 
-		boost::shared_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
-		if (!msg_buffer[buffer_type].empty())
-			msg = msg_buffer[buffer_type].front();
-	}
-
-	//msgs in send buffer and post buffer are packed
-	//msgs in receive buffer are unpacked
-	void pop_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER)
-	{
-		msg.clear();
-
-		boost::unique_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
-		if (!msg_buffer[buffer_type].empty())
-		{
-			msg.swap(msg_buffer[buffer_type].front());
-			msg_buffer[buffer_type].pop_front();
-		}
-	}
+	POP_FIRST_PENDING_MSG(pop_first_pending_post_msg, post_msg_buffer, post_msg_buffer_mutex, InMsgType)
+	POP_FIRST_PENDING_MSG(pop_first_pending_send_msg, send_msg_buffer, send_msg_buffer_mutex, InMsgType)
+	POP_FIRST_PENDING_MSG(pop_first_pending_recv_msg, recv_msg_buffer, recv_msg_buffer_mutex, OutMsgType)
 
 	//clear all pending msgs
-	void pop_all_pending_msg(container_type& msg_list, BufferType buffer_type = SEND_BUFFER)
-	{
-		boost::unique_lock<boost::shared_mutex> lock(msg_buffer_mutex[buffer_type]);
-		msg_list.splice(msg_list.end(), msg_buffer[buffer_type]);
-	}
+	POP_ALL_PENDING_MSG(pop_all_pending_post_msg, post_msg_buffer, post_msg_buffer_mutex, in_container_type)
+	POP_ALL_PENDING_MSG(pop_all_pending_send_msg, send_msg_buffer, send_msg_buffer_mutex, in_container_type)
+	POP_ALL_PENDING_MSG(pop_all_pending_recv_msg, recv_msg_buffer, recv_msg_buffer_mutex, out_container_type)
 
 protected:
 	virtual bool do_start() = 0;
@@ -199,7 +175,7 @@ protected:
 	//notice: on_msg_handle() will not be invoked from within this function
 	//
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
-	virtual bool on_msg(MsgType& msg) = 0;
+	virtual bool on_msg(OutMsgType& msg) = 0;
 #endif
 
 	//handling msg in om_msg_handle() will not block msg receiving on the same st_socket
@@ -207,17 +183,17 @@ protected:
 	//if link_down is true, no matter return true or false, st_socket will not maintain this msg anymore, and continue dispatch the next msg continuously
 	//
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
-	virtual bool on_msg_handle(MsgType& msg, bool link_down) = 0;
+	virtual bool on_msg_handle(OutMsgType& msg, bool link_down) = 0;
 
 #ifdef WANT_MSG_SEND_NOTIFY
 	//one msg has sent to the kernel buffer, msg is the right msg
 	//notice: the msg is packed, using inconstant is for the convenience of swapping
-	virtual void on_msg_send(MsgType& msg) {}
+	virtual void on_msg_send(InMsgType& msg) {}
 #endif
 #ifdef WANT_ALL_MSG_SEND_NOTIFY
 	//send buffer goes empty
 	//notice: the msg is packed, using inconstant is for the convenience of swapping
-	virtual void on_all_msg_send(MsgType& msg) {}
+	virtual void on_all_msg_send(InMsgType& msg) {}
 #endif
 
 	virtual bool on_timer(unsigned char id, const void* user_data)
@@ -305,7 +281,7 @@ protected:
 		dispatching = false;
 		if (!re) //dispatch failed, re-dispatch
 		{
-			recv_msg_buffer.push_front(MsgType());
+			recv_msg_buffer.push_front(OutMsgType());
 			recv_msg_buffer.front().swap(last_dispatch_msg);
 			set_timer(3, 50, nullptr);
 		}
@@ -354,7 +330,7 @@ protected:
 				recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
 #endif
 #ifndef DISCARD_MSG_WHEN_LINK_DOWN
-				st_asio_wrapper::do_something_to_all(recv_msg_buffer, [this](MsgType& msg) {ST_THIS on_msg_handle(msg, true);});
+				st_asio_wrapper::do_something_to_all(recv_msg_buffer, [this](OutMsgType& msg) {ST_THIS on_msg_handle(msg, true);});
 #endif
 				recv_msg_buffer.clear();
 			}
@@ -362,7 +338,7 @@ protected:
 	}
 
 	//must mutex send_msg_buffer before invoke this function
-	bool do_direct_send_msg(MsgType&& msg)
+	bool do_direct_send_msg(InMsgType&& msg)
 	{
 		if (!msg.empty())
 		{
@@ -375,7 +351,7 @@ protected:
 	}
 
 	//must mutex post_msg_buffer before invoke this function
-	bool do_direct_post_msg(MsgType&& msg)
+	bool do_direct_post_msg(InMsgType&& msg)
 	{
 		if (!msg.empty())
 		{
@@ -395,13 +371,16 @@ protected:
 	uint_fast64_t _id;
 	Socket next_layer_;
 
-	MsgType last_send_msg, last_dispatch_msg;
+	InMsgType last_send_msg;
+	OutMsgType last_dispatch_msg;
 	boost::shared_ptr<i_packer<typename Packer::msg_type>> packer_;
 
-	container_type msg_buffer[4];
+	in_container_type post_msg_buffer, send_msg_buffer;
+	out_container_type recv_msg_buffer, temp_msg_buffer;
 	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't push into recv_msg_buffer cause of receive buffer overflow,
 	//st_socket will delay 50 milliseconds(non-blocking) to invoke dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
-	boost::shared_mutex msg_buffer_mutex[3];
+	boost::shared_mutex post_msg_buffer_mutex, send_msg_buffer_mutex;
+	boost::shared_mutex recv_msg_buffer_mutex;
 
 	bool posting;
 	bool sending, suspend_send_msg_;

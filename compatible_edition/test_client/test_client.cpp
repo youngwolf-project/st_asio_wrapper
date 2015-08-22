@@ -9,15 +9,6 @@
 //#define REUSE_OBJECT //use objects pool
 //#define AUTO_CLEAR_CLOSED_SOCKET
 //#define CLEAR_CLOSED_SOCKET_INTERVAL	1
-
-//the following three macro demonstrate how to support huge msg(exceed 65535 - 2).
-//huge msg consume huge memory, for example, if we support 1M msg size, because every st_tcp_socket has a
-//private unpacker which has a buffer at lest 1M size, so 1K st_tcp_socket will consume 1G memory.
-//if we consider the send buffer and recv buffer, the buffer's default max size is 1K, so, every st_tcp_socket
-//can consume 2G(2 * 1M * 1K) memory when performance testing(both send buffer and recv buffer are full).
-//#define HUGE_MSG
-//#define MAX_MSG_LEN (1024 * 1024)
-//#define MAX_MSG_NUM 8 //reduce buffer size to reduce memory occupation
 //configuration
 
 //use the following macro to control the type of packer and unpacker
@@ -83,16 +74,16 @@ public:
 
 protected:
 	//msg handling
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER //not force to use msg recv buffer(so on_msg() will make the decision)
-	//we can handle the msg very fast, so we don't use the recv buffer(return false)
-	virtual bool on_msg(msg_type& msg) {handle_msg(msg); return true;}
+#ifndef FORCE_TO_USE_MSG_RECV_BUFFER //not force to use msg recv buffer(so on_msg will make the decision)
+	//we can handle msg very fast, so we don't use recv buffer(return true)
+	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
-	//we should handle the msg in on_msg_handle for time-consuming task like this:
-	virtual bool on_msg_handle(msg_type& msg, bool link_down) {handle_msg(msg); return true;}
+	//we should handle msg in on_msg_handle for time-consuming task like this:
+	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
 
 private:
-	void handle_msg(msg_ctype& msg)
+	void handle_msg(out_msg_ctype& msg)
 	{
 		recv_bytes += msg.size();
 		if (check_msg && (msg.size() < sizeof(size_t) || recv_index != *(size_t*) msg.data()))
@@ -122,27 +113,23 @@ public:
 
 	void close_some_client(size_t n)
 	{
-		//close some clients
 		//method #1
 //		for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter)
 //			(*iter)->graceful_close();
 		//notice: this method need to define AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL macro, because it just closed the st_socket,
-		//not really removed them from object pool, this will cause test_client still send data to them, and wait responses from them.
+		//not really removed them from object pool, this will cause test_client still send data via them, and wait responses from them.
 		//for this scenario, the smaller CLEAR_CLOSED_SOCKET_INTERVAL is, the better experience you will get, so set it to 1 second.
 
 		//method #2
 		while (n-- > 0)
 			graceful_close(at(0));
-		//notice: this method directly remove the client from object pool (and insert into list temp_object_can), and close the st_socket.
-		//clients in list temp_object_can will be reused if new clients needed (REUSE_OBJECT macro been defined), or be truly freed from memory
-		//CLOSED_SOCKET_MAX_DURATION seconds later (but check interval is SOCKET_FREE_INTERVAL seconds, so the maximum delay is CLOSED_SOCKET_MAX_DURATION + SOCKET_FREE_INTERVAL).
-		//this is a equivalence of calling i_server::del_client in st_server_socket_base::on_recv_error (see st_server_socket_base for more details).
+		//notice: this method directly remove clients from object pool, and close them, not require AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL macro
+		//this is a equivalence of calling i_server::del_client in st_server_socket_base::on_recv_error(see st_server_socket_base for more details).
 	}
 
 	///////////////////////////////////////////////////
 	//msg sending interface
-	//guarantee send msg successfully even if can_overflow equal to false
-	//success at here just means put the msg into st_tcp_socket's send buffer
+	//guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into st_tcp_socket's send buffer successfully
 	TCP_RANDOM_SEND_MSG(safe_random_send_msg, safe_send_msg)
 	TCP_RANDOM_SEND_MSG(safe_random_send_native_msg, safe_send_native_msg)
 	//msg sending interface

@@ -34,17 +34,19 @@ namespace st_tcp
 {
 
 template <typename Socket, typename Packer, typename Unpacker>
-class st_tcp_socket_base : public st_socket<Socket, Packer>
+class st_tcp_socket_base : public st_socket<Socket, Packer, Unpacker>
 {
 public:
-	typedef typename Packer::msg_type msg_type;
-	typedef typename Packer::msg_ctype msg_ctype;
+	typedef typename Packer::msg_type in_msg_type;
+	typedef typename Packer::msg_ctype in_msg_ctype;
+	typedef typename Unpacker::msg_type out_msg_type;
+	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 protected:
-	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
+	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, Unpacker>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
 
 	template<typename Arg>
-	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<Socket, Packer>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
+	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<Socket, Packer, Unpacker>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
 
 public:
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
@@ -52,7 +54,7 @@ public:
 	void reset_state()
 	{
 		unpacker_->reset_state();
-		st_socket<Socket, Packer>::reset_state();
+		st_socket<Socket, Packer, Unpacker>::reset_state();
 		closing = false;
 	}
 
@@ -78,11 +80,11 @@ public:
 	bool is_closing() const {return closing;}
 
 	//get or change the unpacker at runtime
-	boost::shared_ptr<i_unpacker<msg_type>> inner_unpacker() {return unpacker_;}
-	boost::shared_ptr<const i_unpacker<msg_type>> inner_unpacker() const {return unpacker_;}
-	void inner_unpacker(const boost::shared_ptr<i_unpacker<msg_type>>& _unpacker_) {unpacker_ = _unpacker_;}
+	boost::shared_ptr<i_unpacker<out_msg_type>> inner_unpacker() {return unpacker_;}
+	boost::shared_ptr<const i_unpacker<out_msg_type>> inner_unpacker() const {return unpacker_;}
+	void inner_unpacker(const boost::shared_ptr<i_unpacker<out_msg_type>>& _unpacker_) {unpacker_ = _unpacker_;}
 
-	using st_socket<Socket, Packer>::send_msg;
+	using st_socket<Socket, Packer, Unpacker>::send_msg;
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
@@ -111,19 +113,19 @@ protected:
 	{
 		if (!is_send_allowed() || ST_THIS get_io_service().stopped())
 			ST_THIS sending = false;
-		else if (!ST_THIS sending && !send_msg_buffer.empty())
+		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
 		{
 			ST_THIS sending = true;
-			ST_THIS last_send_msg.swap(send_msg_buffer.front());
+			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()),
 				boost::bind(&st_tcp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
-			send_msg_buffer.pop_front();
+			ST_THIS send_msg_buffer.pop_front();
 		}
 
 		return ST_THIS sending;
 	}
 
-	virtual bool is_send_allowed() const {return !is_closing() && st_socket<Socket, Packer>::is_send_allowed();}
+	virtual bool is_send_allowed() const {return !is_closing() && st_socket<Socket, Packer, Unpacker>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
 	//msg can not be unpacked
@@ -131,10 +133,10 @@ protected:
 	virtual void on_unpack_error() = 0;
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	virtual bool on_msg(msg_type& msg) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
+	virtual bool on_msg(out_msg_type& msg) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
 #endif
 
-	virtual bool on_msg_handle(msg_type& msg, bool link_down) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
+	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
 
 	//start the asynchronous read
 	//it's child's responsibility to invoke this properly, because st_tcp_socket_base doesn't know any of the connection status
@@ -143,7 +145,7 @@ protected:
 		auto recv_buff = unpacker_->prepare_next_recv();
 		if (boost::asio::buffer_size(recv_buff) > 0)
 			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
-				boost::bind(&i_unpacker<msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
+				boost::bind(&i_unpacker<out_msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
 				boost::bind(&st_tcp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 	}
 
@@ -164,14 +166,13 @@ protected:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_buffer);
+			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, ST_THIS temp_msg_buffer);
 			ST_THIS dispatch_msg();
 
 			if (!unpack_ok)
 			{
 				on_unpack_error();
-				//reset unpacker's state after on_unpack_error(),
-				//so user can get the left half-baked msg in on_unpack_error()
+				//reset unpacker's state after on_unpack_error(), so user can get the left half-baked msg in on_unpack_error()
 				unpacker_->reset_state();
 			}
 		}
@@ -191,7 +192,7 @@ protected:
 		else
 			ST_THIS on_send_error(ec);
 
-		boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
+		boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex);
 		ST_THIS sending = false;
 
 		//send msg sequentially, that means second send only after first send success
@@ -208,7 +209,7 @@ protected:
 	}
 
 protected:
-	boost::shared_ptr<i_unpacker<msg_type>> unpacker_;
+	boost::shared_ptr<i_unpacker<out_msg_type>> unpacker_;
 	bool closing;
 };
 

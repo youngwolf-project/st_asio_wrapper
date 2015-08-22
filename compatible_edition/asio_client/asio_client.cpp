@@ -3,8 +3,7 @@
 #define SERVER_PORT		9528
 #define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define CUSTOM_LOG
-#define DEFAULT_PACKER	inflexible_packer
-#define DEFAULT_UNPACKER inflexible_unpacker
+#define DEFAULT_UNPACKER unbuffered_unpacker
 
 //the following three macros demonstrate how to support huge msg(exceed 65535 - 2).
 //huge msg will consume huge memory, for example, if we want to support 1M msg size, because every st_tcp_socket has a

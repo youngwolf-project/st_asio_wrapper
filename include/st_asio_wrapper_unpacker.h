@@ -49,11 +49,25 @@ public:
 };
 
 template<typename MsgType>
+class udp_msg : public MsgType
+{
+public:
+	boost::asio::ip::udp::endpoint peer_addr;
+
+	udp_msg() {}
+	udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr, MsgType&& msg) : MsgType(std::move(msg)), peer_addr(_peer_addr) {}
+
+	void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); MsgType::swap(other);}
+	void swap(boost::asio::ip::udp::endpoint& addr, MsgType&& tmp_msg) {std::swap(peer_addr, addr); MsgType::swap(tmp_msg);}
+};
+
+template<typename MsgType>
 class i_udp_unpacker
 {
 public:
 	typedef MsgType msg_type;
 	typedef const msg_type msg_ctype;
+	typedef boost::container::list<udp_msg<msg_type> > container_type;
 
 protected:
 	virtual ~i_udp_unpacker() {}
@@ -80,9 +94,6 @@ public:
 		while (unpack_ok) //considering stick package problem, we need a loop
 			if ((size_t) -1 != cur_msg_len)
 			{
-				//cur_msg_len now can be assigned in the completion_condition function, or in the following 'else if',
-				//so, we must verify cur_msg_len at the very beginning of using it, not at the assignment as we do
-				//before, please pay special attention
 				if (cur_msg_len > MSG_BUFFER_SIZE || cur_msg_len <= HEAD_LEN)
 					unpack_ok = false;
 				else if (remain_len >= cur_msg_len) //one msg received
@@ -120,7 +131,7 @@ public:
 		if (unpack_ok && remain_len > 0)
 		{
 			auto pnext = std::next(msg_pos_can.back().first, msg_pos_can.back().second);
-			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
+			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed data
 		}
 
 		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
@@ -129,8 +140,7 @@ public:
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
-	//read as many as possible to reduce asynchronous call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
-	//stick package carefully in parse_msg function.
+	//read as many as possible to reduce asynchronous call-back, and don't forget to handle stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (ec)
@@ -158,7 +168,7 @@ public:
 
 protected:
 	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
-	size_t cur_msg_len; //-1 means head has not received, so, doesn't know the whole msg length.
+	size_t cur_msg_len; //-1 means head has not received, so doesn't know the whole msg length.
 	size_t remain_len; //half-baked msg
 };
 
@@ -175,8 +185,14 @@ protected:
 class replaceable_unpacker : public i_unpacker<replaceable_buffer>, public unpacker
 {
 public:
+	//overwrite the following three typedef defined by unpacker
+	using i_unpacker<replaceable_buffer>::msg_type;
+	using i_unpacker<replaceable_buffer>::msg_ctype;
+	using i_unpacker<replaceable_buffer>::container_type;
+
+public:
 	virtual void reset_state() {unpacker::reset_state();}
-	virtual bool parse_msg(size_t bytes_transferred, i_unpacker<replaceable_buffer>::container_type& msg_can)
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		unpacker::container_type tmp_can;
 		auto unpack_ok = unpacker::parse_msg(bytes_transferred, tmp_can);
@@ -187,7 +203,7 @@ public:
 			msg_can.back().raw_buffer(com);
 		});
 
-		//when unpack failed, some successfully parsed msgs may still returned via msg_can(stick package), please note.
+		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
 		return unpack_ok;
 	}
 
@@ -212,10 +228,10 @@ protected:
 };
 
 //this unpacker demonstrate how to forbid memory copy while parsing msgs.
-class inflexible_unpacker : public i_unpacker<inflexible_buffer>
+class unbuffered_unpacker : public i_unpacker<inflexible_buffer>
 {
 public:
-	inflexible_unpacker() {reset_state();}
+	unbuffered_unpacker() {reset_state();}
 	size_t current_msg_length() const {return raw_buff.size();} //current msg's total length(not include the head), 0 means don't know
 
 public:
@@ -277,12 +293,11 @@ public:
 
 private:
 	HEAD_TYPE head_buff;
-	//please notice that we don't have a fixed size array with maximum size any more(like the default unpacker).
+	//please note that we don't have a fixed size array with maximum size any more(like the default unpacker).
 	//this is very useful if you have very few but very large msgs, fox example:
 	//you have a very large msg(1M size), but all others are very small, if you use a fixed size array to hold msgs in the unpackers,
-	//all the unpackers must have an array with at least 1M size, each st_socket will have a unpacker, this will cause your application occupy very large memory but with
-	//very low utilization ratio.
-	//this inflexible_unpacker will resolve the above problem, and with another benefit: no memory copying needed any more.
+	//all the unpackers must have an array with at least 1M size, each st_socket will have a unpacker, this will cause your application occupy very large memory but with very low utilization ratio.
+	//this unbuffered_unpacker will resolve above problem, and with another benefit: no memory replication needed any more.
 	msg_type raw_buff;
 	int step; //-1-error format, 0-want the head, 1-want the body
 };

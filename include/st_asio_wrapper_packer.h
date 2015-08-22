@@ -127,54 +127,6 @@ public:
 	}
 };
 
-class inflexible_packer : public i_packer<inflexible_buffer>
-{
-public:
-	static size_t get_max_msg_size() {return MSG_BUFFER_SIZE - HEAD_LEN;}
-
-	using i_packer<msg_type>::pack_msg;
-	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
-	{
-		msg_type msg;
-		auto pre_len = native ? 0 : HEAD_LEN;
-		auto total_len = packer_helper::msg_size_check(pre_len, pstr, len, num);
-		if ((size_t) -1 == total_len)
-			return msg;
-		else if (total_len > pre_len)
-		{
-			char* buff = nullptr;
-			size_t pos = 0;
-			if (!native)
-			{
-				auto head_len = (HEAD_TYPE) total_len;
-				if (total_len != head_len)
-				{
-					unified_out::error_out("pack msg error: length exceeds the header's range!");
-					return msg;
-				}
-
-				head_len = HEAD_H2N(head_len);
-				buff = new char[total_len];
-				memcpy(buff, (const char*) &head_len, HEAD_LEN);
-				pos = HEAD_LEN;
-			}
-			else
-				buff = new char[total_len];
-
-			for (size_t i = 0; i < num; ++i)
-				if (nullptr != pstr[i])
-				{
-					memcpy(buff + pos, pstr[i], len[i]);
-					pos += len[i];
-				}
-
-			msg.attach(buff, total_len);
-		} //if (total_len > pre_len)
-
-		return msg;
-	}
-};
-
 class prefix_suffix_packer : public i_packer<std::string>
 {
 public:

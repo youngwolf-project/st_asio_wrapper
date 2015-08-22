@@ -21,18 +21,18 @@ protected:
 	//msg handling
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//we can handle msg very fast, so we don't use recv buffer
-	virtual bool on_msg(msg_type& msg);
+	virtual bool on_msg(out_msg_type& msg);
 #endif
-	virtual bool on_msg_handle(msg_type& msg, bool link_down);
+	virtual bool on_msg_handle(out_msg_type& msg, bool link_down);
 	//msg handling end
 
 #ifdef WANT_MSG_SEND_NOTIFY
-	virtual void on_msg_send(msg_type& msg);
+	virtual void on_msg_send(in_msg_type& msg);
 #endif
 
 private:
 	void trans_end();
-	void handle_msg(msg_ctype& msg);
+	void handle_msg(out_msg_ctype& msg);
 };
 
 #endif //#ifndef FILE_SOCKET_H_

@@ -81,7 +81,7 @@ protected:
 	//msg handling: send the original msg back(echo server)
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
 	//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
-	virtual bool on_msg(msg_type& msg)
+	virtual bool on_msg(out_msg_type& msg)
 	{
 	#if 2 == PACKER_UNPACKER_TYPE
 		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
@@ -92,7 +92,7 @@ protected:
 	}
 #endif
 	//we should handle msg in on_msg_handle for time-consuming task like this:
-	virtual bool on_msg_handle(msg_type& msg, bool link_down)
+	virtual bool on_msg_handle(out_msg_type& msg, bool link_down)
 	{
 	#if 2 == PACKER_UNPACKER_TYPE
 		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
@@ -184,7 +184,7 @@ int main(int argc, const char* argv[])
 			//send \0 character too, because asio_client used inflexible_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
-				server_.do_something_to_all(boost::bind((bool (normal_server_socket::*)(normal_server_socket::msg_ctype&, bool)) &normal_server_socket::direct_send_msg, _1, boost::cref(msg), false));
+				server_.do_something_to_all(boost::bind((bool (normal_server_socket::*)(packer::msg_ctype&, bool)) &normal_server_socket::direct_send_msg, _1, boost::cref(msg), false));
 		}
 	}
 

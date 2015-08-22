@@ -30,15 +30,14 @@
 #ifndef UNIFIED_OUT_BUF_NUM
 #define UNIFIED_OUT_BUF_NUM	2048
 #endif
-//buffer size used when receiving msg, must equal to or larger than the biggest msg size,
+//the size of the buffer used when receiving msg, must equal to or larger than the biggest msg size,
 //the bigger this buffer is, the more msgs can be received in one time if there are enough msgs buffered in the SOCKET.
 //every unpackers have a fixed buffer with this size, every st_tcp_sockets have an unpacker, so, this size is not the bigger the better.
 //if you customized the packer and unpacker, the above principle maybe not right anymore, it should depends on your implementations.
 #ifndef MSG_BUFFER_SIZE
 #define MSG_BUFFER_SIZE			4000
 #endif
-//msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamicly,
-//which means only allocate memories when needed.
+//msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamicly, which means only allocate memory when needed.
 #ifndef MAX_MSG_NUM
 #define MAX_MSG_NUM	1024
 #endif
@@ -134,7 +133,7 @@ namespace st_asio_wrapper
 		size_t len;
 	};
 
-	//free functions, used to do something to any container optionally with any mutex
+	//free functions, used to do something to any container(except map and multimap) optionally with any mutex
 #if !defined _MSC_VER || _MSC_VER >= 1700
 	template<typename _Can, typename _Mutex, typename _Predicate>
 	void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred) {boost::shared_lock<boost::shared_mutex> lock(__mutex); for (auto& item : __can) __pred(item);}
@@ -163,15 +162,14 @@ namespace st_asio_wrapper
 	bool splice_helper(_Can& dest_can, _Can& src_can, size_t max_size = MAX_MSG_NUM)
 	{
 		auto size = dest_can.size();
-		if (size < max_size) //dest_can's buffer available
+		if (size < max_size) //dest_can can hold more items.
 		{
 			size = max_size - size; //maximum items this time can handle
 			auto begin_iter = std::begin(src_can), end_iter = std::end(src_can);
 			if (src_can.size() > size) //some items left behind
 			{
 				auto left_num = src_can.size() - size;
-				//find the minimum movement
-				end_iter = left_num > size ? std::next(begin_iter, size) : std::prev(end_iter, left_num);
+				end_iter = left_num > size ? std::next(begin_iter, size) : std::prev(end_iter, left_num); //find the minimum movement
 			}
 			else
 				size = src_can.size();
@@ -184,7 +182,7 @@ namespace st_asio_wrapper
 		return false;
 	}
 
-//member functions, used to do something to any member container optionally with any member mutex
+//member functions, used to do something to any member container(except map and multimap) optionally with any member mutex
 #define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)
 #define DO_SOMETHING_TO_ALL(CAN) DO_SOMETHING_TO_ALL_NAME(do_something_to_all, CAN)
 
@@ -222,6 +220,33 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (au
 	boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50)); \
 }
 
+#define GET_PENDING_MSG_NUM(FUNNAME, CAN, MUTEX) size_t FUNNAME() {boost::shared_lock<boost::shared_mutex> lock(MUTEX); return CAN.size();}
+#define PEEK_FIRST_PENDING_MSG(FUNNAME, CAN, MUTEX, MSGTYPE) \
+void FUNNAME(MSGTYPE& msg) \
+{ \
+	msg.clear(); \
+	boost::shared_lock<boost::shared_mutex> lock(MUTEX); \
+	if (!CAN.empty()) \
+		msg = CAN.front(); \
+}
+#define POP_FIRST_PENDING_MSG(FUNNAME, CAN, MUTEX, MSGTYPE) \
+void FUNNAME(MSGTYPE& msg) \
+{ \
+	msg.clear(); \
+	boost::unique_lock<boost::shared_mutex> lock(MUTEX); \
+	if (!CAN.empty()) \
+	{ \
+		msg.swap(CAN.front()); \
+		CAN.pop_front(); \
+	} \
+}
+#define POP_ALL_PENDING_MSG(FUNNAME, CAN, MUTEX, CANTYPE) \
+void FUNNAME(CANTYPE& msg_list) \
+{ \
+	boost::unique_lock<boost::shared_mutex> lock(MUTEX); \
+	msg_list.splice(msg_list.end(), CAN); \
+}
+
 ///////////////////////////////////////////////////
 //TCP msg sending interface
 #define TCP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
@@ -231,8 +256,8 @@ TYPE FUNNAME(const std::string& str, bool can_overflow = false) {return FUNNAME(
 #define TCP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex); \
-	return (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) ? ST_THIS do_direct_send_msg(ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
+	boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex); \
+	return (can_overflow || ST_THIS send_msg_buffer.size() < MAX_MSG_NUM) ? ST_THIS do_direct_send_msg(ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
@@ -240,7 +265,8 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) {return ST_THIS direct_post_msg(ST_THIS packer_->pack_msg(pstr, len, num, NATIVE), can_overflow);} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
-//guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into st_tcp_socket's send buffer
+//guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into st_tcp_socket's send buffer successfully
+//if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define TCP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) {while (!SEND_FUNNAME(pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK return true;} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
@@ -261,8 +287,8 @@ TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const std::string&
 #define UDP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex); \
-	if (can_overflow || send_msg_buffer.size() < MAX_MSG_NUM) \
+	boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex); \
+	if (can_overflow || ST_THIS send_msg_buffer.size() < MAX_MSG_NUM) \
 	{ \
 		udp_msg<typename Packer::msg_type> msg(peer_addr, ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)); \
 		return ST_THIS do_direct_send_msg(std::move(msg)); \
@@ -279,7 +305,8 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const 
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
-//guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into st_udp_socket's send buffer
+//guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into st_udp_socket's send buffer successfully
+//if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define UDP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 	{while (!SEND_FUNNAME(peer_addr, pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK return true;} \

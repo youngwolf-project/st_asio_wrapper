@@ -385,12 +385,17 @@
  * Fixed the possibility of race condition in on_all_msg_send.
  * Dropped fixed_length_packer, use packer(the default packer) instead.
  * i_service::init() will now return boolean value to indicate whether the initialization was succeeded or not.
+  *
+  * 5.2.2	2015.8.20
+ * Packer and unpacker now can have different msg types, for example, use std::string when sending msgs, use inflexible_buffer when receiving msgs,
+ * see asio_client for more details.
+ * Dropped inflexible_packer, changed inflexible_unpacker to unbuffered_unpacker, just the class name.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VERSION 50201
+#define ST_ASIO_WRAPPER_VERSION 50202
 
 #if !defined _MSC_VER && !defined __GNUC__
 #error st_asio_wrapper only support vc and gcc.
