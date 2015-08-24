@@ -41,9 +41,8 @@ namespace st_asio_wrapper
 {
 
 //timers are identified by id.
-//for the same timer in the same st_timer, set_timer and stop_timer are not thread safe,
-//please pay special attention. to resolve this defect, we must add a mutex member variable to timer_info,
-//it's not worth
+//for the same timer in the same st_timer, set_timer and stop_timer are not thread safe, please pay special attention.
+//to resolve this defect, we must add a mutex member variable to timer_info, it's not worth
 //
 //suppose you have more than one service thread(see st_service_pump for service thread number control), then:
 //same st_timer, same timer, on_timer is called sequentially
@@ -73,7 +72,6 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::container::set<object_type> container_type;
 
-	//not thread safe for the same timer
 	void set_timer(unsigned char id, size_t milliseconds, const void* user_data)
 	{
 		object_type ti = {id};
@@ -98,7 +96,6 @@ public:
 		start_timer(*iter);
 	}
 
-	//not thread safe for the same timer
 	void stop_timer(unsigned char id)
 	{
 		object_type ti = {id};

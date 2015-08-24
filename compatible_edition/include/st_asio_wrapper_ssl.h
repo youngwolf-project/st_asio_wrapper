@@ -28,12 +28,7 @@ class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket>
 public:
 	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : st_connector_base<Packer, Unpacker, Socket>(io_service_, ctx), authorized_(false) {}
 
-	//reset all, be ensure that there's no any operations performed on this st_ssl_connector_base when invoke it
-	//notice, when reuse this st_ssl_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
-	//all member variables, and then do not forget to invoke st_ssl_connector_base::reset() to initialize father's
-	//member variables
 	virtual void reset() {authorized_ = false; st_connector_base<Packer, Unpacker, Socket>::reset();}
-
 	bool authorized() const {return authorized_;}
 
 protected:
@@ -89,7 +84,7 @@ protected:
 		else
 		{
 			authorized_ = true;
-			ST_THIS send_msg(); //send msg buffer may have msgs, send them
+			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}
 	}
@@ -107,9 +102,6 @@ public:
 	st_ssl_object_pool(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_object_pool<Object>(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& ssl_context() {return ctx;}
 
-	//this method simply create a class derived from st_socket from heap, secondly you must invoke
-	//bool add_client(typename st_client::object_ctype&, bool) before this socket can send or receive msgs.
-	//for st_udp_socket, you also need to invoke set_local_addr() before add_client(), please note
 	typename st_ssl_object_pool::object_type create_object()
 	{
 		BOOST_AUTO(client_ptr, ST_THIS reuse_object());
