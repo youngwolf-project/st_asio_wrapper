@@ -94,7 +94,6 @@ int main(int argc, const char* argv[])
 #undef SERVER_PORT
 #undef FORCE_TO_USE_MSG_RECV_BUFFER
 #undef CUSTOM_LOG
-#undef DEFAULT_PACKER
 #undef DEFAULT_UNPACKER
 
 //#undef HUGE_MSG

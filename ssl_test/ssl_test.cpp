@@ -4,7 +4,8 @@
 #define REUSE_OBJECT //use objects pool
 //#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ENHANCED_STABILITY
-//#define REPLACEABLE_BUFFER
+//#define DEFAULT_PACKER replaceable_packer
+//#define DEFAULT_UNPACKER replaceable_unpacker
 //configuration
 
 #include "../include/st_asio_wrapper_ssl.h"
@@ -78,7 +79,8 @@ int main() {
 //restore configuration
 #undef SERVER_PORT
 #undef REUSE_OBJECT
-//#undef FORCE_TO_USE_MSG_RECV_BUFFER
+#undef FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ENHANCED_STABILITY
-//#undef REPLACEABLE_BUFFER
+#undef DEFAULT_PACKER
+#undef DEFAULT_UNPACKER
 //restore configuration

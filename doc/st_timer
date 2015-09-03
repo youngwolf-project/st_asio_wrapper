@@ -1,6 +1,25 @@
-
+﻿
 namespace st_asio_wrapper
 {
+
+st_asio_wrapper库中的一些类需要定时器，它们用的也是st_timer，为了与使用者的定时器区分，只能通过预留id的方法：
+st_object_pool：0-9
+st_socket：0-9
+
+st_tcp_socket_base：0-9
+st_connector_base：0-19
+st_tcp_sclient：0-9
+
+st_udp_socket_base：0-9
+st_udp_sclient：0-9
+
+st_server_socket_base：0-9
+st_server_base：0-9
+
+st_client：0-9
+st_tcp_client_base：0-9
+st_udp_client_base：0-9
+使用者如果继承了某个类，并且打算也使用定时器，那么一定要避开上面预留的定时器id。
 
 定时器类
 class st_timer
@@ -14,7 +33,7 @@ protected:
 		timer_status status;
 		size_t milliseconds;
 		const void* user_data; //if needed, you must take the responsibility to manage this memory
-		boost::shared_ptr<deadline_timer> timer;
+		boost::shared_ptr<boost::asio::deadline_timer> timer;
 
 		bool operator <(const timer_info& other) const {return id < other.id;}
 	};
@@ -24,6 +43,12 @@ protected:
 	virtual ~st_timer();
 
 public:
+	typedef timer_info object_type;
+
+	typedef const object_type object_ctype;
+
+	typedef boost::container::set<object_type> container_type;
+
 	void set_timer(unsigned char id, size_t milliseconds, const void* user_data);
 开启定时器，定时器以id分区，如果定时器已经存在，则重新开始记时。
 注意，对同一个st_timer里面的同一个定时器操作并不是线程安全的。
@@ -31,56 +56,39 @@ public:
 	void stop_timer(unsigned char id);
 停止定时器，如果定时时间已经到达，且已经被post到io_server的队列中，则on_timer仍然会在未来某个时候被回调，这是asio的设计。
 
+	boost::asio::io_service& get_io_service();
+
+	const boost::asio::io_service& get_io_service() const;
+
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred);
 对所有定时器做一个操作，操作由__pred来定，st_asio_wrapper库只是调用__pred()。
 
 	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred);
-与do_something_to_all类型，只是当__pred()返回真时就不再继续循环处理后面的定时器，跟查找功能类似。
+与do_something_to_all类似，只是当__pred()返回真时就不再继续循环处理后面的定时器了（如果你永远返回false，那就等于
+so_something_to_all），跟查找功能类似。
 
 	void stop_all_timer();
 停止所有定时器。
 
 protected:
 	virtual bool on_timer(unsigned char id, const void* user_data);
-定时到达之后，回调这个函数，使用者需要重写它以实现自己的功能，对于不感兴趣的定时器，要调用父类的同名函数。
+定时到达之后，回调这个函数，使用者需要重写它以实现自己的功能，对于不感兴趣的定时器，一定要调用st_timer::on_timer，
+返回true表示继续这个定时器，否则结束这个定时器。
 同一个st_timer内同一个定时器，on_timer的调用是顺序的，其它任何情况下，on_timer的调用都是并发的。
 
 	void start_timer(const timer_info& ti);
-内部使用的helper函数。
+内部使用的helper函数，真正的开启定时器（boost::asio::deadline_timer::async_wait）。
 
 	void stop_timer(timer_info& ti);
-内部使用的helper函数。
+内部使用的helper函数，真正的结束定时器（调用boost::asio::deadline_timer::cancel）。
 
 	void timer_handler(const error_code& ec, const timer_info& ti);
-asio需要的回调函数。
+在定时器到达后，由asio回调，其功能是调用on_timer并根据返回值决定是否继续这个定时器。
 
 protected:
-	io_service& io_service_;
-	container::set<timer_info> timer_can;
-	mutex timer_can_mutex;
+	boost::asio::io_service& io_service_;
+	container_type timer_can;
+	boost::shared_mutex timer_can_mutex;
 };
 
 } //namespace
-
-
-注意：每个类都有自己的保留定时器，继承者注意不要使用父类的定时器，具体为：
-/*
-* Please pay attention to the following reserved timer ids:
-* st_object_pool: 0 - 9
-* st_socket: 0 - 9
-
-* st_tcp_socket: inherit from st_socket
-* st_connector: inherit from st_tcp_socket and plus 10 - 19
-* st_tcp_sclient: inherit from st_connector
-*
-* st_udp_socket: inherit from st_socket
-* st_udp_sclient: inherit from st_udp_socket
-*
-* st_server_socket_base: inherit from st_tcp_socket
-* st_server_base: inherit from st_object_pool
-*
-* st_client_base: inherit from st_object_pool
-* st_tcp_client_base: inherit from st_client_base
-* st_udp_client_base: inherit from st_client_base
-*/
-

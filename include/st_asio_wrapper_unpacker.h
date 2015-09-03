@@ -67,7 +67,7 @@ class i_udp_unpacker
 public:
 	typedef MsgType msg_type;
 	typedef const msg_type msg_ctype;
-	typedef boost::container::list<udp_msg<msg_type> > container_type;
+	typedef boost::container::list<udp_msg<msg_type>> container_type;
 
 protected:
 	virtual ~i_udp_unpacker() {}
@@ -107,7 +107,11 @@ public:
 					break;
 			}
 			else if (remain_len >= HEAD_LEN) //the msg's head been received, stick package found
-				cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) pnext);
+			{
+				HEAD_TYPE head;
+				memcpy(&head, pnext, HEAD_LEN);
+				cur_msg_len = HEAD_N2H(head);
+			}
 			else
 				break;
 
@@ -151,7 +155,9 @@ public:
 
 		if ((size_t) -1 == cur_msg_len && data_len >= HEAD_LEN) //the msg's head been received
 		{
-			cur_msg_len = HEAD_N2H(*(HEAD_TYPE*) std::begin(raw_buff));
+			HEAD_TYPE head;
+			memcpy(&head, std::begin(raw_buff), HEAD_LEN);
+			cur_msg_len = HEAD_N2H(head);
 			if (cur_msg_len > MSG_BUFFER_SIZE || cur_msg_len <= HEAD_LEN) //invalid msg, stop reading
 				return 0;
 		}
@@ -272,7 +278,7 @@ public:
 				return boost::asio::detail::default_max_transfer_size;
 
 			assert(HEAD_LEN == bytes_transferred);
-			auto cur_msg_len = HEAD_N2H(head_buff) - HEAD_LEN;
+			auto cur_msg_len = HEAD_N2H(head) - HEAD_LEN;
 			if (cur_msg_len > MSG_BUFFER_SIZE - HEAD_LEN) //invalid msg, stop reading
 				step = -1;
 			else
@@ -289,10 +295,10 @@ public:
 		return 0;
 	}
 
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return raw_buff.empty() ? boost::asio::buffer((char*) &head_buff, HEAD_LEN) : boost::asio::buffer(raw_buff.data(), raw_buff.size());}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return raw_buff.empty() ? boost::asio::buffer((char*) &head, HEAD_LEN) : boost::asio::buffer(raw_buff.data(), raw_buff.size());}
 
 private:
-	HEAD_TYPE head_buff;
+	HEAD_TYPE head;
 	//please note that we don't have a fixed size array with maximum size any more(like the default unpacker).
 	//this is very useful if you have very few but very large msgs, fox example:
 	//you have a very large msg(1M size), but all others are very small, if you use a fixed size array to hold msgs in the unpackers,

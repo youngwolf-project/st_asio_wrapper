@@ -1,6 +1,7 @@
 
 //configuration
-//#define REPLACEABLE_BUFFER
+//#define DEFAULT_PACKER replaceable_packer
+//#define DEFAULT_UDP_UNPACKER replaceable_udp_unpacker
 //configuration
 
 #include "../include/st_asio_wrapper_udp_client.h"
@@ -44,5 +45,6 @@ int main(int argc, const char* argv[]) {
 }
 
 //restore configuration
-//#undef REPLACEABLE_BUFFER
+#undef DEFAULT_PACKER
+#undef DEFAULT_UNPACKER
 //restore configuration

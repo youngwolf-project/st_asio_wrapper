@@ -1,7 +1,7 @@
 
 //configuration
 #define WANT_MSG_SEND_NOTIFY
-#define REPLACEABLE_BUFFER
+#define DEFAULT_PACKER	replaceable_packer
 //configuration
 
 #include "file_socket.h"
@@ -102,5 +102,5 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 
 //restore configuration
 #undef WANT_MSG_SEND_NOTIFY
-#undef REPLACEABLE_BUFFER
+#undef DEFAULT_PACKER
 //restore configuration

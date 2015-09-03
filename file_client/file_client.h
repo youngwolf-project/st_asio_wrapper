@@ -70,7 +70,7 @@ protected:
 	//we can handle msg very fast, so we don't use recv buffer
 	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
-	//we will change unpacker at runtime, this operation must be done in on_msg, do not to it in on_msg_handle
+	//we will change unpacker at runtime, this operation can only be done in on_msg(), reset() or constructor
 	//virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
 

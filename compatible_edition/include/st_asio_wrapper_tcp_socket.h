@@ -21,11 +21,7 @@
 #endif
 
 #ifndef DEFAULT_UNPACKER
-#ifdef REPLACEABLE_BUFFER
-#define DEFAULT_UNPACKER replaceable_unpacker
-#else
 #define DEFAULT_UNPACKER unpacker
-#endif
 #endif
 
 namespace st_asio_wrapper
@@ -80,6 +76,8 @@ public:
 	bool is_closing() const {return closing;}
 
 	//get or change the unpacker at runtime
+	//changing unpacker at runtime is no thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
+	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
 	boost::shared_ptr<i_unpacker<out_msg_type> > inner_unpacker() {return unpacker_;}
 	boost::shared_ptr<const i_unpacker<out_msg_type> > inner_unpacker() const {return unpacker_;}
 	void inner_unpacker(const boost::shared_ptr<i_unpacker<out_msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}

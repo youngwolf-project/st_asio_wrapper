@@ -1,69 +1,96 @@
+﻿
+#ifndef UDP_DEFAULT_IP_VERSION
+
+#define UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
+
+#endif
+
+绑定地址时，在不指定ip的情况下，指定ip地址的版本（v4还是v6），如果指定了ip，则ip地址的版本可以从ip中推导出来。
+
+
+#ifndef DEFAULT_UDP_UNPACKER
+
+#define DEFAULT_UDP_UNPACKER udp_unpacker
+
+#endif
+默认的解包器，也可以通过模板参数控制，提供这个宏可以让使用者省略相应的模板参数。
 
 namespace st_asio_wrapper
 {
 namespace st_udp
 {
 
-//udp消息结构，包括对方地址和消息内容
-template<typename MsgType>
-struct udp_msg
-{
-	udp::endpoint peer_addr;
-	MsgType str;
-
-	void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); str.swap(other.str);}
-	void swap(const udp::endpoint& addr, MsgType& tmp_str) {peer_addr = addr; str.swap(tmp_str);}
-	void clear() {peer_addr = udp::endpoint(); str.clear();}
-	bool empty() const {return str.empty();}
-	bool operator==(const udp_msg& other) const {return this == &other;}
-};
-
 udp套接字类，实现udp数据的收发
-template <typename MsgType = std::string, typename Socket = boost::asio::ip::udp::socket, typename Packer = DEFAULT_PACKER>
-class st_udp_socket_base : public st_socket<udp_msg<MsgType>, Socket, MsgType, Packer>
+template <typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UDP_UNPACKER, typename Socket = boost::asio::ip::udp::socket>
+
+class st_udp_socket_base : public st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>>
+
 {
+
+public:
+
+	typedef udp_msg<typename Packer::msg_type> in_msg_type;
+
+	typedef const in_msg_type in_msg_ctype;
+
+	typedef udp_msg<typename Unpacker::msg_type> out_msg_type;
+
+	typedef const out_msg_type out_msg_ctype;
+
 public:
 	st_udp_socket_base(boost::asio::io_service& io_service_);
 
 public:
 	virtual void reset();
-重置所有，st_object_pool在重用时会调用。重写它以重置子类的状态，记得最后需要调用父类的同名函数。
+重置所有，st_object_pool在重用时会调用。st_udp_socket的子类可重写它以重置自己的状态，记得最后需要调用本类的reset。
 
 	void set_local_addr(unsigned short port, const std::string& ip = std::string());
-设置本地地址。
+	const boost::asio::ip::udp::endpoint& get_local_addr() const;
+设置获取本端地址。
 
 	void disconnect();
 	void force_close();
 	void graceful_close();
-调用clean_up，这三个函数功能完全一样，为了与st_tcp_socket在接口上保持一致才设计成三个的。
+调用clean_up，这三个函数功能完全一样，为了与st_tcp_socket在接口上保持一致才设计成三个。
 
-	using st_socket<udp_msg<MsgType>, Socket, MsgType>::send_msg;
+	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>> inner_unpacker();
+	boost::shared_ptr<const i_udp_unpacker<typename Packer::msg_type>> inner_unpacker() const;
+
+	void inner_unpacker(const boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>>& _unpacker_);
+获取／修改解包器。
+注意，运行时修改解包器是非线程安全的，而且只能在构造函数、子类的reset函数（虚的那个）和on_msg里面修改。不支持多线程一是为了
+效率，二是支持了也必须要在前面说的那三个地方修改，而这三个地方不会有多线程问题，三是这个功能用得很少。
+
+	using st_socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type>::send_msg;
+
 	bool send_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
 	bool send_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
 	bool send_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-发送消息，前两个是helper函数，最后一个才真正的发送消息（放入消息发送缓存）；第二个调用第一个，第一个调用第三个。
+发送消息，前两个是helper函数，最后一个才是真正的发送消息（放入消息发送缓存）；第一个调用第二个，第二个调用第三个。
 
 	bool send_native_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
 	bool send_native_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
 	bool send_native_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-同和，只是以native为true调用i_packer::pack_msg接口。
+同上，只是以native为true调用i_packer::pack_msg接口。
 
 	bool safe_send_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
 	bool safe_send_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
 	bool safe_send_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
 同send_msg，只是在消息发送缓存溢出的时候会等待直到缓存可用；如果is_send_allowed返回false或者io_service已经停止，则马上放弃等待返回失败。
-safe系列函数，不能在on_msg和om_msg_handle里面调用，请注意。
+safe系列函数，在on_msg和om_msg_handle里面调用时需要特别谨慎，因为它会阻塞service线程。
 
-bool safe_send_native_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
-bool safe_send_native_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
-bool safe_send_native_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+	bool safe_send_native_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
+	bool safe_send_native_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
+	bool safe_send_native_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
 同上，只是以native为true调用i_packer::pack_msg接口。
 
 	bool post_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
 	bool post_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
 	bool post_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-同send_msg，只是它永远能马上成功。注意：如果消息发送缓存溢出了（当然can_overflow得为false，否则不检测缓存是否溢出），则暂停消息派发（进而也会
-停止消息接收，因为不派发只接收消息，迟早会让消息接收缓存满而暂停消息接收，如果不使用消息接收缓存，则马上暂停消息接收）。
+同send_msg，只是它永远能马上成功。
+注意：如果消息发送缓存溢出了（当然can_overflow得为false，否则不检测缓存是否溢出），则暂停消息派发（进而也会停止消息接收，
+因为不派发只接收消息，迟早会让消息接收缓存满而暂停消息接收，如果不使用消息接收缓存，则马上暂停消息接收）。
+post_msg和send_msg的区别请看st_socket里面的post_msg_buffer和send_msg_buffer。
 
 	bool post_native_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
 	bool post_native_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
@@ -71,47 +98,48 @@ bool safe_send_native_msg(const udp::endpoint& peer_addr, const char* const pstr
 同上，只是以native为true调用i_packer::pack_msg接口。
 
 	void show_info(const char* head, const char* tail);
-显示套接字的一些信息，在这里会显示本地地址。
+打印日志，在head和tail中间加上本端ip和端口。
 
 protected:
 	virtual bool do_start();
-马上开始消息接收，重写st_socket的do_start，由st_socket调用。
+马上开始消息接收，重写自st_socket的do_start，由st_socket调用。
 
 	virtual bool do_send_msg();
-马上开始消息发送，重写st_socket的do_send_msg，由st_socket调用。
+马上开始消息发送，重写自st_socket的do_send_msg，由st_socket调用。
 
 	virtual bool is_send_allowed() const;
-重写st_socket的is_send_allowed，记住，自己的判断加上st_socket的判断，才是最终结果。
+重写st_socket的is_send_allowed，记住，自己的判断（is_open）加上st_socket的判断，才是最终结果。
 
 	virtual void on_recv_error(const error_code& ec);
 接收消息出错时回调。
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	virtual bool on_msg(msg_type& msg);
+	virtual bool on_msg(out_msg_type& msg);
 重写st_socket的on_msg，功能是打印消息到控制台，使用者重写这个函数以处理消息。
 #endif
 
-	virtual bool on_msg_handle(msg_type& msg, bool link_down);
+	virtual bool on_msg_handle(out_msg_type& msg, bool link_down);
 重写st_socket的on_msg_handle，功能是打印消息到控制台，使用者重写这个函数以处理消息。
 
 	void clean_up();
 关闭套接字，停止所有定时器，直接派发所有剩余消息，重置所有状态（调用reset_state）。
 
 	void recv_handler(const error_code& ec, size_t bytes_transferred);
-收到数据时由asio回调。
+收到数据后由asio回调。
 
 	void send_handler(const error_code& ec, size_t bytes_transferred);
-成功发送消息（写入底层套接字）时由asio回调。
+成功发送消息（写入底层套接字）后由asio回调。
 
 protected:
-	array<char, MAX_MSG_LEN> raw_buff;
+	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>> unpacker_;
 	boost::asio::ip::udp::endpoint peer_addr, local_addr;
+异步接收udp消息时，asio需要一个endpoint，在整个异步接收过程中，这个endpoint必须有效，所以它是一个成员变量，
+它只代表上一次接收udp消息时的对端地址，对于已经接收到的udp消息，对端地方保存在out_msg_type里面。
 };
 typedef st_udp_socket_base<> st_udp_socket;
-
-using namespace st_asio_wrapper::st_udp;
-兼容老版本。
 
 } //namespace st_udp
 } //namespace st_asio_wrapper
 
+using namespace st_asio_wrapper::st_udp;
+兼容老版本。

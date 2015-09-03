@@ -1,4 +1,4 @@
-
+﻿
 namespace st_asio_wrapper
 {
 
@@ -10,26 +10,28 @@ public:
 	virtual const st_service_pump& get_service_pump() const = 0;
 获取st_service_pump。
 	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
-关闭一个连接，并从st_server_socket_base的客户链表里面删除。
-一般来说，当出现on_recv_error的时候，这个连接已经无法使用，此时从客户链表里面删除；客户端必然也会出现连接断开，此时它要么退出程序，
-要么重新连接，重新连接成功时，会得到另一个st_server_socket_base，所以这里的删除是没有问题的。
+关闭一个连接时，st_server_socket调用这个方法，i_server的实现者（st_server就是一个i_server的实现者）一般来说应该把这个连接从自己的
+客户端对象池里面删除，调用这个方法的最佳时期是在on_recv_error里面。
+注意，client_ptr看起来像是一个st_timer，其实它的类型是st_server_base中的Socket模板参数，用st_timer完全是为了不让i_server带一个类似于
+Socket的模板参数，带上之后会有模板参数的循环依赖的问题，如果哪位同仁可以解决此问题，麻烦告诉我一声。
+i_server的实现者在使用client_ptr参数之前，会转换成Socket类型，请看st_server的实现。
 };
 
 
 服务端套接字类
-template<typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket,
-	typename Server = i_server, typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
-class st_server_socket_base : public st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>,
-	public boost::enable_shared_from_this<st_server_socket_base<MsgType, Socket, Server, Packer, Unpacker>>
+template<typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket>
+
+class st_server_socket_base : public st_tcp_socket_base<Socket, Packer, Unpacker>, public boost::enable_shared_from_this<st_server_socket_base<Packer, Unpacker, Server, Socket>>
 {
 public:
 	st_server_socket_base(Server& server_);
+
 	template<typename Arg>
 	st_server_socket_base(Server& server_, Arg& arg);
 ssl使用。
 
 	virtual void reset();
-重置所有，st_object_pool在重用时会调用。重写它以重置子类的状态，记得最后需要调用父类的同名函数。
+重置所有，st_object_pool在重用时会调用。st_server_socket的子类可重写它以重置自己的状态，记得最后需要调用本类的reset。
 
 protected:
 	virtual bool do_start();
@@ -43,6 +45,7 @@ protected:
 
 protected:
 	Server& server;
+用于操控st_server，st_server在创建（其实是st_object_pool创建，st_server是其子类）st_server_socket的时候，会把自己的引用通过构造函数传入。
 };
 typedef st_server_socket_base<> st_server_socket;
 

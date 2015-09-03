@@ -1,4 +1,4 @@
-
+﻿
 namespace st_asio_wrapper
 {
 
@@ -11,38 +11,45 @@ class st_tcp_client_base : public st_client<Socket, Pool>
 {
 public:
 	st_tcp_client_base(st_service_pump& service_pump_);
+
 	template<typename Arg>
 	st_tcp_client_base(st_service_pump& service_pump_, Arg arg);
 ssl使用。
 
 	size_t valid_size();
-有效的连接数量。
+有效（已连接）的连接数量。
 
 	using st_client<Socket, Pool>::add_client;
-	typename st_client<Socket, Pool>::object_type add_client();
-创建一个对象并添加到对象池，但还未设置服务端地址。
-	typename st_client<Socket, Pool>::object_type add_client(unsigned short port, const std::string& ip = std::string());
-创建一个对象，设置服务端地址，并添加到对象池。
 
-	bool broadcast_msg(const char* pstr, size_t len, bool can_overflow = false);
-	bool broadcast_msg(const std::string& str, bool can_overflow = false);
-	bool broadcast_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-	bool broadcast_native_msg(const char* pstr, size_t len, bool can_overflow = false);
-	bool broadcast_native_msg(const std::string& str, bool can_overflow = false);
-	bool broadcast_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-	bool safe_broadcast_msg(const char* pstr, size_t len, bool can_overflow = false);
-	bool safe_broadcast_msg(const std::string& str, bool can_overflow = false);
-	bool safe_broadcast_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-	bool safe_broadcast_native_msg(const char* pstr, size_t len, bool can_overflow = false);
-	bool safe_broadcast_native_msg(const std::string& str, bool can_overflow = false);
-	bool safe_broadcast_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+	typename Pool::object_type add_client();
+创建或者重用一个对象，然后以reset为true调用父类的add_client。注意未设地址，将使用SERVER_IP和SERVER_PORT
+作为服务端地址，如果你要用别的地方，请用下面那个add_client。
+
+	typename Pool::object_type add_client(unsigned short port, const std::string& ip = std::string());
+创建或者重用一个对象，设置服务端地址，然后以reset为true调用父类的add_client。
+
+	void broadcast_msg(const std::string& str, bool can_overflow = false);
+	void broadcast_msg(const char* pstr, size_t len, bool can_overflow = false);
+	void broadcast_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+
+	void broadcast_native_msg(const std::string& str, bool can_overflow = false);
+	void broadcast_native_msg(const char* pstr, size_t len, bool can_overflow = false);
+	void broadcast_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+
+	void safe_broadcast_msg(const std::string& str, bool can_overflow = false);
+	void safe_broadcast_msg(const char* pstr, size_t len, bool can_overflow = false);
+	void safe_broadcast_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
+
+	void safe_broadcast_native_msg(const std::string& str, bool can_overflow = false);
+	void safe_broadcast_native_msg(const char* pstr, size_t len, bool can_overflow = false);
+	void safe_broadcast_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
 对每一个连接调用st_tcp_socket中的同名函数。
 
 protected:
 	virtual void uninit();
-实现i_service的纯虚接口，由st_service_pump调用。
+实现i_service的纯虚接口，由st_service_pump调用（stop_service时调用），跟st_sclient::uninit功能一样，只是对所有
+客户端都做一个“结束”操作。
 };
 typedef st_tcp_client_base<> st_tcp_client;
 
 } //namespace
-

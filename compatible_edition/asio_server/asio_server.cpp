@@ -12,7 +12,8 @@
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-//#define REPLACEABLE_BUFFER
+//#define DEFAULT_PACKER replaceable_packer
+//#define DEFAULT_UNPACKER replaceable_unpacker
 #elif 2 == PACKER_UNPACKER_TYPE
 #define DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
@@ -194,9 +195,10 @@ int main(int argc, const char* argv[])
 //restore configuration
 #undef SERVER_PORT
 #undef REUSE_OBJECT
-//#undef FORCE_TO_USE_MSG_RECV_BUFFER
+#undef FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ENHANCED_STABILITY
-//#undef REPLACEABLE_BUFFER
+#undef DEFAULT_PACKER
+#undef DEFAULT_UNPACKER
 
 //#undef HUGE_MSG
 //#undef MAX_MSG_LEN

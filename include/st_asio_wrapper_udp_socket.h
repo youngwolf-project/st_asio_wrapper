@@ -26,11 +26,7 @@
 #endif
 
 #ifndef DEFAULT_UDP_UNPACKER
-#ifdef REPLACEABLE_BUFFER
-#define DEFAULT_UDP_UNPACKER replaceable_udp_unpacker
-#else
 #define DEFAULT_UDP_UNPACKER udp_unpacker
-#endif
 #endif
 
 namespace st_asio_wrapper
@@ -94,6 +90,8 @@ public:
 	void graceful_close() {clean_up();}
 
 	//get or change the unpacker at runtime
+	//changing unpacker at runtime is no thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
+	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
 	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>> inner_unpacker() {return unpacker_;}
 	boost::shared_ptr<const i_udp_unpacker<typename Packer::msg_type>> inner_unpacker() const {return unpacker_;}
 	void inner_unpacker(const boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>>& _unpacker_) {unpacker_ = _unpacker_;}

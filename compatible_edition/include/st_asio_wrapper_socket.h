@@ -19,11 +19,7 @@
 #include "st_asio_wrapper_timer.h"
 
 #ifndef DEFAULT_PACKER
-#ifdef REPLACEABLE_BUFFER
-#define DEFAULT_PACKER replaceable_packer
-#else
 #define DEFAULT_PACKER packer
-#endif
 #endif
 
 namespace st_asio_wrapper
@@ -106,6 +102,8 @@ public:
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
 
 	//get or change the packer at runtime
+	//changing packer at runtime is no thread-safe, you should avoid it from sending msg or posting msg, please pay special attention
+	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > inner_packer() {return packer_;}
 	boost::shared_ptr<const i_packer<typename Packer::msg_type> > inner_packer() const {return packer_;}
 	void inner_packer(const boost::shared_ptr<i_packer<typename Packer::msg_type> >& _packer_) {packer_ = _packer_;}

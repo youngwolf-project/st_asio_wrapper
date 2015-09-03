@@ -1,4 +1,4 @@
-
+﻿
 #ifndef SERVER_IP
 #define SERVER_IP				"127.0.0.1"
 #endif
@@ -7,9 +7,11 @@
 #endif
 #ifndef RE_CONNECT_INTERVAL
 #define RE_CONNECT_INTERVAL		500 //millisecond(s)
+异步连接，asio返回失败之后，暂停一定时间继续重试（即再次调用asnc_connect）。
 #endif
 
 #ifdef RE_CONNECT_CONTROL
+定义RE_CONNECT_CONTROL宏可以让使用者定义重连接次数。
 #define RE_CONNECT_CHECK	prepare_re_connect()
 #else
 #define RE_CONNECT_CHECK	true
@@ -19,27 +21,28 @@ namespace st_asio_wrapper
 {
 
 带连接功能的st_tcp_socket，算是一个真正的客户端了
-template <typename MsgType = std::string, typename Socket = boost::asio::ip::tcp::socket,
-	typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER>
-class st_connector_base : public st_tcp_socket_base<MsgType, Socket, Packer, Unpacker>
+template <typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Socket = boost::asio::ip::tcp::socket>
+
+class st_connector_base : public st_tcp_socket_base<Socket, Packer, Unpacker>
 {
 public:
 	st_connector_base(boost::asio::io_service& io_service_);
+
 	template<typename Arg>
 	st_connector_base(boost::asio::io_service& io_service_, Arg& arg);
 ssl使用。
 
 public:
 	virtual void reset();
-重置所有，st_object_pool在重用时会调用。重写它以重置子类的状态，记得最后需要调用父类的同名函数。
+重置所有，st_object_pool在重用时会调用。st_connector的子类可重写它以重置自己的状态，记得最后需要调用本类的reset。
 
 	void set_server_addr(unsigned short port, const std::string& ip);
-设置服务端地址用于连接之用。
+设置服务端地址用于连接之用，需要在do_start之前被调用。
 
 #ifdef RE_CONNECT_CONTROL
 	void set_re_connect_times(size_t times);
-#endif
 当连接失败时，重试次数。
+#endif
 
 	bool is_connected() const;
 是否已经连接成功。
@@ -51,7 +54,7 @@ public:
 强制退出————调用父类的clean_up，更新自己的状态（比如已连接状态等），如果reconnect为true，则关闭之后，马上重新连接服务器。
 
 	void graceful_close(bool reconnect = false);
-优雅关闭，reconnect参数的意义同上。
+优雅关闭，重置一些自己的状态之后，调用父类的graceful_close函数，reconnect参数的意义同上。
 
 protected:
 	virtual bool do_start();
@@ -61,7 +64,7 @@ protected:
 连接成功时回调，用户重写它以得到连接成功事件。
 
 	virtual bool is_send_allowed() const;
-是否可发送数据，is_connected()加上父类的is_send_allowed()为最终的判定结果。
+是否可发送数据，is_connected加上父类的is_send_allowed为最终的判定结果。
 
 	virtual void on_unpack_error();
 解包错误，默认的行为是关闭连接，可以重写以自定义行为。
@@ -73,12 +76,13 @@ protected:
 重写st_socket的on_timer，只处理自己的定时器，其它的定时器一律调用父类同名函数。
 
 	void connect_handler(const error_code& ec);
-连接成功或者失败由asio回调。
+连接成功或者失败后由asio回调。
 
 #ifdef RE_CONNECT_CONTROL
 	bool prepare_re_connect();
+连接失败之后，调用这个函数以判断是否可以继续再次连接服务器。如果未定义RE_CONNECT_CONTROL，则不会调用，
+也没有这个函数。
 #endif
-连接失败之后，调用这个函数以判断是否可以继续再次连接服务器。
 
 protected:
 	boost::asio::ip::tcp::endpoint server_addr;
@@ -92,10 +96,7 @@ protected:
 	size_t re_connect_times;
 重连接次数，达到该次数时如果还未连接成功，将放弃重连接；注意需要开启RE_CONNECT_CONTROL才有此功能。
 #endif
-
-	boost::asio::ip::tcp::resolver::iterator server_addr_iter;
 };
 typedef st_connector_base<> st_connector;
 
 } //namespace
-

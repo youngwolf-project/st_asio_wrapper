@@ -46,7 +46,7 @@ public:
 		void id(int id) {id_ = id;}
 		int id() const {return id_;}
 		void user_data(void* data_) {data = data_;}
-		void* user_data() {return data;}
+		void* user_data() const {return data;}
 
 		st_service_pump& get_service_pump() {return service_pump;}
 		const st_service_pump& get_service_pump() const {return service_pump;}

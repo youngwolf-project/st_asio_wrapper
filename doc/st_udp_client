@@ -1,4 +1,4 @@
-
+﻿
 namespace st_asio_wrapper
 {
 
@@ -7,19 +7,21 @@ typedef st_sclient<st_udp_socket> st_udp_sclient;
 
 支持多个套接字的udp客户端
 template<typename Socket = st_udp_socket, typename Pool = st_object_pool<Socket>>
-class st_udp_client_base : public st_client<Socke, Poolt>
+class st_udp_client_base : public st_client<Socke, Pool>
 {
 public:
 	st_udp_client_base(st_service_pump& service_pump_);
 
-	typename st_client<Socket, Pool>::object_type add_client(unsigned short port, const std::string& ip = std::string());
-创建一个对象，设置本地地址，并添加到对象池。
+	using st_client<Socket, Pool>::add_client;
+
+	typename Pool::object_type add_client(unsigned short port, const std::string& ip = std::string());
+创建或者重用一个对象，然后以reset为true调用父类的add_client。
 
 protected:
 	virtual void uninit();
-实现i_service的纯虚接口，由st_service_pump调用。
+实现i_service的纯虚接口，由st_service_pump调用（stop_service时调用），跟st_sclient::uninit功能一样，只是对所有
+客户端都做一个“结束”操作。
 };
 typedef st_udp_client_base<> st_udp_client;
 
 } //namespace
-

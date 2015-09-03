@@ -1,29 +1,27 @@
+﻿#ifndef DEFAULT_PACKER
+
+#define DEFAULT_PACKER packer
+
+#endif
+默认的打包器，也可以通过模板参数控制，提供这个宏可以让使用者省略相应的模板参数。
 
 namespace st_asio_wrapper
 {
 
-enum BufferType {POST_BUFFER, SEND_BUFFER, RECV_BUFFER};
-缓存类型，其中POST_BUFFER缓存是在调用post_msg或者post_native_msg时，如果can_overflow为false且发送缓存不可用，会把消息暂停放入
-POST_BUFFER缓存，并暂停消息派发，直到所有消息从POST_BUFFER缓存存入发送缓存之后，才继续派发消息。这样做的目的是防止在on_msg或者
-on_msg_handle里面发送消息时，可能出现的发送缓存溢出和死锁问题（死锁问题出现在使用者不想发送缓存溢出而使用safe_send_msg的情况下）。
+template<typename Socket, typename Packer, typename Unpacker, typename InMsgType = typename Packer::msg_type, typename OutMsgType = typename Unpacker::msg_type>
 
-#define post_msg_buffer msg_buffer[0]
-#define post_msg_buffer_mutex msg_buffer_mutex[0]
-#define send_msg_buffer msg_buffer[1]
-#define send_msg_buffer_mutex msg_buffer_mutex[1]
-#define recv_msg_buffer msg_buffer[2]
-#define recv_msg_buffer_mutex msg_buffer_mutex[2]
-#define temp_msg_buffer msg_buffer[3]
-
-套接字类，st_tcp_socket和st_udp_socket的公共基类（具体是tcp还是upd根据模板参数Socket而定），主要实现消息派发暂停等功能
-template<typename MsgType, typename Socket, typename MsgDataType = MsgType, typename Packer>
 class st_socket: public st_timer
+
 {
-public:
-	typedef boost::container::list<MsgType> container_type;
+public:
+
+	typedef boost::container::list<InMsgType> in_container_type;
+
+	typedef typename Unpacker::container_type out_container_type;
 
 protected:
 	st_socket(boost::asio::io_service& io_service_);
+
 	template<typename Arg>
 	st_socket(boost::asio::io_service& io_service_, Arg& arg);
 ssl使用。
@@ -35,27 +33,39 @@ ssl使用。
 清空所有buffer。
 
 public:
+	void id(uint_fast64_t id) {_id = id;}
+
+	uint_fast64_t id() const {return _id;}
+id的设置与获取，注意使用者不可设置id，只有st_socket的创建者（st_object_pool或者其继承者）才可设置id，
+除非这个st_socket没有被任何对象池管理。
+
 	Socket& next_layer();
 	const Socket& next_layer() const;
 	typename Socket::lowest_layer_type& lowest_layer();
 	const typename Socket::lowest_layer_type& lowest_layer() const;
+底层对象，它应该是一个boost::asio::ip::tcp::socket，boost::asio::ip::udp::socket或者
+boost::asio::ssl::stream<boost::asio::ip::tcp::socket>对象及其从它们继承的对象。
+最底层对象其实就是调用底层对象的lowest_layer()，我们真正要读写的其实就是最底层对象。
 
 #ifdef REUSE_OBJECT
 	virtual bool reusable();
+对象是否可以被重用，对象池在重用之前，会调用这个函数来看看能否被重用。
 #endif
 
 	bool started() const;
 是否已经开始，已经开始意思是已经调用过start()了，多次调用start()会有严重的包乱顺问题，好在我在某个版本
 增加了防止多次调用start()的功能，之前靠用户保证，现在st_asio_wrapper库可以保证，即使用户多次调用也没问题。
 
+	boos started() const;
+是否已经调用过下面的start函数，多次调用start是没有意义的，只有第一次调用有效。
+
 	void start();
-开始，开始的意思根据协议的不同而意义不同，如果是st_connector，则开始意味着开始连接服务器，对于st_udp_socket，开始意味着
-马上就可以开始接收数据了；这种方式的原理就是用虚函数do_start()来实现，具体请看st_connector和st_udp_socket。
+开始，开始的动作由子类实现，本函数只是简单的判断start是否已经被调用过了，如果没有，则调用do_start函数（纯虚）。
 
 	bool send_msg();
 发送缓存里面的消息，如果当前已经在发送消息了，则调用本函数无任何作用。
-st_asio_wrapper里面有消息发送缓存，当连接未建立的时候，用户仍然可以发送消息，这些消息会缓存起来，当连接建立之后，
-st_asio_wrapper会自动开始真正的发送消息，这个功能就是调用这个函数实现的。
+st_socket内部有消息发送缓存，当连接未建立的时候，用户仍然可以发送消息（注意缓存满问题），这些消息会缓存起来，
+当连接建立之后，会自动开始真正的发送消息，这个功能就是调用这个函数实现的。
 
 	void suspend_send_msg(bool suspend);
 	bool suspend_send_msg() const;
@@ -69,110 +79,146 @@ post_msg不受这个属性的影响，所以post_msg一定只能在on_msg和on_m
 暂停／恢复消息派发，这里的消息派发，是指当st_socket收到消息的时候，调用on_msg或者on_msg_handle，这个功能有什么用呢？
 当你在处理一个耗时消息时，不管你是在on_msg还是on_msg_handle里面处理，处理过程中，都将消耗掉一个service线程，那么必将对自己和
 其它st_socket的数据收发造成一定的影响（当所有service线程耗尽时，就不是一定的影响了，而是所有的st_socket在这期间都将无法发送和
-接收数据了），为了解决这个问题，你可以开启一个线程来做这个耗时业务，但记得在启动线程之前，先暂停消息派发，线程结束之前，再恢复
-消息派发，这样就不会消息乱序，否则由于你开启线程之后，马上退出了on_msg或者on_msg_handle，那么下一条消息（如果有的话）将马上被
+接收数据），为了解决这个问题，你可以开启一个线程来做这个耗时业务，但记得在启动线程之前，先暂停消息派发，线程结束之前，再恢复
+消息派发，这样消息就不会乱序，否则由于你开启线程之后，马上退出了on_msg或者on_msg_handle，那么下一条消息（如果有的话）将马上被
 派发，这样就出现了乱序问题（前一条消息还未处理完，后一条消息就被派发了）。
 
-	boost::shared_ptr<i_packer<MsgDataType>> inner_packer() const;
-	void inner_packer(const boost::shared_ptr<i_packer<MsgDataType>>& _packer_);
+	boost::shared_ptr<i_packer<typename Packer::msg_type>> inner_packer();
+	boost::shared_ptr<const i_packer<typename Packer::msg_type>> inner_packer() const;
+
+	void inner_packer(const boost::shared_ptr<i_packer<typename Packer::msg_type>>& _packer_);
 获取／修改打包器。
+注意，运行时修改打包器是非线程安全的，它会与消息发送冲突，由于消息发送和打包器修改都是使用者触发的，所以如果有资源竞争，使用者
+有义务解决冲突问题。不支持多线程一是为了效率，二是这个功能用得很少。
 
 	bool is_send_buffer_available();
 判断消息发送缓存是否可用，即里面的消息数量是否小于MAX_MSG_NUM条，如果以can_overflow为true调用任何消息发送函数（如send_msg），
 将马上成功而无论消息发送缓存是否可用，所以可能会造成消息发送缓存大小不可控。
 
-	bool direct_send_msg(const MsgType& msg, bool can_overflow = false);
-	bool direct_send_msg(MsgType&& msg, bool can_overflow = false);
-直接发送消息（放入消息发送缓存）而不再调用i_packer::pack_msg函数，其实st_asio_wrapper内部也是调用这个函数，只是在调用之前
-先调用了i_packer::pack_msg而已。
+	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false);
+	bool direct_send_msg(InMsgType&& msg, bool can_overflow = false);
+直接发送消息（放入消息发送缓存）而不再调用i_packer::pack_msg函数，其实st_socket内部在发送消息时也是调用这个函数，只是在调用
+之前先调用了i_packer::pack_msg而已。
 
-	bool direct_post_msg(const MsgType& msg, bool can_overflow = false);
-	bool direct_post_msg(MsgType&& msg, bool can_overflow = false);
+	bool direct_post_msg(const InMsgType& msg, bool can_overflow = false);
+	bool direct_post_msg(InMsgType&& msg, bool can_overflow = false);
 同上，它们之前的区别就是send_msg和post_msg之间的区别。
 	
-	size_t get_pending_msg_num(BufferType buffer_type = SEND_BUFFER);
-获取缓存里面的消息数量，其中，POST_BUFFER和SEND_BUFFER缓存是发送缓存，所以里面的消息是打包过的；RECV_BUFFER是消息接收缓存，
-所以是解包过后的，下同。
+	size_t get_pending_post_msg_num();
+	size_t get_pending_send_msg_num();
+	size_t get_pending_recv_msg_num();
+获取缓存里面的消息数量，其中post和send缓存里面的消息是打包过的；recv缓存里面的消息是解包过后的，下同。
 
-	void peek_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER);
-偷看一下缓存中第一个包，如果得到一个空包，则说明缓存里面没有消息。
+	void peek_first_pending_post_msg(InMsgType& msg);
+	void peek_first_pending_send_msg(InMsgType& msg);
+	void peek_first_pending_recv_msg(OutMsgType& msg);
+偷看一下缓存中第一个包，如果得到一个空包（msg.empty()等于true），则说明缓存里面没有消息。
 
-	void pop_first_pending_msg(MsgType& msg, BufferType buffer_type = SEND_BUFFER);
-弹出缓存中第一个包，如果得到一个空包，则说明缓存里面没有消息。
+	void pop_first_pending_post_msg(InMsgType& msg);
+	void pop_first_pending_send_msg(InMsgType& msg);
+	void pop_first_pending_recv_msg(OutMsgType& msg);
+弹出缓存中第一个包，如果得到一个空包（msg.empty()等于true），则说明缓存里面没有消息。
 
-	void pop_all_pending_msg(container::list<MsgType>& msg_list, BufferType buffer_type = SEND_BUFFER);
+	void pop_all_pending_post_msg(in_container_type& msg_list);
+	void pop_all_pending_send_msg(in_container_type& msg_list);
+	void pop_all_pending_recv_msg(out_container_type& msg_list);
 弹出缓存中所有包，相当于清空了缓存。
 
 protected:
 	virtual bool do_start() = 0;
-子类重写，开始的概念在tcp和udp之下不一样，请看st_connector和st_udp_socket的实现。
+子类重写，请看st_server_socket、st_connector、st_udp_socket和st_ssl_connector的实现。
 
 	virtual bool do_send_msg() = 0;
-真正的消息发送（调用asio函数），具体怎么发请看st_connector和st_udp_socket的实现。
+真正的消息发送（调用asio函数），具体怎么发请看st_tcp_socket和st_udp_socket的实现。
 
 	virtual bool is_send_allowed() const;
 是否允许发送消息，对于st_socket来说，只要未暂停消息发送，就是允许消息发送，子类重写这个函数实现自己的判断逻辑，然后加上
-st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_socket, st_connector和st_udp_socket的实现。
+st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_socket、st_connector和st_udp_socket的实现。
 
 	virtual void on_send_error(const error_code& ec);
-发送失败时回调。
+	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
+发送接收失败时回调，对于st_tcp_socket，如果需要连接断开事件，建议重写on_recv_error。
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	virtual bool on_msg(MsgType& msg) = 0;
+	virtual bool on_msg(OutMsgType& msg) = 0;
 收到一条消息时回调，返回true表示消息被成功处理，返回false表示消息无法立即处理，于是进入接收缓存，通过on_msg_handle再次派发。
 #endif
 
-	virtual bool on_msg_handle(MsgType& msg, bool link_down) = 0;
-从接收缓存派发一条消息，返回true表示消息被成功处理，返回false表示消息无法立即处理，于是将暂停一小段时间之后继续重试（异步地）；
-如果link_down，则无论返回true还是false，都将当成消息已经处理，将继续派发下一条消息（同步地），在连接断开时，会值link_down为真，
+	virtual bool on_msg_handle(OutMsgType& msg, bool link_down) = 0;
+从接收缓存派发一条消息，返回true表示消息被成功处理，返回false表示消息无法立即处理，于是将暂停一小段时间之后继续重试（异步）；
+如果link_down，则无论返回true还是false，都将当成消息已经处理，将继续派发下一条消息（同步地），在连接断开时，会置link_down为真，
 此时需要尽快的派发完所有剩余的消息。
 
 #ifdef WANT_MSG_SEND_NOTIFY
-	virtual void on_msg_send(MsgType& msg);
+	virtual void on_msg_send(InMsgType& msg);
 成功发送（消息写入底层socket缓存）一个消息之后回调，消息是打包过后的。
 #endif
 
 #ifdef WANT_ALL_MSG_SEND_NOTIFY
-	virtual void on_all_msg_send(MsgType& msg);
-当发送缓存由有消息变为空的时候回调，消息是打包过后的。
+	virtual void on_all_msg_send(InMsgType& msg);
+当发送缓存由非空变为空的时候回调，消息是打包过后的。
 #endif
 
 	virtual bool on_timer(unsigned char id, const void* user_data);
-重写st_timer的on_timer。
+重写st_timer的on_timer，以处理属于st_socket的定义器，每个类的保留定时器的范围请看st_timer，用户只能使用保留定时器以外的定时器，
+子类如果重写了on_timer，记得把不属于自己的定时器全部抛给父类处理。
 
 	void dispatch_msg();
 派发消息，它要么直接调用on_msg，要么把消息放入消息接收缓存，最后调用do_dispatch_msg，如果消息处理完毕（调用on_msg）
-或者都放入了消息接收缓存，则调用do_start以继承接收数据。
+或者都放入了消息接收缓存，则调用do_start以继续接收数据。
 
 	void msg_handler();
-回调on_msg_handle，然后调用do_dispatch_msg继承派发消息。
+异步派发接收缓存里面的消息时，asio调用本函数，在这个函数里面将调用on_msg_handle，然后调用do_dispatch_msg继承派发消息。
 
 	void do_dispatch_msg(bool need_lock);
-调用io_service::post派发一条消息，派发成功后回调msg_handler
+调用io_service::post发出一个异步调用，调度到时回调msg_handler。
 
-	bool do_direct_send_msg(MsgType&& msg);
-	bool do_direct_post_msg(MsgType&& msg);
-把消息直接放入消息发送缓存，在direct_send_msg和direct_post_msg中调用。
+	bool do_direct_send_msg(InMsgType&& msg);
+	bool do_direct_post_msg(InMsgType&& msg);
+把消息直接放入消息发送缓存，在direct_send_msg和direct_post_msg中有调用。
 
 protected:
+	uint_fast64_t _id;
+保存在对象池中时，作为key，所以必须唯一，对象池用hash作为容器以快速查找。
 	Socket next_layer_;
+前面在next_layer里面解释过了。
 
-	MsgType last_send_msg, last_dispatch_msg;
+	InMsgType last_send_msg;
+	OutMsgType last_dispatch_msg;
 由于是异步发送和派发消息，这两个成员变量保证其在异步处理过程中的有效性。
 	boost::shared_ptr<i_packer<MsgDataType>> packer_;
 打包器。
 
-	container_type msg_buffer[4];
-	boost::mutex msg_buffer_mutex[3];
-缓存，最后一个缓存叫temp_msg_buffer，内部使用。
+	in_container_type post_msg_buffer, send_msg_buffer;
+
+	out_container_type recv_msg_buffer, temp_msg_buffer;
+
+	boost::shared_mutex post_msg_buffer_mutex, send_msg_buffer_mutex;
+
+	boost::shared_mutex recv_msg_buffer_mutex;
+缓存及操作它们时需要的互斥体，访问temp_msg_buffer无需互斥，它只能在内部访问，作用是当收到消息之后，发现需要存入接收缓存
+（on_msg返回false），但接收缓存已满，那么多余的消息将被存放于temp_msg_buffer，并且不再继续接收消息，直到temp_msg_buffer
+里面的消息全部被处理掉，或者移到了recv_msg_buffer，st_socket会周期性的做以上尝试。
+post_msg_buffer和send_msg_buffer里面存放的都是待发送的消息，通过send_msg发送的消息，只会进入send_msg_buffer，通过post_msg
+发送的消息，如果发送缓存足够的话，会进入send_msg_buffer，如果不够的话，则会进入post_msg_buffer，当post_msg_buffer非空时，
+st_tcp_socket或者st_udp_socket将暂停接收消息，直到post_msg_buffer里面的消息全部被移入send_msg_buffer，这样设计有什么用呢？
+考虑如下情况，你需要发送一个消息，但不想发送缓存溢出，也不想等待直到发送缓存可用，你会怎么做？你不得不把这个消息暂存起来，
+然后立即退出on_msg或者on_msg_handle，然后开个定时器周期性的尝试发送暂存的消息。由于你在第一个消息产生的结果还没有送入发送
+缓存就退出了on_msg或者on_msg_handle，那么第二个消息会接着被派发，第二个消息产生的结果你也必须暂存起来，那么你是不是需要
+一个链表来暂存这些还未送入发送缓存的消息呢？这个链表就是post_msg_buffer。st_socket通过post_msg_buffer和post_msg为你做了上面
+的工作，你只需要把send_msg改为调用post_msg即可，这个调用既不会失败，也不会阻塞线程，还不会让发送缓存失控。
+post_msg_buffer不做大小限制，那为什么不会让发送缓存失控呢？这个我在教程里面强调过，post_msg只能在on_msg或者on_msg_handle
+里面调用，如果消息进入了post_msg_buffer，消息派发将被暂停（最终将导致接受缓存满，进而暂停消息接收），那么on_msg或者
+on_msg_handle将不再被调用，所以最终post_msg_buffer将会被消化（移至send_msg_buffer），st_socket将会周期性的尝试消化
+post_msg_buffer中的消息。
 
 	bool posting;
 	bool sending, suspend_send_msg_;
 	bool dispatching, suspend_dispatch_msg_;
-内部使用的一些状态。
+内部使用的一些状态，看名字应该能猜到其意思。
 
 	bool started_;
-	boost::mutex start_mutex;
+	boost::shared_mutex start_mutex;
 是否已经开始，开始的概念由子类具体实现，st_socket只是记录是否已经调用过start函数而已。
 };
 
