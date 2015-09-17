@@ -13,7 +13,7 @@ using namespace st_asio_wrapper;
 
 #define ORDER_LEN	sizeof(char)
 #define OFFSET_LEN	sizeof(__off64_t)
-#define DATA_LEN	sizeof(__off64_t)
+#define DATA_LEN	OFFSET_LEN
 
 #if defined(_WIN64) || 64 == __WORDSIZE
 #define __off64_t_format "%ld"

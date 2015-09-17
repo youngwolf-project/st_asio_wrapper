@@ -72,7 +72,7 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 			}
 			else
 			{
-				*(__off64_t*) boost::next(buffer, ORDER_LEN) = -1;
+				memset(boost::next(buffer, ORDER_LEN), -1, DATA_LEN);
 				printf("can't not open file %s!\n", boost::next(msg.data(), ORDER_LEN));
 			}
 
@@ -82,8 +82,10 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 	case 1:
 		if (TRANS_PREPARE == state && NULL != file && ORDER_LEN + OFFSET_LEN + DATA_LEN == msg.size())
 		{
-			__off64_t offset = *(__off64_t*) boost::next(msg.data(), ORDER_LEN);
-			__off64_t length = *(__off64_t*) boost::next(msg.data(), ORDER_LEN + OFFSET_LEN);
+			__off64_t offset;
+			memcpy(&offset, boost::next(msg.data(), ORDER_LEN), OFFSET_LEN);
+			__off64_t length;
+			memcpy(&length, boost::next(msg.data(), ORDER_LEN + OFFSET_LEN), DATA_LEN);
 			if (offset >= 0 && length > 0 && offset + length <= ftello64(file))
 			{
 				state = TRANS_BUSY;

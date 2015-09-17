@@ -85,7 +85,7 @@ private:
 	void handle_msg(out_msg_ctype& msg)
 	{
 		recv_bytes += msg.size();
-		if (check_msg && (msg.size() < sizeof(size_t) || recv_index != *(size_t*) msg.data()))
+		if (check_msg && (msg.size() < sizeof(size_t) || 0 != memcmp(&recv_index, msg.data(), sizeof(size_t))))
 			printf("check msg error: " size_t_format ".\n", recv_index);
 		++recv_index;
 	}

@@ -107,7 +107,8 @@ private:
 		case 0:
 			if (ORDER_LEN + DATA_LEN == msg.size() && nullptr != file && TRANS_PREPARE == state)
 			{
-				auto length = *(__off64_t*) std::next(msg.data(), ORDER_LEN);
+				__off64_t length;
+				memcpy(&length, std::next(msg.data(), ORDER_LEN), DATA_LEN);
 				if (-1 == length)
 				{
 					if (0 == index)
@@ -128,8 +129,8 @@ private:
 					{
 						char buffer[ORDER_LEN + OFFSET_LEN + DATA_LEN];
 						*buffer = 1; //head
-						*(__off64_t*) std::next(buffer, ORDER_LEN) = offset;
-						*(__off64_t*) std::next(buffer, ORDER_LEN + OFFSET_LEN) = my_length;
+						memcpy(std::next(buffer, ORDER_LEN), &offset, OFFSET_LEN);
+						memcpy(std::next(buffer, ORDER_LEN + OFFSET_LEN), &my_length, DATA_LEN);
 
 						state = TRANS_BUSY;
 						send_msg(buffer, sizeof(buffer), true);
