@@ -144,7 +144,7 @@ protected:
 
 	virtual void start_next_accept()
 	{
-		BOOST_TYPEOF(ST_THIS create_object()) client_ptr = ST_THIS create_object(boost::ref(*this));
+		typename Pool::object_type client_ptr = ST_THIS create_object(boost::ref(*this));
 		ST_THIS acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_ssl_server_base::accept_handler, this, boost::asio::placeholders::error, client_ptr));
 	}
 

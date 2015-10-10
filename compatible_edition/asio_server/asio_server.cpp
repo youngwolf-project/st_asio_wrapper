@@ -49,10 +49,11 @@ public:
 	virtual void test() = 0;
 };
 
-class echo_socket : public st_server_socket_base<DEFAULT_PACKER, DEFAULT_UNPACKER, i_echo_server>
+typedef st_server_socket_base<DEFAULT_PACKER, DEFAULT_UNPACKER, i_echo_server> echo_socket_base;
+class echo_socket : public echo_socket_base
 {
 public:
-	echo_socket(i_echo_server& server_) : st_server_socket_base(server_)
+	echo_socket(i_echo_server& server_) : echo_socket_base(server_)
 	{
 		inner_packer(global_packer);
 
@@ -68,7 +69,7 @@ public:
 	//because we use objects pool(REUSE_OBJECT been defined), so, strictly speaking, this virtual
 	//function must be rewrote, but we don't have member variables to initialize but invoke father's
 	//reset() directly, so, it can be omitted, but we keep it for possibly future using
-	virtual void reset() {st_server_socket_base::reset();}
+	virtual void reset() {echo_socket_base::reset();}
 
 protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
@@ -76,7 +77,7 @@ protected:
 		//the type of st_server_socket_base::server now can be controlled by derived class(echo_socket),
 		//which is actually i_echo_server, so, we can invoke i_echo_server::test virtual function.
 		server.test();
-		st_server_socket_base::on_recv_error(ec);
+		echo_socket_base::on_recv_error(ec);
 	}
 
 	//msg handling: send the original msg back(echo server)
@@ -107,10 +108,11 @@ protected:
 	//msg handling end
 };
 
-class echo_server : public st_server_base<echo_socket, st_object_pool<echo_socket>, i_echo_server>
+typedef st_server_base<echo_socket, st_object_pool<echo_socket>, i_echo_server> echo_server_base;
+class echo_server : public echo_server_base
 {
 public:
-	echo_server(st_service_pump& service_pump_) : st_server_base(service_pump_) {}
+	echo_server(st_service_pump& service_pump_) : echo_server_base(service_pump_) {}
 
 	//from i_echo_server, pure virtual function, we must implement it.
 	virtual void test() {/*puts("in echo_server::test()");*/}

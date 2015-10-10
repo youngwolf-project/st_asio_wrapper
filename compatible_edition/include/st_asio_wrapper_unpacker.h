@@ -192,9 +192,9 @@ class replaceable_unpacker : public i_unpacker<replaceable_buffer>, public unpac
 {
 public:
 	//overwrite the following three typedef defined by unpacker
-	using i_unpacker<replaceable_buffer>::msg_type;
-	using i_unpacker<replaceable_buffer>::msg_ctype;
-	using i_unpacker<replaceable_buffer>::container_type;
+	typedef i_unpacker<replaceable_buffer>::msg_type msg_type;
+	typedef i_unpacker<replaceable_buffer>::msg_ctype msg_ctype;
+	typedef i_unpacker<replaceable_buffer>::container_type container_type;
 
 public:
 	virtual void reset_state() {unpacker::reset_state();}
