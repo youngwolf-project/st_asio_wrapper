@@ -91,7 +91,7 @@ protected:
 			return;
 		}
 
-		auto loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
+		ssize_t loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
 		if (sync)
 		{
 			while (--loop_num >= 0 && is_closing())
@@ -143,7 +143,7 @@ protected:
 		case 9:
 			if (is_closing())
 			{
-				auto loop_num = reinterpret_cast<int>(user_data);
+				auto loop_num = reinterpret_cast<ssize_t>(user_data);
 				--loop_num;
 
 				if (loop_num > 0)
