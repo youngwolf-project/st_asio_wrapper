@@ -69,10 +69,7 @@ public:
 	{
 		auto raw_client_ptr(boost::dynamic_pointer_cast<Socket>(client_ptr));
 		if (ST_THIS del_object(raw_client_ptr))
-		{
-			raw_client_ptr->show_info("client:", "quit.");
 			raw_client_ptr->force_close();
-		}
 	}
 
 	void close_all_client()
@@ -80,7 +77,6 @@ public:
 		//do not use graceful_close() as client does, because in this function, object_can_mutex has been locked, graceful_close will wait until on_recv_error() been invoked,
 		//but in on_recv_error(), we need to lock object_can_mutex too(in del_object()), this will cause dead lock
 		ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {
-			item->show_info("client:", "been closed.");
 			item->force_close();
 		});
 	}

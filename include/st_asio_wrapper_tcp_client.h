@@ -66,6 +66,12 @@ public:
 
 protected:
 	virtual void uninit() {ST_THIS stop(); ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->graceful_close();});}
+
+public:
+	void disconnect(typename Pool::object_ctype& client_ptr, bool reconnect = false) {if (!reconnect) ST_THIS del_object(client_ptr); client_ptr->disconnect(reconnect);}
+	void force_close(typename Pool::object_ctype& client_ptr, bool reconnect = false) {if (!reconnect) ST_THIS del_object(client_ptr); client_ptr->force_close(reconnect);}
+	void graceful_close(typename Pool::object_ctype& client_ptr, bool reconnect = false, bool sync = true)
+		{if (!reconnect) ST_THIS del_object(client_ptr); client_ptr->graceful_close(reconnect, sync);}
 };
 typedef st_tcp_client_base<> st_tcp_client;
 

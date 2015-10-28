@@ -112,17 +112,23 @@ public:
 
 	void close_some_client(size_t n)
 	{
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
 		//method #1
-//		do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(), false : true;});
-		//notice: this method need to define AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL macro, because it just closed the st_socket,
-		//not really removed them from object pool, this will cause test_client still send data via them, and wait responses from them.
-		//for this scenario, the smaller CLEAR_CLOSED_SOCKET_INTERVAL is, the better experience you will get, so set it to 1 second.
-
+		do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(), false : true;});
+		//notice: this method need to define AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL macro, because it just close the st_socket,
+		//not really remove them from object pool, this will cause test_client still send data via them, and wait responses from them.
+		//for this scenario, the smaller CLEAR_CLOSED_SOCKET_INTERVAL macro is, the better experience you will get, so set it to 1 second.
+#else
 		//method #2
 		while (n-- > 0)
 			graceful_close(at(0));
 		//notice: this method directly remove clients from object pool, and close them, not require AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL macro
 		//this is a equivalence of calling i_server::del_client in st_server_socket_base::on_recv_error(see st_server_socket_base for more details).
+
+		//if you just want to reconnect to the server, you should do it like this:
+//		while (n-- > 0)
+//			graceful_close(at(n), true, false); //if parameter 'reconnect' is true, st_tcp_client will not remove clients from object pool
+#endif
 	}
 
 	///////////////////////////////////////////////////
@@ -137,7 +143,7 @@ public:
 int main(int argc, const char* argv[])
 {
 	///////////////////////////////////////////////////////////
-	printf("usage: test_client [<port=%d> [<ip=%s> [link num=1]]]\n", SERVER_PORT, SERVER_IP);
+	printf("usage: test_client [<port=%d> [<ip=%s> [link num=16]]]\n", SERVER_PORT, SERVER_IP);
 
 	size_t link_num = 16;
 	if (argc > 3)
@@ -198,19 +204,21 @@ int main(int argc, const char* argv[])
 				{
 					if (n > client.size())
 						n = client.size();
-					link_num -= n;
 
 					client.close_some_client(n);
+					link_num = client.size();
 				}
 
 				continue;
 			}
 
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
 			if (client.size() != link_num)
 			{
-				puts("some closed links have not been cleared, did you defined AUTO_CLEAR_CLOSED_SOCKET macro?");
+				puts("some closed links have not been cleared, please define CLEAR_CLOSED_SOCKET_INTERVAL macro as 1 to speed up the auto cleaning, or wait for more time");
 				continue;
 			}
+#endif
 
 			size_t msg_num = 1024;
 			size_t msg_len = 1024; //must greater than or equal to sizeof(size_t)

@@ -51,32 +51,13 @@ public:
 	{
 		unpacker_->reset_state();
 		st_socket<Socket, Packer, Unpacker>::reset_state();
-		closing = false;
+		close_state = 0;
 	}
 
-	void disconnect() {force_close();}
-	void force_close() {clean_up();}
-	void graceful_close() //will block until closing success or time out
-	{
-		closing = true;
-
-		boost::system::error_code ec;
-		ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
-		if (ec) //graceful disconnecting is impossible
-			clean_up();
-		else
-		{
-			int loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
-			while (--loop_num >= 0 && closing)
-				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
-			if (loop_num < 0) //graceful disconnecting is impossible
-				clean_up();
-		}
-	}
-	bool is_closing() const {return closing;}
+	bool is_closing() const {return 0 != close_state;}
 
 	//get or change the unpacker at runtime
-	//changing unpacker at runtime is no thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
+	//changing unpacker at runtime is not thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
 	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
 	boost::shared_ptr<i_unpacker<out_msg_type> > inner_unpacker() {return unpacker_;}
 	boost::shared_ptr<const i_unpacker<out_msg_type> > inner_unpacker() const {return unpacker_;}
@@ -97,15 +78,34 @@ public:
 	//msg sending interface
 	///////////////////////////////////////////////////
 
-	void show_info(const char* head, const char* tail)
+protected:
+	void disconnect() {force_close();}
+	void force_close() {clean_up();}
+	void graceful_close(bool sync = true) //will block until closing success or time out if sync equal to true
 	{
 		boost::system::error_code ec;
-		BOOST_AUTO(ep, ST_THIS lowest_layer().remote_endpoint(ec));
-		if (!ec)
-			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
+		ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+		if (ec) //graceful closing is impossible
+		{
+			clean_up();
+			return;
+		}
+
+		int loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
+		if (sync)
+		{
+			while (--loop_num >= 0 && is_closing())
+				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
+			if (loop_num < 0) //graceful closing is impossible
+			{
+				unified_out::info_out("failed to graceful close within %d seconds", GRACEFUL_CLOSE_MAX_DURATION);
+				clean_up();
+			}
+		}
+		else
+			ST_THIS set_timer(9, 10, reinterpret_cast<const void*>(loop_num));
 	}
 
-protected:
 	//must mutex send_msg_buffer before invoke this function
 	virtual bool do_send_msg()
 	{
@@ -135,6 +135,36 @@ protected:
 #endif
 
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
+
+	virtual bool on_timer(unsigned char id, const void* user_data)
+	{
+		switch (id)
+		{
+		case 9:
+			if (is_closing())
+			{
+				int loop_num = reinterpret_cast<int>(user_data);
+				--loop_num;
+
+				if (loop_num > 0)
+				{
+					ST_THIS update_timer_info(9, 10, reinterpret_cast<const void*>(loop_num));
+					return true;
+				}
+				else
+				{
+					unified_out::info_out("failed to graceful close within %d seconds", GRACEFUL_CLOSE_MAX_DURATION);
+					clean_up();
+				}
+			}
+			break;
+		default:
+			return st_socket<Socket, Packer, Unpacker>::on_timer(id, user_data);
+			break;
+		}
+
+		return false;
+	}
 
 	//start the asynchronous read
 	//it's child's responsibility to invoke this properly, because st_tcp_socket_base doesn't know any of the connection status
@@ -208,7 +238,7 @@ protected:
 
 protected:
 	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker_;
-	bool closing;
+	int close_state; //2-the first step of graceful close, 1-force close, 0-normal state
 };
 
 } //namespace st_tcp

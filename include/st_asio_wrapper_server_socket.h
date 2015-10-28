@@ -41,6 +41,46 @@ public:
 	//and then do not forget to invoke st_server_socket_base::reset() to initialize father's member variables
 	virtual void reset() {st_tcp_socket_base<Socket, Packer, Unpacker>::reset();}
 
+	void disconnect() {force_close();}
+	void force_close()
+	{
+		if (!ST_THIS is_closing())
+		{
+			show_info("link:", "been closed.");
+			ST_THIS close_state = 1;
+		}
+		else if (1 == ST_THIS close_state)
+			return;
+
+		st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();
+	}
+
+	void graceful_close()
+	{
+		if (ST_THIS is_closing())
+			return;
+
+		show_info("link:", "been closing gracefully.");
+		ST_THIS close_state = 2;
+		st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close();
+	}
+
+	void show_info(const char* head, const char* tail) const
+	{
+		boost::system::error_code ec;
+		auto ep = ST_THIS lowest_layer().remote_endpoint(ec);
+		if (!ec)
+			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
+	}
+
+	void show_info(const char* head, const char* tail, const boost::system::error_code& ec) const
+	{
+		boost::system::error_code ec2;
+		auto ep = ST_THIS lowest_layer().remote_endpoint(ec2);
+		if (!ec2)
+			unified_out::info_out("%s %s:%hu %s (%d %s)", head, ep.address().to_string().c_str(), ep.port(), tail, ec.value(), ec.message().data());
+	}
+
 protected:
 	virtual bool do_start()
 	{
@@ -57,12 +97,15 @@ protected:
 	//do not forget to force_close this socket(in del_client(), there's a force_close() invocation)
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
+		ST_THIS show_info("link:", "broken/closed", ec);
+
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
-		ST_THIS show_info("client:", "quit.");
 		ST_THIS force_close();
 #else
 		server.del_client(boost::dynamic_pointer_cast<st_timer>(ST_THIS shared_from_this()));
 #endif
+
+		ST_THIS close_state = 0;
 	}
 
 protected:

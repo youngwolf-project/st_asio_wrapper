@@ -90,7 +90,7 @@ public:
 	void graceful_close() {clean_up();}
 
 	//get or change the unpacker at runtime
-	//changing unpacker at runtime is no thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
+	//changing unpacker at runtime is not thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
 	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
 	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>> inner_unpacker() {return unpacker_;}
 	boost::shared_ptr<const i_udp_unpacker<typename Packer::msg_type>> inner_unpacker() const {return unpacker_;}
@@ -111,13 +111,7 @@ public:
 	//msg sending interface
 	///////////////////////////////////////////////////
 
-	void show_info(const char* head, const char* tail)
-	{
-		boost::system::error_code ec;
-		auto ep = ST_THIS lowest_layer().local_endpoint(ec);
-		if (!ec)
-			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
-	}
+	void show_info(const char* head, const char* tail) const {unified_out::info_out("%s %s:%hu %s", head, local_addr.address().to_string().c_str(), local_addr.port(), tail);}
 
 protected:
 	virtual bool do_start()
@@ -156,7 +150,7 @@ protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 		if (boost::asio::error::operation_aborted != ec)
-			unified_out::error_out("recv msg error: %d %s", ec.value(), ec.message().data());
+			unified_out::error_out("recv msg error (%d %s)", ec.value(), ec.message().data());
 	}
 
 #ifndef FORCE_TO_USE_MSG_RECV_BUFFER

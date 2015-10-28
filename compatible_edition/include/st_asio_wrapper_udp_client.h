@@ -37,6 +37,11 @@ public:
 
 protected:
 	virtual void uninit() {ST_THIS stop(); ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_close));}
+
+public:
+	void disconnect(typename Pool::object_ctype& client_ptr) {if (ST_THIS del_object(client_ptr)) client_ptr->disconnect();}
+	void force_close(typename Pool::object_ctype& client_ptr) {if (ST_THIS del_object(client_ptr)) client_ptr->force_close();}
+	void graceful_close(typename Pool::object_ctype& client_ptr) {if (ST_THIS del_object(client_ptr)) client_ptr->graceful_close();}
 };
 typedef st_udp_client_base<> st_udp_client;
 

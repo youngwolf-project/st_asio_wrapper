@@ -102,7 +102,7 @@ public:
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
 
 	//get or change the packer at runtime
-	//changing packer at runtime is no thread-safe, you should avoid it from sending msg or posting msg, please pay special attention
+	//changing packer at runtime is not thread-safe, please pay special attention
 	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > inner_packer() {return packer_;}
 	boost::shared_ptr<const i_packer<typename Packer::msg_type> > inner_packer() const {return packer_;}
@@ -161,7 +161,7 @@ protected:
 	virtual bool is_send_allowed() const {return !suspend_send_msg_;} //can send msg or not(just put into send buffer)
 
 	//generally, you don't have to rewrite this to maintain the status of connections(TCP)
-	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error: %d %s", ec.value(), ec.message().data());}
+	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
 	//receiving error or peer endpoint quit(false ec means ok)
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 

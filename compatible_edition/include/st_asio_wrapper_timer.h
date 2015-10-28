@@ -72,10 +72,11 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::container::set<object_type> container_type;
 
-	void set_timer(unsigned char id, size_t milliseconds, const void* user_data)
+	void update_timer_info(unsigned char id, size_t milliseconds, const void* user_data, bool start = false)
 	{
 		object_type ti = {id};
 
+		//lock timer_can
 		timer_can_mutex.lock_upgrade();
 		BOOST_AUTO(iter, timer_can.find(ti));
 		if (iter == timer_can.end())
@@ -89,11 +90,41 @@ public:
 		else
 			timer_can_mutex.unlock_upgrade();
 
+		//items in timer_can not locked
 		iter->status = object_type::TIMER_OK;
 		iter->milliseconds = milliseconds;
 		iter->user_data = user_data;
 
+		if (start)
+			start_timer(*iter);
+	}
+
+	void set_timer(unsigned char id, size_t milliseconds, const void* user_data) {update_timer_info(id, milliseconds, user_data, true);}
+
+	object_type find_timer(unsigned char id)
+	{
+		object_type ti = {id, object_type::TIMER_CANCELED, 0, NULL};
+
+		boost::shared_lock<boost::shared_mutex> lock(timer_can_mutex);
+		BOOST_AUTO(iter, timer_can.find(ti));
+		if (iter == timer_can.end())
+			return *iter;
+		else
+			return ti;
+	}
+
+	bool start_timer(unsigned char id)
+	{
+		object_type ti = {id};
+
+		boost::shared_lock<boost::shared_mutex> lock(timer_can_mutex);
+		BOOST_AUTO(iter, timer_can.find(ti));
+		if (iter == timer_can.end())
+			return false;
+		lock.unlock();
+
 		start_timer(*iter);
+		return true;
 	}
 
 	void stop_timer(unsigned char id)

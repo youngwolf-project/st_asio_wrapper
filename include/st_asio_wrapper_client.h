@@ -67,10 +67,6 @@ public:
 
 		return false;
 	}
-
-	void disconnect(typename Pool::object_ctype& client_ptr) {force_close(client_ptr);}
-	void force_close(typename Pool::object_ctype& client_ptr) {if (ST_THIS del_object(client_ptr)) client_ptr->force_close();}
-	void graceful_close(typename Pool::object_ctype& client_ptr) {if (ST_THIS del_object(client_ptr)) client_ptr->graceful_close();}
 };
 
 } //namespace

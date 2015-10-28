@@ -76,17 +76,52 @@ public:
 	//the following three functions can only be used when the connection is OK and you want to reconnect to the server.
 	//if the connection is broken unexpectedly, st_connector will try to reconnect to the server automatically.
 	void disconnect(bool reconnect = false) {force_close(reconnect);}
-	void force_close(bool reconnect = false) {reconnecting = reconnect; connected = false; st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();}
-	void graceful_close(bool reconnect = false)
+	void force_close(bool reconnect = false)
 	{
+		if (!ST_THIS is_closing())
+		{
+			show_info("link:", "been closed.");
+			reconnecting = reconnect;
+			connected = false;
+			ST_THIS close_state = 1;
+		}
+		else if (1 == ST_THIS close_state)
+			return;
+
+		st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();
+	}
+
+	void graceful_close(bool reconnect = false, bool sync = true)
+	{
+		if (ST_THIS is_closing())
+			return;
+
 		if (!is_connected())
 			force_close(reconnect);
 		else
 		{
+			show_info("link:", "been closing gracefully.");
 			reconnecting = reconnect;
 			connected = false;
-			st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close();
+			ST_THIS close_state = 2;
+			st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync);
 		}
+	}
+
+	void show_info(const char* head, const char* tail) const
+	{
+		boost::system::error_code ec;
+		BOOST_AUTO(ep, ST_THIS lowest_layer().local_endpoint(ec));
+		if (!ec)
+			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
+	}
+
+	void show_info(const char* head, const char* tail, const boost::system::error_code& ec) const
+	{
+		boost::system::error_code ec2;
+		BOOST_AUTO(ep, ST_THIS lowest_layer().local_endpoint(ec2));
+		if (!ec2)
+			unified_out::info_out("%s %s:%hu %s (%d %s)", head, ep.address().to_string().c_str(), ep.port(), tail, ec.value(), ec.message().data());
 	}
 
 protected:
@@ -110,7 +145,7 @@ protected:
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
-		unified_out::error_out("connection closed.");
+		show_info("link:", "broken/closed", ec);
 
 		bool reconnect = reconnecting;
 		if (ST_THIS is_closing())
@@ -122,8 +157,9 @@ protected:
 				reconnect = false;
 		}
 
+		ST_THIS close_state = 0;
 		if (reconnect)
-			do_start();
+			ST_THIS start();
 	}
 
 	virtual bool on_timer(unsigned char id, const void* user_data)

@@ -69,10 +69,7 @@ public:
 	{
 		BOOST_AUTO(raw_client_ptr, boost::dynamic_pointer_cast<Socket>(client_ptr));
 		if (ST_THIS del_object(raw_client_ptr))
-		{
-			raw_client_ptr->show_info("client:", "quit.");
 			raw_client_ptr->force_close();
-		}
 	}
 
 	void close_all_client()
@@ -81,10 +78,7 @@ public:
 		//but in on_recv_error(), we need to lock object_can_mutex too(in del_object()), this will cause dead lock
 		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
 		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
-		{
-			(*iter)->show_info("client:", "been closed.");
 			(*iter)->force_close();
-		}
 	}
 
 	///////////////////////////////////////////////////
