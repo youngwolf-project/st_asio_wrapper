@@ -25,12 +25,6 @@
 #define RE_CONNECT_INTERVAL		500 //millisecond(s)
 #endif
 
-#ifdef RE_CONNECT_CONTROL
-#define RE_CONNECT_CHECK	prepare_re_connect()
-#else
-#define RE_CONNECT_CHECK	true
-#endif
-
 namespace st_asio_wrapper
 {
 
@@ -39,16 +33,10 @@ class st_connector_base : public st_tcp_socket_base<Socket, Packer, Unpacker>
 {
 public:
 	st_connector_base(boost::asio::io_service& io_service_) : st_tcp_socket_base<Socket, Packer, Unpacker>(io_service_), connected(false), reconnecting(true)
-#ifdef RE_CONNECT_CONTROL
-		, re_connect_times(-1)
-#endif
 		{set_server_addr(SERVER_PORT, SERVER_IP);}
 
 	template<typename Arg>
 	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) : st_tcp_socket_base<Socket, Packer, Unpacker>(io_service_, arg), connected(false), reconnecting(true)
-#ifdef RE_CONNECT_CONTROL
-		, re_connect_times(-1)
-#endif
 		{set_server_addr(SERVER_PORT, SERVER_IP);}
 
 	//reset all, be ensure that there's no any operations performed on this st_connector_base when invoke it
@@ -68,9 +56,6 @@ public:
 	}
 	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
 
-#ifdef RE_CONNECT_CONTROL
-	void set_re_connect_times(size_t times) {re_connect_times = times;}
-#endif
 	bool is_connected() const {return connected;}
 
 	//the following three functions can only be used when the connection is OK and you want to reconnect to the server.
@@ -140,6 +125,7 @@ protected:
 		return false;
 	}
 
+	virtual bool prepare_re_connect(const boost::system::error_code& ec) {return true;}
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
 	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket_base<Socket, Packer, Unpacker>::is_send_allowed();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
@@ -153,7 +139,7 @@ protected:
 		else
 		{
 			force_close(reconnecting);
-			if (reconnect && (!ec || boost::asio::error::operation_aborted == ec || !RE_CONNECT_CHECK))
+			if (reconnect && (!ec || boost::asio::error::operation_aborted == ec || !prepare_re_connect(ec)))
 				reconnect = false;
 		}
 
@@ -188,31 +174,14 @@ protected:
 			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}
-		else if ((boost::asio::error::operation_aborted != ec || reconnecting) && RE_CONNECT_CHECK && !ST_THIS get_io_service().stopped())
+		else if ((boost::asio::error::operation_aborted != ec || reconnecting) && !ST_THIS get_io_service().stopped() && prepare_re_connect(ec))
 			ST_THIS set_timer(10, RE_CONNECT_INTERVAL, nullptr);
 	}
-
-#ifdef RE_CONNECT_CONTROL
-	bool prepare_re_connect()
-	{
-		if (0 == re_connect_times)
-		{
-			unified_out::info_out("re-connecting abandoned!");
-			return false;
-		}
-
-		--re_connect_times;
-		return true;
-	}
-#endif
 
 protected:
 	boost::asio::ip::tcp::endpoint server_addr;
 	bool connected;
 	bool reconnecting;
-#ifdef RE_CONNECT_CONTROL
-	size_t re_connect_times;
-#endif
 };
 typedef st_connector_base<> st_connector;
 
