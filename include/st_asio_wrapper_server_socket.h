@@ -55,14 +55,14 @@ public:
 		st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();
 	}
 
-	void graceful_close()
+	void graceful_close(bool sync = true)
 	{
 		if (ST_THIS is_closing())
 			return;
 
 		show_info("link:", "been closing gracefully.");
 		ST_THIS close_state = 2;
-		st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close();
+		st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync);
 	}
 
 	void show_info(const char* head, const char* tail) const

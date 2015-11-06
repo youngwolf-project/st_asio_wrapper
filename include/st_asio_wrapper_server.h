@@ -91,6 +91,10 @@ public:
 	//msg sending interface
 	///////////////////////////////////////////////////
 
+	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect();}
+	void force_close(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_close();}
+	void graceful_close(typename Pool::object_ctype& client_ptr, bool sync = true) {ST_THIS del_object(client_ptr); client_ptr->graceful_close(sync);}
+
 protected:
 	virtual bool init()
 	{
