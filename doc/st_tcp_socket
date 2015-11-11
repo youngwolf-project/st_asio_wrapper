@@ -34,12 +34,6 @@ public:
 	void reset_state();
 重载父类同名函数，重置自己的状态之后，调用父类同名函数。
 
-	void disconnect();
-	void force_close();
-	void graceful_close();
-前两个函数功能完全一样（为了完整性而提供了它们），都是直接调用clean_up。
-第三个函数优雅关闭套接字，所谓优雅关闭，就是先关闭自己的数据发送，然后接收完遗留数据之后，才完全关闭套接字。
-
 	bool is_closing() const;
 是否正在优雅关闭套接字，此时不再发送消息（如果发送会出错，因为已经关闭了自己的数据发送），但继续接收消息。
 
@@ -86,10 +80,13 @@ post_msg和send_msg的区别请看st_socket里面的post_msg_buffer和send_msg_b
 	bool post_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
 同上，只是以native为true调用i_packer::pack_msg接口。
 
-	void show_info(const char* head, const char* tail);
-打印日志，在head和tail中间加上对端ip和端口。
-
 protected:
+	void force_close();
+	void graceful_close(bool sync = true);
+前两个函数功能完全一样（为了完整性而提供了它们），都是直接调用clean_up。
+第三个函数优雅关闭套接字，所谓优雅关闭，就是先关闭自己的数据发送，然后接收完遗留数据之后，才完全关闭套接字。当sync为假时，graceful_close马上返回，
+优雅关闭将在后台继承进行，当回调到on_recv_error的时候，关闭结束（有可能优雅关闭成功，有可能超时被强制关闭）。
+
 	virtual bool do_send_msg();
 马上开始消息发送，重写自st_socket的do_send_msg，由st_socket调用。
 
@@ -121,7 +118,7 @@ protected:
 
 protected:
 	boost::shared_ptr<i_unpacker<out_msg_type>> unpacker_;
-	bool closing;
+	int close_state; //2-the first step of graceful close, 1-force close, 0-normal state
 };
 
 } //namespace st_tcp

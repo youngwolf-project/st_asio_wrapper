@@ -29,8 +29,8 @@
 * st_udp_socket_base: inherit from st_socket
 * st_udp_sclient: inherit from st_udp_socket
 *
-* st_server_socket_base: inherit from st_tcp_socket
-* st_server_base: inherit from st_object_pool
+* st_server_socket_base: inherit from st_tcp_socket_base and plus 10 - 19
+* st_server_base: inherit from st_object_pool and plus 10 - 19
 *
 * st_client: inherit from st_object_pool
 * st_tcp_client_base: inherit from st_client_base

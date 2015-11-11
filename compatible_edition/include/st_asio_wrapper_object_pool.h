@@ -33,16 +33,6 @@
 	#endif
 #endif
 
-//define this to have st_object_pool invoke clear_all_closed_object() automatically and periodically
-//this feature may influence performance when huge number of objects exist,
-//so, re-write st_tcp_socket::on_recv_error and invoke st_object_pool::del_object() is recommended in long connection system
-//in short connection system, you are recommended to open this feature, use CLEAR_CLOSED_SOCKET_INTERVAL to set the interval
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
-	#ifndef CLEAR_CLOSED_SOCKET_INTERVAL
-	#define CLEAR_CLOSED_SOCKET_INTERVAL	60 //seconds, validate only if AUTO_CLEAR_CLOSED_SOCKET defined
-	#endif
-#endif
-
 #ifndef CLOSED_SOCKET_MAX_DURATION
 	#define CLOSED_SOCKET_MAX_DURATION	5 //seconds
 	//after this duration, the corresponding object can be freed from the heap or be reused
@@ -95,9 +85,6 @@ protected:
 	{
 #ifndef REUSE_OBJECT
 		set_timer(0, 1000 * SOCKET_FREE_INTERVAL, NULL);
-#endif
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
-		set_timer(1, 1000 * CLEAR_CLOSED_SOCKET_INTERVAL, NULL);
 #endif
 	}
 
@@ -155,21 +142,7 @@ protected:
 			return true;
 			break;
 #endif
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
-		case 1:
-			{
-				container_type objects;
-				clear_all_closed_object(objects);
-				if (!objects.empty())
-				{
-					boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-					temp_object_can.insert(temp_object_can.end(), objects.begin(), objects.end());
-				}
-				return true;
-			}
-			break;
-#endif
-		case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
+		case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
 			break;
 		default:
 			return st_timer::on_timer(id, user_data);
@@ -253,9 +226,10 @@ public:
 	//Consider the following assumption:
 	//1.You don't invoke del_object in on_recv_error and on_send_error, or close the socket in on_unpack_error
 	//2.For some reason(I haven't met yet), on_recv_error, on_send_error and on_unpack_error not invoked
-	//st_object_pool will automatically invoke this function if AUTO_CLEAR_CLOSED_SOCKET been defined
-	void clear_all_closed_object(container_type& objects)
+	size_t clear_all_closed_object()
 	{
+		container_type objects;
+
 		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
 			if (!(*iter)->lowest_layer().is_open())
@@ -265,6 +239,16 @@ public:
 			}
 			else
 				++iter;
+		lock.unlock();
+
+		size_t size = objects.size();
+		if (0 != size)
+		{
+			boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
+			temp_object_can.insert(temp_object_can.end(), objects.begin(), objects.end());
+		}
+
+		return size;
 	}
 
 	//free a specific number of objects
@@ -301,7 +285,6 @@ protected:
 	//(you are recommended to delete the object from object_can, for example via st_server_base::del_client), some other asynchronous calls are still queued in boost::asio::io_service,
 	//and will be dequeued in the future, we must guarantee these objects not be freed from the heap, so we move these objects from object_can to temp_object_can,
 	//and free them from the heap in the near future, see CLOSED_SOCKET_MAX_DURATION macro for more details.
-	//if AUTO_CLEAR_CLOSED_SOCKET been defined, clear_all_closed_object() will be invoked automatically and periodically to move all closed objects to temp_object_can.
 	boost::container::list<temp_object> temp_object_can;
 	boost::shared_mutex temp_object_can_mutex;
 };

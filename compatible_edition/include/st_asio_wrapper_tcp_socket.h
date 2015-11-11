@@ -39,10 +39,10 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 protected:
-	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, Unpacker>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
+	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, Unpacker>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state(); close_state = 0;}
 
 	template<typename Arg>
-	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<Socket, Packer, Unpacker>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()) {reset_state();}
+	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<Socket, Packer, Unpacker>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()) {reset_state(); close_state = 0;}
 
 public:
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
@@ -51,7 +51,6 @@ public:
 	{
 		unpacker_->reset_state();
 		st_socket<Socket, Packer, Unpacker>::reset_state();
-		close_state = 0;
 	}
 
 	bool is_closing() const {return 0 != close_state;}
@@ -79,21 +78,25 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
-	void disconnect() {force_close();}
-	void force_close() {clean_up();}
-	void graceful_close(bool sync = true) //will block until closing success or time out if sync equal to true
+	void force_close() {if (1 != close_state) clean_up();}
+	bool graceful_close(bool sync = true) //will block until closing success or time out if sync equal to true
 	{
+		if (is_closing())
+			return false;
+		else
+			close_state = 2;
+
 		boost::system::error_code ec;
 		ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
 		if (ec) //graceful closing is impossible
 		{
 			clean_up();
-			return;
+			return false;
 		}
 
-		ssize_t loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
 		if (sync)
 		{
+			int loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
 			while (--loop_num >= 0 && is_closing())
 				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
 			if (loop_num < 0) //graceful closing is impossible
@@ -102,8 +105,8 @@ protected:
 				clean_up();
 			}
 		}
-		else
-			ST_THIS set_timer(9, 10, reinterpret_cast<const void*>(loop_num));
+
+		return !sync;
 	}
 
 	//must mutex send_msg_buffer before invoke this function
@@ -136,36 +139,6 @@ protected:
 
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
 
-	virtual bool on_timer(unsigned char id, const void* user_data)
-	{
-		switch (id)
-		{
-		case 9:
-			if (is_closing())
-			{
-				ssize_t loop_num = reinterpret_cast<ssize_t>(user_data);
-				--loop_num;
-
-				if (loop_num > 0)
-				{
-					ST_THIS update_timer_info(9, 10, reinterpret_cast<const void*>(loop_num));
-					return true;
-				}
-				else
-				{
-					unified_out::info_out("failed to graceful close within %d seconds", GRACEFUL_CLOSE_MAX_DURATION);
-					clean_up();
-				}
-			}
-			break;
-		default:
-			return st_socket<Socket, Packer, Unpacker>::on_timer(id, user_data);
-			break;
-		}
-
-		return false;
-	}
-
 	//start the asynchronous read
 	//it's child's responsibility to invoke this properly, because st_tcp_socket_base doesn't know any of the connection status
 	void do_recv_msg()
@@ -179,15 +152,16 @@ protected:
 
 	void clean_up()
 	{
+		close_state = 1;
+		ST_THIS stop_all_timer();
+		reset_state();
+
 		if (ST_THIS lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
 			ST_THIS lowest_layer().close(ec);
 		}
-
-		ST_THIS stop_all_timer();
-		reset_state();
 	}
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)

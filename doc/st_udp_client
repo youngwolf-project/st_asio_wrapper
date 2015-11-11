@@ -17,6 +17,11 @@ public:
 	typename Pool::object_type add_client(unsigned short port, const std::string& ip = std::string());
 创建或者重用一个对象，然后以reset为true调用父类的add_client。
 
+	void disconnect(typename Pool::object_ctype& client_ptr);
+	void force_close(typename Pool::object_ctype& client_ptr);
+	void graceful_close(typename Pool::object_ctype& client_ptr);
+从对象池中删除，然后调用client_ptr的同名函数。
+
 protected:
 	virtual void uninit();
 实现i_service的纯虚接口，由st_service_pump调用（stop_service时调用），跟st_sclient::uninit功能一样，只是对所有

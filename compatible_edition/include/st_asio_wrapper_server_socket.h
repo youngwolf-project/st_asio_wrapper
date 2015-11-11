@@ -39,30 +39,24 @@ public:
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
 	//please note, when reuse this socket, st_object_pool will invoke reset(), child must re-write it to initialize all member variables,
 	//and then do not forget to invoke st_server_socket_base::reset() to initialize father's member variables
-	virtual void reset() {st_tcp_socket_base<Socket, Packer, Unpacker>::reset();}
+	virtual void reset() {st_tcp_socket_base<Socket, Packer, Unpacker>::reset(); ST_THIS close_state = 0;}
 
 	void disconnect() {force_close();}
 	void force_close()
 	{
-		if (!ST_THIS is_closing())
-		{
+		if (1 != ST_THIS close_state)
 			show_info("link:", "been closed.");
-			ST_THIS close_state = 1;
-		}
-		else if (1 == ST_THIS close_state)
-			return;
 
 		st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();
 	}
 
 	void graceful_close(bool sync = true)
 	{
-		if (ST_THIS is_closing())
-			return;
+		if (!ST_THIS is_closing())
+			show_info("link:", "been closing gracefully.");
 
-		show_info("link:", "been closing gracefully.");
-		ST_THIS close_state = 2;
-		st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync);
+		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
+			ST_THIS set_timer(10, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
 	}
 
 	void show_info(const char* head, const char* tail) const
@@ -106,6 +100,38 @@ protected:
 #endif
 
 		ST_THIS close_state = 0;
+	}
+
+	virtual bool on_timer(unsigned char id, const void* user_data)
+	{
+		switch (id)
+		{
+		case 10:
+			if (2 == ST_THIS close_state)
+			{
+				ssize_t loop_num = reinterpret_cast<ssize_t>(user_data);
+				--loop_num;
+
+				if (loop_num > 0)
+				{
+					ST_THIS update_timer_info(id, 10, reinterpret_cast<const void*>(loop_num));
+					return true;
+				}
+				else
+				{
+					unified_out::info_out("failed to graceful close within %d seconds", GRACEFUL_CLOSE_MAX_DURATION);
+					force_close();
+				}
+			}
+			break;
+		case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
+			break;
+		default:
+			return st_tcp_socket_base<Socket, Packer, Unpacker>::on_timer(id, user_data);
+			break;
+		}
+
+		return false;
 	}
 
 protected:

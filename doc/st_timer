@@ -13,8 +13,8 @@ st_tcp_sclient：0-9
 st_udp_socket_base：0-9
 st_udp_sclient：0-9
 
-st_server_socket_base：0-9
-st_server_base：0-9
+st_server_socket_base：0-19
+st_server_base：0-19
 
 st_client：0-9
 st_tcp_client_base：0-9
@@ -49,9 +49,18 @@ public:
 
 	typedef boost::container::set<object_type> container_type;
 
-	void set_timer(unsigned char id, size_t milliseconds, const void* user_data);
-开启定时器，定时器以id分区，如果定时器已经存在，则重新开始记时。
+	void update_timer_info(unsigned char id, size_t milliseconds, const void* user_data, bool start = false);
+更新timer，如果start为true，更新完了之后马上会开启或者重新开启这个timer。
 注意，对同一个st_timer里面的同一个定时器操作并不是线程安全的。
+
+	void set_timer(unsigned char id, size_t milliseconds, const void* user_data);
+开启定时器，定时器以id分区，如果定时器已经存在，则重新开始记时。这个函数其实就是以start为true调用update_timer_info而已。
+
+	object_type find_timer(unsigned char id);
+查找定义器。
+
+	bool start_timer(unsigned char id);
+开启一个已经存在的定义器。注意stop_timer之后，定义器还是存在的，只是未启动。
 
 	void stop_timer(unsigned char id);
 停止定时器，如果定时时间已经到达，且已经被post到io_server的队列中，则on_timer仍然会在未来某个时候被回调，这是asio的设计。

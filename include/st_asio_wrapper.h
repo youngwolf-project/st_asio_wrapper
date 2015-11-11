@@ -385,11 +385,29 @@
  * Fixed the possibility of race condition in on_all_msg_send.
  * Dropped fixed_length_packer, use packer(the default packer) instead.
  * i_service::init() will now return boolean value to indicate whether the initialization was succeeded or not.
-  *
-  * 5.2.2	2015.8.20
+ *
+ * 5.2.2	2015.8.20
  * Packer and unpacker now can have different msg types, for example, use std::string when sending msgs, use inflexible_buffer when receiving msgs,
  * see asio_client for more details.
  * Dropped inflexible_packer, changed inflexible_unpacker to unbuffered_unpacker, just the class name.
+ *
+ * 5.2.3	2015.10.28
+ * Dropped REPLACEABLE_BUFFER macro.
+ * Fix core dump(SIGBUS) on SunOS(sparc).
+ * Compatible edition support older gcc(4.1).
+ * Fix bug: st_connector::started() will return false after reconnected to the server.
+ * Differentiated passive close and active close;
+ * Support async graceful close;
+ * Record more details when link broken;
+ *
+ * 5.2.4	2015.11.11
+ * Let user to fully control the reconnecting operation via virtual function bool st_connector::prepare_re_connect(const boost::system::error_code&).
+ * Moved macro AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL from st_object_pool to st_server, which means st_client won't support this feature
+ *  anymore, because closed sockets in st_client maybe are reconnecting to the server, we should not clear them.
+ * Move asynchronous graceful close logic from st_tcp_socket to st_connector and st_server_socket.
+ * Reserved timer 10 ~ 19 to st_server_socket and st_server.
+ * Fix bug: graceful_close and force_close cannot reconnect to the server(introduced by asynchronous graceful close feature).
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_

@@ -33,6 +33,21 @@ ssl使用。
 	virtual void reset();
 重置所有，st_object_pool在重用时会调用。st_server_socket的子类可重写它以重置自己的状态，记得最后需要调用本类的reset。
 
+	void disconnect();
+直接调用force_close。
+
+	void force_close();
+强制退出————调用父类的同名函数。
+
+	void graceful_close(bool sync = true);
+优雅关闭————调用父类的同名函数。
+
+	void show_info(const char* head, const char* tail) const;
+在head和tail中间，显示对方的地址（IP加端口）。
+
+	void show_info(const char* head, const char* tail, const boost::system::error_code& ec) const;
+同上，但加上了显示ec.message.data()的内容。
+
 protected:
 	virtual bool do_start();
 开始，这里开始的意义是，马上开始接收数据。

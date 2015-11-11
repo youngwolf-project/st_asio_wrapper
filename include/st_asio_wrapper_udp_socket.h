@@ -86,8 +86,8 @@ public:
 	const boost::asio::ip::udp::endpoint& get_local_addr() const {return local_addr;}
 
 	void disconnect() {force_close();}
-	void force_close() {clean_up();}
-	void graceful_close() {clean_up();}
+	void force_close() {show_info("link:", "been closed."); clean_up();}
+	void graceful_close() {force_close();}
 
 	//get or change the unpacker at runtime
 	//changing unpacker at runtime is not thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
@@ -161,15 +161,15 @@ protected:
 
 	void clean_up()
 	{
+		ST_THIS stop_all_timer();
+		ST_THIS reset_state();
+
 		if (ST_THIS lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
 			ST_THIS lowest_layer().close(ec);
 		}
-
-		ST_THIS stop_all_timer();
-		ST_THIS reset_state();
 	}
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)

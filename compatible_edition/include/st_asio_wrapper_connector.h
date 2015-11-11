@@ -42,7 +42,7 @@ public:
 	//reset all, be ensure that there's no any operations performed on this st_connector_base when invoke it
 	//notice, when reusing this st_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
 	//all member variables, and then do not forget to invoke st_connector_base::reset() to initialize father's member variables
-	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<Socket, Packer, Unpacker>::reset();}
+	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<Socket, Packer, Unpacker>::reset(); ST_THIS close_state = 0;}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = SERVER_IP)
 	{
@@ -63,15 +63,12 @@ public:
 	void disconnect(bool reconnect = false) {force_close(reconnect);}
 	void force_close(bool reconnect = false)
 	{
-		if (!ST_THIS is_closing())
+		if (1 != ST_THIS close_state)
 		{
 			show_info("link:", "been closed.");
 			reconnecting = reconnect;
 			connected = false;
-			ST_THIS close_state = 1;
 		}
-		else if (1 == ST_THIS close_state)
-			return;
 
 		st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();
 	}
@@ -80,17 +77,15 @@ public:
 	{
 		if (ST_THIS is_closing())
 			return;
+		else if (!is_connected())
+			return force_close(reconnect);
 
-		if (!is_connected())
-			force_close(reconnect);
-		else
-		{
-			show_info("link:", "been closing gracefully.");
-			reconnecting = reconnect;
-			connected = false;
-			ST_THIS close_state = 2;
-			st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync);
-		}
+		show_info("link:", "been closing gracefully.");
+		reconnecting = reconnect;
+		connected = false;
+
+		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
+			ST_THIS set_timer(11, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
 	}
 
 	void show_info(const char* head, const char* tail) const
@@ -114,7 +109,7 @@ protected:
 	{
 		if (!ST_THIS get_io_service().stopped())
 		{
-			if (reconnecting && !is_connected())
+			if (!is_connected())
 				ST_THIS lowest_layer().async_connect(server_addr, boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error));
 			else
 				ST_THIS do_recv_msg();
@@ -133,18 +128,10 @@ protected:
 	{
 		show_info("link:", "broken/closed", ec);
 
-		bool reconnect = reconnecting;
-		if (ST_THIS is_closing())
-			force_close(reconnecting);
-		else
-		{
-			force_close(reconnecting);
-			if (reconnect && (!ec || boost::asio::error::operation_aborted == ec || !prepare_re_connect(ec)))
-				reconnect = false;
-		}
-
+		force_close(ST_THIS is_closing() ? reconnecting : prepare_re_connect(ec));
 		ST_THIS close_state = 0;
-		if (reconnect)
+
+		if (reconnecting)
 			ST_THIS start();
 	}
 
@@ -155,7 +142,25 @@ protected:
 		case 10:
 			do_start();
 			break;
-		case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
+		case 11:
+			if (2 == ST_THIS close_state)
+			{
+				ssize_t loop_num = reinterpret_cast<ssize_t>(user_data);
+				--loop_num;
+
+				if (loop_num > 0)
+				{
+					ST_THIS update_timer_info(id, 10, reinterpret_cast<const void*>(loop_num));
+					return true;
+				}
+				else
+				{
+					unified_out::info_out("failed to graceful close within %d seconds", GRACEFUL_CLOSE_MAX_DURATION);
+					force_close(reconnecting);
+				}
+			}
+			break;
+		case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
 			break;
 		default:
 			return st_tcp_socket_base<Socket, Packer, Unpacker>::on_timer(id, user_data);

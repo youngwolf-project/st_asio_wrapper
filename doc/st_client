@@ -29,7 +29,6 @@ protected:
 	st_client(st_service_pump& service_pump_, Arg arg);
 后者由ssl使用。
 
-protected:
 	virtual void init();
 实现i_service的纯虚接口，供st_service_pump使用（start_service时调用），跟st_sclient::init功能一样，只是对所有客户端都
 做一个“开始”操作。
@@ -37,12 +36,6 @@ protected:
 public:
 	bool add_client(typename st_client::object_ctype& client_ptr, bool reset = true);
 添加一个连接到对象池，并调用client_ptr->start()，如果reset为true，那么在这之前还会先调用client_ptr->reset。
-
-	void disconnect(typename st_client::object_ctype& client_ptr);
-直接调用force_close。
-	void force_close(typename st_client::object_ctype& client_ptr);
-	void graceful_close(typename st_client::object_ctype& client_ptr);
-先将指定的连接从对象池（由Pool提供）里面删除，然后调用这个连接的force_close或者graceful_close。
 };
 
 } //namespace
