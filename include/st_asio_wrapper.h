@@ -402,10 +402,8 @@
  *
  * 5.2.4	2015.11.11
  * Let user to fully control the reconnecting operation via virtual function bool st_connector::prepare_re_connect(const boost::system::error_code&).
- * Moved macro AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL from st_object_pool to st_server, which means st_client won't support this feature
- *  anymore, because closed sockets in st_client maybe are reconnecting to the server, we should not clear them.
  * Move asynchronous graceful close logic from st_tcp_socket to st_connector and st_server_socket.
- * Reserved timer 10 ~ 19 to st_server_socket and st_server.
+ * Reserved timer 10 ~ 19 to st_server_socket.
  * Fix bug: graceful_close and force_close cannot reconnect to the server(introduced by asynchronous graceful close feature).
  *
  */
