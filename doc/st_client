@@ -1,4 +1,4 @@
-﻿
+
 namespace st_asio_wrapper
 {
 
@@ -16,7 +16,6 @@ protected:
 就是实现了开始和结束逻辑，开始意味着什么由Socket决定，这个我们在前面讲st_socket、st_tcp_socket、st_udp_socket、
 st_connector和st_server_socket的时候，已经说过多次了。
 };
-
 
 支持多条连接的客户端（或者说多个套接字），tcp和udp通用，其实它更像一个容器，只是在st_object_pool上扩展了一些helper函数
 template<typename Socket, typename Pool>

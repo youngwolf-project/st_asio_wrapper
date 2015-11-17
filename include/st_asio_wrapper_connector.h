@@ -43,6 +43,7 @@ public:
 	//notice, when reusing this st_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
 	//all member variables, and then do not forget to invoke st_connector_base::reset() to initialize father's member variables
 	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<Socket, Packer, Unpacker>::reset(); ST_THIS close_state = 0;}
+	virtual bool obsoleted() {return !reconnecting && st_tcp_socket_base<Socket, Packer, Unpacker>::obsoleted();}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = SERVER_IP)
 	{

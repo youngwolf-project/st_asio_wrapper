@@ -1,4 +1,4 @@
-﻿
+
 namespace st_asio_wrapper
 {
 
@@ -16,7 +16,6 @@ public:
 Socket的模板参数，带上之后会有模板参数的循环依赖的问题，如果哪位同仁可以解决此问题，麻烦告诉我一声。
 i_server的实现者在使用client_ptr参数之前，会转换成Socket类型，请看st_server的实现。
 };
-
 
 服务端套接字类
 template<typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket>

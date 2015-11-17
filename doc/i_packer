@@ -1,4 +1,4 @@
-﻿
+
 #ifdef HUGE_MSG
 #define HEAD_TYPE	uint32_t
 #define HEAD_H2N	htonl
@@ -13,11 +13,8 @@ namespace st_asio_wrapper
 
 打包器的helper类，目前只有一个方法，就是判断要打包的消息，在打包后，是否超过了最大长度
 class packer_helper
-
 {
-
 public:
-
 	static size_t msg_size_check(size_t pre_len, const char* const pstr[], const size_t len[], size_t num);
 }
 
@@ -27,11 +24,9 @@ class i_packer
 {
 public:
 	typedef MsgType msg_type;
-
 	typedef const msg_type msg_ctype;
 
 protected:
-
 	virtual ~i_packer() {}
 
 public:
@@ -44,7 +39,6 @@ public:
 	msg_type pack_msg(const std::string& str, bool native = false) {return pack_msg(str.data(), str.size(), native);}
 两个重载体，增加接口灵活性。
 };
-
 
 默认的打包器，如果你需要的消息格式与默认打包器的消息格式不相同，那么显然的，你需要实现自己的打包器；
 默认打包器的消息格式是：长度（２字节）＋　消息内容，所以其支持的消息长度为1至(65535-2)，如果想突破这个限制，
@@ -66,5 +60,4 @@ class prefix_suffix_packer : public i_packer<std::string>;
 必须已经是一个完整的包，直接发送即可（st_socket::direct_send_msg，st_socket::direct_post_msg）。
 
 } //namespace
-
 

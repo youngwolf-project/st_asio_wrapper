@@ -1,4 +1,4 @@
-﻿
+
 #ifndef SERVER_PORT
 #define SERVER_PORT					5050
 服务器监听商品。
@@ -11,8 +11,7 @@
 
 #ifndef TCP_DEFAULT_IP_VERSION
 #define TCP_DEFAULT_IP_VERSION boost::asio::ip::tcp::v4()
-为监听套接字绑定地址时，在不指定ip的情况下，指定ip地址的版本（v4还是v6），如果指定了ip，则ip地址的版本可以从ip中推导出来。
-
+为监听套接字绑定地址时，在不指定ip的情况下，指定ip地址的版本（v4还是v6），如果指定了ip，则ip地址的版本可以从ip中推导出来。
 #endif
 
 namespace st_asio_wrapper

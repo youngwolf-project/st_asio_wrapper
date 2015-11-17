@@ -1,4 +1,4 @@
-﻿
+
 #ifndef MAX_OBJECT_NUM
 #define MAX_OBJECT_NUM				4096
 #endif
@@ -36,47 +36,27 @@ template<typename Object>
 class st_object_pool: public st_service_pump::i_service, public st_timer
 {
 public:
-
 	typedef boost::shared_ptr<Object> object_type;
-
 	typedef const object_type object_ctype;
 
-
-
 protected:
-
 hash表需要的对象比较类。
 	struct st_object_hasher
-
 	{
-
 	public:
-
 		size_t operator()(object_ctype& object_ptr) const;
-
 		size_t operator()(uint_fast64_t id) const;
 	};
 
-
-
 	struct st_object_equal
-
 	{
-
 	public:
-
 		bool operator()(object_ctype& left, object_ctype& right) const;
-
 		bool operator()(uint_fast64_t id, object_ctype& right) const;
 	};
 
-
-
 public:
-
 	typedef boost::unordered::unordered_set<object_type, st_object_hasher, st_object_equal> container_type;
-
-
 
 protected:
 已经关闭的连接，从对象池移出到临时链表时，将按这个结构保存，主要目的是为了记录关闭的时间（以判断是否可以释放或者重用）。
@@ -86,7 +66,6 @@ protected:
 		object_type object_ptr;
 
 		temp_object(object_ctype& object_ptr_);
-
 		bool is_timeout() const;
 		bool is_timeout(time_t now) const;
 是否超时（超时之后就可以释放或者重用object_ptr对象了）。
@@ -132,13 +111,19 @@ ssl使用。
 获取无效对象总数（临时链表里面的对象），无效对象要么定时被删除，要么等待被重用，由宏控制。
 
 	object_type at(size_t index);
-获取指定位置的有效对象（连接池中的对象），位置序号从０开始。
+获取指定位置的有效对象（连接池中的对象），位置序号从0开始。
+
+	object_type closed_object_at(size_t index);
+获取指定位置的无效对象，位置序号从0开始。
 
 	object_type find(uint_fast64_t id);
 根据id查找有效对象。
 
-	void find_object(const std::string& ip, unsigned short port, container_type& objects);
-查找有效对象，如果ip为空，则匹配所有ip，如果port为0，则匹配所有端口。
+	object_type closed_object_find(uint_fast64_t id);
+根据id查找无效对象。
+
+	object_type closed_object_pop(uint_fast64_t id);
+根据id查找无效对象，并且从容器中删除。
 
 	void list_all_object();
 列出所有有效对象。

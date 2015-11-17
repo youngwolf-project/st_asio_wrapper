@@ -1,4 +1,4 @@
-﻿
+
 #ifdef HUGE_MSG
 #define HEAD_TYPE	uint32_t
 #define HEAD_N2H	ntohl
@@ -16,17 +16,11 @@ template<typename MsgType>
 class i_unpacker
 {
 public:
-	
 	typedef MsgType msg_type;
-
 	typedef const msg_type msg_ctype;
-
 	typedef boost::container::list<msg_type> container_type;
 
-
-
 protected:
-
 	virtual ~i_unpacker() {}
 
 public:
@@ -47,53 +41,30 @@ udp消息格式，其实就在普通消息的基础上加了一个对端ip，这
 用packer打包然后生成一个udp_msg即可。
 template<typename MsgType>
 class udp_msg : public MsgType
-
 {
-
 public:
-
 	boost::asio::ip::udp::endpoint peer_addr;
-
 对端地址。
 
-
 	udp_msg() {}
-
 	udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr, MsgType&& msg) : MsgType(std::move(msg)), peer_addr(_peer_addr) {}
 
-
-
 	void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); MsgType::swap(other);}
-
 	void swap(boost::asio::ip::udp::endpoint& addr, MsgType&& tmp_msg) {std::swap(peer_addr, addr); MsgType::swap(tmp_msg);}
-
 };
 
-
-
 template<typename MsgType>
-
 class i_udp_unpacker
-
 {
-
 public:
 	typedef MsgType msg_type;
-
 	typedef const msg_type msg_ctype;
-
 	typedef boost::container::list<udp_msg<msg_type>> container_type;
 
-
-
 protected:
-
 	virtual ~i_udp_unpacker() {}
 
-
-
 public:
-
 	virtual msg_type parse_msg(size_t bytes_transferred) = 0;
 
 解包器，对于udp来说，一次接收就是一个包，所以总是返回一个包，不存在粘包问题。
@@ -101,7 +72,6 @@ public:
 
 返回一个asio需要的buffer，具体参看i_unpacker。
 };
-
 
 默认的解包器，如果你需要的消息格式与默认解包器的消息格式不相同，那么显然的，你需要实现自己的解包器；
 默认解包器的消息格式是：长度（２字节）＋　消息内容，所以其支持的消息长度为1至(65535-2)，如果想突破这个限制，

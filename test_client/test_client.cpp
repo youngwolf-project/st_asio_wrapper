@@ -6,6 +6,8 @@
 #define SERVER_PORT		9527
 //#define REUSE_OBJECT //use objects pool
 //#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+//#define AUTO_CLEAR_CLOSED_SOCKET
+//#define CLEAR_CLOSED_SOCKET_INTERVAL	1
 //configuration
 
 //use the following macro to control the type of packer and unpacker
@@ -111,17 +113,31 @@ public:
 
 	void close_some_client(size_t n)
 	{
-		while (n-- > 0)
-			graceful_close(at(0));
-//			graceful_close(at(0), false, false);
-//			force_close(at(0));
-		//this is a equivalence of calling i_server::del_client in st_server_socket_base::on_recv_error(see st_server_socket_base for more details).
+		static auto test_index = -1;
+		++test_index;
 
-		//if you just want to reconnect to the server, you should do it like this:
-//		while (n-- > 0)
-//			graceful_close(at(n), true); //if parameter 'reconnect' is true, st_tcp_client will not remove clients from object pool
-//			graceful_close(at(n), true, false);
-//			force_close(at(n), true);
+		switch (test_index % 6)
+		{
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
+			//method #1
+			//notice: these methods need to define AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL macro, because it just close the st_socket,
+			//not really remove them from object pool, this will cause test_client still send data via them, and wait responses from them.
+			//for this scenario, the smaller CLEAR_CLOSED_SOCKET_INTERVAL macro is, the better experience you will get, so set it to 1 second.
+		case 0: do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(), false : true;});				break;
+		case 1: do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(false, false), false : true;}); break;
+		case 2: do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->force_close(), false : true;});				break;
+#else
+			//method #2
+			//this is a equivalence of calling i_server::del_client in st_server_socket_base::on_recv_error(see st_server_socket_base for more details).
+		case 0: while (n-- > 0) graceful_close(at(0));			break;
+		case 1: while (n-- > 0) graceful_close(at(0), false);	break;
+		case 2: while (n-- > 0) force_close(at(0));				break;
+#endif
+			//if you just want to reconnect to the server, you should do it like this:
+		case 3: do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(true), false : true;});			break;
+		case 4: do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(true, false), false : true;});	break;
+		case 5: do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->force_close(true), false : true;});			break;
+		}
 	}
 
 	///////////////////////////////////////////////////
@@ -157,7 +173,12 @@ int main(int argc, const char* argv[])
 	else if (argc > 1)
 		client.do_something_to_all([argv](test_client::object_ctype& item) {item->set_server_addr(atoi(argv[1]), SERVER_IP);});
 
-	service_pump.start_service(1);
+	auto min_thread_num = 1;
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
+	++min_thread_num;
+#endif
+
+	service_pump.start_service(min_thread_num);
 	while(service_pump.is_running())
 	{
 		std::string str;
@@ -167,10 +188,10 @@ int main(int argc, const char* argv[])
 		else if (str == RESTART_COMMAND)
 		{
 			service_pump.stop_service();
-			service_pump.start_service(1);
+			service_pump.start_service(min_thread_num);
 		}
 		else if (str == LIST_STATUS)
-			printf("valid links: " size_t_format ", closed links: " size_t_format "\n", client.valid_size(), client.closed_object_size());
+			printf("link #: " size_t_format ", valid links: " size_t_format ", closed links: " size_t_format "\n", client.size(), client.valid_size(), client.closed_object_size());
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
 			client.do_something_to_all([](test_client::object_ctype& item) {item->suspend_dispatch_msg(true);});
@@ -200,9 +221,13 @@ int main(int argc, const char* argv[])
 				continue;
 			}
 
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
+			link_num = client.size();
+			printf("link number: " size_t_format "\n", link_num);
+#endif
 			size_t msg_num = 1024;
 			size_t msg_len = 1024; //must greater than or equal to sizeof(size_t)
-			char msg_fill = '0';
+			auto msg_fill = '0';
 			char model = 0; //0 broadcast, 1 randomly pick one link per msg
 
 			boost::char_separator<char> sep(" \t");
@@ -297,6 +322,8 @@ int main(int argc, const char* argv[])
 #undef SERVER_PORT
 #undef REUSE_OBJECT
 #undef FORCE_TO_USE_MSG_RECV_BUFFER
+#undef AUTO_CLEAR_CLOSED_SOCKET
+#undef CLEAR_CLOSED_SOCKET_INTERVA
 #undef DEFAULT_PACKER
 #undef DEFAULT_UNPACKER
 //restore configuration

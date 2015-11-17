@@ -33,6 +33,16 @@
 	#endif
 #endif
 
+//define this to have st_server_socket_base invoke st_object_pool::clear_all_closed_object() automatically and periodically
+//this feature may influence performance when huge number of objects exist,
+//so, re-write st_server_socket_base::on_recv_error and invoke st_object_pool::del_object() is recommended in long connection system
+//in short connection system, you are recommended to open this feature, use CLEAR_CLOSED_SOCKET_INTERVAL to set the interval
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
+#ifndef CLEAR_CLOSED_SOCKET_INTERVAL
+#define CLEAR_CLOSED_SOCKET_INTERVAL	60 //seconds, validate only if AUTO_CLEAR_CLOSED_SOCKET defined
+#endif
+#endif
+
 #ifndef CLOSED_SOCKET_MAX_DURATION
 	#define CLOSED_SOCKET_MAX_DURATION	5 //seconds
 	//after this duration, the corresponding object can be freed from the heap or be reused
@@ -86,6 +96,9 @@ protected:
 #ifndef REUSE_OBJECT
 		set_timer(0, 1000 * SOCKET_FREE_INTERVAL, NULL);
 #endif
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
+		set_timer(1, 1000 * CLEAR_CLOSED_SOCKET_INTERVAL, NULL);
+#endif
 	}
 
 	void stop() {stop_all_timer();}
@@ -118,7 +131,7 @@ protected:
 		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
 		//objects are order by time, so we don't have to go through all items in temp_object_can
 		for (BOOST_AUTO(iter, temp_object_can.begin()); iter != temp_object_can.end() && iter->is_timeout(); ++iter)
-			if (iter->object_ptr.unique() && iter->object_ptr->reusable())
+			if (iter->object_ptr.unique() && iter->object_ptr->obsoleted())
 			{
 				BOOST_AUTO(object_ptr, iter->object_ptr);
 				temp_object_can.erase(iter);
@@ -142,7 +155,13 @@ protected:
 			return true;
 			break;
 #endif
-		case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
+#ifdef AUTO_CLEAR_CLOSED_SOCKET
+		case 1:
+			clear_all_closed_object();
+			return true;
+			break;
+#endif
+		case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
 			break;
 		default:
 			return st_timer::on_timer(id, user_data);
@@ -196,6 +215,14 @@ public:
 		return index < object_can.size() ? *(boost::next(object_can.begin(), index)) : object_type();
 	}
 
+	//this method has linear complexity, please note.
+	object_type closed_object_at(size_t index)
+	{
+		boost::shared_lock<boost::shared_mutex> lock(temp_object_can_mutex);
+		assert(index < temp_object_can.size());
+		return index < temp_object_can.size() ? boost::next(temp_object_can.begin(), index)->object_ptr : object_type();
+	}
+
 	object_type find(boost::uint64_t id)
 	{
 		boost::shared_lock<boost::shared_mutex> lock(object_can_mutex);
@@ -203,21 +230,26 @@ public:
 		return iter != object_can.end() ? *iter : object_type();
 	}
 
-	//Empty IP means don't care, any IP will match. Zero port means don't care, any port will match.
-	//this function only used with TCP socket, because for UDP socket, remote endpoint means nothing.
-	void find(const std::string& ip, unsigned short port, container_type& objects)
+	object_type closed_object_find(boost::uint_fast64_t id)
 	{
-		boost::shared_lock<boost::shared_mutex> lock(object_can_mutex);
-		if (ip.empty() && 0 == port)
-			objects.insert(object_can.begin(), object_can.end());
-		else
-			for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter)
-				if ((*iter)->lowest_layer().is_open())
-				{
-					BOOST_AUTO(ep, (*iter)->lowest_layer().remote_endpoint());
-					if ((0 == port || port == ep.port()) && (ip.empty() || ip == ep.address().to_string()))
-						objects.insert((*iter));
-				}
+		boost::shared_lock<boost::shared_mutex> lock(temp_object_can_mutex);
+		for (BOOST_AUTO(iter, temp_object_can.begin()); iter != temp_object_can.end(); ++iter)
+			if (id == iter->object_ptr->id())
+				return iter->object_ptr;
+		return object_type();
+	}
+
+	object_type closed_object_pop(boost::uint_fast64_t id)
+	{
+		boost::shared_lock<boost::shared_mutex> lock(temp_object_can_mutex);
+		for (BOOST_AUTO(iter, temp_object_can.begin()); iter != temp_object_can.end(); ++iter)
+			if (id == iter->object_ptr->id())
+			{
+				BOOST_AUTO(object_ptr, iter->object_ptr);
+				temp_object_can.erase(iter);
+				return object_ptr;
+			}
+		return object_type();
 	}
 
 	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}
@@ -226,13 +258,14 @@ public:
 	//Consider the following assumption:
 	//1.You don't invoke del_object in on_recv_error and on_send_error, or close the socket in on_unpack_error
 	//2.For some reason(I haven't met yet), on_recv_error, on_send_error and on_unpack_error not invoked
+	//st_object_pool will automatically invoke this function if AUTO_CLEAR_CLOSED_SOCKET been defined
 	size_t clear_all_closed_object()
 	{
 		container_type objects;
 
 		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
-			if (!(*iter)->lowest_layer().is_open())
+			if ((*iter).unique() && (*iter)->obsoleted())
 			{
 				objects.insert(*iter);
 				iter = object_can.erase(iter);
@@ -263,7 +296,7 @@ public:
 		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
 		//objects are order by time, so we don't have to go through all items in temp_object_can
 		for (BOOST_AUTO(iter, temp_object_can.begin()); num > 0 && iter != temp_object_can.end() && iter->is_timeout();)
-			if (!iter->object_ptr->started())
+			if (iter->object_ptr.unique() && iter->object_ptr->obsoleted())
 			{
 				iter = temp_object_can.erase(iter);
 				--num;
@@ -285,6 +318,7 @@ protected:
 	//(you are recommended to delete the object from object_can, for example via st_server_base::del_client), some other asynchronous calls are still queued in boost::asio::io_service,
 	//and will be dequeued in the future, we must guarantee these objects not be freed from the heap, so we move these objects from object_can to temp_object_can,
 	//and free them from the heap in the near future, see CLOSED_SOCKET_MAX_DURATION macro for more details.
+	//if AUTO_CLEAR_CLOSED_SOCKET been defined, clear_all_closed_object() will be invoked automatically and periodically to move all closed objects into temp_object_can.
 	boost::container::list<temp_object> temp_object_can;
 	boost::shared_mutex temp_object_can_mutex;
 };

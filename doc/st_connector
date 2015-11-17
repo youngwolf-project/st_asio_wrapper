@@ -1,4 +1,4 @@
-﻿
+
 #ifndef SERVER_IP
 #define SERVER_IP				"127.0.0.1"
 #endif
@@ -28,6 +28,8 @@ ssl使用。
 public:
 	virtual void reset();
 重置所有，st_object_pool在重用时会调用。st_connector的子类可重写它以重置自己的状态，记得最后需要调用本类的reset。
+	virtual bool obsoleted();
+在调用父类同名函数的基础上，增加了对是否重连接的判断，如果需要重连接则返回假。
 
 	void set_server_addr(unsigned short port, const std::string& ip);
 设置服务端地址用于连接之用，需要在do_start之前被调用。

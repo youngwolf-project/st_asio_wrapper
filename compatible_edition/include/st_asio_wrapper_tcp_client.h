@@ -64,10 +64,10 @@ public:
 	//msg sending interface
 	///////////////////////////////////////////////////
 
-	void disconnect(typename Pool::object_ctype& client_ptr, bool reconnect = false) {if (!reconnect) ST_THIS del_object(client_ptr); client_ptr->disconnect(reconnect);}
-	void force_close(typename Pool::object_ctype& client_ptr, bool reconnect = false) {if (!reconnect) ST_THIS del_object(client_ptr); client_ptr->force_close(reconnect);}
-	void graceful_close(typename Pool::object_ctype& client_ptr, bool reconnect = false, bool sync = true)
-		{if (!reconnect) ST_THIS del_object(client_ptr); client_ptr->graceful_close(reconnect, sync);}
+	//if you want to reconnect to the server, please call client_ptr's 'disconnect' 'force_close' or 'graceful_close' with true 'reconnect' directly.
+	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect(false);}
+	void force_close(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_close(false);}
+	void graceful_close(typename Pool::object_ctype& client_ptr, bool sync = true) {ST_THIS del_object(client_ptr); client_ptr->graceful_close(false, sync);}
 
 protected:
 	virtual void uninit() {ST_THIS stop(); ST_THIS do_something_to_all(boost::bind(&Socket::graceful_close, _1, false, true));}

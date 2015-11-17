@@ -66,16 +66,14 @@ public:
 	typename Socket::lowest_layer_type& lowest_layer() {return next_layer().lowest_layer();}
 	const typename Socket::lowest_layer_type& lowest_layer() const {return next_layer().lowest_layer();}
 
-#ifdef REUSE_OBJECT
-	virtual bool reusable()
+	virtual bool obsoleted()
 	{
 		if (started())
 			return false;
 
 		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex, boost::try_to_lock);
-		return lock.owns_lock(); //if successfully locked, means this st_socket is idle
+		return lock.owns_lock() && recv_msg_buffer.empty(); //if successfully locked, means this st_socket is idle
 	}
-#endif
 
 	bool started() const {return started_;}
 	void start()

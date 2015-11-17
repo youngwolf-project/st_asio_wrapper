@@ -45,6 +45,8 @@ protected:
 	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<Socket, Packer, Unpacker>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()) {reset_state(); close_state = 0;}
 
 public:
+	virtual bool obsoleted() {return !is_closing() && st_socket<Socket, Packer, Unpacker>::obsoleted();}
+
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
 	void reset() {reset_state(); ST_THIS clear_buffer();}
 	void reset_state()

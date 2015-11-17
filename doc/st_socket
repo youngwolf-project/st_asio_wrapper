@@ -1,7 +1,5 @@
-﻿#ifndef DEFAULT_PACKER
-
+#ifndef DEFAULT_PACKER
 #define DEFAULT_PACKER packer
-
 #endif
 默认的打包器，也可以通过模板参数控制，提供这个宏可以让使用者省略相应的模板参数。
 
@@ -9,14 +7,10 @@ namespace st_asio_wrapper
 {
 
 template<typename Socket, typename Packer, typename Unpacker, typename InMsgType = typename Packer::msg_type, typename OutMsgType = typename Unpacker::msg_type>
-
 class st_socket: public st_timer
-
 {
-public:
-
+public:
 	typedef boost::container::list<InMsgType> in_container_type;
-
 	typedef typename Unpacker::container_type out_container_type;
 
 protected:
@@ -47,10 +41,8 @@ id的设置与获取，注意使用者不可设置id，只有st_socket的创建�
 boost::asio::ssl::stream<boost::asio::ip::tcp::socket>对象及其从它们继承的对象。
 最底层对象其实就是调用底层对象的lowest_layer()，我们真正要读写的其实就是最底层对象。
 
-#ifdef REUSE_OBJECT
-	virtual bool reusable();
-对象是否可以被重用，对象池在重用之前，会调用这个函数来看看能否被重用。
-#endif
+	virtual bool obsoleted();
+判断本对象是否可以被重用或者被释放。
 
 	bool started() const;
 是否已经开始，已经开始意思是已经调用过start()了，多次调用start()会有严重的包乱顺问题，好在我在某个版本
@@ -190,11 +182,8 @@ protected:
 打包器。
 
 	in_container_type post_msg_buffer, send_msg_buffer;
-
 	out_container_type recv_msg_buffer, temp_msg_buffer;
-
 	boost::shared_mutex post_msg_buffer_mutex, send_msg_buffer_mutex;
-
 	boost::shared_mutex recv_msg_buffer_mutex;
 缓存及操作它们时需要的互斥体，访问temp_msg_buffer无需互斥，它只能在内部访问，作用是当收到消息之后，发现需要存入接收缓存
 （on_msg返回false），但接收缓存已满，那么多余的消息将被存放于temp_msg_buffer，并且不再继续接收消息，直到temp_msg_buffer

@@ -24,16 +24,6 @@
 #define ASYNC_ACCEPT_NUM			1 //how many async_accept delivery concurrently
 #endif
 
-//define this to have st_server_socket_base invoke st_object_pool::clear_all_closed_object() automatically and periodically
-//this feature may influence performance when huge number of objects exist,
-//so, re-write st_server_socket_base::on_recv_error and invoke st_object_pool::del_object() is recommended in long connection system
-//in short connection system, you are recommended to open this feature, use CLEAR_CLOSED_SOCKET_INTERVAL to set the interval
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
-#ifndef CLEAR_CLOSED_SOCKET_INTERVAL
-#define CLEAR_CLOSED_SOCKET_INTERVAL	60 //seconds, validate only if AUTO_CLEAR_CLOSED_SOCKET defined
-#endif
-#endif
-
 //in set_server_addr, if the IP is empty, TCP_DEFAULT_IP_VERSION will define the IP version, or the IP version will be deduced by the IP address.
 //boost::asio::ip::tcp::v4() means ipv4 and boost::asio::ip::tcp::v6() means ipv6.
 #ifndef TCP_DEFAULT_IP_VERSION
@@ -120,10 +110,6 @@ protected:
 
 		ST_THIS start();
 
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
-		ST_THIS set_timer(10, 1000 * CLEAR_CLOSED_SOCKET_INTERVAL, NULL);
-#endif
-
 		for (int i = 0; i < ASYNC_ACCEPT_NUM; ++i)
 			start_next_accept();
 
@@ -136,26 +122,6 @@ protected:
 	{
 		typename Pool::object_type client_ptr = ST_THIS create_object(boost::ref(*this));
 		acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_server_base::accept_handler, this, boost::asio::placeholders::error, client_ptr));
-	}
-
-	virtual bool on_timer(unsigned char id, const void* user_data)
-	{
-		switch (id)
-		{
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
-		case 10:
-			ST_THIS clear_all_closed_object();
-			return true;
-			break;
-#endif
-		case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
-			break;
-		default:
-			return st_timer::on_timer(id, user_data);
-			break;
-		}
-
-		return false;
 	}
 
 protected:

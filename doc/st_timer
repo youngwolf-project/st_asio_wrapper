@@ -1,4 +1,4 @@
-﻿
+
 namespace st_asio_wrapper
 {
 
@@ -14,7 +14,7 @@ st_udp_socket_base：0-9
 st_udp_sclient：0-9
 
 st_server_socket_base：0-19
-st_server_base：0-19
+st_server_base：0-9
 
 st_client：0-9
 st_tcp_client_base：0-9
@@ -44,9 +44,7 @@ protected:
 
 public:
 	typedef timer_info object_type;
-
 	typedef const object_type object_ctype;
-
 	typedef boost::container::set<object_type> container_type;
 
 	void update_timer_info(unsigned char id, size_t milliseconds, const void* user_data, bool start = false);
@@ -66,7 +64,6 @@ public:
 停止定时器，如果定时时间已经到达，且已经被post到io_server的队列中，则on_timer仍然会在未来某个时候被回调，这是asio的设计。
 
 	boost::asio::io_service& get_io_service();
-
 	const boost::asio::io_service& get_io_service() const;
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred);
