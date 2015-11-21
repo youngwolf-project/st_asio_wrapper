@@ -8,8 +8,8 @@
 #define SERVER_PORT		9528
 //#define REUSE_OBJECT //use objects pool
 //#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
-//#define AUTO_CLEAR_CLOSED_SOCKET
-//#define CLEAR_CLOSED_SOCKET_INTERVAL	1
+#define AUTO_CLEAR_CLOSED_SOCKET
+#define CLEAR_CLOSED_SOCKET_INTERVAL	1
 //configuration
 
 //use the following macro to control the type of packer and unpacker

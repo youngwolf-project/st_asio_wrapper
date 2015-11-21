@@ -121,7 +121,18 @@ protected:
 		return false;
 	}
 
-	virtual bool prepare_re_connect(const boost::system::error_code& ec) {return true;}
+	//after how much time(ms), st_connector will try to reconnect to the server, negative means give up.
+	virtual int prepare_re_connect(const boost::system::error_code& ec)
+	{
+		if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
+		{
+			boost::system::error_code ec;
+			ST_THIS lowest_layer().close(ec);
+		}
+
+		return RE_CONNECT_INTERVAL;
+	}
+
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
 	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket_base<Socket, Packer, Unpacker>::is_send_allowed();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
@@ -129,7 +140,7 @@ protected:
 	{
 		show_info("link:", "broken/closed", ec);
 
-		force_close(ST_THIS is_closing() ? reconnecting : prepare_re_connect(ec));
+		force_close(ST_THIS is_closing() ? reconnecting : prepare_re_connect(ec) >= 0);
 		ST_THIS close_state = 0;
 
 		if (reconnecting)
@@ -180,8 +191,12 @@ protected:
 			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}
-		else if ((boost::asio::error::operation_aborted != ec || reconnecting) && !ST_THIS get_io_service().stopped() && prepare_re_connect(ec))
-			ST_THIS set_timer(10, RE_CONNECT_INTERVAL, nullptr);
+		else if ((boost::asio::error::operation_aborted != ec || reconnecting) && !ST_THIS get_io_service().stopped())
+		{
+			auto delay = prepare_re_connect(ec);
+			if (delay >= 0)
+				ST_THIS set_timer(10, delay, nullptr);
+		}
 	}
 
 protected:
