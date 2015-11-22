@@ -1,7 +1,7 @@
 
 #ifndef SERVER_PORT
 #define SERVER_PORT					5050
-服务器监听商品。
+服务器监听端口。
 #endif
 
 #ifndef ASYNC_ACCEPT_NUM

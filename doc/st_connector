@@ -28,6 +28,7 @@ ssl使用。
 public:
 	virtual void reset();
 重置所有，st_object_pool在重用时会调用。st_connector的子类可重写它以重置自己的状态，记得最后需要调用本类的reset。
+
 	virtual bool obsoleted();
 在调用父类同名函数的基础上，增加了对是否重连接的判断，如果需要重连接则返回假。
 
@@ -56,8 +57,8 @@ protected:
 	virtual bool do_start();
 开始，这里开始的意义是，如果连接未成功，则开始连接服务器，如果连接已经成功，则开始接收数据。
 
-virtual bool prepare_re_connect(const boost::system::error_code& ec);
-	连接失败时回调，如果返回真，说明继续重试，否则放弃。
+virtual int prepare_re_connect(const boost::system::error_code& ec);
+	连接失败时回调，返回大于等于零则继续在相应毫秒之后重试，返回负数则放弃。
 
 	virtual void on_connect();
 连接成功时回调，用户重写它以得到连接成功事件。

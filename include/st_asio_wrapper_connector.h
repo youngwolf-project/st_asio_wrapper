@@ -122,17 +122,7 @@ protected:
 	}
 
 	//after how much time(ms), st_connector will try to reconnect to the server, negative means give up.
-	virtual int prepare_re_connect(const boost::system::error_code& ec)
-	{
-		if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
-		{
-			boost::system::error_code ec;
-			ST_THIS lowest_layer().close(ec);
-		}
-
-		return RE_CONNECT_INTERVAL;
-	}
-
+	virtual int prepare_re_connect(const boost::system::error_code& ec) {return RE_CONNECT_INTERVAL;}
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
 	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket_base<Socket, Packer, Unpacker>::is_send_allowed();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
@@ -196,6 +186,12 @@ protected:
 			auto delay = prepare_re_connect(ec);
 			if (delay >= 0)
 				ST_THIS set_timer(10, delay, nullptr);
+
+			if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
+			{
+				boost::system::error_code ec;
+				ST_THIS lowest_layer().close(ec);
+			}
 		}
 	}
 

@@ -168,20 +168,25 @@ int main(int argc, const char* argv[])
 	if (argc > 3)
 		link_num = std::min(MAX_OBJECT_NUM, std::max(atoi(argv[3]), 1));
 
-	printf("exec: test_client " size_t_format "\n", link_num);
+	printf("exec: test_client with " size_t_format " links\n", link_num);
 	///////////////////////////////////////////////////////////
 
 	st_service_pump service_pump;
 	test_client client(service_pump);
-	for (size_t i = 0; i < link_num; ++i)
-		client.add_client();
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4
-	if (argc > 2)
-		client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, atoi(argv[1]), argv[2]));
-	else if (argc > 1)
-		client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, atoi(argv[1]), SERVER_IP));
+	unsigned short port = argc > 1 ? atoi(argv[1]) : SERVER_PORT;
+	std::string ip = argc > 2 ? argv[2] : SERVER_IP;
+
+	//method #1, add clients first without any arguments, then set the server address.
+	for (size_t i = 0; i < link_num / 2; ++i)
+		client.add_client();
+	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, port, boost::ref(ip)));
+
+	//method #2, set the server address via add_clinet.
+	for (size_t i = link_num / 2; i < link_num; ++i)
+		client.add_client(port, ip);
 
 	int min_thread_num = 1;
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
@@ -218,7 +223,7 @@ int main(int argc, const char* argv[])
 					n = 1;
 
 				if ('+' == str[0])
-					for (; n > 0 && client.add_client(); ++link_num, --n);
+					for (; n > 0 && client.add_client(port, ip); ++link_num, --n);
 				else
 				{
 					if (n > client.size())

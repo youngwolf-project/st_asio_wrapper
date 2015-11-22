@@ -72,14 +72,9 @@ public:
 			raw_client_ptr->force_close();
 	}
 
-	void close_all_client()
-	{
-		//do not use graceful_close() as client does, because in this function, object_can_mutex has been locked, graceful_close will wait until on_recv_error() been invoked,
-		//but in on_recv_error(), we need to lock object_can_mutex too(in del_object()), this will cause dead lock
-		ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {
-			item->force_close();
-		});
-	}
+	//do not use graceful_close() as client does, because in this function, object_can_mutex has been locked, graceful_close will wait until on_recv_error() been invoked,
+	//but in on_recv_error(), we need to lock object_can_mutex too(in del_object()), this will cause dead lock
+	void close_all_client() {ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->force_close();});}
 
 	///////////////////////////////////////////////////
 	//msg sending interface

@@ -195,6 +195,9 @@ public:
 		return object_ptr;
 	}
 
+	//to configure unordered_set(for example, setup factor or reserved size), not locked the mutex, so must called before service_pump starting up.
+	container_type& container() {return object_can;}
+
 	size_t size()
 	{
 		boost::shared_lock<boost::shared_mutex> lock(object_can_mutex);
