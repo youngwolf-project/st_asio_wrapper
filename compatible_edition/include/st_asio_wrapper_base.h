@@ -24,6 +24,7 @@
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/typeof/typeof.hpp>
 
 #include "st_asio_wrapper.h"
 
