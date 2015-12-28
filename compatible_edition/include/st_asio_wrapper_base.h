@@ -24,12 +24,10 @@
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/typeof/typeof.hpp>
 
 #include "st_asio_wrapper.h"
 
-#ifndef UNIFIED_OUT_BUF_NUM
-#define UNIFIED_OUT_BUF_NUM	2048
-#endif
 //the size of the buffer used when receiving msg, must equal to or larger than the biggest msg size,
 //the bigger this buffer is, the more msgs can be received in one time if there are enough msgs buffered in the SOCKET.
 //every unpackers have a fixed buffer with this size, every st_tcp_sockets have an unpacker, so, this size is not the bigger the better.
@@ -314,33 +312,31 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 class log_formater
 {
 public:
-	static void all_out(char* buff, const char* fmt, va_list& ap)
+	static void all_out(const char* head, const char* fmt, va_list& ap)
 	{
-		assert(NULL != buff);
+		if (NULL != head)
+			printf("[%s] ", head);
+
+		char time_buff[64];
 		time_t now = time(NULL);
 #if defined _MSC_VER
-		ctime_s(buff, UNIFIED_OUT_BUF_NUM, &now);
+		ctime_s(time_buff, sizeof(time_buff), &now);
 #else
-		ctime_r(&now, buff);
+		ctime_r(&now, time_buff);
 #endif
-		size_t len = strlen(buff);
+		size_t len = strlen(time_buff);
 		assert(len > 0);
-		if ('\n' == *boost::next(buff, len - 1))
-			--len;
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-		strcpy_s(boost::next(buff, len), UNIFIED_OUT_BUF_NUM - len, " -> ");
-		len += 4;
-		vsnprintf_s(boost::next(buff, len),  UNIFIED_OUT_BUF_NUM - len, _TRUNCATE, fmt, ap);
-#else
-		strcpy(boost::next(buff, len), " -> ");
-		len += 4;
-		vsnprintf(boost::next(buff, len), UNIFIED_OUT_BUF_NUM - len, fmt, ap);
-#endif
+		if ('\n' == *boost::next(time_buff, len - 1))
+			*boost::next(time_buff, len - 1) = '\0';
+
+		printf("%s -> ", time_buff);
+		vprintf(fmt, ap);
+		putchar('\n');
 	}
 };
 
-#define all_out_helper(buff) va_list ap; va_start(ap, fmt); log_formater::all_out(buff, fmt, ap); va_end(ap)
-#define all_out_helper2 char output_buff[UNIFIED_OUT_BUF_NUM]; all_out_helper(output_buff); puts(output_buff)
+#define all_out_helper(head) va_list ap; va_start(ap, fmt); log_formater::all_out(head, fmt, ap); va_end(ap)
+#define all_out_helper2 all_out_helper(NULL)
 
 #ifndef CUSTOM_LOG
 class unified_out

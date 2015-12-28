@@ -20,20 +20,20 @@
 //configuration
 
 //demonstrate how to use custom log system:
-//notice: please don't forget to define the CUSTOM_LOG macro.
-//use your own code to replace all_out_helper2 macro, then you can record logs according to your wishes.
+//use your own code to replace the following all_out_helper2 macros, then you can record logs according to your wishes.
 //custom log should be defined(or included) before including any st_asio_wrapper header files except st_asio_wrapper_base.h
+//notice: please don't forget to define the CUSTOM_LOG macro.
 #include "../include/st_asio_wrapper_base.h"
 using namespace st_asio_wrapper;
 
 class unified_out
 {
 public:
-	static void fatal_out(const char* fmt, ...) {all_out_helper2;}
-	static void error_out(const char* fmt, ...) {all_out_helper2;}
-	static void warning_out(const char* fmt, ...) {all_out_helper2;}
-	static void info_out(const char* fmt, ...) {all_out_helper2;}
-	static void debug_out(const char* fmt, ...) {all_out_helper2;}
+	static void fatal_out(const char* fmt, ...) {all_out_helper("fatal");}
+	static void error_out(const char* fmt, ...) {all_out_helper("error");}
+	static void warning_out(const char* fmt, ...) {all_out_helper("warning");}
+	static void info_out(const char* fmt, ...) {all_out_helper("info");}
+	static void debug_out(const char* fmt, ...) {all_out_helper("debug");}
 };
 
 #include "../include/st_asio_wrapper_tcp_client.h"
