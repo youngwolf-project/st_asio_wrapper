@@ -1,13 +1,16 @@
 
+cflag = -Wall -fexceptions
 ifeq (${MAKECMDGOALS}, debug)
-	cflag = -g -DDEBUG
+	cflag += -g -DDEBUG
 	dir = debug
 else
-	cflag = -O -DNDEBUG
+	cflag += -O -DNDEBUG
 	lflag = -s
 	dir = release
 endif
-cflags = -Wall -fexceptions ${cflag}
+cflag += -pthread
+lflag += -pthread
+libs = -lcrypto -lssl -lboost_system -lboost_thread
 
 module = ssl_test
 target = ${dir}/${module}
@@ -19,10 +22,10 @@ ${shell mkdir -p ${dir}}
 release debug : ${target}
 -include ${deps}
 ${target} : ${objects}
-	g++ -o ${target} ${objects} ${lflag} -pthread -lcrypto -lssl -lboost_system -lboost_thread
+	g++ -o ${target} ${objects} ${lflag} ${libs}
 ${objects} : ${dir}/%.o : %.cpp
-	g++ ${cflags} -E -MMD -MT '${subst .cpp,.o,${dir}/$<}' -MF ${subst .cpp,.d,${dir}/$<} $< 1>/dev/null
-	g++ ${cflags} -c $< -o $@
+	g++ ${cflag} -E -MMD -MT '${subst .cpp,.o,${dir}/$<}' -MF ${subst .cpp,.d,${dir}/$<} $< 1>/dev/null
+	g++ ${cflag} -c $< -o $@
 
 .PHONY : clean
 clean:
