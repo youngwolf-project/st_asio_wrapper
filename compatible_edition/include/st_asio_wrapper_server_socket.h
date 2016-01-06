@@ -24,7 +24,7 @@ class i_server
 public:
 	virtual st_service_pump& get_service_pump() = 0;
 	virtual const st_service_pump& get_service_pump() const = 0;
-	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
+	virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
 };
 
 template<typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket>
