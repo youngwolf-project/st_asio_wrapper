@@ -10,6 +10,7 @@
 //#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define AUTO_CLEAR_CLOSED_SOCKET
 #define CLEAR_CLOSED_SOCKET_INTERVAL	1
+#define WANT_MSG_SEND_NOTIFY
 //configuration
 
 //use the following macro to control the type of packer and unpacker
@@ -72,7 +73,19 @@ public:
 	boost::uint64_t get_recv_bytes() const {return recv_bytes;}
 	operator boost::uint64_t() const {return recv_bytes;}
 
-	void restart() {recv_bytes = recv_index = 0;}
+	void clear_status() {recv_bytes = recv_index = 0;}
+	void begin(size_t msg_num_, size_t msg_len, char msg_fill)
+	{
+		clear_status();
+		msg_num = msg_num_;
+
+		char* buff = new char[msg_len];
+		memset(buff, msg_fill, msg_len);
+		memcpy(buff, &recv_index, sizeof(size_t)); //seq
+
+		send_msg(buff, msg_len);
+		delete[] buff;
+	}
 
 protected:
 	//msg handling
@@ -83,6 +96,24 @@ protected:
 	//we should handle msg in on_msg_handle for time-consuming task like this:
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
+
+#ifdef WANT_MSG_SEND_NOTIFY
+	virtual void on_msg_send(in_msg_type& msg)
+	{
+		if (0 == --msg_num)
+			return;
+
+		char* pstr = inner_packer()->raw_data(msg);
+		size_t msg_len = inner_packer()->raw_data_len(msg);
+
+		size_t send_index;
+		memcpy(&send_index, pstr, sizeof(size_t));
+		++send_index;
+		memcpy(pstr, &send_index, sizeof(size_t));
+
+		send_msg(pstr, msg_len);
+	}
+#endif
 
 private:
 	void handle_msg(out_msg_ctype& msg)
@@ -95,7 +126,7 @@ private:
 
 private:
 	boost::uint64_t recv_bytes;
-	size_t recv_index;
+	size_t recv_index, msg_num;
 };
 
 class test_client : public st_tcp_client_base<test_socket>
@@ -103,8 +134,7 @@ class test_client : public st_tcp_client_base<test_socket>
 public:
 	test_client(st_service_pump& service_pump_) : st_tcp_client_base<test_socket>(service_pump_) {}
 
-	void restart() {do_something_to_all(boost::mem_fn(&test_socket::restart));}
-	boost::uint64_t get_total_recv_bytes()
+	boost::uint64_t get_recv_bytes()
 	{
 		boost::uint64_t total_recv_bytes = 0;
 		do_something_to_all(boost::ref(total_recv_bytes) += *boost::lambda::_1);
@@ -112,6 +142,9 @@ public:
 
 		return total_recv_bytes;
 	}
+
+	void clear_status() {do_something_to_all(boost::mem_fn(&test_socket::clear_status));}
+	void begin(size_t msg_num, size_t msg_len, char msg_fill) {do_something_to_all(boost::bind(&test_socket::begin, _1, msg_num, msg_len, msg_fill));}
 
 	void close_some_client(size_t n)
 	{
@@ -184,7 +217,7 @@ int main(int argc, const char* argv[])
 		client.add_client();
 	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, port, boost::ref(ip)));
 
-	//method #2, set the server address via add_clinet.
+	//method #2, set the server address via add_client.
 	for (size_t i = link_num / 2; i < link_num; ++i)
 		client.add_client(port, ip);
 
@@ -285,10 +318,36 @@ int main(int argc, const char* argv[])
 				printf("test parameters after adjustment: " size_t_format " " size_t_format " %c %d\n", msg_num, msg_len, msg_fill, model);
 				puts("performance test begin, this application will have no response during the test!");
 
-				client.restart();
-
+				client.clear_status();
 				total_msg_bytes *= msg_len;
 				boost::timer::cpu_timer begin_time;
+
+#ifdef WANT_MSG_SEND_NOTIFY
+				if (0 == model)
+				{
+					client.begin(msg_num, msg_len, msg_fill);
+
+					unsigned new_percent = 0;
+					do
+					{
+						boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
+
+						new_percent = (unsigned) (100 * client.get_recv_bytes() / total_msg_bytes);
+						if (percent != new_percent)
+						{
+							percent = new_percent;
+							printf("\r%u%%", percent);
+							fflush(stdout);
+						}
+					} while (100 != new_percent);
+
+					double used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
+					printf("\r100%%\ntime spent statistics: %.1f seconds.\n", used_time);
+					printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+				}
+				else
+					puts("if WANT_MSG_SEND_NOTIFY defined, only support model 0!");
+#else
 				char* buff = new char[msg_len];
 				memset(buff, msg_fill, msg_len);
 				boost::uint64_t send_bytes = 0;
@@ -320,12 +379,13 @@ int main(int argc, const char* argv[])
 				}
 				delete[] buff;
 
-				while(client.get_total_recv_bytes() != total_msg_bytes)
+				while(client.get_recv_bytes() != total_msg_bytes)
 					boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
 				double used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
 				printf("\r100%%\ntime spent statistics: %.1f seconds.\n", used_time);
 				printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+#endif
 			} // if (total_data_num > 0)
 		}
 	}
@@ -339,6 +399,7 @@ int main(int argc, const char* argv[])
 #undef FORCE_TO_USE_MSG_RECV_BUFFER
 #undef AUTO_CLEAR_CLOSED_SOCKET
 #undef CLEAR_CLOSED_SOCKET_INTERVA
+#undef WANT_MSG_SEND_NOTIFY
 #undef DEFAULT_PACKER
 #undef DEFAULT_UNPACKER
 //restore configuration

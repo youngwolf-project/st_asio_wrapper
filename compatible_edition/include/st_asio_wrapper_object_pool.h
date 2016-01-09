@@ -111,18 +111,23 @@ protected:
 		return object_can.size() < MAX_OBJECT_NUM ? object_can.insert(object_ptr).second : false;
 	}
 
-	//this method will always insert object_ptr into temp_object_can, but will return false if object_ptr cannot be found in object_can
+	//only add object_ptr to temp_object_can when it's in object_can, this can avoid duplicated items in temp_object_can, because temp_object_can is a list, there's no way to check the existence
+	//of an item in a list efficiently.
 	bool del_object(object_ctype& object_ptr)
 	{
 		assert(object_ptr);
 
+		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
+		bool exist = object_can.erase(object_ptr) > 0;
+		lock.unlock();
+
+		if (exist)
 		{
 			boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
 			temp_object_can.push_back(object_ptr);
 		}
 
-		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
-		return object_can.erase(object_ptr) > 0;
+		return exist;
 	}
 
 	virtual object_type reuse_object()

@@ -29,11 +29,11 @@ using namespace st_asio_wrapper;
 class unified_out
 {
 public:
-	static void fatal_out(const char* fmt, ...) {all_out_helper("fatal");}
-	static void error_out(const char* fmt, ...) {all_out_helper("error");}
-	static void warning_out(const char* fmt, ...) {all_out_helper("warning");}
-	static void info_out(const char* fmt, ...) {all_out_helper("info");}
-	static void debug_out(const char* fmt, ...) {all_out_helper("debug");}
+	static void fatal_out(const char* fmt, ...) {all_out_helper2("fatal");}
+	static void error_out(const char* fmt, ...) {all_out_helper2("error");}
+	static void warning_out(const char* fmt, ...) {all_out_helper2("warning");}
+	static void info_out(const char* fmt, ...) {all_out_helper2("info");}
+	static void debug_out(const char* fmt, ...) {all_out_helper2("debug");}
 };
 
 #include "../include/st_asio_wrapper_tcp_client.h"

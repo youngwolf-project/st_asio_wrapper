@@ -65,11 +65,10 @@ public:
 	//implement i_server's pure virtual functions
 	virtual st_service_pump& get_service_pump() {return Pool::get_service_pump();}
 	virtual const st_service_pump& get_service_pump() const {return Pool::get_service_pump();}
-	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr)
+	virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr)
 	{
 		auto raw_client_ptr(boost::dynamic_pointer_cast<Socket>(client_ptr));
-		if (ST_THIS del_object(raw_client_ptr))
-			raw_client_ptr->force_close();
+		return raw_client_ptr && ST_THIS del_object(raw_client_ptr) ? raw_client_ptr->force_close(), true : false;
 	}
 
 	//do not use graceful_close() as client does, because in this function, object_can_mutex has been locked, graceful_close will wait until on_recv_error() been invoked,

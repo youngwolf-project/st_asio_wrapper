@@ -309,13 +309,24 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //UDP msg sending interface
 ///////////////////////////////////////////////////
 
+#include <sstream>
+
+#ifndef UNIFIED_OUT_BUF_NUM
+#define UNIFIED_OUT_BUF_NUM	2048
+#endif
+
 class log_formater
 {
 public:
-	static void all_out(const char* head, const char* fmt, va_list& ap)
+	static void all_out(const char* head, char* buff, size_t buff_len, const char* fmt, va_list& ap)
 	{
+		assert(NULL != buff && buff_len > 0);
+
+		std::stringstream os;
+		os.rdbuf()->pubsetbuf(buff, buff_len);
+
 		if (NULL != head)
-			printf("[%s] ", head);
+			os << '[' << head << "] ";
 
 		char time_buff[64];
 		time_t now = time(NULL);
@@ -326,17 +337,28 @@ public:
 #endif
 		size_t len = strlen(time_buff);
 		assert(len > 0);
-		if ('\n' == *boost::next(time_buff, len - 1))
-			*boost::next(time_buff, len - 1) = '\0';
+		if ('\n' == *boost::next(time_buff, --len))
+			*boost::next(time_buff, len) = '\0';
 
-		printf("%s -> ", time_buff);
-		vprintf(fmt, ap);
-		putchar('\n');
+		os << time_buff << " -> ";
+
+#ifdef _MSC_VER
+		os.rdbuf()->sgetn(buff, buff_len);
+#endif
+		len = os.tellp();
+		if (len >= buff_len)
+			*boost::next(buff, buff_len - 1) = '\0';
+		else
+#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
+			vsnprintf_s(boost::next(buff, len),  buff_len - len, _TRUNCATE, fmt, ap);
+#else
+			vsnprintf(boost::next(buff, len), buff_len - len, fmt, ap);
+#endif
 	}
 };
 
-#define all_out_helper(head) va_list ap; va_start(ap, fmt); log_formater::all_out(head, fmt, ap); va_end(ap)
-#define all_out_helper2 all_out_helper(NULL)
+#define all_out_helper(head, buff, buff_len) va_list ap; va_start(ap, fmt); log_formater::all_out(head, buff, buff_len, fmt, ap); va_end(ap)
+#define all_out_helper2(head) char output_buff[UNIFIED_OUT_BUF_NUM]; all_out_helper(head, output_buff, sizeof(output_buff)); puts(output_buff)
 
 #ifndef CUSTOM_LOG
 class unified_out
@@ -349,11 +371,11 @@ public:
 	static void info_out(const char* fmt, ...) {}
 	static void debug_out(const char* fmt, ...) {}
 #else
-	static void fatal_out(const char* fmt, ...) {all_out_helper2;}
-	static void error_out(const char* fmt, ...) {all_out_helper2;}
-	static void warning_out(const char* fmt, ...) {all_out_helper2;}
-	static void info_out(const char* fmt, ...) {all_out_helper2;}
-	static void debug_out(const char* fmt, ...) {all_out_helper2;}
+	static void fatal_out(const char* fmt, ...) {all_out_helper2(NULL);}
+	static void error_out(const char* fmt, ...) {all_out_helper2(NULL);}
+	static void warning_out(const char* fmt, ...) {all_out_helper2(NULL);}
+	static void info_out(const char* fmt, ...) {all_out_helper2(NULL);}
+	static void debug_out(const char* fmt, ...) {all_out_helper2(NULL);}
 #endif
 };
 #endif
