@@ -67,6 +67,9 @@ protected:
 public:
 	virtual void reset_state() {}
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+	virtual char* raw_data(msg_type& msg) const {return nullptr;}
+	virtual const char* raw_data(msg_ctype& msg) const {return nullptr;}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return 0;}
 
 	msg_type pack_msg(const char* pstr, size_t len, bool native = false) {return pack_msg(&pstr, &len, 1, native);}
 	msg_type pack_msg(const std::string& str, bool native = false) {return pack_msg(str.data(), str.size(), native);}
@@ -110,6 +113,10 @@ public:
 
 		return msg;
 	}
+
+	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(std::next(msg.data(), HEAD_LEN));}
+	virtual const char* raw_data(msg_ctype& msg) const {return std::next(msg.data(), HEAD_LEN);}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - HEAD_LEN;}
 };
 
 class replaceable_packer : public i_packer<replaceable_buffer>
@@ -125,6 +132,10 @@ public:
 
 		return msg_type(com);
 	}
+
+	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(std::next(msg.data(), HEAD_LEN));}
+	virtual const char* raw_data(msg_ctype& msg) const {return std::next(msg.data(), HEAD_LEN);}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - HEAD_LEN;}
 };
 
 class prefix_suffix_packer : public i_packer<std::string>
@@ -157,6 +168,10 @@ public:
 
 		return msg;
 	}
+
+	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(msg.data());}
+	virtual const char* raw_data(msg_ctype& msg) const {return msg.data();}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size();}
 
 private:
 	std::string _prefix, _suffix;
