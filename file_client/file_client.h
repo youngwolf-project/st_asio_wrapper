@@ -8,7 +8,7 @@ using namespace st_asio_wrapper;
 
 extern boost::atomic_ushort completed_client_num;
 extern int link_num;
-extern __off64_t file_size;
+extern off_t file_size;
 
 class file_socket : public base_socket, public st_connector
 {
@@ -20,12 +20,12 @@ public:
 	virtual void reset() {clear(); st_connector::reset();}
 
 	void set_index(int index_) {index = index_;}
-	__off64_t get_rest_size() const
+	off_t get_rest_size() const
 	{
 		auto unpacker = boost::dynamic_pointer_cast<const data_unpacker>(inner_unpacker());
 		return nullptr == unpacker ? 0 : unpacker->get_rest_size();
 	}
-	operator __off64_t() const {return get_rest_size();}
+	operator off_t() const {return get_rest_size();}
 
 	bool get_file(const std::string& file_name)
 	{
@@ -107,7 +107,7 @@ private:
 		case 0:
 			if (ORDER_LEN + DATA_LEN == msg.size() && nullptr != file && TRANS_PREPARE == state)
 			{
-				__off64_t length;
+				off_t length;
 				memcpy(&length, std::next(msg.data(), ORDER_LEN), DATA_LEN);
 				if (-1 == length)
 				{
@@ -135,7 +135,7 @@ private:
 						state = TRANS_BUSY;
 						send_msg(buffer, sizeof(buffer), true);
 
-						fseeko64(file, offset, SEEK_SET);
+						fseeko(file, offset, SEEK_SET);
 						inner_unpacker(boost::make_shared<data_unpacker>(file, my_length));
 					}
 					else
@@ -161,9 +161,9 @@ class file_client : public st_tcp_client_base<file_socket>
 public:
 	file_client(st_service_pump& service_pump_) : st_tcp_client_base<file_socket>(service_pump_) {}
 
-	__off64_t get_total_rest_size()
+	off_t get_total_rest_size()
 	{
-		__off64_t total_rest_size = 0;
+		off_t total_rest_size = 0;
 		do_something_to_all([&total_rest_size](object_ctype& item) {total_rest_size += *item;});
 //		do_something_to_all([&total_rest_size](object_ctype& item) {total_rest_size += item->get_rest_size();});
 

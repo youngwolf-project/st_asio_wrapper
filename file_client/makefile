@@ -8,7 +8,7 @@ else
 	lflag = -s
 	dir = release
 endif
-cflag += -pthread
+cflag += -D_FILE_OFFSET_BITS=64 -pthread
 lflag += -pthread
 libs = -lboost_system -lboost_thread -lboost_timer
 
