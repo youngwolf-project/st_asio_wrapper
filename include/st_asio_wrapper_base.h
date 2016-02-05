@@ -348,7 +348,7 @@ public:
 #ifdef _MSC_VER
 		os.rdbuf()->sgetn(buff, buff_len);
 #endif
-		len = os.tellp();
+		len = (size_t) os.tellp();
 		if (len >= buff_len)
 			*std::next(buff, buff_len - 1) = '\0';
 		else

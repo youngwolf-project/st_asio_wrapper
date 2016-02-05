@@ -5,8 +5,16 @@
 #include "../include/st_asio_wrapper_unpacker.h"
 using namespace st_asio_wrapper;
 
+#ifdef _MSC_VER
+#define fseeko _fseeki64
+#define ftello _ftelli64
+#define fl_type __int64
+#else
+#define fl_type off_t
+#endif
+
 #define ORDER_LEN	sizeof(char)
-#define OFFSET_LEN	sizeof(off_t)
+#define OFFSET_LEN	sizeof(fl_type)
 #define DATA_LEN	OFFSET_LEN
 
 /*
@@ -28,7 +36,7 @@ if head equal to:
 class file_buffer : public i_buffer
 {
 public:
-	file_buffer(FILE* file, off_t data_len) : _file(file), _data_len(data_len)
+	file_buffer(FILE* file, fl_type data_len) : _file(file), _data_len(data_len)
 	{
 		assert(nullptr != _file);
 
@@ -65,13 +73,13 @@ protected:
 	char* buffer;
 	size_t buffer_len;
 
-	off_t _data_len;
+	fl_type _data_len;
 };
 
 class data_unpacker : public i_unpacker<replaceable_buffer>
 {
 public:
-	data_unpacker(FILE* file, off_t data_len)  : _file(file), _data_len(data_len)
+	data_unpacker(FILE* file, fl_type data_len)  : _file(file), _data_len(data_len)
 	{
 		assert(nullptr != _file);
 
@@ -80,12 +88,12 @@ public:
 	}
 	~data_unpacker() {delete[] buffer;}
 
-	off_t get_rest_size() const {return _data_len;}
+	fl_type get_rest_size() const {return _data_len;}
 
 	virtual void reset_state() {_file = nullptr; delete[] buffer; buffer = nullptr; _data_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
-		assert(_data_len >= (off_t) bytes_transferred && bytes_transferred > 0);
+		assert(_data_len >= (fl_type) bytes_transferred && bytes_transferred > 0);
 		_data_len -= bytes_transferred;
 
 		if (bytes_transferred != fwrite(buffer, 1, bytes_transferred, _file))
@@ -111,7 +119,7 @@ protected:
 	FILE* _file;
 	char* buffer;
 
-	off_t _data_len;
+	fl_type _data_len;
 };
 
 class base_socket

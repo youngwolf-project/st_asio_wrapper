@@ -82,9 +82,9 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 	case 1:
 		if (TRANS_PREPARE == state && nullptr != file && ORDER_LEN + OFFSET_LEN + DATA_LEN == msg.size())
 		{
-			off_t offset;
+			fl_type offset;
 			memcpy(&offset, std::next(msg.data(), ORDER_LEN), OFFSET_LEN);
-			off_t length;
+			fl_type length;
 			memcpy(&length, std::next(msg.data(), ORDER_LEN + OFFSET_LEN), DATA_LEN);
 			if (offset >= 0 && length > 0 && offset + length <= ftello(file))
 			{

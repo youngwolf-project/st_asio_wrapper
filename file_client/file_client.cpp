@@ -15,7 +15,7 @@
 
 boost::atomic_ushort completed_client_num;
 int link_num = 1;
-off_t file_size;
+fl_type file_size;
 
 int main(int argc, const char* argv[])
 {
