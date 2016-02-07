@@ -333,7 +333,7 @@ public:
 
 		char time_buff[64];
 		auto now = time(nullptr);
-#if defined _MSC_VER
+#ifdef _MSC_VER
 		ctime_s(time_buff, sizeof(time_buff), &now);
 #else
 		ctime_r(&now, time_buff);
@@ -345,7 +345,7 @@ public:
 
 		os << time_buff << " -> ";
 
-#ifdef _MSC_VER
+#if defined _MSC_VER || (defined __unix__ && !defined __linux__)
 		os.rdbuf()->sgetn(buff, buff_len);
 #endif
 		len = (size_t) os.tellp();
