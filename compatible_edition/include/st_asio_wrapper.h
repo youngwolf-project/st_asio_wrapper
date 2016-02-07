@@ -414,18 +414,15 @@
 #define ST_ASIO_WRAPPER_VERSION 50202
 
 #if !defined _MSC_VER && !defined __GNUC__
-#error st_asio_wrapper only support vc and gcc.
+#error st_asio_wrapper only support VC and GNUC compatible compiler(such as gcc and clang).
 #endif
 
 #if defined _MSC_VER && _MSC_VER >= 1600
 #warning Your compiler is vc2010 or higher, you can use the standard edition to gain some performance improvement.
 #endif
 
-//After a roughly reading from gcc.gnu.org, I guess that the minimum version of gcc that support c++0x
-//is 4.6, so, I supply the following compiler verification. If there's something wrong, you can freely
-//modify them, and if you let me know, I'll be very appreciated.
-#if defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6)
-#warning Your compiler is gcc4.6 or higher, you can use the standard edition to gain some performance improvement.
+#if defined __GNUC__ && (__GNUC__ >= 4)
+#warning Your compiler maybe support C++0x, you can use the standard edition to gain some performance improvement.
 #endif
 
 #endif /* ST_ASIO_WRAPPER_H_ */

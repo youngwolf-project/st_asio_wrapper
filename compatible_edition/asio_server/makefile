@@ -9,7 +9,11 @@ else
 	dir = release
 endif
 cflag += -pthread
+#you may need the next line when compiling this project with clang under UNIX-like system, then please uncomment it
+#cflag += -I/usr/local/include/
 lflag += -pthread
+#you may need the next line when compiling this project with clang under UNIX-like system, then please uncomment it
+#lflag += -L/usr/local/lib/
 libs = -lboost_system -lboost_thread
 
 module = asio_server
@@ -22,10 +26,10 @@ ${shell mkdir -p ${dir}}
 release debug : ${target}
 -include ${deps}
 ${target} : ${objects}
-	g++ -o ${target} ${objects} ${lflag} ${libs}
+	${CXX} -o ${target} ${objects} ${lflag} ${libs}
 ${objects} : ${dir}/%.o : %.cpp
-	g++ ${cflag} -E -MMD -MT '${subst .cpp,.o,${dir}/$<}' -MF ${subst .cpp,.d,${dir}/$<} $< 1>/dev/null
-	g++ ${cflag} -c $< -o $@
+	${CXX} ${cflag} -E -MMD -MT '${subst .cpp,.o,${dir}/$<}' -MF ${subst .cpp,.d,${dir}/$<} $< 1>/dev/null
+	${CXX} ${cflag} -c $< -o $@
 
 .PHONY : clean
 clean:

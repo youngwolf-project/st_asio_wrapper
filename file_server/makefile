@@ -10,10 +10,10 @@ else
 endif
 cflag += -D_FILE_OFFSET_BITS=64 -pthread
 #you may need the next line when compiling this project with clang under UNIX-like system, then please uncomment it
-cflag += -I/usr/local/include/
+#cflag += -I/usr/local/include/
 lflag += -pthread
-#you man need the next line when compiling this project with clang under UNIX-like system, then please uncomment it
-lflag += -L/usr/local/lib/
+#you may need the next line when compiling this project with clang under UNIX-like system, then please uncomment it
+#lflag += -L/usr/local/lib/
 libs = -lboost_system -lboost_thread
 
 module = file_server
