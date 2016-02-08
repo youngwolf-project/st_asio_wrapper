@@ -11,7 +11,7 @@ using namespace st_asio_wrapper;
 
 extern boost::atomic_ushort completed_client_num;
 extern int link_num;
-extern __off64_t file_size;
+extern fl_type file_size;
 
 class file_socket : public base_socket, public st_connector
 {
@@ -23,12 +23,12 @@ public:
 	virtual void reset() {clear(); st_connector::reset();}
 
 	void set_index(int index_) {index = index_;}
-	__off64_t get_rest_size() const
+	fl_type get_rest_size() const
 	{
 		BOOST_AUTO(unpacker, boost::dynamic_pointer_cast<const data_unpacker>(inner_unpacker()));
 		return NULL == unpacker ? 0 : unpacker->get_rest_size();
 	}
-	operator __off64_t() const {return get_rest_size();}
+	operator fl_type() const {return get_rest_size();}
 
 	bool get_file(const std::string& file_name)
 	{
@@ -114,7 +114,7 @@ private:
 		case 0:
 			if (ORDER_LEN + DATA_LEN == msg.size() && NULL != file && TRANS_PREPARE == state)
 			{
-				__off64_t length;
+				fl_type length;
 				memcpy(&length, boost::next(msg.data(), ORDER_LEN), DATA_LEN);
 				if (-1 == length)
 				{
@@ -127,8 +127,8 @@ private:
 					if (0 == index)
 						file_size = length;
 
-					__off64_t my_length = length / link_num;
-					__off64_t offset = my_length * index;
+					fl_type my_length = length / link_num;
+					fl_type offset = my_length * index;
 
 					if (link_num - 1 == index)
 						my_length = length - offset;
@@ -142,7 +142,7 @@ private:
 						state = TRANS_BUSY;
 						send_msg(buffer, sizeof(buffer), true);
 
-						fseeko64(file, offset, SEEK_SET);
+						fseeko(file, offset, SEEK_SET);
 						inner_unpacker(boost::make_shared<data_unpacker>(file, my_length));
 					}
 					else
@@ -168,9 +168,9 @@ class file_client : public st_tcp_client_base<file_socket>
 public:
 	file_client(st_service_pump& service_pump_) : st_tcp_client_base<file_socket>(service_pump_) {}
 
-	__off64_t get_total_rest_size()
+	fl_type get_total_rest_size()
 	{
-		__off64_t total_rest_size = 0;
+		fl_type total_rest_size = 0;
 		do_something_to_all(boost::ref(total_rest_size) += *boost::lambda::_1);
 //		do_something_to_all(boost::ref(total_rest_size) += boost::lambda::bind(&file_socket::get_rest_size, &*boost::lambda::_1));
 

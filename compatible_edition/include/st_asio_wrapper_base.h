@@ -330,7 +330,7 @@ public:
 
 		char time_buff[64];
 		time_t now = time(NULL);
-#if defined _MSC_VER
+#ifdef _MSC_VER
 		ctime_s(time_buff, sizeof(time_buff), &now);
 #else
 		ctime_r(&now, time_buff);
@@ -342,10 +342,10 @@ public:
 
 		os << time_buff << " -> ";
 
-#ifdef _MSC_VER
+#if defined _MSC_VER || (defined __unix__ && !defined __linux__)
 		os.rdbuf()->sgetn(buff, buff_len);
 #endif
-		len = os.tellp();
+		len = (size_t) os.tellp();
 		if (len >= buff_len)
 			*boost::next(buff, buff_len - 1) = '\0';
 		else

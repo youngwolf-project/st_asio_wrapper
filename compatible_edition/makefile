@@ -1,20 +1,20 @@
 
-MAKE = make
+ST_MAKE = ${MAKE_COMMAND}
 ifeq (${MAKECMDGOALS}, debug)
-	MAKE = make debug
+	ST_MAKE += debug
 else
 	ifeq (${MAKECMDGOALS}, clean)
-		MAKE = make clean
+		ST_MAKE += clean
 	endif
 endif
 
 
 release debug clean :
-	cd asio_server && ${MAKE}
-	cd asio_client && ${MAKE}
-	cd test_client && ${MAKE}
-	cd file_server && ${MAKE}
-	cd file_client && ${MAKE}
-	cd udp_client && ${MAKE}
-	cd ssl_test && ${MAKE}
+	cd asio_server && ${ST_MAKE}
+	cd asio_client && ${ST_MAKE}
+	cd test_client && ${ST_MAKE}
+	cd file_server && ${ST_MAKE}
+	cd file_client && ${ST_MAKE}
+	cd udp_client && ${ST_MAKE}
+	cd ssl_test && ${ST_MAKE}
 

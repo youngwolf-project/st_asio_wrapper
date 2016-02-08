@@ -15,7 +15,7 @@
 
 boost::atomic_ushort completed_client_num;
 int link_num = 1;
-__off64_t file_size;
+fl_type file_size;
 
 int main(int argc, const char* argv[])
 {
@@ -75,7 +75,7 @@ int main(int argc, const char* argv[])
 						boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 						if (file_size > 0)
 						{
-							__off64_t total_rest_size = client.get_total_rest_size();
+							fl_type total_rest_size = client.get_total_rest_size();
 							if (total_rest_size > 0)
 							{
 								unsigned new_percent = (unsigned) ((file_size - total_rest_size) * 100 / file_size);
