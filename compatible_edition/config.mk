@@ -1,7 +1,7 @@
 
-If your compiler cannot find the boost's location independently, please specify them explicitly like this(please uncomment them first):
-#boost_include_dir = /usr/local/include/
-#boost_lib_dir = /usr/local/lib/
+# If your compiler cannot find the boost's location independently, please specify them explicitly like this(please uncomment them first):
+#boost_include_dir = -I/usr/local/include/
+#boost_lib_dir = -L/usr/local/lib/
 
 cflag = -Wall -fexceptions
 ifeq (${MAKECMDGOALS}, debug)
