@@ -406,12 +406,30 @@
  * Reserved timer 10 ~ 19 to st_server_socket.
  * Fix bug: graceful_close and force_close cannot reconnect to the server(introduced by asynchronous graceful close feature).
  *
+ * 5.2.5	2016.2.8
+ * Let user to control the delay time of reconnecting via prepare_re_connect.
+ * Fix reconnecting issue on QNX.
+ * New feature: Add interface to manipulate st_object_pool's container(unordered_set).
+ * Synchronized doc.
+ * Fix bug(test_client): latter added clients cannot connect to the server if the server not started up with default parameters.
+ * Be compatible with boost 1.60.
+ * Make the compilation of POSIX thread more standard.
+ * New feature: del_client return a value to indicate the result;
+ * Avoid duplicated items in st_object_pool::temp_object_can.
+ * Optimized log system.
+ * New feature: packers will be able to extract raw data from packed msg.
+ * New demonstration: instead of safe_broadcast_msg, let test_socket to finish its test independently, and not use send buffer anymore(send msg one by one in on_msg_send).
+ * Support gmake(GNU make's name on UNIX-like system).
+ * Make big file support more standard in demo file_server and file_client.
+ * Support clang.
+ * Fix bug: all_out() output random strings on UNIX-like system(such as FreeBSD).
+ * Simplified makefiles.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VERSION 50202
+#define ST_ASIO_WRAPPER_VERSION 50205
 
 #if !defined _MSC_VER && !defined __GNUC__
 #error st_asio_wrapper only support VC and GNUC compatible compiler(such as gcc and clang).
