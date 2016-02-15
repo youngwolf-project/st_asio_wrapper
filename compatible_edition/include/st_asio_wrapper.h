@@ -431,16 +431,29 @@
 
 #define ST_ASIO_WRAPPER_VERSION 50205
 
-#if !defined _MSC_VER && !defined __GNUC__
-#error st_asio_wrapper only support VC and GNUC compatible compiler(such as gcc and clang).
+#ifdef _MSC_VER
+	#if _MSC_VER >= 1600
+		#warning Your compiler is Visual C++ 10.0 or higher, you can use the standard edition to gain some performance improvement.
+	#endif
+#elif __GNUC__
+	//After a roughly reading from gcc.gnu.org and clang.llvm.org, I believed that the minimum version of GCC and Clang that support c++0x
+	//are 4.6 and 3.1, so, I supply the following compiler verification. If there's something wrong, you can freely modify them,
+	//and if you let me know, I'll be very appreciated.
+	#ifdef __clang__
+		#if __clang_major__ > 3 || __clang_major__ == 3 && __clang_minor__ >= 1
+			#warning Your compiler is Clang 3.1 or higher, you can use the standard edition to gain some performance improvement.
+		#endif
+	#else
+		#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6
+			#warning Your compiler is GCC 4.6 or higher, you can use the standard edition to gain some performance improvement.
+		#endif
+	#endif
+#else
+	#error st_asio_wrapper only support Visual C++ and GCC compatible compiler(such as Clang).
 #endif
 
-#if defined _MSC_VER && _MSC_VER >= 1600
-#warning Your compiler is vc2010 or higher, you can use the standard edition to gain some performance improvement.
-#endif
-
-#if defined __GNUC__ && (__GNUC__ >= 4)
-#warning Your compiler maybe support C++0x, you can use the standard edition to gain some performance improvement.
+#if defined(__cplusplus) && __cplusplus >= 201103L
+	#warning st_asio_wrapper(compatible edition) does not need any c++0x features.
 #endif
 
 #endif /* ST_ASIO_WRAPPER_H_ */
