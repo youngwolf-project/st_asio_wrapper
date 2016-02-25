@@ -27,13 +27,18 @@ public:
 	typedef const msg_type msg_ctype;
 
 protected:
-	virtual ~i_packer() {}
+	virtual ~i_packer();
 
 public:
-	virtual void reset_state() {}
+	virtual void reset_state();
 	virtual MsgType pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
 打包函数，如果使用者调用send_msg, broadcast_msg, post_msg，则会以native为false调用本函数；
 如果使用都调用send_native_msg, broadcast_native_msg, post_native_msg，则会以native为true调用本函数。
+
+	virtual char* raw_data(msg_type& msg) const;
+	virtual const char* raw_data(msg_ctype& msg) const;
+	virtual size_t raw_data_len(msg_ctype& msg) const;
+从一个打包器对象中，得到原始数据。
 
 	msg_type pack_msg(const char* pstr, size_t len, bool native = false) {return pack_msg(&pstr, &len, 1, native);}
 	msg_type pack_msg(const std::string& str, bool native = false) {return pack_msg(str.data(), str.size(), native);}

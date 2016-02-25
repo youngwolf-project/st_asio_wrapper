@@ -40,9 +40,9 @@ ssl使用。
 
 	virtual st_service_pump& get_service_pump();
 	virtual const st_service_pump& get_service_pump() const;
-	virtual void del_client(const boost::shared_ptr<st_timer>& client_ptr);
-实现i_server中的三个纯虚接口。del_client的功能主要是调用st_object_pool的del_object函数，并输出一些信息，主要用于连接断开时，
-也可用于主动断开连接，但是用st_socket的force_close或者graceful_close理合理一点。
+	virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr);
+实现i_server中的三个纯虚接口。del_client的功能主要是调用st_object_pool的del_object函数，并输出一些信息，主要用于连接断开时调用，
+也可用于主动断开连接，但是用st_socket的force_close或者graceful_close更理合理一些。
 
 	void close_all_client();
 关闭所有连接，退出服务器时使用。
