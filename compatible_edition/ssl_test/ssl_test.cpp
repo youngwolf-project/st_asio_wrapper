@@ -1,7 +1,7 @@
 
 //configuration
 #define SERVER_PORT		9527
-#define REUSE_OBJECT //use objects pool
+//#define REUSE_OBJECT //use objects pool
 //#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ENHANCED_STABILITY
 //#define DEFAULT_PACKER replaceable_packer
@@ -39,7 +39,8 @@ int main() {
 	ssl_client.ssl_context().use_tmp_dh_file("client_certs/dh1024.pem");
 
 	//please config the ssl context before creating any clients.
-	ssl_client.add_client(SERVER_PORT, SERVER_IP);
+	ssl_client.add_client();
+	ssl_client.add_client();
 */
 ///*
 	//method #2
@@ -53,7 +54,7 @@ int main() {
 	ctx.use_tmp_dh_file("client_certs/dh1024.pem");
 
 	st_ssl_tcp_sclient ssl_sclient(service_pump, ctx);
-	ssl_sclient.set_server_addr(SERVER_PORT, SERVER_IP);
+#define ssl_client ssl_sclient
 //*/
 	service_pump.start_service();
 	while(service_pump.is_running())
@@ -61,15 +62,24 @@ int main() {
 		std::string str;
 		std::cin >> str;
 		if (str == QUIT_COMMAND)
+		{
+			service_pump.stop_service(&ssl_client);
+			sleep(1);
 			service_pump.stop_service();
+		}
 		else if (str == RESTART_COMMAND)
 		{
+			service_pump.stop_service(&ssl_client);
+			sleep(1);
 			service_pump.stop_service();
+
 			service_pump.start_service();
 		}
 		else if (str == RECONNECT_COMMAND)
-			ssl_sclient.graceful_close(true);
-//			ssl_client.at(0)->graceful_close(true);
+			puts("I still not find a way to reuse a boost::asio::ssl::stream,\n"
+				"it can reconnect to the server, but can not re-handshake with the server,\n"
+				"if somebody knows how to fix this defect, please tell me, thanks in advance.");
+//			ssl_client->graceful_close(true);
 		else
 			server_.broadcast_msg(str);
 	}
