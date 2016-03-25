@@ -45,7 +45,7 @@ public:
 	void force_close()
 	{
 		if (1 != ST_THIS close_state)
-			show_info("link:", "been closed.");
+			show_info("server link:", "been closed.");
 
 		st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();
 	}
@@ -53,7 +53,7 @@ public:
 	void graceful_close(bool sync = true)
 	{
 		if (!ST_THIS is_closing())
-			show_info("link:", "been closing gracefully.");
+			show_info("server link:", "been closing gracefully.");
 
 		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
 			ST_THIS set_timer(10, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
@@ -91,7 +91,7 @@ protected:
 	//do not forget to force_close this socket(in del_client(), there's a force_close() invocation)
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
-		ST_THIS show_info("link:", "broken/closed", ec);
+		ST_THIS show_info("server link:", "broken/closed", ec);
 
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
 		ST_THIS force_close();

@@ -121,7 +121,11 @@ protected:
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()),
-				boost::bind(&st_tcp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+				boost::bind(&st_tcp_socket_base::send_handler, this,
+#ifdef ENHANCED_STABILITY
+					ST_THIS async_call_indicator,
+#endif
+					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 			ST_THIS send_msg_buffer.pop_front();
 		}
 
@@ -149,7 +153,11 @@ protected:
 		if (boost::asio::buffer_size(recv_buff) > 0)
 			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
 				boost::bind(&i_unpacker<out_msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
-				boost::bind(&st_tcp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+				boost::bind(&st_tcp_socket_base::recv_handler, this,
+#ifdef ENHANCED_STABILITY
+					ST_THIS async_call_indicator,
+#endif
+					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 	}
 
 	void clean_up()
@@ -166,7 +174,11 @@ protected:
 		}
 	}
 
-	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
+	void recv_handler(
+#ifdef ENHANCED_STABILITY
+		boost::shared_ptr<char> async_call_indicator,
+#endif
+		const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec && bytes_transferred > 0)
 		{
@@ -184,7 +196,11 @@ protected:
 			ST_THIS on_recv_error(ec);
 	}
 
-	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
+	void send_handler(
+#ifdef ENHANCED_STABILITY
+		boost::shared_ptr<char> async_call_indicator,
+#endif
+		const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec)
 		{

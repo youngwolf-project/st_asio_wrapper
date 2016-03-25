@@ -34,10 +34,10 @@ public:
 	typedef typename Unpacker::container_type out_container_type;
 
 protected:
-	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {reset_state();}
+	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {init();}
 
 	template<typename Arg>
-	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {reset_state();}
+	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {init();}
 
 	void reset_state()
 	{
@@ -70,6 +70,11 @@ public:
 	{
 		if (started())
 			return false;
+
+#ifdef ENHANCED_STABILITY
+		if (!async_call_indicator.unique())
+			return false;
+#endif
 
 		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex, boost::try_to_lock);
 		return lock.owns_lock() && recv_msg_buffer.empty(); //if successfully locked, means this st_socket is idle
@@ -365,6 +370,14 @@ protected:
 		return true;
 	}
 
+	void init()
+	{
+		reset_state();
+#ifdef ENHANCED_STABILITY
+		async_call_indicator = boost::make_shared<char>('\0');
+#endif
+	}
+
 protected:
 	boost::uint_fast64_t _id;
 	Socket next_layer_;
@@ -386,6 +399,10 @@ protected:
 
 	bool started_; //has started or not
 	boost::shared_mutex start_mutex;
+
+#ifdef ENHANCED_STABILITY
+	boost::shared_ptr<char> async_call_indicator;
+#endif
 };
 
 } //namespace

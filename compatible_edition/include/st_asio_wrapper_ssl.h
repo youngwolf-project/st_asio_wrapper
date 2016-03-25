@@ -19,6 +19,10 @@
 #include "st_asio_wrapper_tcp_client.h"
 #include "st_asio_wrapper_server.h"
 
+#ifdef REUSE_OBJECT
+	#error boost::asio::ssl::stream not support reuse!
+#endif
+
 namespace st_asio_wrapper
 {
 
@@ -30,6 +34,25 @@ public:
 
 	virtual void reset() {authorized_ = false; st_connector_base<Packer, Unpacker, Socket>::reset();}
 	bool authorized() const {return authorized_;}
+
+	void disconnect(bool reconnect = false) {force_close(reconnect);}
+	void force_close(bool reconnect = false)
+	{
+		if (reconnect)
+			unified_out::error_out("boost::asio::ssl::stream not support reuse!");
+
+		if (!shutdown_ssl())
+			st_connector_base<Packer, Unpacker, Socket>::force_close(false);
+	}
+
+	void graceful_close(bool reconnect = false, bool sync = true)
+	{
+		if (reconnect)
+			unified_out::error_out("boost::asio::ssl::stream not support reuse!");
+
+		if (!shutdown_ssl())
+			st_connector_base<Packer, Unpacker, Socket>::graceful_close(false, sync);
+	}
 
 protected:
 	virtual bool do_start() //connect or receive
@@ -89,6 +112,25 @@ protected:
 		}
 	}
 
+	bool shutdown_ssl()
+	{
+		bool re = false;
+		if (!ST_THIS is_closing() && authorized_)
+		{
+			ST_THIS show_info("ssl client link:", "been shutting down.");
+			ST_THIS close_state = 2;
+			ST_THIS reconnecting = false;
+			authorized_ = false;
+
+			boost::system::error_code ec;
+			ST_THIS next_layer().shutdown(ec);
+
+			re = !ec;
+		}
+
+		return re;
+	}
+
 protected:
 	bool authorized_;
 };
@@ -104,14 +146,24 @@ public:
 
 	typename st_ssl_object_pool::object_type create_object()
 	{
-		BOOST_AUTO(client_ptr, ST_THIS reuse_object());
-		return client_ptr ? client_ptr : boost::make_shared<Object>(boost::ref(ST_THIS service_pump), boost::ref(ctx));
+		BOOST_AUTO(object_ptr, ST_THIS reuse_object());
+		if (!object_ptr)
+			object_ptr = boost::make_shared<Object>(boost::ref(ST_THIS service_pump), boost::ref(ctx));
+		if (object_ptr)
+			object_ptr->id(++ST_THIS cur_id);
+
+		return object_ptr;
 	}
 	template<typename Arg>
 	typename st_ssl_object_pool::object_type create_object(Arg& arg)
 	{
-		BOOST_AUTO(client_ptr, ST_THIS reuse_object());
-		return client_ptr ? client_ptr : boost::make_shared<Object>(arg, boost::ref(ctx));
+		BOOST_AUTO(object_ptr, ST_THIS reuse_object());
+		if (!object_ptr)
+			object_ptr = boost::make_shared<Object>(arg, boost::ref(ctx));
+		if (object_ptr)
+			object_ptr->id(++ST_THIS cur_id);
+
+		return object_ptr;
 	}
 
 protected:

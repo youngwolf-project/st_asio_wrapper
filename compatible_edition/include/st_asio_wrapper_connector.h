@@ -59,14 +59,13 @@ public:
 
 	bool is_connected() const {return connected;}
 
-	//the following three functions can only be used when the connection is OK and you want to reconnect to the server.
 	//if the connection is broken unexpectedly, st_connector will try to reconnect to the server automatically.
 	void disconnect(bool reconnect = false) {force_close(reconnect);}
 	void force_close(bool reconnect = false)
 	{
 		if (1 != ST_THIS close_state)
 		{
-			show_info("link:", "been closed.");
+			show_info("client link:", "been closed.");
 			reconnecting = reconnect;
 			connected = false;
 		}
@@ -81,7 +80,7 @@ public:
 		else if (!is_connected())
 			return force_close(reconnect);
 
-		show_info("link:", "been closing gracefully.");
+		show_info("client link:", "been closing gracefully.");
 		reconnecting = reconnect;
 		connected = false;
 
@@ -128,7 +127,7 @@ protected:
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
-		show_info("link:", "broken/closed", ec);
+		show_info("client link:", "broken/closed", ec);
 
 		force_close(ST_THIS is_closing() ? reconnecting : prepare_re_connect(ec) >= 0);
 		ST_THIS close_state = 0;

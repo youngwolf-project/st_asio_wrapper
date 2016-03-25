@@ -35,12 +35,16 @@ public:
 		return ST_THIS add_client(client_ptr) ? client_ptr : typename Pool::object_type();
 	}
 
+	//functions with a client_ptr parameter will remove the link from object pool first, then call corresponding function
 	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect();}
+	void disconnect() {ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->disconnect();});}
 	void force_close(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_close();}
+	void force_close() {ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->force_close();});}
 	void graceful_close(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->graceful_close();}
+	void graceful_close() {ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->graceful_close();});}
 
 protected:
-	virtual void uninit() {ST_THIS stop(); ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->graceful_close();});}
+	virtual void uninit() {ST_THIS stop(); graceful_close();}
 };
 typedef st_udp_client_base<> st_udp_client;
 
