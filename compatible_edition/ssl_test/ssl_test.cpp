@@ -79,7 +79,7 @@ int main() {
 			puts("I still not find a way to reuse a boost::asio::ssl::stream,\n"
 				"it can reconnect to the server, but can not re-handshake with the server,\n"
 				"if somebody knows how to fix this defect, please tell me, thanks in advance.");
-//			ssl_client->graceful_close(true);
+//			ssl_client.graceful_close(true);
 		else
 			server_.broadcast_msg(str);
 	}

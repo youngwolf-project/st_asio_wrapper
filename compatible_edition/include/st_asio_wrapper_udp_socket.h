@@ -119,7 +119,11 @@ protected:
 		if (!ST_THIS get_io_service().stopped())
 		{
 			ST_THIS next_layer().async_receive_from(unpacker_->prepare_next_recv(), peer_addr,
-				boost::bind(&st_udp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+				boost::bind(&st_udp_socket_base::recv_handler, this,
+#ifdef ENHANCED_STABILITY
+					ST_THIS async_call_indicator,
+#endif
+					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 
 			return true;
 		}
@@ -137,7 +141,11 @@ protected:
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()), ST_THIS last_send_msg.peer_addr,
-				boost::bind(&st_udp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+				boost::bind(&st_udp_socket_base::send_handler, this,
+#ifdef ENHANCED_STABILITY
+					ST_THIS async_call_indicator,
+#endif
+					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 			ST_THIS send_msg_buffer.pop_front();
 		}
 
@@ -172,7 +180,11 @@ protected:
 		}
 	}
 
-	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
+	void recv_handler(
+#ifdef ENHANCED_STABILITY
+		boost::shared_ptr<char> async_call_indicator,
+#endif
+		const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec && bytes_transferred > 0)
 		{
@@ -188,7 +200,11 @@ protected:
 			on_recv_error(ec);
 	}
 
-	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
+	void send_handler(
+#ifdef ENHANCED_STABILITY
+		boost::shared_ptr<char> async_call_indicator,
+#endif
+		const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec)
 		{
