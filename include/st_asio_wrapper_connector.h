@@ -90,7 +90,7 @@ public:
 		connected = false;
 
 		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
-			ST_THIS set_timer(11, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
+			ST_THIS set_timer(TIMER_ASYNC_CLOSE, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
 	}
 
 	void show_info(const char* head, const char* tail) const
@@ -190,7 +190,7 @@ protected:
 		{
 			auto delay = prepare_re_connect(ec);
 			if (delay >= 0)
-				ST_THIS set_timer(10, delay, nullptr);
+				ST_THIS set_timer(TIMER_CONNECT, delay, nullptr);
 
 			if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
 			{

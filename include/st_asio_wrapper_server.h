@@ -40,7 +40,6 @@ public:
 	using Pool::TIMER_BEGIN;
 	using Pool::TIMER_END; //user timer's id must be bigger than TIMER_END
 
-public:
 	st_server_base(st_service_pump& service_pump_) : Pool(service_pump_), acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
 	template<typename Arg>
 	st_server_base(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg), acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
