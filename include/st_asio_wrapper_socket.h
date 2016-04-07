@@ -106,7 +106,7 @@ public:
 	void suspend_dispatch_msg(bool suspend)
 	{
 		suspend_dispatch_msg_ = suspend;
-		stop_timer(1);
+		stop_timer(TIMER_SUSPEND_DISPATCH_MSG);
 		do_dispatch_msg(true);
 	}
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
