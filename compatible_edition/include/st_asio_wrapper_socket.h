@@ -34,6 +34,13 @@ public:
 	typedef typename Unpacker::container_type out_container_type;
 
 protected:
+	static const unsigned char TIMER_BEGIN = (unsigned char) (st_timer::TIMER_END + 1);
+	static const unsigned char TIMER_DISPATCH_MSG = TIMER_BEGIN;
+	static const unsigned char TIMER_SUSPEND_DISPATCH_MSG = TIMER_BEGIN + 1;
+	static const unsigned char TIMER_HANDLE_POST_BUFFER = TIMER_BEGIN + 2;
+	static const unsigned char TIMER_RE_DISPATCH_MSG = TIMER_BEGIN + 3;
+	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
+
 	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {init();}
 
 	template<typename Arg>
@@ -99,7 +106,7 @@ public:
 	void suspend_dispatch_msg(bool suspend)
 	{
 		suspend_dispatch_msg_ = suspend;
-		stop_timer(1);
+		stop_timer(TIMER_SUSPEND_DISPATCH_MSG);
 		do_dispatch_msg(true);
 	}
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
@@ -203,13 +210,13 @@ protected:
 	{
 		switch (id)
 		{
-		case 0: //delay putting msgs into receive buffer cause of receive buffer overflow
+		case TIMER_DISPATCH_MSG: //delay putting msgs into receive buffer cause of receive buffer overflow
 			dispatch_msg();
 			break;
-		case 1: //suspend dispatching msgs
+		case TIMER_SUSPEND_DISPATCH_MSG: //suspend dispatching msgs
 			do_dispatch_msg(true);
 			break;
-		case 2:
+		case TIMER_HANDLE_POST_BUFFER:
 			{
 				boost::unique_lock<boost::shared_mutex> lock(post_msg_buffer_mutex);
 				{
@@ -228,13 +235,14 @@ protected:
 				return !empty; //continue the timer if some msgs still left behind
 			}
 			break;
-		case 3: //re-dispatch
+		case TIMER_RE_DISPATCH_MSG: //re-dispatch
 			do_dispatch_msg(true);
 			break;
-		case 4: case 5: case 6: case 7: case 8: case 9: //reserved
-			break;
 		default:
-			return st_timer::on_timer(id, user_data);
+			if (id < TIMER_BEGIN)
+				return st_timer::on_timer(id, user_data);
+			else if (id > TIMER_END)
+				unified_out::warning_out("You have unhandled timer %u", id);
 			break;
 		}
 
@@ -274,7 +282,7 @@ protected:
 		if (temp_msg_buffer.empty())
 			do_start(); //receive msg sequentially, which means second receiving only after first receiving success
 		else
-			set_timer(0, 50, NULL);
+			set_timer(TIMER_DISPATCH_MSG, 50, NULL);
 	}
 
 	void msg_handler()
@@ -286,7 +294,7 @@ protected:
 		{
 			recv_msg_buffer.push_front(OutMsgType());
 			recv_msg_buffer.front().swap(last_dispatch_msg);
-			set_timer(3, 50, NULL);
+			set_timer(TIMER_RE_DISPATCH_MSG, 50, NULL);
 		}
 		else //dispatch msg sequentially, which means second dispatching only after first dispatching success
 			do_dispatch_msg(false);
@@ -304,7 +312,7 @@ protected:
 		if (suspend_dispatch_msg_)
 		{
 			if (!dispatching && !recv_msg_buffer.empty())
-				set_timer(1, 24 * 60 * 60 * 1000, NULL); //one day
+				set_timer(TIMER_SUSPEND_DISPATCH_MSG, 24 * 60 * 60 * 1000, NULL); //one day
 		}
 		else if (!posting)
 		{
@@ -363,7 +371,7 @@ protected:
 			if (!posting)
 			{
 				posting = true;
-				set_timer(2, 50, NULL);
+				set_timer(TIMER_HANDLE_POST_BUFFER, 50, NULL);
 			}
 		}
 

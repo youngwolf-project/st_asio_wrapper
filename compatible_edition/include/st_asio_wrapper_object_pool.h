@@ -89,15 +89,20 @@ protected:
 	};
 
 protected:
+	static const unsigned char TIMER_BEGIN = (unsigned char) (st_timer::TIMER_END + 1);
+	static const unsigned char TIMER_FREE_SOCKET = TIMER_BEGIN;
+	static const unsigned char TIMER_CLEAR_SOCKET = TIMER_BEGIN + 1;
+	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
+
 	st_object_pool(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_), cur_id(-1) {}
 
 	void start()
 	{
 #ifndef REUSE_OBJECT
-		set_timer(0, 1000 * SOCKET_FREE_INTERVAL, NULL);
+		set_timer(TIMER_FREE_SOCKET, 1000 * SOCKET_FREE_INTERVAL, NULL);
 #endif
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
-		set_timer(1, 1000 * CLEAR_CLOSED_SOCKET_INTERVAL, NULL);
+		set_timer(TIMER_CLEAR_SOCKET, 1000 * CLEAR_CLOSED_SOCKET_INTERVAL, NULL);
 #endif
 	}
 
@@ -155,21 +160,22 @@ protected:
 		switch(id)
 		{
 #ifndef REUSE_OBJECT
-		case 0:
+		case TIMER_FREE_SOCKET:
 			free_object();
 			return true;
 			break;
 #endif
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
-		case 1:
+		case TIMER_CLEAR_SOCKET:
 			clear_all_closed_object();
 			return true;
 			break;
 #endif
-		case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
-			break;
 		default:
-			return st_timer::on_timer(id, user_data);
+			if (id < TIMER_BEGIN)
+				return st_timer::on_timer(id, user_data);
+			else if (id > TIMER_END)
+				unified_out::warning_out("You have unhandled timer %u", id);
 			break;
 		}
 
