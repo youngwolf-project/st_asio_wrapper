@@ -17,26 +17,7 @@
 
 #include "st_asio_wrapper_base.h"
 
-/*
-* Please pay attention to the following reserved timer ids:
-* st_object_pool: 0 - 9
-* st_socket: 0 - 9
-
-* st_tcp_socket_base: inherit from st_socket
-* st_connector_base: inherit from st_tcp_socket_base and plus 10 - 19
-* st_tcp_sclient: inherit from st_connector
-*
-* st_udp_socket_base: inherit from st_socket
-* st_udp_sclient: inherit from st_udp_socket
-*
-* st_server_socket_base: inherit from st_tcp_socket_base and plus 10 - 19
-* st_server_base: inherit from st_object_pool
-*
-* st_client: inherit from st_object_pool
-* st_tcp_client_base: inherit from st_client_base
-* st_udp_client_base: inherit from st_client_base
-*/
-
+//If you inherit a class from class X, your own timers' ids must be bigger than X::TIMER_END
 namespace st_asio_wrapper
 {
 

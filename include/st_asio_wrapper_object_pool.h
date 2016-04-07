@@ -58,6 +58,11 @@ public:
 	typedef boost::shared_ptr<Object> object_type;
 	typedef const object_type object_ctype;
 
+	static const unsigned char TIMER_BEGIN = 0;
+	static const unsigned char TIMER_FREE_SOCKET = TIMER_BEGIN;
+	static const unsigned char TIMER_CLEAR_SOCKET = TIMER_BEGIN + 1;
+	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
+
 protected:
 	struct st_object_hasher
 	{
@@ -94,10 +99,10 @@ protected:
 	void start()
 	{
 #ifndef REUSE_OBJECT
-		set_timer(0, 1000 * SOCKET_FREE_INTERVAL, nullptr);
+		set_timer(TIMER_FREE_SOCKET, 1000 * SOCKET_FREE_INTERVAL, nullptr);
 #endif
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
-		set_timer(1, 1000 * CLEAR_CLOSED_SOCKET_INTERVAL, nullptr);
+		set_timer(TIMER_CLEAR_SOCKET, 1000 * CLEAR_CLOSED_SOCKET_INTERVAL, nullptr);
 #endif
 	}
 
@@ -155,21 +160,22 @@ protected:
 		switch(id)
 		{
 #ifndef REUSE_OBJECT
-		case 0:
+		case TIMER_FREE_SOCKET:
 			free_object();
 			return true;
 			break;
 #endif
 #ifdef AUTO_CLEAR_CLOSED_SOCKET
-		case 1:
+		case TIMER_CLEAR_SOCKET:
 			clear_all_closed_object();
 			return true;
 			break;
 #endif
-		case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: //reserved
-			break;
 		default:
-			return st_timer::on_timer(id, user_data);
+			if (id < TIMER_BEGIN)
+				return st_timer::on_timer(id, user_data);
+			else if (id > TIMER_END)
+				unified_out::warning_out("You have unhandled timer %u", id);
 			break;
 		}
 

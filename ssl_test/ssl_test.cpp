@@ -28,7 +28,7 @@ int main() {
 	server_.ssl_context().use_private_key_file("certs/server.key", boost::asio::ssl::context::pem);
 	server_.ssl_context().use_tmp_dh_file("certs/dh1024.pem");
 
-/*
+///*
 	//method #1
 	st_ssl_tcp_client ssl_client(service_pump, boost::asio::ssl::context::sslv23_client);
 	ssl_client.ssl_context().set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
@@ -41,8 +41,8 @@ int main() {
 	//please config the ssl context before creating any clients.
 	ssl_client.add_client();
 	ssl_client.add_client();
-*/
-///*
+//*/
+/*
 	//method #2
 	//to use st_ssl_tcp_sclient, we must construct ssl context first.
 	boost::asio::ssl::context ctx(boost::asio::ssl::context::sslv23_client);
@@ -55,7 +55,7 @@ int main() {
 
 	st_ssl_tcp_sclient ssl_sclient(service_pump, ctx);
 #define ssl_client ssl_sclient
-//*/
+*/
 	service_pump.start_service();
 	while(service_pump.is_running())
 	{
