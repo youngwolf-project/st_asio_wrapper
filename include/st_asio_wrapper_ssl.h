@@ -33,7 +33,6 @@ public:
 	using st_connector_base<Packer, Unpacker, Socket>::TIMER_BEGIN;
 	using st_connector_base<Packer, Unpacker, Socket>::TIMER_END; //user timer's id must be bigger than TIMER_END
 
-public:
 	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : st_connector_base<Packer, Unpacker, Socket>(io_service_, ctx), authorized_(false) {}
 
 	virtual void reset() {authorized_ = false; st_connector_base<Packer, Unpacker, Socket>::reset();}
@@ -148,7 +147,6 @@ public:
 	using st_object_pool<Object>::TIMER_BEGIN;
 	using st_object_pool<Object>::TIMER_END; //user timer's id must be bigger than TIMER_END
 
-public:
 	st_ssl_object_pool(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_object_pool<Object>(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& ssl_context() {return ctx;}
 
@@ -190,7 +188,6 @@ public:
 	using st_server_base<Socket, Pool, Server>::TIMER_BEGIN;
 	using st_server_base<Socket, Pool, Server>::TIMER_END; //user timer's id must be bigger than TIMER_END
 
-public:
 	st_ssl_server_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_server_base<Socket, Pool, Server>(service_pump_, m) {}
 
 protected:

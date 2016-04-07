@@ -35,7 +35,6 @@ public:
 	static const unsigned char TIMER_ASYNC_CLOSE = TIMER_BEGIN;
 	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
 
-public:
 	st_server_socket_base(Server& server_) : st_tcp_socket_base<Socket, Packer, Unpacker>(server_.get_service_pump()), server(server_) {}
 
 	template<typename Arg>

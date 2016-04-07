@@ -28,7 +28,6 @@ public:
 	using st_client<Socket, Pool>::TIMER_BEGIN;
 	using st_client<Socket, Pool>::TIMER_END; //user timer's id must be bigger than TIMER_END
 
-public:
 	st_tcp_client_base(st_service_pump& service_pump_) : st_client<Socket, Pool>(service_pump_) {}
 	template<typename Arg>
 	st_tcp_client_base(st_service_pump& service_pump_, Arg arg) : st_client<Socket, Pool>(service_pump_, arg) {}

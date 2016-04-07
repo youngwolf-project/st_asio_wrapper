@@ -45,6 +45,8 @@ protected:
 		bool operator <(const timer_info& other) const {return id < other.id;}
 	};
 
+	static const unsigned char TIMER_END = 0xFF; //user timer's id must be bigger than TIMER_END
+
 	st_timer(boost::asio::io_service& _io_service_) : io_service_(_io_service_) {}
 	virtual ~st_timer() {}
 

@@ -37,7 +37,6 @@ public:
 	static const unsigned char TIMER_ASYNC_CLOSE = TIMER_BEGIN + 1;
 	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
 
-public:
 	st_connector_base(boost::asio::io_service& io_service_) : st_tcp_socket_base<Socket, Packer, Unpacker>(io_service_), connected(false), reconnecting(true)
 		{set_server_addr(SERVER_PORT, SERVER_IP);}
 

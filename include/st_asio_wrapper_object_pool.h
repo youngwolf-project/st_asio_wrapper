@@ -58,11 +58,6 @@ public:
 	typedef boost::shared_ptr<Object> object_type;
 	typedef const object_type object_ctype;
 
-	static const unsigned char TIMER_BEGIN = 0;
-	static const unsigned char TIMER_FREE_SOCKET = TIMER_BEGIN;
-	static const unsigned char TIMER_CLEAR_SOCKET = TIMER_BEGIN + 1;
-	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
-
 protected:
 	struct st_object_hasher
 	{
@@ -94,6 +89,11 @@ protected:
 	};
 
 protected:
+	static const unsigned char TIMER_BEGIN = (unsigned char) (st_timer::TIMER_END + 1);
+	static const unsigned char TIMER_FREE_SOCKET = TIMER_BEGIN;
+	static const unsigned char TIMER_CLEAR_SOCKET = TIMER_BEGIN + 1;
+	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
+
 	st_object_pool(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_), cur_id(-1) {}
 
 	void start()

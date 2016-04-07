@@ -33,14 +33,14 @@ public:
 	typedef boost::container::list<InMsgType> in_container_type;
 	typedef typename Unpacker::container_type out_container_type;
 
-	static const unsigned char TIMER_BEGIN = 0;
+protected:
+	static const unsigned char TIMER_BEGIN = (unsigned char) (st_timer::TIMER_END + 1);
 	static const unsigned char TIMER_DISPATCH_MSG = TIMER_BEGIN;
 	static const unsigned char TIMER_SUSPEND_DISPATCH_MSG = TIMER_BEGIN + 1;
 	static const unsigned char TIMER_HANDLE_POST_BUFFER = TIMER_BEGIN + 2;
 	static const unsigned char TIMER_RE_DISPATCH_MSG = TIMER_BEGIN + 3;
 	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
 
-protected:
 	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {init();}
 
 	template<typename Arg>
@@ -369,7 +369,7 @@ protected:
 			if (!posting)
 			{
 				posting = true;
-				set_timer(TIMER_SUSPEND_DISPATCH_MSG, 50, nullptr);
+				set_timer(TIMER_HANDLE_POST_BUFFER, 50, nullptr);
 			}
 		}
 
