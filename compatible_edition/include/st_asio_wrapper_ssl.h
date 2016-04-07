@@ -178,7 +178,14 @@ protected:
 typedef st_tcp_client_base<st_ssl_connector, st_ssl_object_pool<st_ssl_connector> > st_ssl_tcp_client;
 
 template<typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket> >
-using st_ssl_server_socket_base = st_server_socket_base<Packer, Unpacker, Server, Socket>;
+class st_ssl_server_socket_base : public st_server_socket_base<Packer, Unpacker, Server, Socket> //so cumbersome, what should we do to make it as simple as normal edition?
+{
+public:
+	using st_server_socket_base<Packer, Unpacker, Server, Socket>::TIMER_BEGIN;
+	using st_server_socket_base<Packer, Unpacker, Server, Socket>::TIMER_END; //user timer's id must be bigger than TIMER_END
+
+	st_ssl_server_socket_base(Server& server_, boost::asio::ssl::context& ctx) : st_server_socket_base<Packer, Unpacker, Server, Socket>(server_, ctx) {}
+};
 typedef st_ssl_server_socket_base<> st_ssl_server_socket;
 
 template<typename Socket = st_ssl_server_socket, typename Pool = st_ssl_object_pool<Socket>, typename Server = i_server>
