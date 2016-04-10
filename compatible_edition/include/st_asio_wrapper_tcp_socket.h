@@ -39,6 +39,9 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 protected:
+	using st_socket<Socket, Packer, Unpacker>::TIMER_BEGIN;
+	using st_socket<Socket, Packer, Unpacker>::TIMER_END; //user timer's id must be bigger than TIMER_END
+
 	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, Unpacker>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state(); close_state = 0;}
 
 	template<typename Arg>

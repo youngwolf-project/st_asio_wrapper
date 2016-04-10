@@ -30,6 +30,9 @@ template <typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER
 class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket>
 {
 public:
+	using st_connector_base<Packer, Unpacker, Socket>::TIMER_BEGIN;
+	using st_connector_base<Packer, Unpacker, Socket>::TIMER_END; //user timer's id must be bigger than TIMER_END
+
 	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : st_connector_base<Packer, Unpacker, Socket>(io_service_, ctx), authorized_(false) {}
 
 	virtual void reset() {authorized_ = false; st_connector_base<Packer, Unpacker, Socket>::reset();}
@@ -141,6 +144,9 @@ template<typename Object>
 class st_ssl_object_pool : public st_object_pool<Object>
 {
 public:
+	using st_object_pool<Object>::TIMER_BEGIN;
+	using st_object_pool<Object>::TIMER_END; //user timer's id must be bigger than TIMER_END
+
 	st_ssl_object_pool(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_object_pool<Object>(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& ssl_context() {return ctx;}
 
@@ -172,9 +178,12 @@ protected:
 typedef st_tcp_client_base<st_ssl_connector, st_ssl_object_pool<st_ssl_connector> > st_ssl_tcp_client;
 
 template<typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket> >
-class st_ssl_server_socket_base : public st_server_socket_base<Packer, Unpacker, Server, Socket>
+class st_ssl_server_socket_base : public st_server_socket_base<Packer, Unpacker, Server, Socket> //so cumbersome, what should we do to make it as simple as normal edition?
 {
 public:
+	using st_server_socket_base<Packer, Unpacker, Server, Socket>::TIMER_BEGIN;
+	using st_server_socket_base<Packer, Unpacker, Server, Socket>::TIMER_END; //user timer's id must be bigger than TIMER_END
+
 	st_ssl_server_socket_base(Server& server_, boost::asio::ssl::context& ctx) : st_server_socket_base<Packer, Unpacker, Server, Socket>(server_, ctx) {}
 };
 typedef st_ssl_server_socket_base<> st_ssl_server_socket;
@@ -183,6 +192,9 @@ template<typename Socket = st_ssl_server_socket, typename Pool = st_ssl_object_p
 class st_ssl_server_base : public st_server_base<Socket, Pool, Server>
 {
 public:
+	using st_server_base<Socket, Pool, Server>::TIMER_BEGIN;
+	using st_server_base<Socket, Pool, Server>::TIMER_END; //user timer's id must be bigger than TIMER_END
+
 	st_ssl_server_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_server_base<Socket, Pool, Server>(service_pump_, m) {}
 
 protected:

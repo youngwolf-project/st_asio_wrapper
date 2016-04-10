@@ -31,6 +31,10 @@ template<typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER,
 class st_server_socket_base : public st_tcp_socket_base<Socket, Packer, Unpacker>, public boost::enable_shared_from_this<st_server_socket_base<Packer, Unpacker, Server, Socket>>
 {
 public:
+	static const unsigned char TIMER_BEGIN = st_tcp_socket_base<Socket, Packer, Unpacker>::TIMER_END + 1;
+	static const unsigned char TIMER_ASYNC_CLOSE = TIMER_BEGIN;
+	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
+
 	st_server_socket_base(Server& server_) : st_tcp_socket_base<Socket, Packer, Unpacker>(server_.get_service_pump()), server(server_) {}
 
 	template<typename Arg>
@@ -56,7 +60,7 @@ public:
 			show_info("server link:", "been closing gracefully.");
 
 		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
-			ST_THIS set_timer(10, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
+			ST_THIS set_timer(TIMER_ASYNC_CLOSE, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
 	}
 
 	void show_info(const char* head, const char* tail) const

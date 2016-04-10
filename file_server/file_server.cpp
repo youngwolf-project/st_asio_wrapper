@@ -3,6 +3,7 @@
 #define SERVER_PORT		5050
 #define AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
 #define ENHANCED_STABILITY
+#define CLOSED_SOCKET_MAX_DURATION	0
 #define WANT_MSG_SEND_NOTIFY
 #define DEFAULT_PACKER	replaceable_packer
 //configuration
@@ -52,6 +53,7 @@ int main(int argc, const char* argv[])
 #undef SERVER_PORT
 #undef AUTO_CLEAR_CLOSED_SOCKET
 #undef ENHANCED_STABILITY
+#undef CLOSED_SOCKET_MAX_DURATION
 #undef WANT_MSG_SEND_NOTIFY
 #undef DEFAULT_PACKER
 //restore configuration

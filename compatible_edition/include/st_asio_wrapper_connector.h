@@ -32,6 +32,11 @@ template <typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER
 class st_connector_base : public st_tcp_socket_base<Socket, Packer, Unpacker>
 {
 public:
+	static const unsigned char TIMER_BEGIN = st_tcp_socket_base<Socket, Packer, Unpacker>::TIMER_END + 1;
+	static const unsigned char TIMER_CONNECT = TIMER_BEGIN;
+	static const unsigned char TIMER_ASYNC_CLOSE = TIMER_BEGIN + 1;
+	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
+
 	st_connector_base(boost::asio::io_service& io_service_) : st_tcp_socket_base<Socket, Packer, Unpacker>(io_service_), connected(false), reconnecting(true)
 		{set_server_addr(SERVER_PORT, SERVER_IP);}
 
@@ -85,7 +90,7 @@ public:
 		connected = false;
 
 		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
-			ST_THIS set_timer(11, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
+			ST_THIS set_timer(TIMER_ASYNC_CLOSE, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
 	}
 
 	void show_info(const char* head, const char* tail) const
@@ -140,10 +145,10 @@ protected:
 	{
 		switch(id)
 		{
-		case 10:
+		case TIMER_CONNECT:
 			do_start();
 			break;
-		case 11:
+		case TIMER_ASYNC_CLOSE:
 			if (2 == ST_THIS close_state)
 			{
 				ssize_t loop_num = reinterpret_cast<ssize_t>(user_data);
@@ -161,10 +166,11 @@ protected:
 				}
 			}
 			break;
-		case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
-			break;
 		default:
-			return st_tcp_socket_base<Socket, Packer, Unpacker>::on_timer(id, user_data);
+			if (id < TIMER_BEGIN)
+				return st_tcp_socket_base<Socket, Packer, Unpacker>::on_timer(id, user_data);
+			else if (id > TIMER_END)
+				unified_out::warning_out("You have unhandled timer %u", id);
 			break;
 		}
 
@@ -184,7 +190,7 @@ protected:
 		{
 			int delay = prepare_re_connect(ec);
 			if (delay >= 0)
-				ST_THIS set_timer(10, delay, NULL);
+				ST_THIS set_timer(TIMER_CONNECT, delay, NULL);
 
 			if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
 			{
