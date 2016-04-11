@@ -110,7 +110,7 @@ protected:
 	{
 		switch (id)
 		{
-		case 10:
+		case TIMER_ASYNC_CLOSE:
 			if (2 == ST_THIS close_state)
 			{
 				auto loop_num = reinterpret_cast<ssize_t>(user_data);
@@ -128,10 +128,11 @@ protected:
 				}
 			}
 			break;
-		case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19: //reserved
-			break;
 		default:
-			return st_tcp_socket_base<Socket, Packer, Unpacker>::on_timer(id, user_data);
+			if (id < TIMER_BEGIN)
+				return st_tcp_socket_base<Socket, Packer, Unpacker>::on_timer(id, user_data);
+			else if (id > TIMER_END)
+				unified_out::warning_out("You have unhandled timer %u", id);
 			break;
 		}
 
