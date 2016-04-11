@@ -188,20 +188,14 @@ protected:
 	boost::array<char, MSG_BUFFER_SIZE> raw_buff;
 };
 
-class replaceable_unpacker : public i_unpacker<replaceable_buffer>, public unpacker
+class replaceable_unpacker : public i_unpacker<replaceable_buffer>
 {
 public:
-	//overwrite the following three typedef defined by unpacker
-	using i_unpacker<replaceable_buffer>::msg_type;
-	using i_unpacker<replaceable_buffer>::msg_ctype;
-	using i_unpacker<replaceable_buffer>::container_type;
-
-public:
-	virtual void reset_state() {unpacker::reset_state();}
+	virtual void reset_state() {unpacker_.reset_state();}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		unpacker::container_type tmp_can;
-		auto unpack_ok = unpacker::parse_msg(bytes_transferred, tmp_can);
+		auto unpack_ok = unpacker_.parse_msg(bytes_transferred, tmp_can);
 		do_something_to_all(tmp_can, [&msg_can](decltype(*std::begin(tmp_can))& item) {
 			auto com = boost::make_shared<buffer>();
 			com->swap(item);
@@ -213,8 +207,11 @@ public:
 		return unpack_ok;
 	}
 
-	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return unpacker::completion_condition(ec, bytes_transferred);}
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return unpacker::prepare_next_recv();}
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return unpacker_.completion_condition(ec, bytes_transferred);}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return unpacker_.prepare_next_recv();}
+
+protected:
+	unpacker unpacker_;
 };
 
 class replaceable_udp_unpacker : public i_udp_unpacker<replaceable_buffer>
