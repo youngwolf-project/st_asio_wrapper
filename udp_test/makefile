@@ -1,5 +1,5 @@
 
-module = udp_client
+module = udp_test
 
 include ../config.mk
 

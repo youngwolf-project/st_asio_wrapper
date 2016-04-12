@@ -10,11 +10,15 @@ using namespace st_asio_wrapper;
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char* argv[])
+{
 	puts("usage: udp_client <my port> <peer port> [peer ip=127.0.0.1]");
-
-	if (argc < 3)
+	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
+		return 0;
+	else if (argc < 3)
 		return 1;
+	else
+		puts("type " QUIT_COMMAND " to end.");
 
 	auto local_port = (unsigned short) atoi(argv[1]);
 	boost::system::error_code ec;

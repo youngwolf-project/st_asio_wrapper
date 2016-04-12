@@ -21,7 +21,10 @@ int main(int argc, const char* argv[])
 {
 	puts("this is a file transfer client.");
 	printf("usage: file_client [<port=%d> [<ip=%s> [link num=1]]]\n", SERVER_PORT, SERVER_IP);
-	puts("type " QUIT_COMMAND " to end.");
+	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
+		return 0;
+	else
+		puts("type " QUIT_COMMAND " to end.");
 
 	st_service_pump service_pump;
 	file_client client(service_pump);

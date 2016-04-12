@@ -20,7 +20,10 @@ int main(int argc, const char* argv[])
 {
 	puts("this is a file transfer server.");
 	printf("usage: file_server [<port=%d> [ip=0.0.0.0]]\n", SERVER_PORT);
-	puts("type " QUIT_COMMAND " to end.");
+	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
+		return 0;
+	else
+		puts("type " QUIT_COMMAND " to end.");
 
 	st_service_pump service_pump;
 	st_server_base<file_socket> file_server_(service_pump);

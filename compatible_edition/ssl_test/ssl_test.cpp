@@ -15,8 +15,13 @@ using namespace st_asio_wrapper;
 #define RESTART_COMMAND	"restart"
 #define RECONNECT_COMMAND "reconnect"
 
-int main() {
-	puts("type " QUIT_COMMAND " to end.");
+int main(int argc, const char* argv[])
+{
+	puts("Directories certs and client_certs must be in the current directory.");
+	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
+		return 0;
+	else
+		puts("type " QUIT_COMMAND " to end.");
 
 	st_service_pump service_pump;
 
