@@ -123,7 +123,10 @@ int main(int argc, const char* argv[])
 {
 	printf("usage: asio_server [<port=%d> [ip=0.0.0.0]]\n", SERVER_PORT);
 	puts("normal server's port will be 100 larger.");
-	puts("type " QUIT_COMMAND " to end.");
+	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
+		return 0;
+	else
+		puts("type " QUIT_COMMAND " to end.");
 
 	st_service_pump service_pump;
 	//only need a simple server? you can directly use st_server or st_server_base.

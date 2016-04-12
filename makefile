@@ -15,7 +15,7 @@ release debug clean :
 	cd test_client && ${ST_MAKE}
 	cd file_server && ${ST_MAKE}
 	cd file_client && ${ST_MAKE}
-	cd udp_client && ${ST_MAKE}
+	cd udp_test && ${ST_MAKE}
 	cd ssl_test && ${ST_MAKE}
 	cd compatible_edition && ${ST_MAKE}
 

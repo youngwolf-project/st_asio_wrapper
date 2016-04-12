@@ -184,9 +184,13 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	///////////////////////////////////////////////////////////
 	printf("usage: test_client [<port=%d> [<ip=%s> [link num=16]]]\n", SERVER_PORT, SERVER_IP);
+	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
+		return 0;
+	else
+		puts("type " QUIT_COMMAND " to end.");
 
+	///////////////////////////////////////////////////////////
 	size_t link_num = 16;
 	if (argc > 3)
 		link_num = std::min(MAX_OBJECT_NUM, std::max(atoi(argv[3]), 1));
