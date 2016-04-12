@@ -12,7 +12,7 @@ using namespace st_asio_wrapper;
 
 int main(int argc, const char* argv[])
 {
-	puts("usage: udp_client <my port> <peer port> [peer ip=127.0.0.1]");
+	puts("usage: udp_test <my port> <peer port> [peer ip=127.0.0.1]");
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else if (argc < 3)

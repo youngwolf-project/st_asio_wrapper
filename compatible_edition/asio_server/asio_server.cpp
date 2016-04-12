@@ -4,7 +4,7 @@
 #define REUSE_OBJECT //use objects pool
 //#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ENHANCED_STABILITY
-#define CLOSED_SOCKET_MAX_DURATION   0
+#define CLOSED_SOCKET_MAX_DURATION	0
 
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	1

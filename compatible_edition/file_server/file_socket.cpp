@@ -1,6 +1,6 @@
 
 //configuration
-#define SERVER_PORT		5050
+#define SERVER_PORT		5051
 #define AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
 #define ENHANCED_STABILITY
 #define CLOSED_SOCKET_MAX_DURATION	0
