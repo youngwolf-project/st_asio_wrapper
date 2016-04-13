@@ -94,7 +94,7 @@ protected:
 	static const unsigned char TIMER_CLEAR_SOCKET = TIMER_BEGIN + 1;
 	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
 
-	st_object_pool(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_), cur_id(-1) {}
+	st_object_pool(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_), cur_id(-1), max_size_(MAX_OBJECT_NUM) {}
 
 	void start()
 	{
@@ -113,7 +113,7 @@ protected:
 		assert(object_ptr && &object_ptr->get_io_service() == &get_service_pump());
 
 		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
-		return object_can.size() < MAX_OBJECT_NUM ? object_can.insert(object_ptr).second : false;
+		return object_can.size() < max_size_ ? object_can.insert(object_ptr).second : false;
 	}
 
 	//only add object_ptr to temp_object_can when it's in object_can, this can avoid duplicated items in temp_object_can, because temp_object_can is a list, there's no way to check the existence
@@ -206,8 +206,11 @@ public:
 		return object_ptr;
 	}
 
-	//to configure unordered_set(for example, setup factor or reserved size), not locked the mutex, so must called before service_pump starting up.
+	//to configure unordered_set(for example, set factor or reserved size), not locked the mutex, so must be called before service_pump starting up.
 	container_type& container() {return object_can;}
+
+	size_t max_size() const {return max_size_;}
+	void max_size(size_t _max_size) {max_size_ = _max_size;}
 
 	size_t size()
 	{
@@ -327,6 +330,7 @@ protected:
 
 	container_type object_can;
 	boost::shared_mutex object_can_mutex;
+	size_t max_size_;
 
 	//because all objects are dynamic created and stored in object_can, maybe when receiving error occur
 	//(you are recommended to delete the object from object_can, for example via st_server_base::del_client), some other asynchronous calls are still queued in boost::asio::io_service,
