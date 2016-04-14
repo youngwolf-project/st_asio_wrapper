@@ -16,18 +16,18 @@
 #include "st_asio_wrapper_server_socket.h"
 #include "st_asio_wrapper_object_pool.h"
 
-#ifndef SERVER_PORT
-#define SERVER_PORT					5051
+#ifndef ST_ASIO_SERVER_PORT
+#define ST_ASIO_SERVER_PORT			5051
 #endif
 
-#ifndef ASYNC_ACCEPT_NUM
-#define ASYNC_ACCEPT_NUM			1 //how many async_accept delivery concurrently
+#ifndef ST_ASIO_ASYNC_ACCEPT_NUM
+#define ST_ASIO_ASYNC_ACCEPT_NUM	1 //how many async_accept delivery concurrently
 #endif
 
-//in set_server_addr, if the IP is empty, TCP_DEFAULT_IP_VERSION will define the IP version, or the IP version will be deduced by the IP address.
+//in set_server_addr, if the IP is empty, ST_ASIO_TCP_DEFAULT_IP_VERSION will define the IP version, or the IP version will be deduced by the IP address.
 //boost::asio::ip::tcp::v4() means ipv4 and boost::asio::ip::tcp::v6() means ipv6.
-#ifndef TCP_DEFAULT_IP_VERSION
-#define TCP_DEFAULT_IP_VERSION boost::asio::ip::tcp::v4()
+#ifndef ST_ASIO_TCP_DEFAULT_IP_VERSION
+#define ST_ASIO_TCP_DEFAULT_IP_VERSION boost::asio::ip::tcp::v4()
 #endif
 
 namespace st_asio_wrapper
@@ -40,14 +40,14 @@ public:
 	using Pool::TIMER_BEGIN;
 	using Pool::TIMER_END; //user timer's id must be bigger than TIMER_END
 
-	st_server_base(st_service_pump& service_pump_) : Pool(service_pump_), acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
+	st_server_base(st_service_pump& service_pump_) : Pool(service_pump_), acceptor(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
 	template<typename Arg>
-	st_server_base(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg), acceptor(service_pump_) {set_server_addr(SERVER_PORT);}
+	st_server_base(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg), acceptor(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = std::string())
 	{
 		if (ip.empty())
-			server_addr = boost::asio::ip::tcp::endpoint(TCP_DEFAULT_IP_VERSION, port);
+			server_addr = boost::asio::ip::tcp::endpoint(ST_ASIO_TCP_DEFAULT_IP_VERSION, port);
 		else
 		{
 			boost::system::error_code ec;
@@ -97,7 +97,7 @@ protected:
 	{
 		boost::system::error_code ec;
 		acceptor.open(server_addr.protocol(), ec); assert(!ec);
-#ifndef NOT_REUSE_ADDRESS
+#ifndef ST_ASIO_NOT_REUSE_ADDRESS
 		acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true), ec); assert(!ec);
 #endif
 		acceptor.bind(server_addr, ec); assert(!ec);
@@ -107,7 +107,7 @@ protected:
 
 		ST_THIS start();
 
-		for (int i = 0; i < ASYNC_ACCEPT_NUM; ++i)
+		for (int i = 0; i < ST_ASIO_ASYNC_ACCEPT_NUM; ++i)
 			start_next_accept();
 
 		return true;

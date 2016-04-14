@@ -73,7 +73,7 @@ public:
 
 protected:
 	//msg handling
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	//we can handle msg very fast, so we don't use recv buffer
 	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
@@ -91,7 +91,7 @@ private:
 			file = NULL;
 		}
 
-		inner_unpacker(boost::make_shared<DEFAULT_UNPACKER>());
+		inner_unpacker(boost::make_shared<ST_ASIO_DEFAULT_UNPACKER>());
 	}
 	void trans_end() {clear(); ++completed_client_num;}
 
@@ -105,7 +105,7 @@ private:
 		}
 		else if (msg.size() <= ORDER_LEN)
 		{
-			printf("wrong order length: " size_t_format ".\n", msg.size());
+			printf("wrong order length: " ST_ASIO_SF ".\n", msg.size());
 			return;
 		}
 

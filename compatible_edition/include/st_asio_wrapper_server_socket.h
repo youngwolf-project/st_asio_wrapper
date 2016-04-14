@@ -27,7 +27,7 @@ public:
 	virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
 };
 
-template<typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket>
+template<typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket>
 class st_server_socket_base : public st_tcp_socket_base<Socket, Packer, Unpacker>, public boost::enable_shared_from_this<st_server_socket_base<Packer, Unpacker, Server, Socket> >
 {
 public:
@@ -60,7 +60,7 @@ public:
 			show_info("server link:", "been closing gracefully.");
 
 		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
-			ST_THIS set_timer(TIMER_ASYNC_CLOSE, 10, reinterpret_cast<const void*>((ssize_t) (GRACEFUL_CLOSE_MAX_DURATION * 100)));
+			ST_THIS set_timer(TIMER_ASYNC_CLOSE, 10, reinterpret_cast<const void*>((ssize_t) (ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION * 100)));
 	}
 
 	void show_info(const char* head, const char* tail) const
@@ -97,7 +97,7 @@ protected:
 	{
 		ST_THIS show_info("server link:", "broken/closed", ec);
 
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
+#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
 		ST_THIS force_close();
 #else
 		server.del_client(boost::dynamic_pointer_cast<st_timer>(ST_THIS shared_from_this()));
@@ -123,7 +123,7 @@ protected:
 				}
 				else
 				{
-					unified_out::info_out("failed to graceful close within %d seconds", GRACEFUL_CLOSE_MAX_DURATION);
+					unified_out::info_out("failed to graceful close within %d seconds", ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION);
 					force_close();
 				}
 			}

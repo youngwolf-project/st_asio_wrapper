@@ -1,7 +1,7 @@
 
 //configuration
-//#define DEFAULT_PACKER replaceable_packer
-//#define DEFAULT_UDP_UNPACKER replaceable_udp_unpacker
+//#define ST_ASIO_DEFAULT_PACKER replaceable_packer
+//#define ST_ASIO_DEFAULT_UDP_UNPACKER replaceable_udp_unpacker
 //configuration
 
 #include "../include/st_asio_wrapper_udp_client.h"
@@ -49,6 +49,6 @@ int main(int argc, const char* argv[])
 }
 
 //restore configuration
-#undef DEFAULT_PACKER
-#undef DEFAULT_UNPACKER
+#undef ST_ASIO_DEFAULT_PACKER
+#undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration

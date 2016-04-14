@@ -1,11 +1,11 @@
 
 //configuration
-#define SERVER_PORT		5051
-#define AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
-#define ENHANCED_STABILITY
-#define CLOSED_SOCKET_MAX_DURATION	0
-#define WANT_MSG_SEND_NOTIFY
-#define DEFAULT_PACKER	replaceable_packer
+#define ST_ASIO_SERVER_PORT		5051
+#define ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
+#define ST_ASIO_ENHANCED_STABILITY
+#define ST_ASIO_CLOSED_SOCKET_MAX_DURATION	0
+#define ST_ASIO_WANT_MSG_SEND_NOTIFY
+#define ST_ASIO_DEFAULT_PACKER	replaceable_packer
 //configuration
 
 #include "file_socket.h"
@@ -16,14 +16,14 @@ file_socket::~file_socket() {trans_end();}
 void file_socket::reset() {trans_end(); st_server_socket::reset();}
 
 //msg handling
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 //we can handle msg very fast, so we don't use recv buffer
 bool file_socket::on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
 bool file_socket::on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 //msg handling end
 
-#ifdef WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 void file_socket::on_msg_send(in_msg_type& msg)
 {
 	BOOST_AUTO(buffer, boost::dynamic_pointer_cast<file_buffer>(msg.raw_buffer()));
@@ -52,7 +52,7 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 {
 	if (msg.size() <= ORDER_LEN)
 	{
-		printf("wrong order length: " size_t_format ".\n", msg.size());
+		printf("wrong order length: " ST_ASIO_SF ".\n", msg.size());
 		return;
 	}
 
@@ -107,10 +107,10 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 }
 
 //restore configuration
-#undef SERVER_PORT
-#undef AUTO_CLEAR_CLOSED_SOCKET
-#undef ENHANCED_STABILITY
-#undef CLOSED_SOCKET_MAX_DURATION
-#undef WANT_MSG_SEND_NOTIFY
-#undef DEFAULT_PACKER
+#undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#undef ST_ASIO_ENHANCED_STABILITY
+#undef ST_ASIO_CLOSED_SOCKET_MAX_DURATION
+#undef ST_ASIO_WANT_MSG_SEND_NOTIFY
+#undef ST_ASIO_DEFAULT_PACKER
 //restore configuration
