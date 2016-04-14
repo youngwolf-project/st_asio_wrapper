@@ -1,9 +1,9 @@
 
 //configuration
-#define SERVER_PORT		9527
-#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
-#define CUSTOM_LOG
-#define DEFAULT_UNPACKER unbuffered_unpacker
+#define ST_ASIO_SERVER_PORT		9527
+#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+#define ST_ASIO_CUSTOM_LOG
+#define ST_ASIO_DEFAULT_UNPACKER unbuffered_unpacker
 
 //the following three macros demonstrate how to support huge msg(exceed 65535 - 2).
 //huge msg will consume huge memory, for example, if we want to support 1M msg size, because every st_tcp_socket has a
@@ -12,17 +12,17 @@
 //can consume 2G(2 * 1M * 1K) memory when performance testing(both send buffer and recv buffer are full).
 //generally speaking, if there are 1K clients connected to the server, the server can consume
 //1G(occupied by unpackers) + 2G(occupied by msg buffer) * 1K = 2049G memory theoretically.
-//please note that the server also need to define at least HUGE_MSG and MSG_BUFFER_SIZE macros too.
+//please note that the server also need to define at least ST_ASIO_HUGE_MSG and ST_ASIO_MSG_BUFFER_SIZE macros too.
 
-//#define HUGE_MSG
-//#define MSG_BUFFER_SIZE (1024 * 1024)
-//#define MAX_MSG_NUM 8 //reduce msg buffer size to reduce memory occupation
+//#define ST_ASIO_HUGE_MSG
+//#define ST_ASIO_MSG_BUFFER_SIZE (1024 * 1024)
+//#define ST_ASIO_MAX_MSG_NUM 8 //reduce msg buffer size to reduce memory occupation
 //configuration
 
 //demonstrate how to use custom log system:
 //use your own code to replace the following all_out_helper2 macros, then you can record logs according to your wishes.
 //custom log should be defined(or included) before including any st_asio_wrapper header files except st_asio_wrapper_base.h
-//notice: please don't forget to define the CUSTOM_LOG macro.
+//notice: please don't forget to define the ST_ASIO_CUSTOM_LOG macro.
 #include "../include/st_asio_wrapper_base.h"
 using namespace st_asio_wrapper;
 
@@ -46,7 +46,7 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: asio_client [<port=%d> [ip=%s]]\n", SERVER_PORT + 100, SERVER_IP);
+	printf("usage: asio_client [<port=%d> [ip=%s]]\n", ST_ASIO_SERVER_PORT + 100, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -61,9 +61,9 @@ int main(int argc, const char* argv[])
 	if (argc > 2)
 		client.set_server_addr(atoi(argv[1]), argv[2]);
 	else if (argc > 1)
-		client.set_server_addr(atoi(argv[1]), SERVER_IP);
+		client.set_server_addr(atoi(argv[1]), ST_ASIO_SERVER_IP);
 	else
-		client.set_server_addr(SERVER_PORT + 100, SERVER_IP);
+		client.set_server_addr(ST_ASIO_SERVER_PORT + 100, ST_ASIO_SERVER_IP);
 
 	service_pump.start_service();
 	while(service_pump.is_running())
@@ -92,12 +92,12 @@ int main(int argc, const char* argv[])
 }
 
 //restore configuration
-#undef SERVER_PORT
-#undef FORCE_TO_USE_MSG_RECV_BUFFER
-#undef CUSTOM_LOG
-#undef DEFAULT_UNPACKER
+#undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+#undef ST_ASIO_CUSTOM_LOG
+#undef ST_ASIO_DEFAULT_UNPACKER
 
-//#undef HUGE_MSG
-//#undef MAX_MSG_LEN
-//#undef MAX_MSG_NUM
+//#undef ST_ASIO_HUGE_MSG
+//#undef ST_ASIO_MAX_MSG_LEN
+//#undef ST_ASIO_MAX_MSG_NUM
 //restore configuration

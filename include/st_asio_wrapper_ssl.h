@@ -19,14 +19,14 @@
 #include "st_asio_wrapper_tcp_client.h"
 #include "st_asio_wrapper_server.h"
 
-#ifdef REUSE_OBJECT
+#ifdef ST_ASIO_REUSE_OBJECT
 	#error boost::asio::ssl::stream not support reuse!
 #endif
 
 namespace st_asio_wrapper
 {
 
-template <typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
+template <typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_DEFAULT_UNPACKER, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
 class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket>
 {
 public:
@@ -177,7 +177,7 @@ protected:
 };
 typedef st_tcp_client_base<st_ssl_connector, st_ssl_object_pool<st_ssl_connector>> st_ssl_tcp_client;
 
-template<typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
+template<typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
 using st_ssl_server_socket_base = st_server_socket_base<Packer, Unpacker, Server, Socket>;
 typedef st_ssl_server_socket_base<> st_ssl_server_socket;
 

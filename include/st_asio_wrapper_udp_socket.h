@@ -18,15 +18,15 @@
 #include "st_asio_wrapper_socket.h"
 #include "st_asio_wrapper_unpacker.h"
 
-//in set_local_addr, if the IP is empty, UDP_DEFAULT_IP_VERSION will define the IP version,
+//in set_local_addr, if the IP is empty, ST_ASIO_UDP_DEFAULT_IP_VERSION will define the IP version,
 //or, the IP version will be deduced by the IP address.
 //boost::asio::ip::udp::v4() means ipv4 and boost::asio::ip::udp::v6() means ipv6.
-#ifndef UDP_DEFAULT_IP_VERSION
-#define UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
+#ifndef ST_ASIO_UDP_DEFAULT_IP_VERSION
+#define ST_ASIO_UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
 #endif
 
-#ifndef DEFAULT_UDP_UNPACKER
-#define DEFAULT_UDP_UNPACKER udp_unpacker
+#ifndef ST_ASIO_DEFAULT_UDP_UNPACKER
+#define ST_ASIO_DEFAULT_UDP_UNPACKER udp_unpacker
 #endif
 
 namespace st_asio_wrapper
@@ -34,7 +34,7 @@ namespace st_asio_wrapper
 namespace st_udp
 {
 
-template <typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UDP_UNPACKER, typename Socket = boost::asio::ip::udp::socket>
+template <typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_DEFAULT_UDP_UNPACKER, typename Socket = boost::asio::ip::udp::socket>
 class st_udp_socket_base : public st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>>
 {
 public:
@@ -62,7 +62,7 @@ public:
 		boost::system::error_code ec;
 		ST_THIS lowest_layer().close(ec);
 		ST_THIS lowest_layer().open(local_addr.protocol(), ec); assert(!ec);
-#ifndef NOT_REUSE_ADDRESS
+#ifndef ST_ASIO_NOT_REUSE_ADDRESS
 		ST_THIS lowest_layer().set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
 #endif
 		ST_THIS lowest_layer().bind(local_addr, ec); assert(!ec);
@@ -73,7 +73,7 @@ public:
 	bool set_local_addr(unsigned short port, const std::string& ip = std::string())
 	{
 		if (ip.empty())
-			local_addr = boost::asio::ip::udp::endpoint(UDP_DEFAULT_IP_VERSION, port);
+			local_addr = boost::asio::ip::udp::endpoint(ST_ASIO_UDP_DEFAULT_IP_VERSION, port);
 		else
 		{
 			boost::system::error_code ec;
@@ -123,7 +123,7 @@ protected:
 		{
 			ST_THIS next_layer().async_receive_from(unpacker_->prepare_next_recv(), peer_addr,
 				boost::bind(&st_udp_socket_base::recv_handler, this,
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 					ST_THIS async_call_indicator,
 #endif
 					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
@@ -145,7 +145,7 @@ protected:
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()), ST_THIS last_send_msg.peer_addr,
 				boost::bind(&st_udp_socket_base::send_handler, this,
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 					ST_THIS async_call_indicator,
 #endif
 					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
@@ -164,11 +164,11 @@ protected:
 			unified_out::error_out("recv msg error (%d %s)", ec.value(), ec.message().data());
 	}
 
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	virtual bool on_msg(out_msg_type& msg) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+	virtual bool on_msg(out_msg_type& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 #endif
 
-	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
+	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 
 	void clean_up()
 	{
@@ -184,7 +184,7 @@ protected:
 	}
 
 	void recv_handler(
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 		boost::shared_ptr<char> async_call_indicator,
 #endif
 		const boost::system::error_code& ec, size_t bytes_transferred)
@@ -204,7 +204,7 @@ protected:
 	}
 
 	void send_handler(
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 		boost::shared_ptr<char> async_call_indicator,
 #endif
 		const boost::system::error_code& ec, size_t bytes_transferred)
@@ -212,7 +212,7 @@ protected:
 		if (!ec)
 		{
 			assert(bytes_transferred > 0);
-#ifdef WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(ST_THIS last_send_msg);
 #endif
 		}
@@ -225,7 +225,7 @@ protected:
 		//send msg sequentially, that means second send only after first send success
 		//under windows, send a msg to addr_any may cause sending errors, please note
 		//for UDP in st_asio_wrapper, sending error will not stop the following sending.
-#ifdef WANT_ALL_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 		if (!do_send_msg())
 			ST_THIS on_all_msg_send(ST_THIS last_send_msg);
 #else

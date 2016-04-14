@@ -18,8 +18,8 @@
 #include "st_asio_wrapper_packer.h"
 #include "st_asio_wrapper_timer.h"
 
-#ifndef DEFAULT_PACKER
-#define DEFAULT_PACKER packer
+#ifndef ST_ASIO_DEFAULT_PACKER
+#define ST_ASIO_DEFAULT_PACKER packer
 #endif
 
 namespace st_asio_wrapper
@@ -78,7 +78,7 @@ public:
 		if (started())
 			return false;
 
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 		if (!async_call_indicator.unique())
 			return false;
 #endif
@@ -123,7 +123,7 @@ public:
 	bool is_send_buffer_available()
 	{
 		boost::shared_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
-		return send_msg_buffer.size() < MAX_MSG_NUM;
+		return send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;
 	}
 
 	//don't use the packer but insert into send buffer directly
@@ -131,7 +131,7 @@ public:
 	bool direct_send_msg(InMsgType&& msg, bool can_overflow = false)
 	{
 		boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
-		return can_overflow || send_msg_buffer.size() < MAX_MSG_NUM ? do_direct_send_msg(std::move(msg)) : false;
+		return can_overflow || send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM ? do_direct_send_msg(std::move(msg)) : false;
 	}
 
 	bool direct_post_msg(const InMsgType& msg, bool can_overflow = false) {return direct_post_msg(InMsgType(msg), can_overflow);}
@@ -173,7 +173,7 @@ protected:
 	//receiving error or peer endpoint quit(false ec means ok)
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	//if you want to use your own receive buffer, you can move the msg to your own receive buffer, then handle them as your own strategy(may be you'll need a msg dispatch thread),
 	//or you can handle the msg at here, but this will reduce efficiency because this msg handling will block the next msg receiving on the same st_socket,
 	//but if you can handle the msg very fast, you are recommended to handle them at here, which will inversely more efficient,
@@ -193,12 +193,12 @@ protected:
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
 	virtual bool on_msg_handle(OutMsgType& msg, bool link_down) = 0;
 
-#ifdef WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	//one msg has sent to the kernel buffer, msg is the right msg
 	//notice: the msg is packed, using inconstant is for the convenience of swapping
 	virtual void on_msg_send(InMsgType& msg) {}
 #endif
-#ifdef WANT_ALL_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 	//send buffer goes empty
 	//notice: the msg is packed, using inconstant is for the convenience of swapping
 	virtual void on_all_msg_send(InMsgType& msg) {}
@@ -249,7 +249,7 @@ protected:
 
 	void dispatch_msg()
 	{
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 		auto dispatch = false;
 		for (auto iter = std::begin(temp_msg_buffer); !suspend_dispatch_msg_ && !posting && iter != std::end(temp_msg_buffer);)
 			if (on_msg(*iter))
@@ -257,7 +257,7 @@ protected:
 			else
 			{
 				boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-				if (recv_msg_buffer.size() < MAX_MSG_NUM) //msg receive buffer available
+				if (recv_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM) //msg receive buffer available
 				{
 					dispatch = true;
 					recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer, iter++);
@@ -333,12 +333,12 @@ protected:
 
 			if (dispatch_all)
 			{
-#ifdef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifdef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 				//the msgs in temp_msg_buffer are discarded if we don't used msg receive buffer, it's very hard to resolve this defect,
 				//so, please be very carefully if you decide to resolve this issue, the biggest problem is calling force_close in on_msg.
 				recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
 #endif
-#ifndef DISCARD_MSG_WHEN_LINK_DOWN
+#ifndef ST_ASIO_DISCARD_MSG_WHEN_LINK_DOWN
 				st_asio_wrapper::do_something_to_all(recv_msg_buffer, [this](OutMsgType& msg) {ST_THIS on_msg_handle(msg, true);});
 #endif
 				recv_msg_buffer.clear();
@@ -379,7 +379,7 @@ protected:
 	void init()
 	{
 		reset_state();
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 		async_call_indicator = boost::make_shared<char>('\0');
 #endif
 	}
@@ -406,7 +406,7 @@ protected:
 	bool started_; //has started or not
 	boost::shared_mutex start_mutex;
 
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 	boost::shared_ptr<char> async_call_indicator;
 #endif
 };

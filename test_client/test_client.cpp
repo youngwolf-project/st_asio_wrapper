@@ -3,12 +3,12 @@
 #include <boost/tokenizer.hpp>
 
 //configuration
-#define SERVER_PORT		9527
-//#define REUSE_OBJECT //use objects pool
-//#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
-//#define AUTO_CLEAR_CLOSED_SOCKET
-//#define CLEAR_CLOSED_SOCKET_INTERVAL	1
-#define WANT_MSG_SEND_NOTIFY
+#define ST_ASIO_SERVER_PORT		9527
+//#define ST_ASIO_REUSE_OBJECT //use objects pool
+//#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+//#define ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+//#define ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL	1
+#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 //configuration
 
 //use the following macro to control the type of packer and unpacker
@@ -18,13 +18,13 @@
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-//#define DEFAULT_PACKER replaceable_packer
-//#define DEFAULT_UNPACKER replaceable_unpacker
+//#define ST_ASIO_DEFAULT_PACKER replaceable_packer
+//#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 #elif 2 == PACKER_UNPACKER_TYPE
-#define DEFAULT_UNPACKER fixed_length_unpacker
+#define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
-#define DEFAULT_PACKER prefix_suffix_packer
-#define DEFAULT_UNPACKER prefix_suffix_unpacker
+#define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
+#define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
 
 #include "../include/st_asio_wrapper_tcp_client.h"
@@ -87,7 +87,7 @@ public:
 
 protected:
 	//msg handling
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER //not force to use msg recv buffer(so on_msg will make the decision)
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //not force to use msg recv buffer(so on_msg will make the decision)
 	//we can handle msg very fast, so we don't use recv buffer(return true)
 	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
@@ -95,7 +95,7 @@ protected:
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
 
-#ifdef WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	virtual void on_msg_send(in_msg_type& msg)
 	{
 		if (0 == --msg_num)
@@ -118,7 +118,7 @@ private:
 	{
 		recv_bytes += msg.size();
 		if (check_msg && (msg.size() < sizeof(size_t) || 0 != memcmp(&recv_index, msg.data(), sizeof(size_t))))
-			printf("check msg error: " size_t_format ".\n", recv_index);
+			printf("check msg error: " ST_ASIO_SF ".\n", recv_index);
 		++recv_index;
 	}
 
@@ -151,11 +151,11 @@ public:
 
 		switch (test_index % 6)
 		{
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
+#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
 			//method #1
-			//notice: these methods need to define AUTO_CLEAR_CLOSED_SOCKET and CLEAR_CLOSED_SOCKET_INTERVAL macro, because it just close the st_socket,
+			//notice: these methods need to define ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET and ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL macro, because it just close the st_socket,
 			//not really remove them from object pool, this will cause test_client still send data via them, and wait responses from them.
-			//for this scenario, the smaller CLEAR_CLOSED_SOCKET_INTERVAL macro is, the better experience you will get, so set it to 1 second.
+			//for this scenario, the smaller ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL macro is, the better experience you will get, so set it to 1 second.
 		case 0: do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(), false : true;});				break;
 		case 1: do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->graceful_close(false, false), false : true;}); break;
 		case 2: do_something_to_one([&n](object_ctype& item) {return n-- > 0 ? item->force_close(), false : true;});				break;
@@ -184,7 +184,7 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: test_client [<port=%d> [<ip=%s> [link num=16]]]\n", SERVER_PORT, SERVER_IP);
+	printf("usage: test_client [<port=%d> [<ip=%s> [link num=16]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -193,9 +193,9 @@ int main(int argc, const char* argv[])
 	///////////////////////////////////////////////////////////
 	size_t link_num = 16;
 	if (argc > 3)
-		link_num = std::min(MAX_OBJECT_NUM, std::max(atoi(argv[3]), 1));
+		link_num = std::min(ST_ASIO_MAX_OBJECT_NUM, std::max(atoi(argv[3]), 1));
 
-	printf("exec: test_client with " size_t_format " links\n", link_num);
+	printf("exec: test_client with " ST_ASIO_SF " links\n", link_num);
 	///////////////////////////////////////////////////////////
 
 	st_service_pump service_pump;
@@ -203,8 +203,8 @@ int main(int argc, const char* argv[])
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4
-	unsigned short port = argc > 1 ? atoi(argv[1]) : SERVER_PORT;
-	std::string ip = argc > 2 ? argv[2] : SERVER_IP;
+	unsigned short port = argc > 1 ? atoi(argv[1]) : ST_ASIO_SERVER_PORT;
+	std::string ip = argc > 2 ? argv[2] : ST_ASIO_SERVER_IP;
 
 	//method #1, add clients first without any arguments, then set the server address.
 	for (size_t i = 0; i < link_num / 2; ++i)
@@ -216,7 +216,7 @@ int main(int argc, const char* argv[])
 		client.add_client(port, ip);
 
 	auto min_thread_num = 1;
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
+#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
 	++min_thread_num;
 #endif
 
@@ -233,7 +233,7 @@ int main(int argc, const char* argv[])
 			service_pump.start_service(min_thread_num);
 		}
 		else if (str == LIST_STATUS)
-			printf("link #: " size_t_format ", valid links: " size_t_format ", closed links: " size_t_format "\n", client.size(), client.valid_size(), client.closed_object_size());
+			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.closed_object_size());
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
 			client.do_something_to_all([](test_client::object_ctype& item) {item->suspend_dispatch_msg(true);});
@@ -263,9 +263,9 @@ int main(int argc, const char* argv[])
 				continue;
 			}
 
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
+#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
 			link_num = client.size();
-			printf("link number: " size_t_format "\n", link_num);
+			printf("link number: " ST_ASIO_SF "\n", link_num);
 #endif
 			size_t msg_num = 1024;
 			size_t msg_len = 1024; //must greater than or equal to sizeof(size_t)
@@ -286,7 +286,7 @@ int main(int argc, const char* argv[])
 			msg_len = 1024; //we hard code this because we fixedly initialized the length of fixed_length_unpacker to 1024
 			native = true; //we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
 #elif 3 == PACKER_UNPACKER_TYPE
-			if (iter != std::end(tok)) msg_len = std::min((size_t) MSG_BUFFER_SIZE,
+			if (iter != std::end(tok)) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE,
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t)));
 #endif
 			if (iter != std::end(tok)) msg_fill = *iter++->data();
@@ -309,14 +309,14 @@ int main(int argc, const char* argv[])
 
 			if (total_msg_bytes > 0)
 			{
-				printf("test parameters after adjustment: " size_t_format " " size_t_format " %c %d\n", msg_num, msg_len, msg_fill, model);
+				printf("test parameters after adjustment: " ST_ASIO_SF " " ST_ASIO_SF " %c %d\n", msg_num, msg_len, msg_fill, model);
 				puts("performance test begin, this application will have no response during the test!");
 
 				client.clear_status();
 				total_msg_bytes *= msg_len;
 				boost::timer::cpu_timer begin_time;
 
-#ifdef WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 				if (0 == model)
 				{
 					client.begin(msg_num, msg_len, msg_fill);
@@ -340,7 +340,7 @@ int main(int argc, const char* argv[])
 					printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
 				}
 				else
-					puts("if WANT_MSG_SEND_NOTIFY defined, only support model 0!");
+					puts("if ST_ASIO_WANT_MSG_SEND_NOTIFY defined, only support model 0!");
 #else
 				auto buff = new char[msg_len];
 				memset(buff, msg_fill, msg_len);
@@ -388,12 +388,12 @@ int main(int argc, const char* argv[])
 }
 
 //restore configuration
-#undef SERVER_PORT
-#undef REUSE_OBJECT
-#undef FORCE_TO_USE_MSG_RECV_BUFFER
-#undef AUTO_CLEAR_CLOSED_SOCKET
-#undef CLEAR_CLOSED_SOCKET_INTERVA
-#undef WANT_MSG_SEND_NOTIFY
-#undef DEFAULT_PACKER
-#undef DEFAULT_UNPACKER
+#undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_REUSE_OBJECT
+#undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+#undef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#undef ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVA
+#undef ST_ASIO_WANT_MSG_SEND_NOTIFY
+#undef ST_ASIO_DEFAULT_PACKER
+#undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration

@@ -3,8 +3,8 @@
 #include <boost/tokenizer.hpp>
 
 //configuration
-#define SERVER_PORT		5050
-#define DEFAULT_UNPACKER replaceable_unpacker
+#define ST_ASIO_SERVER_PORT		5050
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 //configuration
 
 #include "file_client.h"
@@ -20,7 +20,7 @@ fl_type file_size;
 int main(int argc, const char* argv[])
 {
 	puts("this is a file transfer client.");
-	printf("usage: file_client [<port=%d> [<ip=%s> [link num=1]]]\n", SERVER_PORT, SERVER_IP);
+	printf("usage: file_client [<port=%d> [<ip=%s> [link num=1]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -107,6 +107,6 @@ int main(int argc, const char* argv[])
 }
 
 //restore configuration
-#undef SERVER_PORT
-#undef DEFAULT_UNPACKER
+#undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration
