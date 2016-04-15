@@ -17,7 +17,7 @@
 
 #include "st_asio_wrapper_base.h"
 
-//If you inherit a class from class X, your own timers' ids must be bigger than X::TIMER_END
+//If you inherit a class from class X, your own timer ids must begin from X::TIMER_END
 namespace st_asio_wrapper
 {
 
@@ -45,7 +45,7 @@ protected:
 		bool operator <(const timer_info& other) const {return id < other.id;}
 	};
 
-	static const unsigned char TIMER_END = 0xFF; //user timer's id must be bigger than TIMER_END
+	static const unsigned char TIMER_END = 0; //user timer's id must begin from parent class' TIMER_END
 
 	st_timer(boost::asio::io_service& _io_service_) : io_service_(_io_service_) {}
 	virtual ~st_timer() {}

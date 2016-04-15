@@ -32,10 +32,10 @@ template <typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_
 class st_connector_base : public st_tcp_socket_base<Socket, Packer, Unpacker>
 {
 public:
-	static const unsigned char TIMER_BEGIN = st_tcp_socket_base<Socket, Packer, Unpacker>::TIMER_END + 1;
+	static const unsigned char TIMER_BEGIN = st_tcp_socket_base<Socket, Packer, Unpacker>::TIMER_END;
 	static const unsigned char TIMER_CONNECT = TIMER_BEGIN;
 	static const unsigned char TIMER_ASYNC_CLOSE = TIMER_BEGIN + 1;
-	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
+	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
 
 	st_connector_base(boost::asio::io_service& io_service_) : st_tcp_socket_base<Socket, Packer, Unpacker>(io_service_), connected(false), reconnecting(true)
 		{set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
@@ -169,7 +169,7 @@ protected:
 		default:
 			if (id < TIMER_BEGIN)
 				return st_tcp_socket_base<Socket, Packer, Unpacker>::on_timer(id, user_data);
-			else if (id > TIMER_END)
+			else if (id >= TIMER_END)
 				unified_out::warning_out("You have unhandled timer %u", id);
 			break;
 		}

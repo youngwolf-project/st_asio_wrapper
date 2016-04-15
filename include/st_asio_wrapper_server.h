@@ -38,7 +38,7 @@ class st_server_base : public Server, public Pool
 {
 public:
 	using Pool::TIMER_BEGIN;
-	using Pool::TIMER_END; //user timer's id must be bigger than TIMER_END
+	using Pool::TIMER_END;
 
 	st_server_base(st_service_pump& service_pump_) : Pool(service_pump_), acceptor(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
 	template<typename Arg>
