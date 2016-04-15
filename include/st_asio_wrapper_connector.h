@@ -90,7 +90,7 @@ public:
 		connected = false;
 
 		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
-			ST_THIS set_timer(TIMER_ASYNC_CLOSE, 10, reinterpret_cast<const void*>((ssize_t) (ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION * 100)));
+			ST_THIS set_timer(TIMER_ASYNC_CLOSE, 10, boost::bind(&st_connector_base::async_close_handler, this, _1, ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION * 100));
 	}
 
 	void show_info(const char* head, const char* tail) const
@@ -141,37 +141,24 @@ protected:
 			ST_THIS start();
 	}
 
-	virtual bool on_timer(unsigned char id, const void* user_data)
+private:
+	bool async_close_handler(unsigned char id, ssize_t loop_num)
 	{
-		switch(id)
-		{
-		case TIMER_CONNECT:
-			do_start();
-			break;
-		case TIMER_ASYNC_CLOSE:
-			if (2 == ST_THIS close_state)
-			{
-				auto loop_num = reinterpret_cast<ssize_t>(user_data);
-				--loop_num;
+		assert(TIMER_ASYNC_CLOSE == id);
 
-				if (loop_num > 0)
-				{
-					ST_THIS update_timer_info(id, 10, reinterpret_cast<const void*>(loop_num));
-					return true;
-				}
-				else
-				{
-					unified_out::info_out("failed to graceful close within %d seconds", ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION);
-					force_close(reconnecting);
-				}
+		if (2 == ST_THIS close_state)
+		{
+			--loop_num;
+			if (loop_num > 0)
+			{
+				ST_THIS update_timer_info(id, 10, boost::bind(&st_connector_base::async_close_handler, this, _1, loop_num));
+				return true;
 			}
-			break;
-		default:
-			if (id < TIMER_BEGIN)
-				return st_tcp_socket_base<Socket, Packer, Unpacker>::on_timer(id, user_data);
-			else if (id >= TIMER_END)
-				unified_out::warning_out("You have unhandled timer %u", id);
-			break;
+			else
+			{
+				unified_out::info_out("failed to graceful close within %d seconds", ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION);
+				force_close(reconnecting);
+			}
 		}
 
 		return false;
@@ -190,7 +177,7 @@ protected:
 		{
 			auto delay = prepare_reconnect(ec);
 			if (delay >= 0)
-				ST_THIS set_timer(TIMER_CONNECT, delay, nullptr);
+				ST_THIS set_timer(TIMER_CONNECT, delay, [this](unsigned char id)->bool {assert(TIMER_CONNECT == id); do_start(); return false;});
 
 			if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
 			{

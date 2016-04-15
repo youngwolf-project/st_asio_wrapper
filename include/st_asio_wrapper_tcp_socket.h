@@ -177,6 +177,7 @@ protected:
 		}
 	}
 
+private:
 	void recv_handler(
 #ifdef ST_ASIO_ENHANCED_STABILITY
 		boost::shared_ptr<char> async_call_indicator,

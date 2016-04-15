@@ -99,10 +99,10 @@ protected:
 	void start()
 	{
 #ifndef ST_ASIO_REUSE_OBJECT
-		set_timer(TIMER_FREE_SOCKET, 1000 * ST_ASIO_SOCKET_FREE_INTERVAL, NULL);
+		set_timer(TIMER_FREE_SOCKET, 1000 * ST_ASIO_SOCKET_FREE_INTERVAL, boost::bind(&st_object_pool::free_object_handler, this, _1));
 #endif
 #ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
-		set_timer(TIMER_CLEAR_SOCKET, 1000 * ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL, NULL);
+		set_timer(TIMER_CLEAR_SOCKET, 1000 * ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL, boost::bind(&st_object_pool::clear_object_handler, this, _1));
 #endif
 	}
 
@@ -153,33 +153,6 @@ protected:
 #endif
 
 		return object_type();
-	}
-
-	virtual bool on_timer(unsigned char id, const void* user_data)
-	{
-		switch(id)
-		{
-#ifndef ST_ASIO_REUSE_OBJECT
-		case TIMER_FREE_SOCKET:
-			free_object();
-			return true;
-			break;
-#endif
-#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
-		case TIMER_CLEAR_SOCKET:
-			clear_all_closed_object();
-			return true;
-			break;
-#endif
-		default:
-			if (id < TIMER_BEGIN)
-				return st_timer::on_timer(id, user_data);
-			else if (id >= TIMER_END)
-				unified_out::warning_out("You have unhandled timer %u", id);
-			break;
-		}
-
-		return false;
 	}
 
 public:
@@ -324,6 +297,27 @@ public:
 
 	DO_SOMETHING_TO_ALL_MUTEX(object_can, object_can_mutex)
 	DO_SOMETHING_TO_ONE_MUTEX(object_can, object_can_mutex)
+
+private:
+#ifndef ST_ASIO_REUSE_OBJECT
+	bool free_object_handler(unsigned char id)
+	{
+		assert(TIMER_FREE_SOCKET == id);
+
+		free_object();
+		return true;
+	}
+#endif
+
+#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+	bool clear_object_handler(unsigned char id)
+	{
+		assert(TIMER_CLEAR_SOCKET == id);
+
+		clear_all_closed_object();
+		return true;
+	}
+#endif
 
 protected:
 	boost::atomic_uint_fast64_t cur_id;

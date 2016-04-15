@@ -14,6 +14,7 @@
 #define ST_ASIO_WRAPPER_TIMER_H_
 
 #include <boost/container/set.hpp>
+#include <boost/function.hpp>
 
 #include "st_asio_wrapper_base.h"
 
@@ -39,7 +40,7 @@ protected:
 		unsigned char id;
 		timer_status status;
 		size_t milliseconds;
-		const void* user_data; //if needed, you must take the responsibility to manage this memory
+		boost::function<bool (unsigned char)> call_back;
 		boost::shared_ptr<boost::asio::deadline_timer> timer;
 
 		bool operator <(const timer_info& other) const {return id < other.id;}
@@ -55,7 +56,7 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::container::set<object_type> container_type;
 
-	void update_timer_info(unsigned char id, size_t milliseconds, const void* user_data, bool start = false)
+	void update_timer_info(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>&& call_back, bool start = false)
 	{
 		object_type ti = {id};
 
@@ -76,17 +77,20 @@ public:
 		//items in timer_can not locked
 		iter->status = object_type::TIMER_OK;
 		iter->milliseconds = milliseconds;
-		iter->user_data = user_data;
+		iter->call_back.swap(call_back);
 
 		if (start)
 			start_timer(*iter);
 	}
+	void update_timer_info(unsigned char id, size_t milliseconds, const boost::function<bool (unsigned char)>& call_back, bool start = false)
+		{update_timer_info(id, milliseconds, boost::function<bool(unsigned char)>(call_back), start);}
 
-	void set_timer(unsigned char id, size_t milliseconds, const void* user_data) {update_timer_info(id, milliseconds, user_data, true);}
+	void set_timer(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>&& call_back) {update_timer_info(id, milliseconds, std::move(call_back), true);}
+	void set_timer(unsigned char id, size_t milliseconds, const boost::function<bool(unsigned char)>& call_back) {update_timer_info(id, milliseconds, call_back, true);}
 
 	object_type find_timer(unsigned char id)
 	{
-		object_type ti = {id, object_type::TIMER_CANCELED, 0, nullptr};
+		object_type ti = {id, object_type::TIMER_CANCELED, 0};
 
 		boost::shared_lock<boost::shared_mutex> lock(timer_can_mutex);
 		auto iter = timer_can.find(ti);
@@ -132,9 +136,6 @@ public:
 	void stop_all_timer() {do_something_to_all([this](object_type& item) {ST_THIS stop_timer(item);});}
 
 protected:
-	//return true to continue the timer, or the timer will stop
-	virtual bool on_timer(unsigned char id, const void* user_data) {return false;}
-
 	void start_timer(object_ctype& ti)
 	{
 		ti.timer->expires_from_now(boost::posix_time::milliseconds(ti.milliseconds));
@@ -150,7 +151,8 @@ protected:
 
 	void timer_handler(const boost::system::error_code& ec, object_ctype& ti)
 	{
-		if (!ec && on_timer(ti.id, ti.user_data) && object_type::TIMER_OK == ti.status)
+		//return true to continue the timer, or the timer will stop
+		if (!ec && ti.call_back(ti.id) && object_type::TIMER_OK == ti.status)
 			start_timer(ti);
 	}
 

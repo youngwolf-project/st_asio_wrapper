@@ -89,6 +89,26 @@ protected:
 	}
 	virtual bool is_send_allowed() const {return authorized() && st_connector_base<Packer, Unpacker, Socket>::is_send_allowed();}
 
+	bool shutdown_ssl()
+	{
+		bool re = false;
+		if (!ST_THIS is_closing() && authorized_)
+		{
+			ST_THIS show_info("ssl client link:", "been shutting down.");
+			ST_THIS close_state = 2;
+			ST_THIS reconnecting = false;
+			authorized_ = false;
+
+			boost::system::error_code ec;
+			ST_THIS next_layer().shutdown(ec);
+
+			re = !ec;
+		}
+
+		return re;
+	}
+
+private:
 	void connect_handler(const boost::system::error_code& ec)
 	{
 		if (!ec)
@@ -113,25 +133,6 @@ protected:
 			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}
-	}
-
-	bool shutdown_ssl()
-	{
-		bool re = false;
-		if (!ST_THIS is_closing() && authorized_)
-		{
-			ST_THIS show_info("ssl client link:", "been shutting down.");
-			ST_THIS close_state = 2;
-			ST_THIS reconnecting = false;
-			authorized_ = false;
-
-			boost::system::error_code ec;
-			ST_THIS next_layer().shutdown(ec);
-
-			re = !ec;
-		}
-
-		return re;
 	}
 
 protected:
@@ -205,7 +206,7 @@ protected:
 		ST_THIS acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_ssl_server_base::accept_handler, this, boost::asio::placeholders::error, client_ptr));
 	}
 
-protected:
+private:
 	void accept_handler(const boost::system::error_code& ec, typename st_ssl_server_base::object_ctype& client_ptr)
 	{
 		if (!ec)

@@ -1,5 +1,4 @@
 
-#include <boost/timer/timer.hpp>
 #include <boost/tokenizer.hpp>
 
 //configuration
@@ -71,29 +70,12 @@ int main(int argc, const char* argv[])
 				if (client.find(0)->get_file(*iter))
 				{
 					client.do_something_to_all(boost::bind(&file_socket::get_file, _1, boost::cref(*iter)));
+					client.start();
 
-					unsigned percent = -1;
 					while (completed_client_num != (unsigned short) link_num)
-					{
 						boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
-						if (file_size > 0)
-						{
-							fl_type total_rest_size = client.get_total_rest_size();
-							if (total_rest_size > 0)
-							{
-								unsigned new_percent = (unsigned) ((file_size - total_rest_size) * 100 / file_size);
-								if (percent != new_percent)
-								{
-									percent = new_percent;
-									printf("\r%u%%", percent);
-									fflush(stdout);
-								}
-							}
-						}
-					}
 
-					double used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
-					printf("\r100%%\ntransfer %s end, speed: %.0f kB/s.\n", iter->data(), file_size / used_time / 1024);
+					client.stop(*iter);
 				}
 				else
 					printf("transfer %s failed!\n", iter->data());

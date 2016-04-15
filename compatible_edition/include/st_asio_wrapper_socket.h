@@ -206,49 +206,6 @@ protected:
 	virtual void on_all_msg_send(InMsgType& msg) {}
 #endif
 
-	virtual bool on_timer(unsigned char id, const void* user_data)
-	{
-		switch (id)
-		{
-		case TIMER_DISPATCH_MSG: //delay putting msgs into receive buffer cause of receive buffer overflow
-			dispatch_msg();
-			break;
-		case TIMER_SUSPEND_DISPATCH_MSG: //suspend dispatching msgs
-			do_dispatch_msg(true);
-			break;
-		case TIMER_HANDLE_POST_BUFFER:
-			{
-				boost::unique_lock<boost::shared_mutex> lock(post_msg_buffer_mutex);
-				{
-					boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
-					if (splice_helper(send_msg_buffer, post_msg_buffer))
-						do_send_msg();
-				}
-
-				bool empty = post_msg_buffer.empty();
-				posting = !empty;
-				lock.unlock();
-
-				if (empty)
-					do_dispatch_msg(true);
-
-				return !empty; //continue the timer if some msgs still left behind
-			}
-			break;
-		case TIMER_RE_DISPATCH_MSG: //re-dispatch
-			do_dispatch_msg(true);
-			break;
-		default:
-			if (id < TIMER_BEGIN)
-				return st_timer::on_timer(id, user_data);
-			else if (id >= TIMER_END)
-				unified_out::warning_out("You have unhandled timer %u", id);
-			break;
-		}
-
-		return false;
-	}
-
 	void dispatch_msg()
 	{
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
@@ -282,25 +239,7 @@ protected:
 		if (temp_msg_buffer.empty())
 			do_start(); //receive msg sequentially, which means second receiving only after first receiving success
 		else
-			set_timer(TIMER_DISPATCH_MSG, 50, NULL);
-	}
-
-	void msg_handler()
-	{
-		bool re = on_msg_handle(last_dispatch_msg, false); //must before next msg dispatching to keep sequence
-		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-		dispatching = false;
-		if (!re) //dispatch failed, re-dispatch
-		{
-			recv_msg_buffer.push_front(OutMsgType());
-			recv_msg_buffer.front().swap(last_dispatch_msg);
-			set_timer(TIMER_RE_DISPATCH_MSG, 50, NULL);
-		}
-		else //dispatch msg sequentially, which means second dispatching only after first dispatching success
-			do_dispatch_msg(false);
-
-		if (!dispatching)
-			last_dispatch_msg.clear();
+			set_timer(TIMER_DISPATCH_MSG, 50, boost::bind(&st_socket::timer_handler, this, _1));
 	}
 
 	//must mutex recv_msg_buffer before invoke this function
@@ -312,7 +251,7 @@ protected:
 		if (suspend_dispatch_msg_)
 		{
 			if (!dispatching && !recv_msg_buffer.empty())
-				set_timer(TIMER_SUSPEND_DISPATCH_MSG, 24 * 60 * 60 * 1000, NULL); //one day
+				set_timer(TIMER_SUSPEND_DISPATCH_MSG, 24 * 60 * 60 * 1000, boost::bind(&st_socket::timer_handler, this, _1)); //one day
 		}
 		else if (!posting)
 		{
@@ -371,7 +310,7 @@ protected:
 			if (!posting)
 			{
 				posting = true;
-				set_timer(TIMER_HANDLE_POST_BUFFER, 50, NULL);
+				set_timer(TIMER_HANDLE_POST_BUFFER, 50, boost::bind(&st_socket::timer_handler, this, _1));
 			}
 		}
 
@@ -384,6 +323,65 @@ protected:
 #ifdef ST_ASIO_ENHANCED_STABILITY
 		async_call_indicator = boost::make_shared<char>('\0');
 #endif
+	}
+
+private:
+	bool timer_handler(unsigned char id)
+	{
+		switch (id)
+		{
+		case TIMER_DISPATCH_MSG: //delay putting msgs into receive buffer cause of receive buffer overflow
+			dispatch_msg();
+			break;
+		case TIMER_SUSPEND_DISPATCH_MSG: //suspend dispatching msgs
+			do_dispatch_msg(true);
+			break;
+		case TIMER_HANDLE_POST_BUFFER:
+			{
+				boost::unique_lock<boost::shared_mutex> lock(post_msg_buffer_mutex);
+				{
+					boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
+					if (splice_helper(send_msg_buffer, post_msg_buffer))
+						do_send_msg();
+				}
+
+				bool empty = post_msg_buffer.empty();
+				posting = !empty;
+				lock.unlock();
+
+				if (empty)
+					do_dispatch_msg(true);
+
+				return !empty; //continue the timer if some msgs still left behind
+			}
+			break;
+		case TIMER_RE_DISPATCH_MSG: //re-dispatch
+			do_dispatch_msg(true);
+			break;
+		default:
+			assert(false);
+			break;
+		}
+
+		return false;
+	}
+
+	void msg_handler()
+	{
+		bool re = on_msg_handle(last_dispatch_msg, false); //must before next msg dispatching to keep sequence
+		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
+		dispatching = false;
+		if (!re) //dispatch failed, re-dispatch
+		{
+			recv_msg_buffer.push_front(OutMsgType());
+			recv_msg_buffer.front().swap(last_dispatch_msg);
+			set_timer(TIMER_RE_DISPATCH_MSG, 50, boost::bind(&st_socket::timer_handler, this, _1));
+		}
+		else //dispatch msg sequentially, which means second dispatching only after first dispatching success
+			do_dispatch_msg(false);
+
+		if (!dispatching)
+			last_dispatch_msg.clear();
 	}
 
 protected:
