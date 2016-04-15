@@ -424,6 +424,27 @@
  * Support clang.
  * Fix bug: all_out() output random strings on UNIX-like system(such as FreeBSD).
  * Simplified makefiles.
+ *
+ * 5.3.0	2016.4.17
+ * Use boost::function instead of on_timer as the callback of all timers, this is a very popular approach on async IO.
+ * Prefix all macros with 'ST_ASIO_' to avoid conflict between user's macros, except:
+ *  RE_CONNECT_INTERVAL has been changed to ST_ASIO_RECONNECT_INTERVAL;
+ *  ST_SERVICE_THREAD_NUM has been changed to ST_ASIO_SERVICE_THREAD_NUM;
+ *  size_t_format has been changed to ST_ASIO_SF;
+ *  ST_THIS remain untouched;
+ * Renamed interface st_connector::prepare_re_connect to st_connector::prepare_reconnect.
+ * Support changing the capacity of st_object_pool at runtime.
+ * Add --help and -h options to all demos.
+ * Rename demo udp_client to udp_test.
+ * Fix warning (hides overloaded virtual function) in Clang.
+ * Fix Bug: wrong configuration caused file_server core dump(because file_socket in file_server.o and file_socket.o are different)
+ * Add definitions for timer IDs.
+ * Add TIMER_BEGIN and TIMER_END to every class which directly or indirectly derived from st_timer.
+ * New feature: guarantee absolute safety when freeing or reusing st_socket, just need to define ENHANCED_STABILITY macro.
+ * Fix bug: objects created by st_ssl_object_pool not updated their IDs, but keep them uninitialized.
+ * More demonstration: more links supported in ssl_tesk (method #1).
+ * Log enhancement: when link broken, also output where the link came from (server andpoint or client andpoint).
+ * Check compiler's version carefully to give more accurate warnings or errors.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_

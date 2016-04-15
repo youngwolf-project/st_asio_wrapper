@@ -57,7 +57,7 @@ protected:
 	virtual bool do_start();
 开始，这里开始的意义是，如果连接未成功，则开始连接服务器，如果连接已经成功，则开始接收数据。
 
-virtual int prepare_re_connect(const boost::system::error_code& ec);
+virtual int prepare_reconnect(const boost::system::error_code& ec);
 	连接失败时回调，返回大于等于零则继续在相应毫秒之后重试，返回负数则放弃。
 
 	virtual void on_connect();
