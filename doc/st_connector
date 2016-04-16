@@ -72,8 +72,12 @@ virtual int prepare_reconnect(const boost::system::error_code& ec);
 	virtual void on_recv_error(const error_code& ec);
 接收错误，默认的行为是关闭连接，可以重写以自定义行为。
 
-	virtual bool on_timer(unsigned char id, const void* user_data);
-重写st_socket的on_timer，只处理自己的定时器，其它的定时器一律调用父类同名函数。
+	bool prepare_next_reconnect(const boost::system::error_code& ec);
+如果允许（io_service仍然在运行且prepare_reconnect返回大于等于0），启动定时器以延时一小段时间之后重新连接服务器。
+
+private:
+	bool async_close_handler(unsigned char id, ssize_t loop_num);
+异步优雅关闭超时定时器。
 
 	void connect_handler(const error_code& ec);
 连接成功或者失败后由asio回调。
