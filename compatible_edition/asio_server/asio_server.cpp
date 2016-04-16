@@ -1,10 +1,10 @@
 
 //configuration
-#define SERVER_PORT		9528
-#define REUSE_OBJECT //use objects pool
-//#define FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
-#define ENHANCED_STABILITY
-#define CLOSED_SOCKET_MAX_DURATION   0
+#define ST_ASIO_SERVER_PORT		9528
+#define ST_ASIO_REUSE_OBJECT //use objects pool
+//#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
+#define ST_ASIO_ENHANCED_STABILITY
+#define ST_ASIO_CLOSED_SOCKET_MAX_DURATION	0
 
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	1
@@ -13,13 +13,13 @@
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-//#define DEFAULT_PACKER replaceable_packer
-//#define DEFAULT_UNPACKER replaceable_unpacker
+//#define ST_ASIO_DEFAULT_PACKER replaceable_packer
+//#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 #elif 2 == PACKER_UNPACKER_TYPE
-#define DEFAULT_UNPACKER fixed_length_unpacker
+#define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
-#define DEFAULT_PACKER prefix_suffix_packer
-#define DEFAULT_UNPACKER prefix_suffix_unpacker
+#define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
+#define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
 //configuration
 
@@ -38,7 +38,7 @@ using namespace st_asio_wrapper;
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
 #if 1 == PACKER_UNPACKER_TYPE || 2 == PACKER_UNPACKER_TYPE
-BOOST_AUTO(global_packer, boost::make_shared<DEFAULT_PACKER>());
+BOOST_AUTO(global_packer, boost::make_shared<ST_ASIO_DEFAULT_PACKER>());
 #elif 3 == PACKER_UNPACKER_TYPE
 BOOST_AUTO(global_packer, boost::make_shared<prefix_suffix_packer>());
 #endif
@@ -50,7 +50,7 @@ public:
 	virtual void test() = 0;
 };
 
-typedef st_server_socket_base<DEFAULT_PACKER, DEFAULT_UNPACKER, i_echo_server> echo_socket_base;
+typedef st_server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, i_echo_server> echo_socket_base;
 class echo_socket : public echo_socket_base
 {
 public:
@@ -82,8 +82,8 @@ protected:
 	}
 
 	//msg handling: send the original msg back(echo server)
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	//this virtual function doesn't exists if FORCE_TO_USE_MSG_RECV_BUFFER been defined
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+	//this virtual function doesn't exists if ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER been defined
 	virtual bool on_msg(out_msg_type& msg)
 	{
 	#if 2 == PACKER_UNPACKER_TYPE
@@ -104,7 +104,7 @@ protected:
 		return send_msg(msg.data(), msg.size());
 	#endif
 	}
-	//please remember that we have defined FORCE_TO_USE_MSG_RECV_BUFFER, so, st_tcp_socket will directly
+	//please remember that we have defined ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER, so, st_tcp_socket will directly
 	//use msg recv buffer, and we need not rewrite on_msg(), which doesn't exists any more
 	//msg handling end
 };
@@ -121,7 +121,7 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: asio_server [<port=%d> [ip=0.0.0.0]]\n", SERVER_PORT);
+	printf("usage: asio_server [<port=%d> [ip=0.0.0.0]]\n", ST_ASIO_SERVER_PORT);
 	puts("normal server's port will be 100 larger.");
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
@@ -147,7 +147,7 @@ int main(int argc, const char* argv[])
 		echo_server_.set_server_addr(atoi(argv[1]));
 	}
 	else
-		server_.set_server_addr(SERVER_PORT + 100);
+		server_.set_server_addr(ST_ASIO_SERVER_PORT + 100);
 
 	service_pump.start_service(1);
 	while(service_pump.is_running())
@@ -163,8 +163,8 @@ int main(int argc, const char* argv[])
 		}
 		else if (str == LIST_STATUS)
 		{
-			printf("normal server, link #: " size_t_format ", closed links: " size_t_format "\n", server_.size(), server_.closed_object_size());
-			printf("echo server, link #: " size_t_format ", closed links: " size_t_format "\n", echo_server_.size(), echo_server_.closed_object_size());
+			printf("normal server, link #: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", server_.size(), server_.closed_object_size());
+			printf("echo server, link #: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.closed_object_size());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
@@ -199,15 +199,11 @@ int main(int argc, const char* argv[])
 }
 
 //restore configuration
-#undef SERVER_PORT
-#undef REUSE_OBJECT
-#undef FORCE_TO_USE_MSG_RECV_BUFFER
-#undef ENHANCED_STABILITY
-#undef CLOSED_SOCKET_MAX_DURATION
-#undef DEFAULT_PACKER
-#undef DEFAULT_UNPACKER
-
-//#undef HUGE_MSG
-//#undef MAX_MSG_LEN
-//#undef MAX_MSG_NUM
+#undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_REUSE_OBJECT
+#undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+#undef ST_ASIO_ENHANCED_STABILITY
+#undef ST_ASIO_CLOSED_SOCKET_MAX_DURATION
+#undef ST_ASIO_DEFAULT_PACKER
+#undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration

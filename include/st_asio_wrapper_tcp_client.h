@@ -26,7 +26,7 @@ class st_tcp_client_base : public st_client<Socket, Pool>
 {
 public:
 	using st_client<Socket, Pool>::TIMER_BEGIN;
-	using st_client<Socket, Pool>::TIMER_END; //user timer's id must be bigger than TIMER_END
+	using st_client<Socket, Pool>::TIMER_END;
 
 	st_tcp_client_base(st_service_pump& service_pump_) : st_client<Socket, Pool>(service_pump_) {}
 	template<typename Arg>
@@ -49,7 +49,7 @@ public:
 		auto client_ptr(ST_THIS create_object());
 		return ST_THIS add_client(client_ptr) ? client_ptr : typename Pool::object_type();
 	}
-	typename Pool::object_type add_client(unsigned short port, const std::string& ip = SERVER_IP)
+	typename Pool::object_type add_client(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
 	{
 		auto client_ptr(ST_THIS create_object());
 		client_ptr->set_server_addr(port, ip);

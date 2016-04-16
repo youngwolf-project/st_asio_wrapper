@@ -24,7 +24,7 @@ class st_sclient : public st_service_pump::i_service, public Socket
 {
 public:
 	using Socket::TIMER_BEGIN;
-	using Socket::TIMER_END; //user timer's id must be bigger than TIMER_END
+	using Socket::TIMER_END;
 
 	st_sclient(st_service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
 	template<typename Arg>
@@ -40,7 +40,7 @@ class st_client : public Pool
 {
 protected:
 	using Pool::TIMER_BEGIN;
-	using Pool::TIMER_END; //user timer's id must be bigger than TIMER_END
+	using Pool::TIMER_END;
 
 	st_client(st_service_pump& service_pump_) : Pool(service_pump_) {}
 	template<typename Arg>

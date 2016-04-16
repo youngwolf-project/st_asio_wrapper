@@ -2,25 +2,6 @@
 namespace st_asio_wrapper
 {
 
-st_asio_wrapper库中的一些类需要定时器，它们用的也是st_timer，为了与使用者的定时器区分，只能通过预留id的方法：
-st_object_pool：0-9
-st_socket：0-9
-
-st_tcp_socket_base：0-9
-st_connector_base：0-19
-st_tcp_sclient：0-9
-
-st_udp_socket_base：0-9
-st_udp_sclient：0-9
-
-st_server_socket_base：0-19
-st_server_base：0-9
-
-st_client：0-9
-st_tcp_client_base：0-9
-st_udp_client_base：0-9
-使用者如果继承了某个类，并且打算也使用定时器，那么一定要避开上面预留的定时器id。
-
 定时器类
 class st_timer
 {
@@ -32,12 +13,15 @@ protected:
 		unsigned char id;
 		timer_status status;
 		size_t milliseconds;
-		const void* user_data; //if needed, you must take the responsibility to manage this memory
+		boost::function<bool (unsigned char)> call_back;
 		boost::shared_ptr<boost::asio::deadline_timer> timer;
 
 		bool operator <(const timer_info& other) const {return id < other.id;}
 	};
-定时器数据结构，其中user_data成员需要使用者控制其生命周期。
+定时器数据结构。
+
+	static const unsigned char TIMER_END = 0;
+继承者的定义器ID必须从父类的TIMER_END开始，然后最好也定义一个自己的TIMER_END，如果你这个类可能会被继承的话。
 
 	st_timer(io_service& _io_service_);
 	virtual ~st_timer();
@@ -47,11 +31,13 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::container::set<object_type> container_type;
 
-	void update_timer_info(unsigned char id, size_t milliseconds, const void* user_data, bool start = false);
+	void update_timer_info(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>&& call_back, bool start = false);
+	void update_timer_info(unsigned char id, size_t milliseconds, const boost::function<bool(unsigned char)>& call_back, bool start = false)
 更新timer，如果start为true，更新完了之后马上会开启或者重新开启这个timer。
 注意，对同一个st_timer里面的同一个定时器操作并不是线程安全的。
 
-	void set_timer(unsigned char id, size_t milliseconds, const void* user_data);
+	void set_timer(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>&& call_back);
+	void set_timer(unsigned char id, size_t milliseconds, const boost::function<bool(unsigned char)>& call_back);
 开启定时器，定时器以id分区，如果定时器已经存在，则重新开始记时。这个函数其实就是以start为true调用update_timer_info而已。
 
 	object_type find_timer(unsigned char id);
@@ -77,11 +63,6 @@ so_something_to_all），跟查找功能类似。
 停止所有定时器。
 
 protected:
-	virtual bool on_timer(unsigned char id, const void* user_data);
-定时到达之后，回调这个函数，使用者需要重写它以实现自己的功能，对于不感兴趣的定时器，一定要调用st_timer::on_timer，
-返回true表示继续这个定时器，否则结束这个定时器。
-同一个st_timer内同一个定时器，on_timer的调用是顺序的，其它任何情况下，on_timer的调用都是并发的。
-
 	void start_timer(const timer_info& ti);
 内部使用的helper函数，真正的开启定时器（boost::asio::deadline_timer::async_wait）。
 
@@ -89,7 +70,8 @@ protected:
 内部使用的helper函数，真正的结束定时器（调用boost::asio::deadline_timer::cancel）。
 
 	void timer_handler(const error_code& ec, const timer_info& ti);
-在定时器到达后，由asio回调，其功能是调用on_timer并根据返回值决定是否继续这个定时器。
+在定时器到达后，由asio回调，其功能是调用timer_info::call_back并根据返回值决定是否继续这个定时器。
+同一个st_timer内同一个定时器，on_timer的调用是顺序的，其它任何情况下，on_timer的调用都是并发的。
 
 protected:
 	boost::asio::io_service& io_service_;

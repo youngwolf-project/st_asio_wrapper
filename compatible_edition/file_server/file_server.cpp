@@ -1,11 +1,11 @@
 
 //configuration
-#define SERVER_PORT		5051
-#define AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
-#define ENHANCED_STABILITY
-#define CLOSED_SOCKET_MAX_DURATION	0
-#define WANT_MSG_SEND_NOTIFY
-#define DEFAULT_PACKER	replaceable_packer
+#define ST_ASIO_SERVER_PORT		5051
+#define ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
+#define ST_ASIO_ENHANCED_STABILITY
+#define ST_ASIO_CLOSED_SOCKET_MAX_DURATION	0
+#define ST_ASIO_WANT_MSG_SEND_NOTIFY
+#define ST_ASIO_DEFAULT_PACKER	replaceable_packer
 //configuration
 
 #include "../include/st_asio_wrapper_server.h"
@@ -19,7 +19,7 @@ using namespace st_asio_wrapper;
 int main(int argc, const char* argv[])
 {
 	puts("this is a file transfer server.");
-	printf("usage: file_server [<port=%d> [ip=0.0.0.0]]\n", SERVER_PORT);
+	printf("usage: file_server [<port=%d> [ip=0.0.0.0]]\n", ST_ASIO_SERVER_PORT);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -53,10 +53,10 @@ int main(int argc, const char* argv[])
 }
 
 //restore configuration
-#undef SERVER_PORT
-#undef AUTO_CLEAR_CLOSED_SOCKET
-#undef ENHANCED_STABILITY
-#undef CLOSED_SOCKET_MAX_DURATION
-#undef WANT_MSG_SEND_NOTIFY
-#undef DEFAULT_PACKER
+#undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#undef ST_ASIO_ENHANCED_STABILITY
+#undef ST_ASIO_CLOSED_SOCKET_MAX_DURATION
+#undef ST_ASIO_WANT_MSG_SEND_NOTIFY
+#undef ST_ASIO_DEFAULT_PACKER
 //restore configuration

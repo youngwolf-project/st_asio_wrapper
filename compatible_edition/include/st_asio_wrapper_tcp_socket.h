@@ -16,12 +16,12 @@
 #include "st_asio_wrapper_socket.h"
 #include "st_asio_wrapper_unpacker.h"
 
-#ifndef GRACEFUL_CLOSE_MAX_DURATION
-	#define GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, maximum waiting seconds while graceful closing
+#ifndef ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION
+	#define ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, maximum waiting seconds while graceful closing
 #endif
 
-#ifndef DEFAULT_UNPACKER
-#define DEFAULT_UNPACKER unpacker
+#ifndef ST_ASIO_DEFAULT_UNPACKER
+#define ST_ASIO_DEFAULT_UNPACKER unpacker
 #endif
 
 namespace st_asio_wrapper
@@ -40,7 +40,7 @@ public:
 
 protected:
 	using st_socket<Socket, Packer, Unpacker>::TIMER_BEGIN;
-	using st_socket<Socket, Packer, Unpacker>::TIMER_END; //user timer's id must be bigger than TIMER_END
+	using st_socket<Socket, Packer, Unpacker>::TIMER_END;
 
 	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, Unpacker>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state(); close_state = 0;}
 
@@ -101,12 +101,12 @@ protected:
 
 		if (sync)
 		{
-			int loop_num = GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
+			int loop_num = ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION * 100; //seconds to 10 milliseconds
 			while (--loop_num >= 0 && is_closing())
 				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
 			if (loop_num < 0) //graceful closing is impossible
 			{
-				unified_out::info_out("failed to graceful close within %d seconds", GRACEFUL_CLOSE_MAX_DURATION);
+				unified_out::info_out("failed to graceful close within %d seconds", ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION);
 				clean_up();
 			}
 		}
@@ -125,7 +125,7 @@ protected:
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()),
 				boost::bind(&st_tcp_socket_base::send_handler, this,
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 					ST_THIS async_call_indicator,
 #endif
 					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
@@ -142,11 +142,11 @@ protected:
 	//the link can continue to use, so don't need to close the st_tcp_socket_base at both client and server endpoint
 	virtual void on_unpack_error() = 0;
 
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-	virtual bool on_msg(out_msg_type& msg) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+	virtual bool on_msg(out_msg_type& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 #endif
 
-	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" size_t_format "): %s", msg.size(), msg.data()); return true;}
+	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 
 	//start the asynchronous read
 	//it's child's responsibility to invoke this properly, because st_tcp_socket_base doesn't know any of the connection status
@@ -157,7 +157,7 @@ protected:
 			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
 				boost::bind(&i_unpacker<out_msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
 				boost::bind(&st_tcp_socket_base::recv_handler, this,
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 					ST_THIS async_call_indicator,
 #endif
 					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
@@ -177,8 +177,9 @@ protected:
 		}
 	}
 
+private:
 	void recv_handler(
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 		boost::shared_ptr<char> async_call_indicator,
 #endif
 		const boost::system::error_code& ec, size_t bytes_transferred)
@@ -200,7 +201,7 @@ protected:
 	}
 
 	void send_handler(
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 		boost::shared_ptr<char> async_call_indicator,
 #endif
 		const boost::system::error_code& ec, size_t bytes_transferred)
@@ -208,7 +209,7 @@ protected:
 		if (!ec)
 		{
 			assert(bytes_transferred > 0);
-#ifdef WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(ST_THIS last_send_msg);
 #endif
 		}
@@ -220,7 +221,7 @@ protected:
 
 		//send msg sequentially, that means second send only after first send success
 		if (!ec)
-#ifdef WANT_ALL_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 			if (!do_send_msg())
 				ST_THIS on_all_msg_send(ST_THIS last_send_msg);
 #else

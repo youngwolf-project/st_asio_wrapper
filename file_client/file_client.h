@@ -2,6 +2,8 @@
 #ifndef FILE_CLIENT_H_
 #define FILE_CLIENT_H_
 
+#include <boost/timer/timer.hpp>
+
 #include "../file_server/packer_unpacker.h"
 #include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
@@ -66,7 +68,7 @@ public:
 
 protected:
 	//msg handling
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	//we can handle msg very fast, so we don't use recv buffer
 	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
@@ -84,7 +86,7 @@ private:
 			file = nullptr;
 		}
 
-		inner_unpacker(boost::make_shared<DEFAULT_UNPACKER>());
+		inner_unpacker(boost::make_shared<ST_ASIO_DEFAULT_UNPACKER>());
 	}
 	void trans_end() {clear(); ++completed_client_num;}
 
@@ -98,7 +100,7 @@ private:
 		}
 		else if (msg.size() <= ORDER_LEN)
 		{
-			printf("wrong order length: " size_t_format ".\n", msg.size());
+			printf("wrong order length: " ST_ASIO_SF ".\n", msg.size());
 			return;
 		}
 
@@ -159,7 +161,25 @@ private:
 class file_client : public st_tcp_client_base<file_socket>
 {
 public:
+	static const unsigned char TIMER_BEGIN = st_tcp_client_base<file_socket>::TIMER_END;
+	static const unsigned char UPDATE_PROGRESS = TIMER_BEGIN;
+	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
+
 	file_client(st_service_pump& service_pump_) : st_tcp_client_base<file_socket>(service_pump_) {}
+
+	void start()
+	{
+		begin_time.start();
+		set_timer(UPDATE_PROGRESS, 500, boost::bind(&file_client::update_progress_handler, this, _1, -1));
+	}
+
+	void stop(const std::string& file_name)
+	{
+		stop_timer(UPDATE_PROGRESS);
+
+		auto used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
+		printf("\r100%%\ntransfer %s end, speed: %.0f kB/s.\n", file_name.data(), file_size / used_time / 1024);
+	}
 
 	fl_type get_total_rest_size()
 	{
@@ -169,6 +189,30 @@ public:
 
 		return total_rest_size;
 	}
+
+private:
+	bool update_progress_handler(unsigned char id, unsigned last_percent)
+	{
+		assert(UPDATE_PROGRESS == id);
+
+		auto total_rest_size = get_total_rest_size();
+		if (total_rest_size > 0)
+		{
+			auto new_percent = (unsigned) ((file_size - total_rest_size) * 100 / file_size);
+			if (last_percent != new_percent)
+			{
+				printf("\r%u%%", new_percent);
+				fflush(stdout);
+
+				ST_THIS update_timer_info(id, 500, boost::bind(&file_client::update_progress_handler, this, _1, new_percent));
+			}
+		}
+
+		return true;
+	}
+
+protected:
+	boost::timer::cpu_timer begin_time;
 };
 
 #endif //#ifndef FILE_CLIENT_H_

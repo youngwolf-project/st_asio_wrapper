@@ -20,8 +20,8 @@
 //IO thread number
 //listen, msg send and receive, msg handle(on_msg_handle() and on_msg()) will use these threads
 //keep big enough, no empirical value i can suggest, you must try to find it in your own environment
-#ifndef ST_SERVICE_THREAD_NUM
-#define ST_SERVICE_THREAD_NUM 8
+#ifndef ST_ASIO_SERVICE_THREAD_NUM
+#define ST_ASIO_SERVICE_THREAD_NUM	8
 #endif
 
 namespace st_asio_wrapper
@@ -114,7 +114,7 @@ public:
 		st_asio_wrapper::do_something_to_all(temp_service_can, [this](object_type& item) {ST_THIS stop_and_free(item);});
 	}
 
-	void start_service(int thread_num = ST_SERVICE_THREAD_NUM)
+	void start_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM)
 	{
 		if (!is_service_started())
 		{
@@ -146,7 +146,7 @@ public:
 	}
 
 	//if you add a service after start_service, use this to start it
-	void start_service(object_type i_service_, int thread_num = ST_SERVICE_THREAD_NUM)
+	void start_service(object_type i_service_, int thread_num = ST_ASIO_SERVICE_THREAD_NUM)
 	{
 		assert(nullptr != i_service_);
 
@@ -161,7 +161,7 @@ public:
 	bool is_service_started() const {return started;}
 
 	//this function works like start_service except that it will block until all services run out
-	void run_service(int thread_num = ST_SERVICE_THREAD_NUM)
+	void run_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM)
 	{
 		if (!is_service_started())
 		{
@@ -191,7 +191,7 @@ protected:
 	}
 	virtual void free(object_type i_service_) {} //if needed, rewrite this to free the service
 
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 	virtual bool on_exception(const std::exception& e)
 	{
 		unified_out::info_out("service pump exception: %s.", e.what());

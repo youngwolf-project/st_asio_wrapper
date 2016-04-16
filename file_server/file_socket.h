@@ -13,20 +13,20 @@ public:
 	virtual ~file_socket();
 
 public:
-	//because we don't use objects pool(we don't define REUSE_OBJECT), so, this virtual function will
+	//because we don't use objects pool(we don't define ST_ASIO_REUSE_OBJECT), so, this virtual function will
 	//not be invoked, and can be omitted, but we keep it for possibly future using
 	virtual void reset();
 
 protected:
 	//msg handling
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	//we can handle msg very fast, so we don't use recv buffer
 	virtual bool on_msg(out_msg_type& msg);
 #endif
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down);
 	//msg handling end
 
-#ifdef WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	virtual void on_msg_send(in_msg_type& msg);
 #endif
 

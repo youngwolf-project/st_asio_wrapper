@@ -62,7 +62,7 @@ public:
 			_data_len -= buffer_len;
 			if (buffer_len != fread(buffer, 1, buffer_len, _file))
 			{
-				printf("fread(" size_t_format ") error!\n", buffer_len);
+				printf("fread(" ST_ASIO_SF ") error!\n", buffer_len);
 				buffer_len = 0;
 			}
 		}
@@ -98,7 +98,7 @@ public:
 
 		if (bytes_transferred != fwrite(buffer, 1, bytes_transferred, _file))
 		{
-			printf("fwrite(" size_t_format ") error!\n", bytes_transferred);
+			printf("fwrite(" ST_ASIO_SF ") error!\n", bytes_transferred);
 			return false;
 		}
 

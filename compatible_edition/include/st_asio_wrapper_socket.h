@@ -18,8 +18,8 @@
 #include "st_asio_wrapper_packer.h"
 #include "st_asio_wrapper_timer.h"
 
-#ifndef DEFAULT_PACKER
-#define DEFAULT_PACKER packer
+#ifndef ST_ASIO_DEFAULT_PACKER
+#define ST_ASIO_DEFAULT_PACKER packer
 #endif
 
 namespace st_asio_wrapper
@@ -34,12 +34,12 @@ public:
 	typedef typename Unpacker::container_type out_container_type;
 
 protected:
-	static const unsigned char TIMER_BEGIN = (unsigned char) (st_timer::TIMER_END + 1);
+	static const unsigned char TIMER_BEGIN = st_timer::TIMER_END;
 	static const unsigned char TIMER_DISPATCH_MSG = TIMER_BEGIN;
 	static const unsigned char TIMER_SUSPEND_DISPATCH_MSG = TIMER_BEGIN + 1;
 	static const unsigned char TIMER_HANDLE_POST_BUFFER = TIMER_BEGIN + 2;
 	static const unsigned char TIMER_RE_DISPATCH_MSG = TIMER_BEGIN + 3;
-	static const unsigned char TIMER_END = TIMER_BEGIN + 9; //user timer's id must be bigger than TIMER_END
+	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
 
 	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {init();}
 
@@ -78,7 +78,7 @@ public:
 		if (started())
 			return false;
 
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 		if (!async_call_indicator.unique())
 			return false;
 #endif
@@ -123,7 +123,7 @@ public:
 	bool is_send_buffer_available()
 	{
 		boost::shared_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
-		return send_msg_buffer.size() < MAX_MSG_NUM;
+		return send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;
 	}
 
 	//don't use the packer but insert into send buffer directly
@@ -132,7 +132,7 @@ public:
 	bool direct_send_msg(InMsgType& msg, bool can_overflow = false)
 	{
 		boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
-		return can_overflow || send_msg_buffer.size() < MAX_MSG_NUM ? do_direct_send_msg(msg) : false;
+		return can_overflow || send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM ? do_direct_send_msg(msg) : false;
 	}
 
 	bool direct_post_msg(const InMsgType& msg, bool can_overflow = false) {InMsgType tmp_msg(msg); return direct_post_msg(tmp_msg, can_overflow);}
@@ -175,7 +175,7 @@ protected:
 	//receiving error or peer endpoint quit(false ec means ok)
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	//if you want to use your own receive buffer, you can move the msg to your own receive buffer, then handle them as your own strategy(may be you'll need a msg dispatch thread),
 	//or you can handle the msg at here, but this will reduce efficiency because this msg handling will block the next msg receiving on the same st_socket,
 	//but if you can handle the msg very fast, you are recommended to handle them at here, which will inversely more efficient,
@@ -195,18 +195,138 @@ protected:
 	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
 	virtual bool on_msg_handle(OutMsgType& msg, bool link_down) = 0;
 
-#ifdef WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	//one msg has sent to the kernel buffer, msg is the right msg
 	//notice: the msg is packed, using inconstant is for the convenience of swapping
 	virtual void on_msg_send(InMsgType& msg) {}
 #endif
-#ifdef WANT_ALL_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 	//send buffer goes empty
 	//notice: the msg is packed, using inconstant is for the convenience of swapping
 	virtual void on_all_msg_send(InMsgType& msg) {}
 #endif
 
-	virtual bool on_timer(unsigned char id, const void* user_data)
+	void dispatch_msg()
+	{
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+		bool dispatch = false;
+		for (BOOST_AUTO(iter, temp_msg_buffer.begin()); !suspend_dispatch_msg_ && !posting && iter != temp_msg_buffer.end();)
+			if (on_msg(*iter))
+				temp_msg_buffer.erase(iter++);
+			else
+			{
+				boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
+				if (recv_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM) //msg receive buffer available
+				{
+					dispatch = true;
+					recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer, iter++);
+				}
+				else
+					++iter;
+			}
+
+		if (dispatch)
+			do_dispatch_msg(true);
+#else
+		if (!temp_msg_buffer.empty())
+		{
+			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
+			if (splice_helper(recv_msg_buffer, temp_msg_buffer))
+				do_dispatch_msg(false);
+		}
+#endif
+
+		if (temp_msg_buffer.empty())
+			do_start(); //receive msg sequentially, which means second receiving only after first receiving success
+		else
+			set_timer(TIMER_DISPATCH_MSG, 50, boost::bind(&st_socket::timer_handler, this, _1));
+	}
+
+	//must mutex recv_msg_buffer before invoke this function
+	void do_dispatch_msg(bool need_lock)
+	{
+		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex, boost::defer_lock);
+		if (need_lock) lock.lock();
+
+		if (suspend_dispatch_msg_)
+		{
+			if (!dispatching && !recv_msg_buffer.empty())
+				set_timer(TIMER_SUSPEND_DISPATCH_MSG, 24 * 60 * 60 * 1000, boost::bind(&st_socket::timer_handler, this, _1)); //one day
+		}
+		else if (!posting)
+		{
+			BOOST_AUTO(&io_service_, get_io_service());
+			bool dispatch_all = false;
+			if (io_service_.stopped())
+				dispatch_all = !(dispatching = false);
+			else if (!dispatching)
+			{
+				if (!lowest_layer().is_open())
+					dispatch_all = true;
+				else if (!recv_msg_buffer.empty())
+				{
+					dispatching = true;
+					last_dispatch_msg.swap(recv_msg_buffer.front());
+					io_service_.post(boost::bind(&st_socket::msg_handler, this));
+					recv_msg_buffer.pop_front();
+				}
+			}
+
+			if (dispatch_all)
+			{
+#ifdef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+				//the msgs in temp_msg_buffer are discarded if we don't used msg receive buffer, it's very hard to resolve this defect,
+				//so, please be very carefully if you decide to resolve this issue, the biggest problem is calling force_close in on_msg.
+				recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer);
+#endif
+#ifndef ST_ASIO_DISCARD_MSG_WHEN_LINK_DOWN
+				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&st_socket::on_msg_handle, this, _1, true));
+#endif
+				recv_msg_buffer.clear();
+			}
+		}
+	}
+
+	//must mutex send_msg_buffer before invoke this function
+	bool do_direct_send_msg(InMsgType& msg)
+	{
+		if (!msg.empty())
+		{
+			send_msg_buffer.resize(send_msg_buffer.size() + 1);
+			send_msg_buffer.back().swap(msg);
+			do_send_msg();
+		}
+
+		return true;
+	}
+
+	//must mutex post_msg_buffer before invoke this function
+	bool do_direct_post_msg(InMsgType& msg)
+	{
+		if (!msg.empty())
+		{
+			post_msg_buffer.resize(post_msg_buffer.size() + 1);
+			post_msg_buffer.back().swap(msg);
+			if (!posting)
+			{
+				posting = true;
+				set_timer(TIMER_HANDLE_POST_BUFFER, 50, boost::bind(&st_socket::timer_handler, this, _1));
+			}
+		}
+
+		return true;
+	}
+
+	void init()
+	{
+		reset_state();
+#ifdef ST_ASIO_ENHANCED_STABILITY
+		async_call_indicator = boost::make_shared<char>('\0');
+#endif
+	}
+
+private:
+	bool timer_handler(unsigned char id)
 	{
 		switch (id)
 		{
@@ -239,50 +359,11 @@ protected:
 			do_dispatch_msg(true);
 			break;
 		default:
-			if (id < TIMER_BEGIN)
-				return st_timer::on_timer(id, user_data);
-			else if (id > TIMER_END)
-				unified_out::warning_out("You have unhandled timer %u", id);
+			assert(false);
 			break;
 		}
 
 		return false;
-	}
-
-	void dispatch_msg()
-	{
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
-		bool dispatch = false;
-		for (BOOST_AUTO(iter, temp_msg_buffer.begin()); !suspend_dispatch_msg_ && !posting && iter != temp_msg_buffer.end();)
-			if (on_msg(*iter))
-				temp_msg_buffer.erase(iter++);
-			else
-			{
-				boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-				if (recv_msg_buffer.size() < MAX_MSG_NUM) //msg receive buffer available
-				{
-					dispatch = true;
-					recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer, iter++);
-				}
-				else
-					++iter;
-			}
-
-		if (dispatch)
-			do_dispatch_msg(true);
-#else
-		if (!temp_msg_buffer.empty())
-		{
-			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-			if (splice_helper(recv_msg_buffer, temp_msg_buffer))
-				do_dispatch_msg(false);
-		}
-#endif
-
-		if (temp_msg_buffer.empty())
-			do_start(); //receive msg sequentially, which means second receiving only after first receiving success
-		else
-			set_timer(TIMER_DISPATCH_MSG, 50, NULL);
 	}
 
 	void msg_handler()
@@ -294,96 +375,13 @@ protected:
 		{
 			recv_msg_buffer.push_front(OutMsgType());
 			recv_msg_buffer.front().swap(last_dispatch_msg);
-			set_timer(TIMER_RE_DISPATCH_MSG, 50, NULL);
+			set_timer(TIMER_RE_DISPATCH_MSG, 50, boost::bind(&st_socket::timer_handler, this, _1));
 		}
 		else //dispatch msg sequentially, which means second dispatching only after first dispatching success
 			do_dispatch_msg(false);
 
 		if (!dispatching)
 			last_dispatch_msg.clear();
-	}
-
-	//must mutex recv_msg_buffer before invoke this function
-	void do_dispatch_msg(bool need_lock)
-	{
-		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex, boost::defer_lock);
-		if (need_lock) lock.lock();
-
-		if (suspend_dispatch_msg_)
-		{
-			if (!dispatching && !recv_msg_buffer.empty())
-				set_timer(TIMER_SUSPEND_DISPATCH_MSG, 24 * 60 * 60 * 1000, NULL); //one day
-		}
-		else if (!posting)
-		{
-			BOOST_AUTO(&io_service_, get_io_service());
-			bool dispatch_all = false;
-			if (io_service_.stopped())
-				dispatch_all = !(dispatching = false);
-			else if (!dispatching)
-			{
-				if (!lowest_layer().is_open())
-					dispatch_all = true;
-				else if (!recv_msg_buffer.empty())
-				{
-					dispatching = true;
-					last_dispatch_msg.swap(recv_msg_buffer.front());
-					io_service_.post(boost::bind(&st_socket::msg_handler, this));
-					recv_msg_buffer.pop_front();
-				}
-			}
-
-			if (dispatch_all)
-			{
-#ifdef FORCE_TO_USE_MSG_RECV_BUFFER
-				//the msgs in temp_msg_buffer are discarded if we don't used msg receive buffer, it's very hard to resolve this defect,
-				//so, please be very carefully if you decide to resolve this issue, the biggest problem is calling force_close in on_msg.
-				recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer);
-#endif
-#ifndef DISCARD_MSG_WHEN_LINK_DOWN
-				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&st_socket::on_msg_handle, this, _1, true));
-#endif
-				recv_msg_buffer.clear();
-			}
-		}
-	}
-
-	//must mutex send_msg_buffer before invoke this function
-	bool do_direct_send_msg(InMsgType& msg)
-	{
-		if (!msg.empty())
-		{
-			send_msg_buffer.resize(send_msg_buffer.size() + 1);
-			send_msg_buffer.back().swap(msg);
-			do_send_msg();
-		}
-
-		return true;
-	}
-
-	//must mutex post_msg_buffer before invoke this function
-	bool do_direct_post_msg(InMsgType& msg)
-	{
-		if (!msg.empty())
-		{
-			post_msg_buffer.resize(post_msg_buffer.size() + 1);
-			post_msg_buffer.back().swap(msg);
-			if (!posting)
-			{
-				posting = true;
-				set_timer(TIMER_HANDLE_POST_BUFFER, 50, NULL);
-			}
-		}
-
-		return true;
-	}
-
-	void init()
-	{
-		reset_state();
-#ifdef ENHANCED_STABILITY
-		async_call_indicator = boost::make_shared<char>('\0');
-#endif
 	}
 
 protected:
@@ -408,7 +406,7 @@ protected:
 	bool started_; //has started or not
 	boost::shared_mutex start_mutex;
 
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 	boost::shared_ptr<char> async_call_indicator;
 #endif
 };

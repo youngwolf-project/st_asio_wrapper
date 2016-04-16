@@ -31,20 +31,20 @@
 //the bigger this buffer is, the more msgs can be received in one time if there are enough msgs buffered in the SOCKET.
 //every unpackers have a fixed buffer with this size, every st_tcp_sockets have an unpacker, so, this size is not the bigger the better.
 //if you customized the packer and unpacker, the above principle maybe not right anymore, it should depends on your implementations.
-#ifndef MSG_BUFFER_SIZE
-#define MSG_BUFFER_SIZE			4000
+#ifndef ST_ASIO_MSG_BUFFER_SIZE
+#define ST_ASIO_MSG_BUFFER_SIZE	4000
 #endif
 //msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamicly, which means only allocate memory when needed.
-#ifndef MAX_MSG_NUM
-#define MAX_MSG_NUM	1024
+#ifndef ST_ASIO_MAX_MSG_NUM
+#define ST_ASIO_MAX_MSG_NUM		1024
 #endif
 
 #if defined _MSC_VER
-#define size_t_format "%Iu"
+#define ST_ASIO_SF "%Iu"
 #define ST_THIS //workaround to make up the BOOST_AUTO's defect under vc2008 and compiler bugs before vc2012
 #define ssize_t SSIZE_T
 #else // defined __GNUC__
-#define size_t_format "%tu"
+#define ST_ASIO_SF "%tu"
 #define ST_THIS this->
 #endif
 
@@ -157,7 +157,7 @@ namespace st_asio_wrapper
 	void do_something_to_one(_Can& __can, const _Predicate& __pred) {for (auto iter = std::begin(__can); iter != std::end(__can); ++iter) if (__pred(*iter)) break;}
 
 	template<typename _Can>
-	bool splice_helper(_Can& dest_can, _Can& src_can, size_t max_size = MAX_MSG_NUM)
+	bool splice_helper(_Can& dest_can, _Can& src_can, size_t max_size = ST_ASIO_MAX_MSG_NUM)
 	{
 		auto size = dest_can.size();
 		if (size < max_size) //dest_can can hold more items.
@@ -255,7 +255,7 @@ TYPE FUNNAME(const std::string& str, bool can_overflow = false) {return FUNNAME(
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
 	boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex); \
-	return (can_overflow || ST_THIS send_msg_buffer.size() < MAX_MSG_NUM) ? ST_THIS do_direct_send_msg(ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
+	return (can_overflow || ST_THIS send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM) ? ST_THIS do_direct_send_msg(ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)) : false; \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
@@ -286,7 +286,7 @@ TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const std::string&
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
 	boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex); \
-	if (can_overflow || ST_THIS send_msg_buffer.size() < MAX_MSG_NUM) \
+	if (can_overflow || ST_THIS send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM) \
 	{ \
 		udp_msg<typename Packer::msg_type> msg(peer_addr, ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)); \
 		return ST_THIS do_direct_send_msg(std::move(msg)); \
@@ -314,8 +314,8 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
 #include <sstream>
 
-#ifndef UNIFIED_OUT_BUF_NUM
-#define UNIFIED_OUT_BUF_NUM	2048
+#ifndef ST_ASIO_UNIFIED_OUT_BUF_NUM
+#define ST_ASIO_UNIFIED_OUT_BUF_NUM	2048
 #endif
 
 class log_formater
@@ -361,13 +361,13 @@ public:
 };
 
 #define all_out_helper(head, buff, buff_len) va_list ap; va_start(ap, fmt); log_formater::all_out(head, buff, buff_len, fmt, ap); va_end(ap)
-#define all_out_helper2(head) char output_buff[UNIFIED_OUT_BUF_NUM]; all_out_helper(head, output_buff, sizeof(output_buff)); puts(output_buff)
+#define all_out_helper2(head) char output_buff[ST_ASIO_UNIFIED_OUT_BUF_NUM]; all_out_helper(head, output_buff, sizeof(output_buff)); puts(output_buff)
 
-#ifndef CUSTOM_LOG
+#ifndef ST_ASIO_CUSTOM_LOG
 class unified_out
 {
 public:
-#ifdef NO_UNIFIED_OUT
+#ifdef ST_ASIO_NO_UNIFIED_OUT
 	static void fatal_out(const char* fmt, ...) {}
 	static void error_out(const char* fmt, ...) {}
 	static void warning_out(const char* fmt, ...) {}

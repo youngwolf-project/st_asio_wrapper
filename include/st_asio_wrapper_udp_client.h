@@ -26,7 +26,7 @@ class st_udp_client_base : public st_client<Socket, Pool>
 {
 public:
 	using st_client<Socket, Pool>::TIMER_BEGIN;
-	using st_client<Socket, Pool>::TIMER_END; //user timer's id must be bigger than TIMER_END
+	using st_client<Socket, Pool>::TIMER_END;
 
 	st_udp_client_base(st_service_pump& service_pump_) : st_client<Socket, Pool>(service_pump_) {}
 

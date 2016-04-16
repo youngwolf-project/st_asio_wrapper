@@ -151,16 +151,9 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 当发送缓存由非空变为空的时候回调，消息是打包过后的。
 #endif
 
-	virtual bool on_timer(unsigned char id, const void* user_data);
-重写st_timer的on_timer，以处理属于st_socket的定义器，每个类的保留定时器的范围请看st_timer，用户只能使用保留定时器以外的定时器，
-子类如果重写了on_timer，记得把不属于自己的定时器全部抛给父类处理。
-
 	void dispatch_msg();
 派发消息，它要么直接调用on_msg，要么把消息放入消息接收缓存，最后调用do_dispatch_msg，如果消息处理完毕（调用on_msg）
 或者都放入了消息接收缓存，则调用do_start以继续接收数据。
-
-	void msg_handler();
-异步派发接收缓存里面的消息时，asio调用本函数，在这个函数里面将调用on_msg_handle，然后调用do_dispatch_msg继承派发消息。
 
 	void do_dispatch_msg(bool need_lock);
 调用io_service::post发出一个异步调用，调度到时回调msg_handler。
@@ -168,6 +161,13 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 	bool do_direct_send_msg(InMsgType&& msg);
 	bool do_direct_post_msg(InMsgType&& msg);
 把消息直接放入消息发送缓存，在direct_send_msg和direct_post_msg中有调用。
+
+private:
+	bool timer_handler(unsigned char id);
+处理所有定时器
+
+	void msg_handler();
+异步派发接收缓存里面的消息时，asio调用本函数，在这个函数里面将调用on_msg_handle，然后调用do_dispatch_msg继承派发消息。
 
 protected:
 	uint_fast64_t _id;
