@@ -30,9 +30,8 @@ template <typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_
 class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket>
 {
 public:
-	static const unsigned char TIMER_BEGIN = st_tcp_socket_base<Socket, Packer, Unpacker>::TIMER_END;
-	static const unsigned char TIMER_CONNECT = TIMER_BEGIN;
-	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
+	using st_connector_base<Packer, Unpacker, Socket>::TIMER_BEGIN;
+	using st_connector_base<Packer, Unpacker, Socket>::TIMER_END;
 
 	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : st_connector_base<Packer, Unpacker, Socket>(io_service_, ctx), authorized_(false) {}
 
@@ -119,18 +118,8 @@ private:
 			ST_THIS on_connect();
 			do_start();
 		}
-		else if ((boost::asio::error::operation_aborted != ec || ST_THIS reconnecting) && !ST_THIS get_io_service().stopped())
-		{
-			auto delay = ST_THIS prepare_reconnect(ec);
-			if (delay >= 0)
-				ST_THIS set_timer(TIMER_CONNECT, delay, [this](unsigned char id)->bool {assert(TIMER_CONNECT == id); do_start(); return false;});
-
-			if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
-			{
-				boost::system::error_code ec;
-				ST_THIS lowest_layer().close(ec);
-			}
-		}
+		else
+			ST_THIS prepare_next_reconnect(ec);
 	}
 
 	void handshake_handler(const boost::system::error_code& ec)

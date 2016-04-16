@@ -141,6 +141,27 @@ protected:
 			ST_THIS start();
 	}
 
+	bool prepare_next_reconnect(const boost::system::error_code& ec)
+	{
+		if ((boost::asio::error::operation_aborted != ec || reconnecting) && !ST_THIS get_io_service().stopped())
+		{
+			if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
+			{
+				boost::system::error_code ec;
+				ST_THIS lowest_layer().close(ec);
+			}
+
+			auto delay = prepare_reconnect(ec);
+			if (delay >= 0)
+			{
+				ST_THIS set_timer(TIMER_CONNECT, delay, [this](unsigned char id)->bool {assert(TIMER_CONNECT == id); do_start(); return false;});
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 private:
 	bool async_close_handler(unsigned char id, ssize_t loop_num)
 	{
@@ -173,18 +194,8 @@ private:
 			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}
-		else if ((boost::asio::error::operation_aborted != ec || reconnecting) && !ST_THIS get_io_service().stopped())
-		{
-			auto delay = prepare_reconnect(ec);
-			if (delay >= 0)
-				ST_THIS set_timer(TIMER_CONNECT, delay, [this](unsigned char id)->bool {assert(TIMER_CONNECT == id); do_start(); return false;});
-
-			if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
-			{
-				boost::system::error_code ec;
-				ST_THIS lowest_layer().close(ec);
-			}
-		}
+		else
+			prepare_next_reconnect(ec);
 	}
 
 protected:
