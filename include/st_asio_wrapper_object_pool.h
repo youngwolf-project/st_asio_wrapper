@@ -99,10 +99,10 @@ protected:
 	void start()
 	{
 #ifndef ST_ASIO_REUSE_OBJECT
-		set_timer(TIMER_FREE_SOCKET, 1000 * ST_ASIO_SOCKET_FREE_INTERVAL, [this](unsigned char id)->bool {assert(TIMER_FREE_SOCKET == id); free_object(); return true;});
+		set_timer(TIMER_FREE_SOCKET, 1000 * ST_ASIO_SOCKET_FREE_INTERVAL, [this](unsigned char id)->bool {assert(TIMER_FREE_SOCKET == id); ST_THIS free_object(); return true;});
 #endif
 #ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
-		set_timer(TIMER_CLEAR_SOCKET, 1000 * ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL, [this](unsigned char id)->bool {assert(TIMER_CLEAR_SOCKET == id); clear_all_closed_object(); return true;});
+		set_timer(TIMER_CLEAR_SOCKET, 1000 * ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL, [this](unsigned char id)->bool {assert(TIMER_CLEAR_SOCKET == id); ST_THIS clear_all_closed_object(); return true;});
 #endif
 	}
 

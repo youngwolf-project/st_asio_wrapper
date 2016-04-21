@@ -237,7 +237,7 @@ protected:
 		if (temp_msg_buffer.empty())
 			do_start(); //receive msg sequentially, which means second receiving only after first receiving success
 		else
-			set_timer(TIMER_DISPATCH_MSG, 50, [this](unsigned char id)->bool {return timer_handler(id);});
+			set_timer(TIMER_DISPATCH_MSG, 50, [this](unsigned char id)->bool {return ST_THIS timer_handler(id);});
 	}
 
 	//must mutex recv_msg_buffer before invoke this function
@@ -249,7 +249,7 @@ protected:
 		if (suspend_dispatch_msg_)
 		{
 			if (!dispatching && !recv_msg_buffer.empty())
-				set_timer(TIMER_SUSPEND_DISPATCH_MSG, 24 * 60 * 60 * 1000, [this](unsigned char id)->bool {return timer_handler(id);}); //one day
+				set_timer(TIMER_SUSPEND_DISPATCH_MSG, 24 * 60 * 60 * 1000, [this](unsigned char id)->bool {return ST_THIS timer_handler(id);}); //one day
 		}
 		else if (!posting)
 		{
@@ -308,7 +308,7 @@ protected:
 			if (!posting)
 			{
 				posting = true;
-				set_timer(TIMER_HANDLE_POST_BUFFER, 50, [this](unsigned char id)->bool {return timer_handler(id);});
+				set_timer(TIMER_HANDLE_POST_BUFFER, 50, [this](unsigned char id)->bool {return ST_THIS timer_handler(id);});
 			}
 		}
 
@@ -373,7 +373,7 @@ private:
 		{
 			recv_msg_buffer.push_front(OutMsgType());
 			recv_msg_buffer.front().swap(last_dispatch_msg);
-			set_timer(TIMER_RE_DISPATCH_MSG, 50, [this](unsigned char id)->bool {return timer_handler(id);});
+			set_timer(TIMER_RE_DISPATCH_MSG, 50, [this](unsigned char id)->bool {return ST_THIS timer_handler(id);});
 		}
 		else //dispatch msg sequentially, which means second dispatching only after first dispatching success
 			do_dispatch_msg(false);
