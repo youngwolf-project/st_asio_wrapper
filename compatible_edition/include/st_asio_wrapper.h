@@ -182,7 +182,7 @@
  * Change the return type of st_test_client::get_recv_bytes() from size_t to uint64_t to avoid overflow
  * under 32bit system.
  *
- * Strip update logs, compiler verification, etc from st_asio_wrapper_socket.h to
+ * Strip update logs, compiler verification etc. from st_asio_wrapper_socket.h to
  * st_asio_wrapper_verfication.h.
  *
  * Add WANT_MSG_SEND_NOTIFY macro to decide weather to open msg send notification(on_msg_send) or not,
@@ -330,7 +330,7 @@
  * 3.7	2013.8.20
  * Protected some member functions to avoid abusing them.
  * Change code to avoid compiler crash before vc2012, gcc doesn't have this problem.
- * Forbid using some classes(eg st_timer) directly.
+ * Forbid using some classes(e.g. st_timer) directly.
  * Correct some error comments in st_asio_wrapper_timer.h.
  *
  * Forbid invoking st_socket::start() repeatedly, this is always forbidden, but it's the user's responsibility
@@ -418,7 +418,7 @@
  * Avoid duplicated items in st_object_pool::temp_object_can.
  * Optimized log system.
  * New feature: packers will be able to extract raw data from packed msg.
- * New demonstration: instead of safe_broadcast_msg, let test_socket to finish its test independently, and not use send buffer anymore(send msg one by one in on_msg_send).
+ * New demonstration: instead of safe_broadcast_msg, let test_socket to finish its test independently, and not use send buffer any more(send msg one by one in on_msg_send).
  * Support gmake(GNU make's name on UNIX-like system).
  * Make big file support more standard in demo file_server and file_client.
  * Support clang.
@@ -443,14 +443,14 @@
  * New feature: guarantee absolute safety when freeing or reusing st_socket, just need to define ENHANCED_STABILITY macro.
  * Fix bug: objects created by st_ssl_object_pool not updated their IDs, but keep them uninitialized.
  * More demonstration: more links supported in ssl_tesk (method #1).
- * Log enhancement: when link broken, also output where the link came from (server andpoint or client andpoint).
+ * Log enhancement: when link broken, also output where the link came from (server endpoint or client endpoint).
  * Check compiler's version carefully to give more accurate warnings or errors.
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VERSION 50205
+#define ST_ASIO_WRAPPER_VERSION 50300
 
 #ifdef _MSC_VER
 	#if _MSC_VER >= 1600

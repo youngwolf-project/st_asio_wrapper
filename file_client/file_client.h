@@ -170,7 +170,7 @@ public:
 	void start()
 	{
 		begin_time.start();
-		set_timer(UPDATE_PROGRESS, 500, boost::bind(&file_client::update_progress_handler, this, _1, -1));
+		set_timer(UPDATE_PROGRESS, 50, boost::bind(&file_client::update_progress_handler, this, _1, -1));
 	}
 
 	void stop(const std::string& file_name)
@@ -204,7 +204,7 @@ private:
 				printf("\r%u%%", new_percent);
 				fflush(stdout);
 
-				ST_THIS update_timer_info(id, 500, boost::bind(&file_client::update_progress_handler, this, _1, new_percent));
+				ST_THIS update_timer_info(id, 50, boost::bind(&file_client::update_progress_handler, this, _1, new_percent));
 			}
 		}
 
