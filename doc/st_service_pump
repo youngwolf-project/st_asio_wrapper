@@ -101,6 +101,8 @@ protected:
 	virtual void free(object_type i_service_);
 重写这个以释放指定的i_service，如果需要的话。注意，就算你是在堆上分配的i_service，也不一定需要释放它，只要你的service的生命周期跟
 进程一样，就不需要释放。这个函数目前是空的，什么也不做，st_asio_wrapper自带的demo都没有重写这个函数。
+st_service_pump不负责创建和释放任何service（继承自i_service的类）对象，因为service对象在绝大多数情况下，都与进程有相同的生命周期，
+所以无需释放，这也是为了让st_service_pump尽量的简单。
 
 #ifdef ENHANCED_STABILITY
 	virtual bool on_exception(const std::exception& e);
