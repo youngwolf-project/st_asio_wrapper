@@ -104,6 +104,10 @@ ssl使用。
 	container_type& container();
 用于配置unordered_set，比如设置负载因子，预分配空间等。注意必须在service_pump启动之前调用，因为没有锁相应的mutex。
 
+	size_t max_size() const;
+	void max_size(size_t _max_size);
+对象池最大容量，可运行时修改。占用内存是动态分配的，只有有效的对象（包括等待被重用的对象）会占用内存。
+
 	size_t size();
 对象池中的对象个数，不包括被移除到临时链表的对象。
 

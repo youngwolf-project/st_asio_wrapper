@@ -14,6 +14,7 @@ protected:
 		timer_status status;
 		size_t milliseconds;
 		boost::function<bool (unsigned char)> call_back;
+		在定时器到达后，call_back被回调，并根据返回值决定是否继续这个定时器（true即继续），同一个定时器，call_back的调用是顺序的。
 		boost::shared_ptr<boost::asio::deadline_timer> timer;
 
 		bool operator <(const timer_info& other) const {return id < other.id;}
@@ -68,10 +69,6 @@ protected:
 
 	void stop_timer(timer_info& ti);
 内部使用的helper函数，真正的结束定时器（调用boost::asio::deadline_timer::cancel）。
-
-	void timer_handler(const error_code& ec, const timer_info& ti);
-在定时器到达后，由asio回调，其功能是调用timer_info::call_back并根据返回值决定是否继续这个定时器。
-同一个st_timer内同一个定时器，on_timer的调用是顺序的，其它任何情况下，on_timer的调用都是并发的。
 
 protected:
 	boost::asio::io_service& io_service_;
