@@ -171,10 +171,11 @@ public:
 		return ST_THIS post_create(object_ptr), object_ptr;
 	}
 #else
-	object_type create_object() {BOOST_AUTO(object_ptr, boost::make_shared<Object>(boost::ref(ST_THIS service_pump), boost::ref(ctx))); return ST_THIS post_create(object_ptr), object_ptr;}
+	typename st_ssl_object_pool::object_type create_object()
+		{BOOST_AUTO(object_ptr, boost::make_shared<Object>(boost::ref(ST_THIS service_pump), boost::ref(ctx))); return ST_THIS post_create(object_ptr), object_ptr;}
 
 	template<typename Arg>
-	object_type create_object(Arg& arg) {BOOST_AUTO(object_ptr, boost::make_shared<Object>(arg, boost::ref(ctx))); return ST_THIS post_create(object_ptr), object_ptr;}
+	typename st_ssl_object_pool::object_type create_object(Arg& arg) {BOOST_AUTO(object_ptr, boost::make_shared<Object>(arg, boost::ref(ctx))); return ST_THIS post_create(object_ptr), object_ptr;}
 #endif
 
 protected:

@@ -86,20 +86,28 @@ protected:
 	bool del_object(object_ctype& object_ptr);
 清除一个对象（从对象池移出到临时链表，并不真正的从内存中释放该对象）。
 
-	virtual object_type reuse_object();
-查找可重用的对象，如果没有，返回空的智能指针。
+	virtual void post_create(object_ctype& object_ptr);
+每次创建（包括重用）一个对象之后，会调用这个函数，使用者可以利用这个机会（重写这个虚函数），在对象池级别
+对新创建的对象做一些必要的设置（最典型的就是设置对象的ID，不过这个工作已经在st_object_pool::post_create里面做了，
+所以如果要做你自己的设置，必须在重写的post_create函数中调用父类的post_create函数）。
 
-	virtual object_type reuse_object();
-每次创建对象时（create_object），都会调用这个函数以尝试重用一个对象，能被重用的对象首先是已经从对象池移到
-了临时链表里面，其次是关闭超过一定的时间（CLOSED_SOCKET_MAX_DURATION），使用者可以重写这个方法以自定义什么
-对象可被重用。对象被重用之后，id将会被更新，如果没有可重用的对象，返回一个空的object_type即可。
+#ifdef ST_ASIO_REUSE_OBJECT
+	object_type reuse_object();
+查找可重用的对象，如果没有，返回空的智能指针。能被重用的对象必需是：
+ 1. 已经从对象池移到了临时链表里面；
+ 2. 关闭超过一定的时间（CLOSED_SOCKET_MAX_DURATION）；
+ 3. 对象的引用记数（对象是一个shared_ptr）必须是1；
+ 4. 对象的obsoleted函数必须返回true。
+#endif
 
 public:
 	object_type create_object();
+如果定义了ST_ASIO_REUSE_OBJECT宏，则先调用reuse_object尝试重用对象，如果没有对象可被重用，或者未定义该宏，
+则创建一个新的，最后都是调用post_create。
 
 	template<typename Arg>
 	object_type create_object(Arg& arg);
-ssl使用。
+ssl使用，行为和上一个重载一样。
 
 	container_type& container();
 用于配置unordered_set，比如设置负载因子，预分配空间等。注意必须在service_pump启动之前调用，因为没有锁相应的mutex。

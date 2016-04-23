@@ -138,7 +138,7 @@ protected:
 	virtual void post_create(object_ctype& object_ptr) {if (object_ptr) object_ptr->id(++cur_id);}
 
 #ifdef ST_ASIO_REUSE_OBJECT
-	virtual object_type reuse_object()
+	object_type reuse_object()
 	{
 		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
 		//objects are order by time, so we don't have to go through all items in temp_object_can
