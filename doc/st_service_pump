@@ -73,14 +73,17 @@ public:
 	void stop_service();
 启动／停止service（调用end_service），thread_num是线程数量（用于调用io_service::run）。
 
-	void force_stop_service();
-先尝试正常结束所有service（调用i_service::stop_service），如果不能成功结束所有service，则强制结束service（调用io_service::stop）。
-
 	void start_service(object_type i_service_, int thread_num = ST_SERVICE_THREAD_NUM);
 	void stop_service(object_type i_service_);
 如果某个service是在前面那个start_service之后才添加的，则调用这个启动它，否则功能完全同前面那个start_service，这也是为什么带了
 thread_num这个看似无关的参数。
 stop_service停止指定的service，跟前面的stop_service一样，差别仅是前面的停止所有service。
+
+	void run_service(int thread_num = ST_SERVICE_THREAD_NUM);
+	void end_service();
+run_service同start_service，但是会阻塞，直到所有线程（调用io_service::run的线程）都退出，所以end_service必须在另外的线程中调用。
+请注意，结束以run_service启动的service pump，必须用end_service，end_service调用之后马上返回，service pump是否结束以run_service
+是否返回为准，而不是end_service的返回。
 
 	bool is_running() const;
 等效于　!io_service::stopped()
@@ -88,28 +91,26 @@ stop_service停止指定的service，跟前面的stop_service一样，差别仅�
 	bool is_service_started() const;
 是否已经调用过了start_service(int thread_num)。
 
-	void run_service(int thread_num = ST_SERVICE_THREAD_NUM);
-	void end_service();
-end_service完全同stop_service，其实stop_service就是直接调用end_service。
-run_service同start_service，但是会阻塞，直到所有线程（调用io_service::run的线程）都退出，所以end_service必须在另外的线程中调用。
-其实start_service(int thread_num)就是创建了一个线程，在这个线程中执行run_service，然后自己马上退出而已。
+	void add_service_thread(int thread_num);
+运行时增加service线程，注意只能增加不能减少。
 
 protected:
+	void do_service(int thread_num);
+真正开启service，其实就是调用每一个service的start_service接口，并开启指定数据的线程来执行run函数。
+	void wait_service();
+等待do_service创建的所有线程结束。
+
 	void stop_and_free(object_type i_service_);
-调用i_service::stop_service，然后调用st_service_pump::free。
+调用stop_service接口，并传给free函数释放i_service_。
 
 	virtual void free(object_type i_service_);
-重写这个以释放指定的i_service，如果需要的话。注意，就算你是在堆上分配的i_service，也不一定需要释放它，只要你的service的生命周期跟
-进程一样，就不需要释放。这个函数目前是空的，什么也不做，st_asio_wrapper自带的demo都没有重写这个函数。
-st_service_pump不负责创建和释放任何service（继承自i_service的类）对象，因为service对象在绝大多数情况下，都与进程有相同的生命周期，
-所以无需释放，这也是为了让st_service_pump尽量的简单。
+默认什么也不做，如果你需要，请重写这个函数。
 
-#ifdef ENHANCED_STABILITY
+#ifdef ST_ASIO_ENHANCED_STABILITY
 	virtual bool on_exception(const std::exception& e);
-包在io_service::run外面的try捕捉到了异常后调用，返回true代表忽略这个异常，返回false表现结束这个io_service::run。
-
-	size_t run(error_code& ec);
-内部使用的helper函数，在io_service::run外面用try包裹。
+如果io_service::run抛出异常，则会调用这个函数，如果返回真，则忽略异常再次调用io_service::run。
+	size_t run(boost::system::error_code& ec);
+调用io_service::run，并在外面包一层try catch。
 #endif
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred);
@@ -120,14 +121,10 @@ private:
 	void add(object_type i_service_);
 添加一个service，由i_service使用。
 
-	void do_service(int thread_num);
-run_service使用，正确的创建线程并且执行run。
-
 protected:
 	container_type service_can;
 	boost::shared_mutex service_can_mutex;
-	boost::thread service_thread;
-这个线程运行着run_service（如果你的服务是通过start_service启动的话）。
+	boost::thread_group service_threads;
 	bool started;
 };
 
