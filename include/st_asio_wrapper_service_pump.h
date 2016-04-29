@@ -137,18 +137,23 @@ public:
 	}
 	void stop_service(object_type i_service_) {assert(nullptr != i_service_); i_service_->stop_service();}
 
-	//this function works like start_service except that it will block until all services run out
+	//this function works like start_service except that it will block until all services run out,
+	//and if you start service pump by 'run_service', you cannot add service threads at runtime (call add_service_thread will be blocked)
 	void run_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM)
 	{
 		if (!is_service_started())
 		{
-			do_service(thread_num);
+			do_service(thread_num - 1);
+
+			boost::system::error_code ec;
+			run(ec);
+
 			wait_service();
 		}
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example, close the application
 	//only for service pump started by 'run_service', this function will return immediately,
-	//only the return from 'run_service' means service ended.
+	//only the return from 'run_service' means service pump ended.
 	void end_service() {if (is_service_started()) do_something_to_all([](object_type& item) {item->stop_service();});}
 
 	bool is_running() const {return !stopped();}
