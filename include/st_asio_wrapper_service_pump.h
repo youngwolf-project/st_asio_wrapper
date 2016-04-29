@@ -39,8 +39,8 @@ public:
 	public:
 		//for the same i_service, start_service and stop_service are not thread safe,
 		//to resolve this defect, we must add a mutex member variable to i_service, it's not worth
-		void start_service() {if (!started) {started = init();}}
-		void stop_service() {if (started) {uninit(); started = false;}}
+		void start_service() {if (!started) started = init();}
+		void stop_service() {if (started) uninit(); started = false;}
 		bool is_started() const {return started;}
 
 		void id(int id) {id_ = id;}
