@@ -39,8 +39,8 @@ public:
 	public:
 		//for the same i_service, start_service and stop_service are not thread safe,
 		//to resolve this defect, we must add a mutex member variable to i_service, it's not worth
-		void start_service() {if (!started) {started = init();}}
-		void stop_service() {if (started) {uninit(); started = false;}}
+		void start_service() {if (!started) started = init();}
+		void stop_service() {if (started) uninit(); started = false;}
 		bool is_started() const {return started;}
 
 		void id(int id) {id_ = id;}
@@ -115,34 +115,14 @@ public:
 		st_asio_wrapper::do_something_to_all(temp_service_can, boost::bind(&st_service_pump::stop_and_free, this, _1));
 	}
 
-	void start_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM)
-	{
-		if (!is_service_started())
-		{
-			service_thread = boost::thread(boost::bind(&st_service_pump::run_service, this, thread_num));
-			int loop_num = 10;
-			while (--loop_num >= 0 && !is_service_started())
-				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
-		}
-	}
+	void start_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM) {if (!is_service_started()) do_service(thread_num);}
 	//stop the service, must be invoked explicitly when the service need to stop, for example, close the application
-	void stop_service() {end_service();}
-	//only used when stop_service() can not stop the service(been blocked and can not return)
-	void force_stop_service()
+	void stop_service()
 	{
 		if (is_service_started())
 		{
-			do_something_to_all(boost::mem_fn(&i_service::stop_service));
-			int loop_num = 20; //one second
-			while (is_service_started())
-			{
-				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
-				if (--loop_num <= 0)
-				{
-					stop();
-					loop_num = 0x7fffffff;
-				}
-			}
+			end_service();
+			wait_service();
 		}
 	}
 
@@ -158,31 +138,40 @@ public:
 	}
 	void stop_service(object_type i_service_) {assert(NULL != i_service_); i_service_->stop_service();}
 
-	bool is_running() const {return !stopped();}
-	bool is_service_started() const {return started;}
-
 	//this function works like start_service except that it will block until all services run out
 	void run_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM)
 	{
 		if (!is_service_started())
 		{
-			reset(); //this is needed when restart service
-			do_something_to_all(boost::mem_fn(&i_service::start_service));
-			do_service(thread_num);
+			do_service(thread_num - 1);
+
+			boost::system::error_code ec;
+			run(ec);
+
+			wait_service();
 		}
 	}
 	//stop the service, must be invoked explicitly when the service need to stop, for example, close the application
-	void end_service()
-	{
-		if (is_service_started())
-		{
-			do_something_to_all(boost::mem_fn(&i_service::stop_service));
-			while (is_service_started())
-				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
-		}
-	}
+	//only for service pump started by 'run_service', this function will return immediately,
+	//only the return from 'run_service' means service pump ended.
+	void end_service() {if (is_service_started()) do_something_to_all(boost::mem_fn(&i_service::stop_service));}
+
+	bool is_running() const {return !stopped();}
+	bool is_service_started() const {return started;}
+	void add_service_thread(int thread_num) {for (int i = 0; i < thread_num; ++i) service_threads.create_thread(boost::bind(&st_service_pump::run, this, boost::system::error_code()));}
 
 protected:
+	void do_service(int thread_num)
+	{
+		started = true;
+		unified_out::info_out("service pump started.");
+
+		reset(); //this is needed when restart service
+		do_something_to_all(boost::mem_fn(&i_service::start_service));
+		add_service_thread(thread_num);
+	}
+	void wait_service() {service_threads.join_all(); unified_out::info_out("service pump end."); started = false;}
+
 	void stop_and_free(object_type i_service_)
 	{
 		assert(NULL != i_service_);
@@ -221,26 +210,10 @@ private:
 		service_can.push_back(i_service_);
 	}
 
-	void do_service(int thread_num)
-	{
-		started = true;
-		unified_out::info_out("service pump started.");
-
-		--thread_num;
-		boost::thread_group tg;
-		for (int i = 0; i < thread_num; ++i)
-			tg.create_thread(boost::bind(&st_service_pump::run, this, boost::system::error_code()));
-		boost::system::error_code ec; run(ec);
-		tg.join_all();
-
-		unified_out::info_out("service pump end.");
-		started = false;
-	}
-
 protected:
 	container_type service_can;
 	boost::shared_mutex service_can_mutex;
-	boost::thread service_thread;
+	boost::thread_group service_threads;
 	bool started;
 };
 

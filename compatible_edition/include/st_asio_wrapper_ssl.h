@@ -152,26 +152,10 @@ public:
 	boost::asio::ssl::context& ssl_context() {return ctx;}
 
 	typename st_ssl_object_pool::object_type create_object()
-	{
-		BOOST_AUTO(object_ptr, ST_THIS reuse_object());
-		if (!object_ptr)
-			object_ptr = boost::make_shared<Object>(boost::ref(ST_THIS service_pump), boost::ref(ctx));
-		if (object_ptr)
-			object_ptr->id(++ST_THIS cur_id);
+		{BOOST_AUTO(object_ptr, boost::make_shared<Object>(boost::ref(ST_THIS service_pump), boost::ref(ctx))); return ST_THIS post_create(object_ptr), object_ptr;}
 
-		return object_ptr;
-	}
 	template<typename Arg>
-	typename st_ssl_object_pool::object_type create_object(Arg& arg)
-	{
-		BOOST_AUTO(object_ptr, ST_THIS reuse_object());
-		if (!object_ptr)
-			object_ptr = boost::make_shared<Object>(arg, boost::ref(ctx));
-		if (object_ptr)
-			object_ptr->id(++ST_THIS cur_id);
-
-		return object_ptr;
-	}
+	typename st_ssl_object_pool::object_type create_object(Arg& arg) {BOOST_AUTO(object_ptr, boost::make_shared<Object>(arg, boost::ref(ctx))); return ST_THIS post_create(object_ptr), object_ptr;}
 
 protected:
 	boost::asio::ssl::context ctx;

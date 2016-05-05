@@ -135,9 +135,11 @@ protected:
 		return exist;
 	}
 
-	virtual object_type reuse_object()
-	{
+	virtual void post_create(object_ctype& object_ptr) {if (object_ptr) object_ptr->id(++cur_id);}
+
 #ifdef ST_ASIO_REUSE_OBJECT
+	object_type reuse_object()
+	{
 		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
 		//objects are order by time, so we don't have to go through all items in temp_object_can
 		for (BOOST_AUTO(iter, temp_object_can.begin()); iter != temp_object_can.end() && iter->is_timeout(); ++iter)
@@ -150,7 +152,6 @@ protected:
 				object_ptr->reset();
 				return object_ptr;
 			}
-#endif
 
 		return object_type();
 	}
@@ -161,10 +162,8 @@ public:
 		BOOST_AUTO(object_ptr, reuse_object());
 		if (!object_ptr)
 			object_ptr = boost::make_shared<Object>(boost::ref(service_pump));
-		if (object_ptr)
-			object_ptr->id(++cur_id);
 
-		return object_ptr;
+		return post_create(object_ptr), object_ptr;
 	}
 
 	template<typename Arg>
@@ -173,11 +172,16 @@ public:
 		BOOST_AUTO(object_ptr, reuse_object());
 		if (!object_ptr)
 			object_ptr = boost::make_shared<Object>(arg);
-		if (object_ptr)
-			object_ptr->id(++cur_id);
 
-		return object_ptr;
+		return post_create(object_ptr), object_ptr;
 	}
+#else
+public:
+	object_type create_object() {BOOST_AUTO(object_ptr, boost::make_shared<Object>(boost::ref(service_pump))); return post_create(object_ptr), object_ptr;}
+
+	template<typename Arg>
+	object_type create_object(Arg& arg) {BOOST_AUTO(object_ptr, boost::make_shared<Object>(arg)); return post_create(object_ptr), object_ptr;}
+#endif
 
 	//to configure unordered_set(for example, set factor or reserved size), not locked the mutex, so must be called before service_pump starting up.
 	container_type& container() {return object_can;}
