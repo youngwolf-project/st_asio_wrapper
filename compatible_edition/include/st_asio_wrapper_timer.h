@@ -154,7 +154,7 @@ protected:
 
 	void timer_handler(const boost::system::error_code& ec, object_ctype& ti)
 	{
-		//return true to continue the timer, or the timer will stop
+		//return true from call_back to continue the timer, or the timer will stop
 		if (!ec && ti.call_back(ti.id) && object_type::TIMER_OK == ti.status)
 			start_timer(ti);
 	}

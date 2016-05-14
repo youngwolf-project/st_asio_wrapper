@@ -139,8 +139,8 @@ protected:
 	void start_timer(object_ctype& ti)
 	{
 		ti.timer->expires_from_now(boost::posix_time::milliseconds(ti.milliseconds));
-		//call_back return true to continue the timer, or the timer will stop
-		ti.timer->async_wait([this, &ti](const boost::system::error_code& ec) {if (!ec && ti.call_back(ti.id) && object_type::TIMER_OK == ti.status) ST_THIS start_timer(ti);});
+		//return true from call_back to continue the timer, or the timer will stop
+		ti.timer->async_wait([this, &ti](const boost::system::error_code& ec) {if (!ec && ti.call_back(ti.id) && st_timer::object_type::TIMER_OK == ti.status) ST_THIS start_timer(ti);});
 	}
 
 	void stop_timer(object_type& ti)
