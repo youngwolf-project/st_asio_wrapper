@@ -1,5 +1,5 @@
 
-# If your compiler cannot find the boost's location independently, please specify them explicitly like this(please uncomment them first):
+# If your compiler cannot find boost, please specify it explicitly like this:
 #boost_include_dir = -I/usr/local/include/
 #boost_lib_dir = -L/usr/local/lib/
 
@@ -24,9 +24,9 @@ ${shell mkdir -p ${dir}}
 release debug : ${target}
 -include ${deps}
 ${target} : ${objects}
-	${CXX} -o ${target} ${objects} ${lflag}
+	${CXX} -o $@ $^ ${lflag}
 ${objects} : ${dir}/%.o : %.cpp
-	${CXX} ${cflag} -E -MMD -MT '${subst .cpp,.o,${dir}/$<}' -MF ${subst .cpp,.d,${dir}/$<} $< 1>/dev/null
+	${CXX} ${cflag} -E -MMD -MT '$@' -MF ${subst .cpp,.d,${dir}/$<} $< 1>/dev/null
 	${CXX} ${cflag} -c $< -o $@
 
 .PHONY : clean
