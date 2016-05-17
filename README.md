@@ -50,10 +50,12 @@ Boost requirement:
 1.49 or highter, earlier edition maybe can work, but I'm not sure.</br>
 Debug environment:
 -
-Win7 vc2008/vc2015 32/64 bit</br>
+win10 vc2008/vc2015 32/64 bit</br>
+Win7 vc2010 32/64 bit</br>
 Debian 7/8 32/64 bit</br>
 Ubuntu 16 64 bit</br>
 Fedora 23 64 bit</br>
+FreeBSD 10 32/64 bit</br>
 email: mail2tao@163.com
 -
 Community on QQ: 198941541
