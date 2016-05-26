@@ -192,9 +192,11 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			ST_THIS temp_msg_buffer.resize(ST_THIS temp_msg_buffer.size() + 1);
-			ST_THIS temp_msg_buffer.back().swap(peer_addr, unpacker_->parse_msg(bytes_transferred));
-			ST_THIS dispatch_msg();
+			typename st_socket<Socket, Packer, Unpacker>::out_container_type temp_msg_buffer;
+			temp_msg_buffer.resize(1);
+			temp_msg_buffer.back().swap(peer_addr, unpacker_->parse_msg(bytes_transferred));
+			//this is cumbersome, because it's impossible that more than one UDP msgs glued together, just satisfy st_socket::dispatch_msg.
+			ST_THIS dispatch_msg(temp_msg_buffer);
 		}
 #ifdef _MSC_VER
 		else if (boost::asio::error::connection_refused == ec || boost::asio::error::connection_reset == ec)

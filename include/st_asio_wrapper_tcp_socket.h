@@ -186,8 +186,9 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, ST_THIS temp_msg_buffer);
-			ST_THIS dispatch_msg();
+			typename st_socket<Socket, Packer, Unpacker>::out_container_type temp_msg_buffer;
+			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_buffer);
+			ST_THIS dispatch_msg(temp_msg_buffer);
 
 			if (!unpack_ok)
 			{
