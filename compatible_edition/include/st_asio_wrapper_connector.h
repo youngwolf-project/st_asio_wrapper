@@ -78,6 +78,7 @@ public:
 		st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();
 	}
 
+	//sync must be false if you call graceful_close in on_msg
 	void graceful_close(bool reconnect = false, bool sync = true)
 	{
 		if (ST_THIS is_closing())
@@ -114,7 +115,7 @@ protected:
 	{
 		if (!ST_THIS get_io_service().stopped())
 		{
-			if (!is_connected())
+			if (reconnecting && !is_connected())
 				ST_THIS lowest_layer().async_connect(server_addr, boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error));
 			else
 				ST_THIS do_recv_msg();

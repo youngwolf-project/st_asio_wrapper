@@ -56,6 +56,15 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::container::set<object_type> container_type;
 
+#ifdef ST_ASIO_ENHANCED_STABILITY
+	void post(const boost::function<void()>& handler) {io_service_.post(boost::bind(&st_timer::post_handler, this, async_call_indicator, handler));}
+	bool is_async_calling() const {return !async_call_indicator.unique();}
+#else
+	template<typename CompletionHandler>
+	BOOST_ASIO_INITFN_RESULT_TYPE(CompletionHandler, void ()) post(BOOST_ASIO_MOVE_ARG(CompletionHandler) handler) {io_service_.post(handler);}
+	bool is_async_calling() const {return false;}
+#endif
+
 	//after this call, call_back cannot be used again, please note.
 	void update_timer_info(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>& call_back, bool start = false)
 	{
@@ -139,10 +148,21 @@ public:
 	void stop_all_timer() {do_something_to_all(boost::bind((void (st_timer::*) (object_type&)) &st_timer::stop_timer, this, _1));}
 
 protected:
+#ifdef ST_ASIO_ENHANCED_STABILITY
+	void init() {async_call_indicator = boost::make_shared<char>('\0');}
+	void post_handler(const boost::shared_ptr<char>& async_call_indicator, const boost::function<void()>& handler) {handler();}
+#else
+	void init() {}
+#endif
+
 	void start_timer(object_ctype& ti)
 	{
 		ti.timer->expires_from_now(boost::posix_time::milliseconds(ti.milliseconds));
-		ti.timer->async_wait(boost::bind(&st_timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti)));
+		ti.timer->async_wait(boost::bind(&st_timer::timer_handler, this,
+#ifdef ST_ASIO_ENHANCED_STABILITY
+			async_call_indicator,
+#endif
+			boost::asio::placeholders::error, boost::ref(ti)));
 	}
 
 	void stop_timer(object_type& ti)
@@ -152,7 +172,11 @@ protected:
 		ti.status = object_type::TIMER_CANCELED;
 	}
 
-	void timer_handler(const boost::system::error_code& ec, object_ctype& ti)
+	void timer_handler(
+#ifdef ST_ASIO_ENHANCED_STABILITY
+		const boost::shared_ptr<char>& async_call_indicator,
+#endif
+		const boost::system::error_code& ec, object_ctype& ti)
 	{
 		//return true from call_back to continue the timer, or the timer will stop
 		if (!ec && ti.call_back(ti.id) && object_type::TIMER_OK == ti.status)
@@ -162,6 +186,10 @@ protected:
 	boost::asio::io_service& io_service_;
 	container_type timer_can;
 	boost::shared_mutex timer_can_mutex;
+
+#ifdef ST_ASIO_ENHANCED_STABILITY
+	boost::shared_ptr<char> async_call_indicator;
+#endif
 };
 
 } //namespace

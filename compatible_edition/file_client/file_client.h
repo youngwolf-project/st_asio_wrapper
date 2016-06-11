@@ -190,8 +190,8 @@ public:
 	fl_type get_total_rest_size()
 	{
 		fl_type total_rest_size = 0;
-		do_something_to_all(boost::ref(total_rest_size) += *boost::lambda::_1);
-//		do_something_to_all(boost::ref(total_rest_size) += boost::lambda::bind(&file_socket::get_rest_size, &*boost::lambda::_1));
+		do_something_to_all(total_rest_size += *boost::lambda::_1);
+//		do_something_to_all(total_rest_size += boost::lambda::bind(&file_socket::get_rest_size, &*boost::lambda::_1));
 
 		return total_rest_size;
 	}

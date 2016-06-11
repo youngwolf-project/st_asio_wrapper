@@ -137,10 +137,20 @@ public:
 	boost::uint64_t get_recv_bytes()
 	{
 		boost::uint64_t total_recv_bytes = 0;
-		do_something_to_all(boost::ref(total_recv_bytes) += *boost::lambda::_1);
-//		do_something_to_all(boost::ref(total_recv_bytes) += boost::lambda::bind(&test_socket::get_recv_bytes, &*boost::lambda::_1));
+		do_something_to_all(total_recv_bytes += *boost::lambda::_1);
+//		do_something_to_all(total_recv_bytes += boost::lambda::bind(&test_socket::get_recv_bytes, &*boost::lambda::_1));
 
 		return total_recv_bytes;
+	}
+
+	boost::posix_time::time_duration recv_idle_time()
+	{
+		boost::posix_time::time_duration time_recv_idle;
+		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
+		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
+			time_recv_idle += (*iter)->recv_idle_time();
+
+		return time_recv_idle;
 	}
 
 	void clear_status() {do_something_to_all(boost::mem_fn(&test_socket::clear_status));}
@@ -243,7 +253,12 @@ int main(int argc, const char* argv[])
 			service_pump.start_service(min_thread_num);
 		}
 		else if (str == LIST_STATUS)
+		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.closed_object_size());
+			boost::posix_time::time_duration time_recv_idle = client.recv_idle_time();
+			printf("recv idle time: %d:%d:%d %f\n", time_recv_idle.hours(), time_recv_idle.minutes(), time_recv_idle.seconds(),
+				time_recv_idle.fractional_seconds() / pow(10., boost::posix_time::time_duration::num_fractional_digits()));
+		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
 			client.do_something_to_all(boost::bind(&test_socket::suspend_dispatch_msg, _1, true));

@@ -42,7 +42,6 @@ protected:
 	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
 
 	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {init();}
-
 	template<typename Arg>
 	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {init();}
 
@@ -52,6 +51,8 @@ protected:
 		sending = suspend_send_msg_ = false;
 		dispatching = suspend_dispatch_msg_ = false;
 		started_ = false;
+
+		time_recv_idle = boost::posix_time::time_duration();
 	}
 
 	void clear_buffer()
@@ -75,13 +76,8 @@ public:
 
 	virtual bool obsoleted()
 	{
-		if (started())
+		if (started() || ST_THIS is_async_calling())
 			return false;
-
-#ifdef ST_ASIO_ENHANCED_STABILITY
-		if (!async_call_indicator.unique())
-			return false;
-#endif
 
 		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex, boost::try_to_lock);
 		return lock.owns_lock() && recv_msg_buffer.empty(); //if successfully locked, means this st_socket is idle
@@ -110,6 +106,8 @@ public:
 		do_dispatch_msg(true);
 	}
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
+
+	boost::posix_time::time_duration recv_idle_time() const {return time_recv_idle;}
 
 	//get or change the packer at runtime
 	//changing packer at runtime is not thread-safe, please pay special attention
@@ -165,6 +163,7 @@ public:
 protected:
 	virtual bool do_start() = 0;
 	virtual bool do_send_msg() = 0; //must mutex send_msg_buffer before invoke this function
+	virtual void do_recv_msg() = 0;
 
 	virtual bool is_send_allowed() const {return !suspend_send_msg_;} //can send msg or not(just put into send buffer)
 
@@ -235,7 +234,7 @@ protected:
 #endif
 
 		if (temp_msg_buffer.empty())
-			do_start(); //receive msg sequentially, which means second receiving only after first receiving success
+			do_recv_msg(); //receive msg sequentially, which means second receiving only after first receiving success
 		else
 			set_timer(TIMER_DISPATCH_MSG, 50, [this](unsigned char id)->bool {return ST_THIS timer_handler(id);});
 	}
@@ -253,9 +252,8 @@ protected:
 		}
 		else if (!posting)
 		{
-			auto& io_service_ = get_io_service();
 			auto dispatch_all = false;
-			if (io_service_.stopped())
+			if (get_io_service().stopped())
 				dispatch_all = !(dispatching = false);
 			else if (!dispatching)
 			{
@@ -265,18 +263,13 @@ protected:
 				{
 					dispatching = true;
 					last_dispatch_msg.swap(recv_msg_buffer.front());
-					io_service_.post([this]() {ST_THIS msg_handler();});
+					post([this]() {ST_THIS msg_handler();});
 					recv_msg_buffer.pop_front();
 				}
 			}
 
 			if (dispatch_all)
 			{
-#ifdef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-				//the msgs in temp_msg_buffer are discarded if we don't used msg receive buffer, it's very hard to resolve this defect,
-				//so, please be very carefully if you decide to resolve this issue, the biggest problem is calling force_close in on_msg.
-				recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
-#endif
 #ifndef ST_ASIO_DISCARD_MSG_WHEN_LINK_DOWN
 				st_asio_wrapper::do_something_to_all(recv_msg_buffer, [this](OutMsgType& msg) {ST_THIS on_msg_handle(msg, true);});
 #endif
@@ -318,9 +311,7 @@ protected:
 	void init()
 	{
 		reset_state();
-#ifdef ST_ASIO_ENHANCED_STABILITY
-		async_call_indicator = boost::make_shared<char>('\0');
-#endif
+		st_timer::init();
 	}
 
 private:
@@ -329,6 +320,7 @@ private:
 		switch (id)
 		{
 		case TIMER_DISPATCH_MSG: //delay putting msgs into receive buffer cause of receive buffer overflow
+			time_recv_idle += boost::posix_time::milliseconds(50);
 			dispatch_msg();
 			break;
 		case TIMER_SUSPEND_DISPATCH_MSG: //suspend dispatching msgs
@@ -354,6 +346,7 @@ private:
 			}
 			break;
 		case TIMER_RE_DISPATCH_MSG: //re-dispatch
+			time_recv_idle += boost::posix_time::milliseconds(50);
 			do_dispatch_msg(true);
 			break;
 		default:
@@ -404,9 +397,8 @@ protected:
 	bool started_; //has started or not
 	boost::shared_mutex start_mutex;
 
-#ifdef ST_ASIO_ENHANCED_STABILITY
-	boost::shared_ptr<char> async_call_indicator;
-#endif
+	//during this duration, st_socket suspended msg reception because of receiving buffer was full.
+	boost::posix_time::time_duration time_recv_idle;
 };
 
 } //namespace

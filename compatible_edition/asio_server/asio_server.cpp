@@ -115,6 +115,16 @@ class echo_server : public echo_server_base
 public:
 	echo_server(st_service_pump& service_pump_) : echo_server_base(service_pump_) {}
 
+	boost::posix_time::time_duration recv_idle_time()
+	{
+		boost::posix_time::time_duration time_recv_idle;
+		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
+		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
+			time_recv_idle += (*iter)->recv_idle_time();
+
+		return time_recv_idle;
+	}
+
 	//from i_echo_server, pure virtual function, we must implement it.
 	virtual void test() {/*puts("in echo_server::test()");*/}
 };
@@ -165,6 +175,9 @@ int main(int argc, const char* argv[])
 		{
 			printf("normal server, link #: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", server_.size(), server_.closed_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.closed_object_size());
+			boost::posix_time::time_duration time_recv_idle = echo_server_.recv_idle_time();
+			printf("recv idle time: %d:%d:%d %f\n", time_recv_idle.hours(), time_recv_idle.minutes(), time_recv_idle.seconds(),
+				time_recv_idle.fractional_seconds() / pow(10., boost::posix_time::time_duration::num_fractional_digits()));
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)

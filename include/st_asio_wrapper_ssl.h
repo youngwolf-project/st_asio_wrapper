@@ -152,7 +152,6 @@ public:
 	boost::asio::ssl::context& ssl_context() {return ctx;}
 
 	typename st_ssl_object_pool::object_type create_object() {auto object_ptr = boost::make_shared<Object>(ST_THIS service_pump, ctx); return ST_THIS post_create(object_ptr), object_ptr;}
-
 	template<typename Arg>
 	typename st_ssl_object_pool::object_type create_object(Arg& arg) {auto object_ptr = boost::make_shared<Object>(arg, ctx); return ST_THIS post_create(object_ptr), object_ptr;}
 

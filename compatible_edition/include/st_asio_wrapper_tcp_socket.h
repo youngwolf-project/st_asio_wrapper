@@ -43,7 +43,6 @@ protected:
 	using st_socket<Socket, Packer, Unpacker>::TIMER_END;
 
 	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, Unpacker>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state(); close_state = 0;}
-
 	template<typename Arg>
 	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<Socket, Packer, Unpacker>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()) {reset_state(); close_state = 0;}
 
@@ -135,6 +134,19 @@ protected:
 		return ST_THIS sending;
 	}
 
+	virtual void do_recv_msg()
+	{
+		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
+		if (boost::asio::buffer_size(recv_buff) > 0)
+			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
+				boost::bind(&i_unpacker<out_msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
+				boost::bind(&st_tcp_socket_base::recv_handler, this,
+#ifdef ST_ASIO_ENHANCED_STABILITY
+					ST_THIS async_call_indicator,
+#endif
+					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+	}
+
 	virtual bool is_send_allowed() const {return !is_closing() && st_socket<Socket, Packer, Unpacker>::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
@@ -147,21 +159,6 @@ protected:
 #endif
 
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
-
-	//start the asynchronous read
-	//it's child's responsibility to invoke this properly, because st_tcp_socket_base doesn't know any of the connection status
-	void do_recv_msg()
-	{
-		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
-		if (boost::asio::buffer_size(recv_buff) > 0)
-			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
-				boost::bind(&i_unpacker<out_msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
-				boost::bind(&st_tcp_socket_base::recv_handler, this,
-#ifdef ST_ASIO_ENHANCED_STABILITY
-					ST_THIS async_call_indicator,
-#endif
-					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
-	}
 
 	void clean_up()
 	{
@@ -180,7 +177,7 @@ protected:
 private:
 	void recv_handler(
 #ifdef ST_ASIO_ENHANCED_STABILITY
-		boost::shared_ptr<char> async_call_indicator,
+		const boost::shared_ptr<char>& async_call_indicator,
 #endif
 		const boost::system::error_code& ec, size_t bytes_transferred)
 	{
@@ -202,7 +199,7 @@ private:
 
 	void send_handler(
 #ifdef ST_ASIO_ENHANCED_STABILITY
-		boost::shared_ptr<char> async_call_indicator,
+		const boost::shared_ptr<char>& async_call_indicator,
 #endif
 		const boost::system::error_code& ec, size_t bytes_transferred)
 	{

@@ -141,6 +141,14 @@ public:
 		return total_recv_bytes;
 	}
 
+	boost::posix_time::time_duration recv_idle_time()
+	{
+		boost::posix_time::time_duration time_recv_idle;
+		ST_THIS do_something_to_all([&time_recv_idle](object_ctype& item) {time_recv_idle += item->recv_idle_time();});
+
+		return time_recv_idle;
+	}
+
 	void clear_status() {do_something_to_all([](object_ctype& item) {item->clear_status();});}
 	void begin(size_t msg_num, size_t msg_len, char msg_fill) {do_something_to_all([=](object_ctype& item) {item->begin(msg_num, msg_len, msg_fill);});}
 
@@ -233,7 +241,12 @@ int main(int argc, const char* argv[])
 			service_pump.start_service(min_thread_num);
 		}
 		else if (str == LIST_STATUS)
+		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.closed_object_size());
+			boost::posix_time::time_duration time_recv_idle = client.recv_idle_time();
+			printf("recv idle time: %d:%d:%d %f\n", time_recv_idle.hours(), time_recv_idle.minutes(), time_recv_idle.seconds(),
+				time_recv_idle.fractional_seconds() / pow(10., boost::posix_time::time_duration::num_fractional_digits()));
+		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (str == SUSPEND_COMMAND)
 			client.do_something_to_all([](test_client::object_ctype& item) {item->suspend_dispatch_msg(true);});
