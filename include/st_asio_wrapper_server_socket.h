@@ -42,7 +42,7 @@ public:
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
 	//please note, when reuse this socket, st_object_pool will invoke reset(), child must re-write it to initialize all member variables,
 	//and then do not forget to invoke st_server_socket_base::reset() to initialize father's member variables
-	virtual void reset() {st_tcp_socket_base<Socket, Packer, Unpacker>::reset(); ST_THIS close_state = 0;}
+	virtual void reset() {st_tcp_socket_base<Socket, Packer, Unpacker>::reset();}
 
 	void disconnect() {force_close();}
 	void force_close()
