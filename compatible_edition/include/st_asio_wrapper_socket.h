@@ -41,10 +41,11 @@ protected:
 	static const unsigned char TIMER_RE_DISPATCH_MSG = TIMER_BEGIN + 3;
 	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
 
-	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {init();}
+	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()) {reset_state();}
 	template<typename Arg>
-	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {init();}
+	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()) {reset_state();}
 
+	void reset() {reset_state(); clear_buffer(); st_timer::reset();}
 	void reset_state()
 	{
 		posting = false;
@@ -308,12 +309,6 @@ protected:
 		}
 
 		return true;
-	}
-
-	void init()
-	{
-		reset_state();
-		st_timer::init();
 	}
 
 private:

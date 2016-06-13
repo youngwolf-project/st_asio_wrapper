@@ -13,8 +13,6 @@
 #ifndef ST_ASIO_WRAPPER_OBJECT_H_
 #define ST_ASIO_WRAPPER_OBJECT_H_
 
-#include <boost/function.hpp>
-
 #include "st_asio_wrapper_base.h"
 
 namespace st_asio_wrapper
@@ -31,15 +29,19 @@ public:
 	const boost::asio::io_service& get_io_service() const {return io_service_;}
 
 	template<typename CompletionHandler>
-	BOOST_ASIO_INITFN_RESULT_TYPE(CompletionHandler, void ())
+	BOOST_ASIO_INITFN_RESULT_TYPE(CompletionHandler, void())
 #ifdef ST_ASIO_ENHANCED_STABILITY
 	post(BOOST_ASIO_MOVE_ARG(CompletionHandler) handler) {auto unused(ST_THIS async_call_indicator); io_service_.post([=]() {handler();});}
 	bool is_async_calling() const {return !async_call_indicator.unique();}
 
-	std::function<void(const boost::system::error_code&)> make_handler_error(const std::function<void(const boost::system::error_code&)>& handler)
+	std::function<void(const boost::system::error_code&)> make_handler_error(std::function<void(const boost::system::error_code&)>&& handler) const
+		{boost::shared_ptr<char>unused(async_call_indicator); return [=](const boost::system::error_code& ec) {handler(ec);};}
+	std::function<void(const boost::system::error_code&)> make_handler_error(const std::function<void(const boost::system::error_code&)>& handler) const
 		{boost::shared_ptr<char>unused(async_call_indicator); return [=](const boost::system::error_code& ec) {handler(ec);};}
 
-	std::function<void(const boost::system::error_code&, size_t)> make_handler_error_size(const std::function<void(const boost::system::error_code&, size_t)>& handler)
+	std::function<void(const boost::system::error_code&, size_t)> make_handler_error_size(std::function<void(const boost::system::error_code&, size_t)>&& handler) const
+		{boost::shared_ptr<char>unused(async_call_indicator); return [=](const boost::system::error_code& ec, size_t bytes_transferred) {handler(ec, bytes_transferred);};}
+	std::function<void(const boost::system::error_code&, size_t)> make_handler_error_size(const std::function<void(const boost::system::error_code&, size_t)>& handler) const
 		{boost::shared_ptr<char>unused(async_call_indicator); return [=](const boost::system::error_code& ec, size_t bytes_transferred) {handler(ec, bytes_transferred);};}
 
 protected:
@@ -52,10 +54,14 @@ protected:
 	bool is_async_calling() const {return false;}
 
 	template<typename F>
-	const F& make_handler_error(const F& f) {return f;}
+	inline F&& make_handler_error(F&& f) const {return std::move(f);}
+	template<typename F>
+	inline const F& make_handler_error(const F& f) const {return f;}
 
 	template<typename F>
-	const F& make_handler_error_size(const F& f) {return f;}
+	inline F&& make_handler_error_size(F&& f) const {return std::move(f);}
+	template<typename F>
+	inline const F& make_handler_error_size(const F& f) const {return f;}
 
 protected:
 	void reset() {}

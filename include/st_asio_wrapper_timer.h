@@ -16,7 +16,6 @@
 #include <boost/container/set.hpp>
 
 #include "st_asio_wrapper_object.h"
-#include "st_asio_wrapper_base.h"
 
 //If you inherit a class from class X, your own timer ids must begin from X::TIMER_END
 namespace st_asio_wrapper
@@ -40,7 +39,7 @@ protected:
 		unsigned char id;
 		timer_status status;
 		size_t milliseconds;
-		boost::function<bool(unsigned char)> call_back;
+		std::function<bool(unsigned char)> call_back;
 		boost::shared_ptr<boost::asio::deadline_timer> timer;
 
 		bool operator <(const timer_info& other) const {return id < other.id;}
@@ -56,7 +55,7 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::container::set<object_type> container_type;
 
-	void update_timer_info(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>&& call_back, bool start = false)
+	void update_timer_info(unsigned char id, size_t milliseconds, std::function<bool(unsigned char)>&& call_back, bool start = false)
 	{
 		object_type ti = {id};
 
@@ -82,11 +81,11 @@ public:
 		if (start)
 			start_timer(*iter);
 	}
-	void update_timer_info(unsigned char id, size_t milliseconds, const boost::function<bool(unsigned char)>& call_back, bool start = false)
-		{update_timer_info(id, milliseconds, boost::function<bool(unsigned char)>(call_back), start);}
+	void update_timer_info(unsigned char id, size_t milliseconds, const std::function<bool(unsigned char)>& call_back, bool start = false)
+		{update_timer_info(id, milliseconds, std::function<bool(unsigned char)>(call_back), start);}
 
-	void set_timer(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>&& call_back) {update_timer_info(id, milliseconds, std::move(call_back), true);}
-	void set_timer(unsigned char id, size_t milliseconds, const boost::function<bool(unsigned char)>& call_back) {update_timer_info(id, milliseconds, call_back, true);}
+	void set_timer(unsigned char id, size_t milliseconds, std::function<bool(unsigned char)>&& call_back) {update_timer_info(id, milliseconds, std::move(call_back), true);}
+	void set_timer(unsigned char id, size_t milliseconds, const std::function<bool(unsigned char)>& call_back) {update_timer_info(id, milliseconds, call_back, true);}
 
 	object_type find_timer(unsigned char id)
 	{

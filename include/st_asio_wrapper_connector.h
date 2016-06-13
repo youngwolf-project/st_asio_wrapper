@@ -116,7 +116,7 @@ protected:
 		if (!ST_THIS get_io_service().stopped())
 		{
 			if (reconnecting && !is_connected())
-				ST_THIS lowest_layer().async_connect(server_addr, boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error));
+				ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error)));
 			else
 				ST_THIS do_recv_msg();
 

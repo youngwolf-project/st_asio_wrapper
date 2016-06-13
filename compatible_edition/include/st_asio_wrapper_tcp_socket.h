@@ -42,15 +42,15 @@ protected:
 	using st_socket<Socket, Packer, Unpacker>::TIMER_BEGIN;
 	using st_socket<Socket, Packer, Unpacker>::TIMER_END;
 
-	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, Unpacker>(io_service_), unpacker_(boost::make_shared<Unpacker>()) {reset_state(); close_state = 0;}
+	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, Unpacker>(io_service_), unpacker_(boost::make_shared<Unpacker>()), close_state(0) {}
 	template<typename Arg>
-	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<Socket, Packer, Unpacker>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()) {reset_state(); close_state = 0;}
+	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<Socket, Packer, Unpacker>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()), close_state(0) {}
 
 public:
 	virtual bool obsoleted() {return !is_closing() && st_socket<Socket, Packer, Unpacker>::obsoleted();}
 
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
-	void reset() {reset_state(); ST_THIS clear_buffer();}
+	void reset() {reset_state(); close_state = 0; st_socket<Socket, Packer, Unpacker>::reset();}
 	void reset_state()
 	{
 		unpacker_->reset_state();
@@ -123,11 +123,7 @@ protected:
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()),
-				boost::bind(&st_tcp_socket_base::send_handler, this,
-#ifdef ST_ASIO_ENHANCED_STABILITY
-					ST_THIS async_call_indicator,
-#endif
-					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+				ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 			ST_THIS send_msg_buffer.pop_front();
 		}
 
@@ -140,11 +136,7 @@ protected:
 		if (boost::asio::buffer_size(recv_buff) > 0)
 			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
 				boost::bind(&i_unpacker<out_msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
-				boost::bind(&st_tcp_socket_base::recv_handler, this,
-#ifdef ST_ASIO_ENHANCED_STABILITY
-					ST_THIS async_call_indicator,
-#endif
-					boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+				ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
 	virtual bool is_send_allowed() const {return !is_closing() && st_socket<Socket, Packer, Unpacker>::is_send_allowed();}
@@ -175,11 +167,7 @@ protected:
 	}
 
 private:
-	void recv_handler(
-#ifdef ST_ASIO_ENHANCED_STABILITY
-		const boost::shared_ptr<char>& async_call_indicator,
-#endif
-		const boost::system::error_code& ec, size_t bytes_transferred)
+	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec && bytes_transferred > 0)
 		{
@@ -197,15 +185,11 @@ private:
 			ST_THIS on_recv_error(ec);
 	}
 
-	void send_handler(
-#ifdef ST_ASIO_ENHANCED_STABILITY
-		const boost::shared_ptr<char>& async_call_indicator,
-#endif
-		const boost::system::error_code& ec, size_t bytes_transferred)
+	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec)
 		{
-			assert(bytes_transferred > 0);
+			assert(bytes_transferred == ST_THIS last_send_msg.size());
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(ST_THIS last_send_msg);
 #endif

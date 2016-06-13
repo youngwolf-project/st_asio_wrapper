@@ -14,9 +14,8 @@
 #define ST_ASIO_WRAPPER_TIMER_H_
 
 #include <boost/container/set.hpp>
-#include <boost/function.hpp>
 
-#include "st_asio_wrapper_base.h"
+#include "st_asio_wrapper_object.h"
 
 //If you inherit a class from class X, your own timer ids must begin from X::TIMER_END
 namespace st_asio_wrapper
@@ -30,7 +29,7 @@ namespace st_asio_wrapper
 //same st_timer, same timer, on_timer is called sequentially
 //same st_timer, different timer, on_timer is called concurrently
 //different st_timer, on_timer is always called concurrently
-class st_timer
+class st_timer : public st_object
 {
 protected:
 	struct timer_info
@@ -48,22 +47,13 @@ protected:
 
 	static const unsigned char TIMER_END = 0; //user timer's id must begin from parent class' TIMER_END
 
-	st_timer(boost::asio::io_service& _io_service_) : io_service_(_io_service_) {}
+	st_timer(boost::asio::io_service& _io_service_) : st_object(_io_service_) {}
 	virtual ~st_timer() {}
 
 public:
 	typedef timer_info object_type;
 	typedef const object_type object_ctype;
 	typedef boost::container::set<object_type> container_type;
-
-#ifdef ST_ASIO_ENHANCED_STABILITY
-	void post(const boost::function<void()>& handler) {io_service_.post(boost::bind(&st_timer::post_handler, this, async_call_indicator, handler));}
-	bool is_async_calling() const {return !async_call_indicator.unique();}
-#else
-	template<typename CompletionHandler>
-	BOOST_ASIO_INITFN_RESULT_TYPE(CompletionHandler, void ()) post(BOOST_ASIO_MOVE_ARG(CompletionHandler) handler) {io_service_.post(handler);}
-	bool is_async_calling() const {return false;}
-#endif
 
 	//after this call, call_back cannot be used again, please note.
 	void update_timer_info(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>& call_back, bool start = false)
@@ -79,7 +69,7 @@ public:
 			iter = timer_can.insert(ti).first;
 			timer_can_mutex.unlock();
 
-			iter->timer = boost::make_shared<boost::asio::deadline_timer>(boost::ref(io_service_));
+			iter->timer = boost::make_shared<boost::asio::deadline_timer>(boost::ref(get_io_service()));
 		}
 		else
 			timer_can_mutex.unlock_upgrade();
@@ -139,30 +129,18 @@ public:
 		}
 	}
 
-	boost::asio::io_service& get_io_service() {return io_service_;}
-	const boost::asio::io_service& get_io_service() const {return io_service_;}
-
 	DO_SOMETHING_TO_ALL_MUTEX(timer_can, timer_can_mutex)
 	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex)
 
 	void stop_all_timer() {do_something_to_all(boost::bind((void (st_timer::*) (object_type&)) &st_timer::stop_timer, this, _1));}
 
 protected:
-#ifdef ST_ASIO_ENHANCED_STABILITY
-	void init() {async_call_indicator = boost::make_shared<char>('\0');}
-	void post_handler(const boost::shared_ptr<char>& async_call_indicator, const boost::function<void()>& handler) {handler();}
-#else
-	void init() {}
-#endif
+	void reset() {st_object::reset();}
 
 	void start_timer(object_ctype& ti)
 	{
 		ti.timer->expires_from_now(boost::posix_time::milliseconds(ti.milliseconds));
-		ti.timer->async_wait(boost::bind(&st_timer::timer_handler, this,
-#ifdef ST_ASIO_ENHANCED_STABILITY
-			async_call_indicator,
-#endif
-			boost::asio::placeholders::error, boost::ref(ti)));
+		ti.timer->async_wait(make_handler_error(boost::bind(&st_timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti))));
 	}
 
 	void stop_timer(object_type& ti)
@@ -172,24 +150,15 @@ protected:
 		ti.status = object_type::TIMER_CANCELED;
 	}
 
-	void timer_handler(
-#ifdef ST_ASIO_ENHANCED_STABILITY
-		const boost::shared_ptr<char>& async_call_indicator,
-#endif
-		const boost::system::error_code& ec, object_ctype& ti)
+	void timer_handler(const boost::system::error_code& ec, object_ctype& ti)
 	{
 		//return true from call_back to continue the timer, or the timer will stop
 		if (!ec && ti.call_back(ti.id) && object_type::TIMER_OK == ti.status)
 			start_timer(ti);
 	}
 
-	boost::asio::io_service& io_service_;
 	container_type timer_can;
 	boost::shared_mutex timer_can_mutex;
-
-#ifdef ST_ASIO_ENHANCED_STABILITY
-	boost::shared_ptr<char> async_call_indicator;
-#endif
 };
 
 } //namespace

@@ -47,7 +47,7 @@ public:
 	//reset all, be ensure that there's no any operations performed on this st_connector_base when invoke it
 	//notice, when reusing this st_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
 	//all member variables, and then do not forget to invoke st_connector_base::reset() to initialize father's member variables
-	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<Socket, Packer, Unpacker>::reset(); ST_THIS close_state = 0;}
+	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<Socket, Packer, Unpacker>::reset();}
 	virtual bool obsoleted() {return !reconnecting && st_tcp_socket_base<Socket, Packer, Unpacker>::obsoleted();}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
@@ -116,7 +116,7 @@ protected:
 		if (!ST_THIS get_io_service().stopped())
 		{
 			if (reconnecting && !is_connected())
-				ST_THIS lowest_layer().async_connect(server_addr, boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error));
+				ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error)));
 			else
 				ST_THIS do_recv_msg();
 
