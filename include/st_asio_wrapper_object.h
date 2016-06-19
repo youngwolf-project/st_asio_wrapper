@@ -25,8 +25,7 @@ protected:
 	virtual ~st_object() {}
 
 public:
-	boost::asio::io_service& get_io_service() {return io_service_;}
-	const boost::asio::io_service& get_io_service() const {return io_service_;}
+	bool stopped() const {return io_service_.stopped();}
 
 	template<typename CompletionHandler>
 	BOOST_ASIO_INITFN_RESULT_TYPE(CompletionHandler, void())

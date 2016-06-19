@@ -110,7 +110,7 @@ protected:
 
 	bool add_object(object_ctype& object_ptr)
 	{
-		assert(object_ptr && &object_ptr->get_io_service() == &get_service_pump());
+		assert(object_ptr);
 
 		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
 		return object_can.size() < max_size_ ? object_can.insert(object_ptr).second : false;

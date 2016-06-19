@@ -68,7 +68,7 @@ public:
 			iter = timer_can.insert(ti).first;
 			timer_can_mutex.unlock();
 
-			iter->timer = boost::make_shared<boost::asio::deadline_timer>(get_io_service());
+			iter->timer = boost::make_shared<boost::asio::deadline_timer>(io_service_);
 		}
 		else
 			timer_can_mutex.unlock_upgrade();
@@ -151,6 +151,9 @@ protected:
 
 	container_type timer_can;
 	boost::shared_mutex timer_can_mutex;
+
+private:
+	using st_object::io_service_;
 };
 
 } //namespace

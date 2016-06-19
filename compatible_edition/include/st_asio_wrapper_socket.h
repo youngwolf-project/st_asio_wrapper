@@ -256,7 +256,7 @@ protected:
 		else if (!posting)
 		{
 			bool dispatch_all = false;
-			if (get_io_service().stopped())
+			if (stopped())
 				dispatch_all = !(dispatching = false);
 			else if (!dispatching)
 			{

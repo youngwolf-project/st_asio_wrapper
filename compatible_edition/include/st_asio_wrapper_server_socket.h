@@ -81,7 +81,7 @@ public:
 protected:
 	virtual bool do_start()
 	{
-		if (!ST_THIS get_io_service().stopped())
+		if (!ST_THIS stopped())
 		{
 			ST_THIS do_recv_msg();
 			return true;

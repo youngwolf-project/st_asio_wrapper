@@ -117,7 +117,7 @@ public:
 protected:
 	virtual bool do_start()
 	{
-		if (!ST_THIS get_io_service().stopped())
+		if (!ST_THIS stopped())
 		{
 			do_recv_msg();
 			return true;
@@ -129,7 +129,7 @@ protected:
 	//must mutex send_msg_buffer before invoke this function
 	virtual bool do_send_msg()
 	{
-		if (!is_send_allowed() || ST_THIS get_io_service().stopped())
+		if (!is_send_allowed() || ST_THIS stopped())
 			ST_THIS sending = false;
 		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
 		{

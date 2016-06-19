@@ -214,7 +214,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (au
 //used by both TCP and UDP
 #define SAFE_SEND_MSG_CHECK \
 { \
-	if (!ST_THIS is_send_allowed() || ST_THIS get_io_service().stopped()) return false; \
+	if (!ST_THIS is_send_allowed() || ST_THIS stopped()) return false; \
 	boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50)); \
 }
 

@@ -113,7 +113,7 @@ public:
 protected:
 	virtual bool do_start() //connect or receive
 	{
-		if (!ST_THIS get_io_service().stopped())
+		if (!ST_THIS stopped())
 		{
 			if (reconnecting && !is_connected())
 				ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error)));
@@ -144,7 +144,7 @@ protected:
 
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
 	{
-		if ((boost::asio::error::operation_aborted != ec || reconnecting) && !ST_THIS get_io_service().stopped())
+		if ((boost::asio::error::operation_aborted != ec || reconnecting) && !ST_THIS stopped())
 		{
 			if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
 			{
