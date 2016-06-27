@@ -85,7 +85,7 @@ protected:
 		else
 		{
 			unified_out::error_out("handshake failed!");
-			ST_THIS force_close(false);
+			force_close(false);
 		}
 	}
 	virtual bool is_send_allowed() const {return authorized() && st_connector_base<Packer, Unpacker, Socket>::is_send_allowed();}
@@ -101,6 +101,7 @@ protected:
 			authorized_ = false;
 
 			boost::system::error_code ec;
+			boost::unique_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
 			ST_THIS next_layer().shutdown(ec);
 
 			re = !ec;
@@ -131,6 +132,7 @@ private:
 		else
 		{
 			authorized_ = true;
+			ST_THIS reset_state();
 			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}

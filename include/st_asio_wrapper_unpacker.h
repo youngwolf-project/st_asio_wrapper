@@ -73,6 +73,7 @@ protected:
 	virtual ~i_udp_unpacker() {}
 
 public:
+	virtual void reset_state() {}
 	virtual msg_type parse_msg(size_t bytes_transferred) = 0;
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
 };

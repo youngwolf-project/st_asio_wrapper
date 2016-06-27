@@ -65,6 +65,7 @@ public:
 		if (ec)
 			unified_out::error_out("bind failed.");
 
+		unpacker_->reset_state();
 		st_socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type>::reset();
 	}
 
@@ -87,7 +88,7 @@ public:
 	const boost::asio::ip::udp::endpoint& get_local_addr() const {return local_addr;}
 
 	void disconnect() {force_close();}
-	void force_close() {show_info("link:", "been closed."); clean_up();}
+	void force_close() {show_info("link:", "been closed."); do_close();}
 	void graceful_close() {force_close();}
 
 	//get or change the unpacker at runtime
@@ -135,9 +136,11 @@ protected:
 		{
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
+			ST_THIS send_msg_buffer.pop_front();
+
+			boost::shared_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()), ST_THIS last_send_msg.peer_addr,
 				ST_THIS make_handler_error_size(boost::bind(&st_udp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
-			ST_THIS send_msg_buffer.pop_front();
 		}
 
 		return ST_THIS sending;
@@ -145,7 +148,11 @@ protected:
 
 	virtual void do_recv_msg()
 	{
-		ST_THIS next_layer().async_receive_from(unpacker_->prepare_next_recv(), peer_addr,
+		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
+		assert(boost::asio::buffer_size(recv_buff) > 0);
+
+		boost::shared_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
+		ST_THIS next_layer().async_receive_from(recv_buff, peer_addr,
 			ST_THIS make_handler_error_size(boost::bind(&st_udp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
@@ -164,15 +171,18 @@ protected:
 
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 
-	void clean_up()
+	void do_close()
 	{
 		ST_THIS stop_all_timer();
-		ST_THIS reset_state();
+		ST_THIS started_ = false;
+//		ST_THIS reset_state();
 
 		if (ST_THIS lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
+
+			boost::unique_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
 			ST_THIS lowest_layer().close(ec);
 		}
 	}

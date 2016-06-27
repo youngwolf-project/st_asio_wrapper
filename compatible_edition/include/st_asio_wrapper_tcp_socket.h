@@ -82,7 +82,7 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
-	void force_close() {if (1 != close_state) clean_up();}
+	void force_close() {if (1 != close_state) do_close();}
 	bool graceful_close(bool sync = true) //will block until closing success or time out if sync equal to true
 	{
 		if (is_closing())
@@ -94,7 +94,7 @@ protected:
 		ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
 		if (ec) //graceful closing is impossible
 		{
-			clean_up();
+			do_close();
 			return false;
 		}
 
@@ -106,7 +106,7 @@ protected:
 			if (loop_num < 0) //graceful closing is impossible
 			{
 				unified_out::info_out("failed to graceful close within %d seconds", ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION);
-				clean_up();
+				do_close();
 			}
 		}
 
@@ -122,9 +122,11 @@ protected:
 		{
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
+			ST_THIS send_msg_buffer.pop_front();
+
+			boost::shared_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
 			boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()),
 				ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
-			ST_THIS send_msg_buffer.pop_front();
 		}
 
 		return ST_THIS sending;
@@ -133,10 +135,12 @@ protected:
 	virtual void do_recv_msg()
 	{
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
-		if (boost::asio::buffer_size(recv_buff) > 0)
-			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
-				boost::bind(&i_unpacker<out_msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
-				ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+		assert(boost::asio::buffer_size(recv_buff) > 0);
+
+		boost::shared_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
+		boost::asio::async_read(ST_THIS next_layer(), recv_buff,
+			boost::bind(&i_unpacker<out_msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
+			ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
 	virtual bool is_send_allowed() const {return !is_closing() && st_socket<Socket, Packer, Unpacker>::is_send_allowed();}
@@ -152,16 +156,19 @@ protected:
 
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 
-	void clean_up()
+	void do_close()
 	{
 		close_state = 1;
 		ST_THIS stop_all_timer();
-		reset_state();
+		ST_THIS started_ = false;
+//		reset_state();
 
 		if (ST_THIS lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+
+			boost::unique_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
 			ST_THIS lowest_layer().close(ec);
 		}
 	}
