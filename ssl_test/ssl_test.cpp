@@ -65,13 +65,18 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::cin >> str;
-		if (str == QUIT_COMMAND)
+		if (QUIT_COMMAND == str)
 		{
 			service_pump.stop_service(&ssl_client);
 			sleep(1);
 			service_pump.stop_service();
 		}
-		else if (str == RESTART_COMMAND)
+		else if (RESTART_COMMAND == str || RECONNECT_COMMAND == str)
+			puts("I still not find a way to reuse a boost::asio::ssl::stream,\n"
+				"it can reconnect to the server, but can not re-handshake with the server,\n"
+				"if somebody knows how to fix this defect, please tell me, thanks in advance.");
+		/*
+		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service(&ssl_client);
 			sleep(1);
@@ -79,11 +84,9 @@ int main(int argc, const char* argv[])
 
 			service_pump.start_service();
 		}
-		else if (str == RECONNECT_COMMAND)
-			puts("I still not find a way to reuse a boost::asio::ssl::stream,\n"
-				"it can reconnect to the server, but can not re-handshake with the server,\n"
-				"if somebody knows how to fix this defect, please tell me, thanks in advance.");
-//			ssl_client.graceful_close(true);
+		else if (RECONNECT_COMMAND == str)
+			ssl_client.graceful_close(true);
+		*/
 		else
 			server_.broadcast_msg(str);
 	}

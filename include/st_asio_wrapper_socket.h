@@ -45,9 +45,20 @@ protected:
 	template<typename Arg>
 	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()), started_(false) {reset_state();}
 
-	void reset() {reset_state(); clear_buffer(); time_recv_idle = boost::posix_time::time_duration(); st_timer::reset();}
+	void reset()
+	{
+		close();
+		reset_state();
+		clear_buffer();
+		time_recv_idle = boost::posix_time::time_duration();
+
+		st_timer::reset();
+	}
+
 	void reset_state()
 	{
+		packer_->reset_state();
+
 		posting = false;
 		sending = suspend_send_msg_ = false;
 		dispatching = suspend_dispatch_msg_ = false;
@@ -68,7 +79,7 @@ protected:
 public:
 	//please do not change id at runtime via the following function, except this st_socket is not managed by st_object_pool,
 	//it should only be used by st_object_pool when this st_socket being reused or creating new st_socket.
-	void id(uint_fast64_t id) {_id = id;}
+	void id(uint_fast64_t id) {assert(!started_); if (started_) unified_out::error_out("id is unchangeable!"); else _id = id;}
 	uint_fast64_t id() const {return _id;}
 
 	Socket& next_layer() {return next_layer_;}
@@ -92,6 +103,18 @@ public:
 		if (!started_)
 			started_ = do_start();
 	}
+
+	//return false not means failure, but means already closed.
+	bool close()
+	{
+		if (!lowest_layer().is_open())
+			return false;
+
+		boost::system::error_code ec;
+		lowest_layer().close(ec);
+		return true;
+	}
+
 	bool send_msg() //return false if send buffer is empty or sending not allowed or io_service stopped
 	{
 		boost::unique_lock<boost::shared_mutex> lock(send_msg_buffer_mutex);
@@ -259,7 +282,7 @@ protected:
 				dispatch_all = !(dispatching = false);
 			else if (!dispatching)
 			{
-				if (!lowest_layer().is_open())
+				if (!started())
 					dispatch_all = true;
 				else if (!recv_msg_buffer.empty())
 				{
@@ -374,7 +397,6 @@ private:
 protected:
 	uint_fast64_t _id;
 	Socket next_layer_;
-	boost::shared_mutex close_mutex;
 
 	InMsgType last_send_msg;
 	OutMsgType last_dispatch_msg;

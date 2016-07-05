@@ -55,8 +55,10 @@ public:
 	//member variables
 	virtual void reset()
 	{
+		reset_state();
+		st_socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type>::reset();
+
 		boost::system::error_code ec;
-		ST_THIS lowest_layer().close(ec);
 		ST_THIS lowest_layer().open(local_addr.protocol(), ec); assert(!ec);
 #ifndef ST_ASIO_NOT_REUSE_ADDRESS
 		ST_THIS lowest_layer().set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
@@ -64,9 +66,12 @@ public:
 		ST_THIS lowest_layer().bind(local_addr, ec); assert(!ec);
 		if (ec)
 			unified_out::error_out("bind failed.");
+	}
 
+	void reset_state()
+	{
 		unpacker_->reset_state();
-		st_socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type>::reset();
+		st_socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type>::reset_state();
 	}
 
 	bool set_local_addr(unsigned short port, const std::string& ip = std::string())
@@ -138,7 +143,7 @@ protected:
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			ST_THIS send_msg_buffer.pop_front();
 
-			boost::shared_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
+			boost::shared_lock<boost::shared_mutex> lock(close_mutex);
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()), ST_THIS last_send_msg.peer_addr,
 				ST_THIS make_handler_error_size(boost::bind(&st_udp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
@@ -151,7 +156,7 @@ protected:
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
 		assert(boost::asio::buffer_size(recv_buff) > 0);
 
-		boost::shared_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
+		boost::shared_lock<boost::shared_mutex> lock(close_mutex);
 		ST_THIS next_layer().async_receive_from(recv_buff, peer_addr,
 			ST_THIS make_handler_error_size(boost::bind(&st_udp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
@@ -182,7 +187,7 @@ protected:
 			boost::system::error_code ec;
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
 
-			boost::unique_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
+			boost::unique_lock<boost::shared_mutex> lock(close_mutex);
 			ST_THIS lowest_layer().close(ec);
 		}
 	}
@@ -236,6 +241,8 @@ private:
 protected:
 	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type> > unpacker_;
 	boost::asio::ip::udp::endpoint peer_addr, local_addr;
+
+	boost::shared_mutex close_mutex;
 };
 typedef st_udp_socket_base<> st_udp_socket;
 

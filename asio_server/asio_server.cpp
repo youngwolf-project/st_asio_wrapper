@@ -2,9 +2,9 @@
 //configuration
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
+#define ST_ASIO_FREE_OBJECT_INTERVAL	60
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_ENHANCED_STABILITY
-#define ST_ASIO_CLOSED_SOCKET_MAX_DURATION	0
 
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	1
@@ -166,14 +166,14 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::cin >> str;
-		if (str == QUIT_COMMAND)
+		if (QUIT_COMMAND == str)
 			service_pump.stop_service();
-		else if (str == RESTART_COMMAND)
+		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service();
 			service_pump.start_service(1);
 		}
-		else if (str == LIST_STATUS)
+		else if (LIST_STATUS == str)
 		{
 			printf("normal server, link #: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", server_.size(), server_.closed_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.closed_object_size());
@@ -181,11 +181,11 @@ int main(int argc, const char* argv[])
 			printf("total recv idle time(echo server): %d." fractional_seconds_format " second(s)\n", time_recv_idle.total_seconds(), time_recv_idle.fractional_seconds());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
-		else if (str == SUSPEND_COMMAND)
+		else if (SUSPEND_COMMAND == str)
 			echo_server_.do_something_to_all([](echo_server::object_ctype& item) {item->suspend_dispatch_msg(true);});
-		else if (str == RESUME_COMMAND)
+		else if (RESUME_COMMAND == str)
 			echo_server_.do_something_to_all([](echo_server::object_ctype& item) {item->suspend_dispatch_msg(false);});
-		else if (str == LIST_ALL_CLIENT)
+		else if (LIST_ALL_CLIENT == str)
 		{
 			puts("clients from normal server:");
 			server_.list_all_object();
@@ -215,9 +215,9 @@ int main(int argc, const char* argv[])
 //restore configuration
 #undef ST_ASIO_SERVER_PORT
 #undef ST_ASIO_REUSE_OBJECT
+#undef ST_ASIO_FREE_OBJECT_INTERVAL
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ST_ASIO_ENHANCED_STABILITY
-#undef ST_ASIO_CLOSED_SOCKET_MAX_DURATION
 #undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration

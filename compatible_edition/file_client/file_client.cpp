@@ -48,9 +48,9 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::getline(std::cin, str);
-		if (str == QUIT_COMMAND)
+		if (QUIT_COMMAND == str)
 			service_pump.stop_service();
-		else if (str == RESTART_COMMAND)
+		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service();
 			service_pump.start_service();

@@ -96,7 +96,7 @@ protected:
 	{
 		ST_THIS show_info("server link:", "broken/closed", ec);
 
-#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 		ST_THIS force_close();
 #else
 		server.del_client(boost::dynamic_pointer_cast<st_timer>(ST_THIS shared_from_this()));

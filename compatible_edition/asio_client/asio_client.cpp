@@ -70,19 +70,19 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::cin >> str;
-		if (str == QUIT_COMMAND)
+		if (QUIT_COMMAND == str)
 			service_pump.stop_service();
-		else if (str == RESTART_COMMAND)
+		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service();
 			service_pump.start_service();
 		}
-		else if (str == RECONNECT_COMMAND)
+		else if (RECONNECT_COMMAND == str)
 			client.graceful_close(true);
 		//the following two commands demonstrate how to suspend msg sending, no matter recv buffer been used or not
-		else if (str == SUSPEND_COMMAND)
+		else if (SUSPEND_COMMAND == str)
 			client.suspend_send_msg(true);
-		else if (str == RESUME_COMMAND)
+		else if (RESUME_COMMAND == str)
 			client.suspend_send_msg(false);
 		else
 			client.safe_send_msg(str);

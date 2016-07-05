@@ -8,8 +8,7 @@
 #define ST_ASIO_SERVER_PORT		9528
 //#define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
-#define ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
-#define ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL	1
+#define ST_ASIO_CLEAR_OBJECT_INTERVAL	1
 #define ST_ASIO_WANT_MSG_SEND_NOTIFY
 //configuration
 
@@ -162,7 +161,7 @@ public:
 		++test_index;
 
 		int index = test_index % 6;
-#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 		boost::shared_lock<boost::shared_mutex> lock(object_can_mutex);
 #else
 		boost::shared_lock<boost::shared_mutex> lock(object_can_mutex, boost::defer_lock);
@@ -171,11 +170,11 @@ public:
 
 		switch (index)
 		{
-#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 			//method #1
-			//notice: these methods need to define ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET and ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL macro, because it just close the st_socket,
+			//notice: these methods need to define ST_ASIO_CLEAR_OBJECT_INTERVAL macro, because it just close the st_socket,
 			//not really remove them from object pool, this will cause test_client still send data via them, and wait responses from them.
-			//for this scenario, the smaller ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVAL macro is, the better experience you will get, so set it to 1 second.
+			//for this scenario, the smaller ST_ASIO_CLEAR_OBJECT_INTERVAL macro is, the better experience you will get, so set it to 1 second.
 		case 0: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_close();				break;
 		case 1: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_close(false, false);	break;
 		case 2: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->force_close();					break;
@@ -232,17 +231,23 @@ int main(int argc, const char* argv[])
 	unsigned short port = argc > 1 ? atoi(argv[1]) : ST_ASIO_SERVER_PORT;
 	std::string ip = argc > 2 ? argv[2] : ST_ASIO_SERVER_IP;
 
-	//method #1, add clients first without any arguments, then set the server address.
-	for (size_t i = 0; i < link_num / 2; ++i)
+	//method #1, create and add clients manually.
+	BOOST_AUTO(client_ptr, client.create_object());
+	//client_ptr->set_server_addr(port, ip); //we don't have to set server address at here, the following do_something_to_all will do it for me
+	//some other initializations according to your business
+	client.add_client(client_ptr, false);
+
+	//method #2, add clients first without any arguments, then set the server address.
+	for (size_t i = 1; i < link_num / 2; ++i)
 		client.add_client();
 	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, port, boost::ref(ip)));
 
-	//method #2, set the server address via add_client.
-	for (size_t i = link_num / 2; i < link_num; ++i)
+	//method #3, add clients and set server address in one invocation.
+	for (size_t i = std::max(1U, link_num / 2); i < link_num; ++i)
 		client.add_client(port, ip);
 
 	int min_thread_num = 1;
-#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 	++min_thread_num;
 #endif
 
@@ -251,25 +256,25 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::getline(std::cin, str);
-		if (str == QUIT_COMMAND)
+		if (QUIT_COMMAND == str)
 			service_pump.stop_service();
-		else if (str == RESTART_COMMAND)
+		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service();
 			service_pump.start_service(min_thread_num);
 		}
-		else if (str == LIST_STATUS)
+		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.closed_object_size());
 			boost::posix_time::time_duration time_recv_idle = client.recv_idle_time();
 			printf("total recv idle time: %d." fractional_seconds_format " second(s)\n", time_recv_idle.total_seconds(), time_recv_idle.fractional_seconds());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
-		else if (str == SUSPEND_COMMAND)
+		else if (SUSPEND_COMMAND == str)
 			client.do_something_to_all(boost::bind(&test_socket::suspend_dispatch_msg, _1, true));
-		else if (str == RESUME_COMMAND)
+		else if (RESUME_COMMAND == str)
 			client.do_something_to_all(boost::bind(&test_socket::suspend_dispatch_msg, _1, false));
-		else if (str == LIST_ALL_CLIENT)
+		else if (LIST_ALL_CLIENT == str)
 			client.list_all_object();
 		else if (!str.empty())
 		{
@@ -293,7 +298,7 @@ int main(int argc, const char* argv[])
 				continue;
 			}
 
-#ifdef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 			link_num = client.size();
 			printf("link number: " ST_ASIO_SF "\n", link_num);
 #endif
@@ -421,8 +426,7 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_SERVER_PORT
 #undef ST_ASIO_REUSE_OBJECT
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-#undef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
-#undef ST_ASIO_CLEAR_CLOSED_SOCKET_INTERVA
+#undef ST_ASIO_CLEAR_OBJECT_INTERVAL
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY
 #undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER

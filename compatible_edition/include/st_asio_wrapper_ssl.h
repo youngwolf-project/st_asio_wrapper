@@ -78,15 +78,12 @@ protected:
 
 	virtual void on_unpack_error() {authorized_ = false; st_connector_base<Packer, Unpacker, Socket>::on_unpack_error();}
 	virtual void on_recv_error(const boost::system::error_code& ec) {authorized_ = false; st_connector_base<Packer, Unpacker, Socket>::on_recv_error(ec);}
-	virtual void on_handshake(bool result)
+	virtual void on_handshake(const boost::system::error_code& ec)
 	{
-		if (result)
+		if (!ec)
 			unified_out::info_out("handshake success.");
 		else
-		{
-			unified_out::error_out("handshake failed!");
-			force_close(false);
-		}
+			unified_out::error_out("handshake failed: %s", ec.message().data());
 	}
 	virtual bool is_send_allowed() const {return authorized() && st_connector_base<Packer, Unpacker, Socket>::is_send_allowed();}
 
@@ -101,7 +98,6 @@ protected:
 			authorized_ = false;
 
 			boost::system::error_code ec;
-			boost::unique_lock<boost::shared_mutex> lock(ST_THIS close_mutex);
 			ST_THIS next_layer().shutdown(ec);
 
 			re = !ec;
@@ -115,8 +111,8 @@ private:
 	{
 		if (!ec)
 		{
-			ST_THIS connected = true;
-			ST_THIS reconnecting = false;
+			ST_THIS connected = ST_THIS reconnecting = false;
+			ST_THIS reset_state();
 			ST_THIS on_connect();
 			do_start();
 		}
@@ -126,16 +122,15 @@ private:
 
 	void handshake_handler(const boost::system::error_code& ec)
 	{
-		on_handshake(!ec);
-		if (ec)
-			unified_out::error_out("handshake failed: %s", ec.message().data());
-		else
+		on_handshake(ec);
+		if (!ec)
 		{
 			authorized_ = true;
-			ST_THIS reset_state();
 			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}
+		else
+			force_close(false);
 	}
 
 protected:
@@ -154,11 +149,10 @@ public:
 	st_ssl_object_pool(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_object_pool<Object>(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& ssl_context() {return ctx;}
 
-	typename st_ssl_object_pool::object_type create_object()
-		{BOOST_AUTO(object_ptr, boost::make_shared<Object>(boost::ref(ST_THIS service_pump), boost::ref(ctx))); return ST_THIS post_create(object_ptr), object_ptr;}
-
+	using st_object_pool<Object>::create_object;
+	typename st_ssl_object_pool::object_type create_object() {return create_object(boost::ref(ST_THIS service_pump), boost::ref(ctx));}
 	template<typename Arg>
-	typename st_ssl_object_pool::object_type create_object(Arg& arg) {BOOST_AUTO(object_ptr, boost::make_shared<Object>(arg, boost::ref(ctx))); return ST_THIS post_create(object_ptr), object_ptr;}
+	typename st_ssl_object_pool::object_type create_object(Arg& arg) {return create_object(arg, boost::ref(ctx));}
 
 protected:
 	boost::asio::ssl::context ctx;
@@ -186,12 +180,16 @@ public:
 	st_ssl_server_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_server_base<Socket, Pool, Server>(service_pump_, m) {}
 
 protected:
-	virtual void on_handshake(bool result, typename st_ssl_server_base::object_ctype& client_ptr)
+	virtual void on_handshake(const boost::system::error_code& ec, typename st_ssl_server_base::object_ctype& client_ptr)
 	{
-		if (result)
+		if (!ec)
 			client_ptr->show_info("handshake with", "success.");
 		else
-			client_ptr->show_info("handshake with", "failed!");
+		{
+			std::string error_info = "failed: ";
+			error_info += ec.message().data();
+			client_ptr->show_info("handshake with", error_info.data());
+		}
 	}
 
 	virtual void start_next_accept()
@@ -217,18 +215,9 @@ private:
 
 	void handshake_handler(const boost::system::error_code& ec, typename st_ssl_server_base::object_ctype& client_ptr)
 	{
-		on_handshake(!ec, client_ptr);
-		if (ec)
-			unified_out::error_out("handshake failed: %s", ec.message().data());
-		else if (ST_THIS add_client(client_ptr))
-		{
+		on_handshake(ec, client_ptr);
+		if (!ec && ST_THIS add_client(client_ptr))
 			client_ptr->start();
-			return;
-		}
-		else
-			client_ptr->show_info("client:", "been refused cause of too many clients.");
-
-		client_ptr->force_close();
 	}
 };
 typedef st_ssl_server_base<> st_ssl_server;

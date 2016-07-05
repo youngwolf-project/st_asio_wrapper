@@ -13,7 +13,7 @@ public:
 	virtual ~file_socket();
 
 public:
-	//because we don't use objects pool(we don't define ST_ASIO_REUSE_OBJECT), so, this virtual function will
+	//because we don't use objects pool(we don't defined ST_ASIO_REUSE_OBJECT), so this virtual function will
 	//not be invoked, and can be omitted, but we keep it for possibly future using
 	virtual void reset();
 

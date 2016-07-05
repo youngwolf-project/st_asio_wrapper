@@ -1,9 +1,8 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		5051
-#define ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
+#define ST_ASIO_CLEAR_OBJECT_INTERVAL	60
 #define ST_ASIO_ENHANCED_STABILITY
-#define ST_ASIO_CLOSED_SOCKET_MAX_DURATION	0
 #define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_DEFAULT_PACKER	replaceable_packer
 //configuration
@@ -38,14 +37,14 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::getline(std::cin, str);
-		if (str == QUIT_COMMAND)
+		if (QUIT_COMMAND == str)
 			service_pump.stop_service();
-		else if (str == RESTART_COMMAND)
+		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service();
 			service_pump.start_service();
 		}
-		else if (str == LIST_ALL_CLIENT)
+		else if (LIST_ALL_CLIENT == str)
 			file_server_.list_all_object();
 	}
 
@@ -54,9 +53,8 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef ST_ASIO_SERVER_PORT
-#undef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#undef ST_ASIO_CLEAR_OBJECT_INTERVAL
 #undef ST_ASIO_ENHANCED_STABILITY
-#undef ST_ASIO_CLOSED_SOCKET_MAX_DURATION
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY
 #undef ST_ASIO_DEFAULT_PACKER
 //restore configuration

@@ -130,6 +130,8 @@ protected:
 			return true;
 		}
 
+		client_ptr->show_info("client:", "been refused because of too many clients.");
+		client_ptr->force_close();
 		return false;
 	}
 
@@ -137,16 +139,8 @@ protected:
 	{
 		if (!ec)
 		{
-			if (on_accept(client_ptr))
-			{
-				if (add_client(client_ptr))
-					client_ptr->start();
-				else
-				{
-					client_ptr->show_info("client:", "been refused cause of too many clients.");
-					client_ptr->force_close();
-				}
-			}
+			if (on_accept(client_ptr) && add_client(client_ptr))
+				client_ptr->start();
 
 			start_next_accept();
 		}

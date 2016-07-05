@@ -1,9 +1,8 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		5051
-#define ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET //auto clear closed clients
+#define ST_ASIO_CLEAR_OBJECT_INTERVAL	60
 #define ST_ASIO_ENHANCED_STABILITY
-#define ST_ASIO_CLOSED_SOCKET_MAX_DURATION	0
 #define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_DEFAULT_PACKER	replaceable_packer
 //configuration
@@ -108,9 +107,8 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 
 //restore configuration
 #undef ST_ASIO_SERVER_PORT
-#undef ST_ASIO_AUTO_CLEAR_CLOSED_SOCKET
+#undef ST_ASIO_CLEAR_OBJECT_INTERVAL
 #undef ST_ASIO_ENHANCED_STABILITY
-#undef ST_ASIO_CLOSED_SOCKET_MAX_DURATION
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY
 #undef ST_ASIO_DEFAULT_PACKER
 //restore configuration

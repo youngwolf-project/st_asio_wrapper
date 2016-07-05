@@ -146,7 +146,9 @@ protected:
 	{
 		if ((boost::asio::error::operation_aborted != ec || reconnecting) && !ST_THIS stopped())
 		{
-			if (boost::asio::error::connection_refused != ec && boost::asio::error::timed_out != ec)
+#ifdef _WIN32
+			if (boost::asio::error::connection_refused != ec && boost::asio::error::network_unreachable != ec && boost::asio::error::timed_out != ec)
+#endif
 			{
 				boost::system::error_code ec;
 				ST_THIS lowest_layer().close(ec);
@@ -199,8 +201,8 @@ private:
 		if (!ec)
 		{
 			connected = reconnecting = true;
-			on_connect();
 			ST_THIS reset_state();
+			on_connect();
 			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}

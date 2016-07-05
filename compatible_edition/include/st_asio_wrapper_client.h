@@ -55,6 +55,7 @@ protected:
 	}
 
 public:
+	//parameter reset valid only if the service pump already started, or service pump will call object pool's init function before start service pump
 	bool add_client(typename Pool::object_ctype& client_ptr, bool reset = true)
 	{
 		if (ST_THIS add_object(client_ptr))
@@ -71,6 +72,9 @@ public:
 
 		return false;
 	}
+
+	//unseal object creation for client endpoint object pool.
+	using Pool::create_object;
 };
 
 } //namespace
