@@ -243,7 +243,7 @@ int main(int argc, const char* argv[])
 	client.do_something_to_all(boost::bind(&test_socket::set_server_addr, _1, port, boost::ref(ip)));
 
 	//method #3, add clients and set server address in one invocation.
-	for (size_t i = std::max(1U, link_num / 2); i < link_num; ++i)
+	for (size_t i = std::max((size_t) 1, link_num / 2); i < link_num; ++i)
 		client.add_client(port, ip);
 
 	int min_thread_num = 1;

@@ -231,7 +231,7 @@ int main(int argc, const char* argv[])
 	client.do_something_to_all([argv, port, &ip](test_client::object_ctype& item) {item->set_server_addr(port, ip);});
 
 	//method #3, add clients and set server address in one invocation.
-	for (auto i = std::max(1U, link_num / 2); i < link_num; ++i)
+	for (auto i = std::max((size_t) 1, link_num / 2); i < link_num; ++i)
 		client.add_client(port, ip);
 
 	auto min_thread_num = 1;
