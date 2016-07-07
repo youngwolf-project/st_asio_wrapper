@@ -1,12 +1,12 @@
 
-#ifndef SERVER_IP
-#define SERVER_IP				"127.0.0.1"
+#ifndef ST_ASIO_SERVER_IP
+#define ST_ASIO_SERVER_IP			"127.0.0.1"
 #endif
-#ifndef SERVER_PORT
-#define SERVER_PORT				5050
+#ifndef ST_ASIO_SERVER_PORT
+#define ST_ASIO_SERVER_PORT			5050
 #endif
-#ifndef RE_CONNECT_INTERVAL
-#define RE_CONNECT_INTERVAL		500 //millisecond(s)
+#ifndef ST_ASIO_RECONNECT_INTERVAL
+#define ST_ASIO_RECONNECT_INTERVAL		500 //millisecond(s)
 异步连接，asio返回失败之后，暂停一定时间继续重试（即再次调用asnc_connect）。
 #endif
 
@@ -14,7 +14,7 @@ namespace st_asio_wrapper
 {
 
 带连接功能的st_tcp_socket，算是一个真正的客户端了
-template <typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UNPACKER, typename Socket = boost::asio::ip::tcp::socket>
+template <typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_DEFAULT_UNPACKER, typename Socket = boost::asio::ip::tcp::socket>
 
 class st_connector_base : public st_tcp_socket_base<Socket, Packer, Unpacker>
 {
@@ -42,10 +42,10 @@ public:
 直接调用force_close。
 
 	void force_close(bool reconnect = false);
-强制退出————调用父类的clean_up，更新自己的状态（比如已连接状态等），如果reconnect为true，则关闭之后，马上重新连接服务器。
+强制关闭————调用父类的do_close，如果reconnect为true，则关闭之后，马上重新连接服务器。
 
 	void graceful_close(bool reconnect = false, bool sync = true);
-优雅关闭，重置一些自己的状态之后，调用父类的graceful_close函数，reconnect参数的意义同上，sync参数直接传递给父类。
+优雅关闭，调用父类的graceful_close函数，reconnect参数的意义同上，sync参数直接传递给父类。
 
 	void show_info(const char* head, const char* tail) const;
 在head和tail中间，显示自己的地址（IP加端口）。

@@ -23,6 +23,7 @@
 #ifndef ST_ASIO_SERVICE_THREAD_NUM
 #define ST_ASIO_SERVICE_THREAD_NUM	8
 #endif
+static_assert(ST_ASIO_SERVICE_THREAD_NUM > 0, "service thread number be bigger than zero.");
 
 namespace st_asio_wrapper
 {

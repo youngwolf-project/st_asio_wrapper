@@ -17,8 +17,9 @@
 #include "st_asio_wrapper_unpacker.h"
 
 #ifndef ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION
-	#define ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, maximum waiting seconds while graceful closing
+#define ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, maximum waiting seconds while graceful closing
 #endif
+static_assert(ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION > 0, "graceful close duration must be bigger than zero.");
 
 #ifndef ST_ASIO_DEFAULT_UNPACKER
 #define ST_ASIO_DEFAULT_UNPACKER unpacker

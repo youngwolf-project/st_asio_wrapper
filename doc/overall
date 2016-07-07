@@ -4,7 +4,6 @@
  ST_SERVICE_THREAD_NUM被改成了ST_ASIO_SERVICE_THREAD_NUM
  size_t_format被改成了ST_ASIO_SF
  ST_THIS未做任何修改
-这些修改没有更新相应的文档，请在阅读时注意。
 
 每个直接或者间接从st_timer继承的类中，都定义了TIMER_BEGIN和TIMER_END两个静态常量，
 用户自定义定时器ID必须从父类的TIMER_END开始。

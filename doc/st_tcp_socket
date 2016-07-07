@@ -93,7 +93,7 @@ protected:
 	virtual void on_unpack_error() = 0;
 解包出错时回调。
 
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	virtual bool on_msg(out_msg_type& msg);
 重写st_socket的on_msg，功能是打印消息到控制台，使用者重写这个函数以处理消息。
 #endif

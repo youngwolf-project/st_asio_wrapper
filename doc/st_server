@@ -1,16 +1,16 @@
 
-#ifndef SERVER_PORT
-#define SERVER_PORT					5050
+#ifndef ST_ASIO_SERVER_PORT
+#define ST_ASIO_SERVER_PORT				5050
 服务器监听端口。
 #endif
 
-#ifndef ASYNC_ACCEPT_NUM
-#define ASYNC_ACCEPT_NUM			1
+#ifndef ST_ASIO_ASYNC_ACCEPT_NUM
+#define ST_ASIO_ASYNC_ACCEPT_NUM			1
 同时投递多少个async_accept。
 #endif
 
-#ifndef TCP_DEFAULT_IP_VERSION
-#define TCP_DEFAULT_IP_VERSION boost::asio::ip::tcp::v4()
+#ifndef ST_ASIO_TCP_DEFAULT_IP_VERSION
+#define ST_ASIO_TCP_DEFAULT_IP_VERSION boost::asio::ip::tcp::v4()
 为监听套接字绑定地址时，在不指定ip的情况下，指定ip地址的版本（v4还是v6），如果指定了ip，则ip地址的版本可以从ip中推导出来。
 #endif
 
@@ -76,7 +76,7 @@ protected:
 
 	void start_next_accept();
 开始下一次异步接受连接，抽象成一个方法是因为两个地方需要调用，一是init内，一accept_handler内。
-使用者也可以随时调用这个方法，如果你想增加一些异步accept的话（参看ASYNC_ACCEPT_NUM宏）。
+使用者也可以随时调用这个方法，如果你想增加一些异步accept的话（参看ST_ASIO_ASYNC_ACCEPT_NUM宏）。
 
 protected:
 	bool add_client(typename st_server_base::object_ctype& client_ptr);

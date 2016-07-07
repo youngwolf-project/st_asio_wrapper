@@ -1,12 +1,12 @@
 
-#ifdef HUGE_MSG
-#define HEAD_TYPE	uint32_t
-#define HEAD_N2H	ntohl
+#ifdef ST_ASIO_HUGE_MSG
+#define ST_ASIO_HEAD_TYPE	uint32_t
+#define ST_ASIO_HEAD_N2H	ntohl
 #else
-#define HEAD_TYPE	uint16_t
-#define HEAD_N2H	ntohs
+#define ST_ASIO_HEAD_TYPE	uint16_t
+#define ST_ASIO_HEAD_N2H	ntohs
 #endif
-#define HEAD_LEN	(sizeof(HEAD_TYPE))
+#define ST_ASIO_HEAD_LEN	(sizeof(ST_ASIO_HEAD_TYPE))
 
 namespace st_asio_wrapper
 {

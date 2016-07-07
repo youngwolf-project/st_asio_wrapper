@@ -22,6 +22,8 @@
 //keep big enough, no empirical value i can suggest, you must try to find it in your own environment
 #ifndef ST_ASIO_SERVICE_THREAD_NUM
 #define ST_ASIO_SERVICE_THREAD_NUM	8
+#elif ST_ASIO_SERVICE_THREAD_NUM <= 0
+	#error service thread number be bigger than zero.
 #endif
 
 namespace st_asio_wrapper

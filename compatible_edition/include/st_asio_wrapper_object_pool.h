@@ -22,11 +22,13 @@
 
 #ifndef ST_ASIO_MAX_OBJECT_NUM
 #define ST_ASIO_MAX_OBJECT_NUM	4096
+#elif ST_ASIO_MAX_OBJECT_NUM <= 0
+	#error object capacity must be bigger than zero.
 #endif
 
-//define ST_ASIO_REUSE_OBJECT macro will enable object pool, all objects in temp_object_can will never be freed, but kept for reusing,
-//otherwise, st_object_pool will free objects in temp_object_can automatically and periodically, ST_ASIO_FREE_OBJECT_INTERVAL means the interval, unit is second,
-//see temp_object_can at the end of st_object_pool class for more details.
+//define ST_ASIO_REUSE_OBJECT macro will enable object pool, all objects in invalid_object_can will never be freed, but kept for reusing,
+//otherwise, st_object_pool will free objects in invalid_object_can automatically and periodically, ST_ASIO_FREE_OBJECT_INTERVAL means the interval, unit is second,
+//see invalid_object_can at the end of st_object_pool class for more details.
 //please note that even if you defined ST_ASIO_REUSE_OBJECT macro, ST_ASIO_FREE_OBJECT_INTERVAL macro is still useful, it will make st_object_pool
 //to close (just close, not free, Object must has close function which takes no parameter) objects automatically and periodically for saving SOCKET handles.
 #ifndef ST_ASIO_REUSE_OBJECT
@@ -34,18 +36,32 @@
 	#define ST_ASIO_FREE_OBJECT_INTERVAL	10 //seconds
 	#endif
 #endif
+#if defined(ST_ASIO_FREE_OBJECT_INTERVAL) && ST_ASIO_FREE_OBJECT_INTERVAL <= 0
+	#error free/close object interval must be bigger than zero.
+#endif
 
 //define ST_ASIO_CLEAR_OBJECT_INTERVAL macro to let st_object_pool to invoke clear_obsoleted_object() automatically and periodically
 //this feature may affect performance with huge number of objects, so re-write st_server_socket_base::on_recv_error and invoke st_object_pool::del_object()
 //is recommended for long-term connection system, but for short-term connection system, you are recommended to open this feature.
 //you must define this macro as a value, not just define it, the value means the interval, unit is second
 //#define ST_ASIO_CLEAR_OBJECT_INTERVAL		60 //seconds
+#if defined(ST_ASIO_CLEAR_OBJECT_INTERVAL) && ST_ASIO_CLEAR_OBJECT_INTERVAL <= 0
+	#error clear object interval must be bigger than zero.
+#endif
 
-//after this duration, corresponding objects in temp_object_can can be freed from the heap or reused,
+//after this duration, corresponding objects in invalid_object_can can be freed from the heap or reused,
 //you must define this macro as a value, not just define it, the value means the duration, unit is second.
 //if macro ST_ASIO_ENHANCED_STABILITY been defined, this macro is useless, object's life time is always zero.
-#ifndef ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME
-#define ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME	5 //seconds
+#ifdef ST_ASIO_ENHANCED_STABILITY
+	#if defined(ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME) && ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME != 0
+		#warning ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME will always be zero if ST_ASIO_ENHANCED_STABILITY macro been defined.
+	#endif
+#else
+	#ifndef ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME
+	#define ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME	5 //seconds
+	#elif ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME <= 0
+		#error "obsoleted object's life time must be bigger than zero."
+	#endif
 #endif
 
 namespace st_asio_wrapper
@@ -77,22 +93,23 @@ public:
 	typedef boost::unordered::unordered_set<object_type, st_object_hasher, st_object_equal> container_type;
 
 protected:
-	struct temp_object
+	struct invalid_object
 	{
 		object_ctype object_ptr;
 
 #ifdef ST_ASIO_ENHANCED_STABILITY
-		temp_object(object_ctype& object_ptr_) : object_ptr(object_ptr_) {assert(object_ptr);}
+		invalid_object(object_ctype& object_ptr_) : object_ptr(object_ptr_) {assert(object_ptr);}
 
 		bool is_timeout() const {return true;}
 		bool is_timeout(time_t now) const {return true;}
 #else
-		const time_t closed_time;
-		temp_object(object_ctype& object_ptr_) : object_ptr(object_ptr_), closed_time(time(NULL)) {assert(object_ptr);}
+		const time_t kick_out_time;
+		invalid_object(object_ctype& object_ptr_) : object_ptr(object_ptr_), kick_out_time(time(NULL)) {assert(object_ptr);}
 
 		bool is_timeout() const {return is_timeout(time(NULL));}
-		bool is_timeout(time_t now) const {return closed_time <= now - ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME;}
+		bool is_timeout(time_t now) const {return kick_out_time <= now - ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME;}
 #endif
+		bool is_equal_to(boost::uint_fast64_t id) const {return object_ptr->id() == id;}
 	};
 
 protected:
@@ -123,8 +140,8 @@ protected:
 		return object_can.size() < max_size_ ? object_can.insert(object_ptr).second : false;
 	}
 
-	//only add object_ptr to temp_object_can when it's in object_can, this can avoid duplicated items in temp_object_can, because temp_object_can is a list, there's no way to check the existence
-	//of an item in a list efficiently.
+	//only add object_ptr to invalid_object_can when it's in object_can, this can avoid duplicated items in invalid_object_can, because invalid_object_can is a list,
+	//there's no way to check the existence of an item in a list efficiently.
 	bool del_object(object_ctype& object_ptr)
 	{
 		assert(object_ptr);
@@ -135,8 +152,8 @@ protected:
 
 		if (exist)
 		{
-			boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-			temp_object_can.push_back(object_ptr);
+			boost::unique_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
+			invalid_object_can.push_back(object_ptr);
 		}
 
 		return exist;
@@ -158,13 +175,13 @@ protected:
 #ifdef ST_ASIO_REUSE_OBJECT
 	object_type reuse_object()
 	{
-		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-		//objects are order by time, so we don't have to go through all items in temp_object_can
-		for (BOOST_AUTO(iter, temp_object_can.begin()); iter != temp_object_can.end() && iter->is_timeout(); ++iter)
+		boost::unique_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
+		//objects are order by time, so we don't have to go through all items in invalid_object_can
+		for (BOOST_AUTO(iter, invalid_object_can.begin()); iter != invalid_object_can.end() && iter->is_timeout(); ++iter)
 			if (iter->object_ptr.unique() && iter->object_ptr->obsoleted())
 			{
 				BOOST_AUTO(object_ptr, iter->object_ptr);
-				temp_object_can.erase(iter);
+				invalid_object_can.erase(iter);
 				lock.unlock();
 
 				object_ptr->reset();
@@ -228,10 +245,10 @@ public:
 		return object_can.size();
 	}
 
-	size_t closed_object_size()
+	size_t invalid_object_size()
 	{
-		boost::shared_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-		return temp_object_can.size();
+		boost::shared_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
+		return invalid_object_can.size();
 	}
 
 	object_type find(boost::uint64_t id)
@@ -250,34 +267,32 @@ public:
 	}
 
 	//this method has linear complexity, please note.
-	object_type closed_object_at(size_t index)
+	object_type invalid_object_at(size_t index)
 	{
-		boost::shared_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-		assert(index < temp_object_can.size());
-		return index < temp_object_can.size() ? boost::next(temp_object_can.begin(), index)->object_ptr : object_type();
+		boost::shared_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
+		assert(index < invalid_object_can.size());
+		return index < invalid_object_can.size() ? boost::next(invalid_object_can.begin(), index)->object_ptr : object_type();
 	}
 
 	//this method has linear complexity, please note.
-	object_type closed_object_find(boost::uint_fast64_t id)
+	object_type invalid_object_find(boost::uint_fast64_t id)
 	{
-		boost::shared_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-		for (BOOST_AUTO(iter, temp_object_can.begin()); iter != temp_object_can.end(); ++iter)
-			if (id == iter->object_ptr->id())
-				return iter->object_ptr;
-		return object_type();
+		boost::shared_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
+		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&invalid_object::is_equal_to, _1, id)));
+		return iter == invalid_object_can.end() ? object_type() : iter->object_ptr;
 	}
 
 	//this method has linear complexity, please note.
-	object_type closed_object_pop(boost::uint_fast64_t id)
+	object_type invalid_object_pop(boost::uint_fast64_t id)
 	{
-		boost::shared_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-		for (BOOST_AUTO(iter, temp_object_can.begin()); iter != temp_object_can.end(); ++iter)
-			if (id == iter->object_ptr->id())
-			{
-				BOOST_AUTO(object_ptr, iter->object_ptr);
-				temp_object_can.erase(iter);
-				return object_ptr;
-			}
+		boost::shared_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
+		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&invalid_object::is_equal_to, _1, id)));
+		if (iter != invalid_object_can.end())
+		{
+			BOOST_AUTO(object_ptr, iter->object_ptr);
+			invalid_object_can.erase(iter);
+			return object_ptr;
+		}
 		return object_type();
 	}
 
@@ -316,16 +331,16 @@ public:
 		{
 			unified_out::warning_out(ST_ASIO_SF " object(s) been kicked out!", size);
 
-			boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-			temp_object_can.insert(temp_object_can.end(), objects.begin(), objects.end());
+			boost::unique_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
+			invalid_object_can.insert(invalid_object_can.end(), objects.begin(), objects.end());
 		}
 
 		return size;
 	}
 
 	//free or close a specific number of objects
-	//if you used object pool(define ST_ASIO_REUSE_OBJECT), you can manually call this function to free some objects after the object pool(get_closed_object_size())
-	// goes big enough for memory saving(because the objects in temp_object_can are waiting for reusing and will never be freed),
+	//if you used object pool(define ST_ASIO_REUSE_OBJECT), you can manually call this function to free some objects after the object pool(invalid_object_size())
+	// goes big enough for memory saving(because the objects in invalid_object_can are waiting for reusing and will never be freed),
 	// you can also define ST_ASIO_FREE_OBJECT_INTERVAL to let st_object_pool to call this function automatically and periodically, but objects will only be closed.
 	//if you don't used object pool, st_object_pool will invoke this function automatically and periodically, so you don't need to invoke this function exactly
 	//return affected object number, if just_close equal to true, then closed objects will be treated as unaffected.
@@ -336,9 +351,9 @@ public:
 #endif
 	{
 		size_t num_affected = 0;
-		boost::unique_lock<boost::shared_mutex> lock(temp_object_can_mutex);
-		//objects are order by time, so we don't have to go through all items in temp_object_can
-		for (BOOST_AUTO(iter, temp_object_can.begin()); num > 0 && iter != temp_object_can.end() && iter->is_timeout();)
+		boost::unique_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
+		//objects are order by time, so we don't have to go through all items in invalid_object_can
+		for (BOOST_AUTO(iter, invalid_object_can.begin()); num > 0 && iter != invalid_object_can.end() && iter->is_timeout();)
 			if (iter->object_ptr.unique() && iter->object_ptr->obsoleted())
 			{
 				--num;
@@ -351,7 +366,7 @@ public:
 				else
 				{
 					++num_affected;
-					iter = temp_object_can.erase(iter);
+					iter = invalid_object_can.erase(iter);
 				}
 			}
 			else
@@ -396,11 +411,11 @@ protected:
 
 	//because all objects are dynamic created and stored in object_can, maybe when receiving error occur
 	//(you are recommended to delete the object from object_can, for example via st_server_base::del_client), some other asynchronous calls are still queued in boost::asio::io_service,
-	//and will be dequeued in the future, we must guarantee these objects not be freed from the heap or reused, so we move these objects from object_can to temp_object_can,
+	//and will be dequeued in the future, we must guarantee these objects not be freed from the heap or reused, so we move these objects from object_can to invalid_object_can,
 	//and free them from the heap or reuse them in the near future, see ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME macro for more details.
-	//if ST_ASIO_CLEAR_OBJECT_INTERVAL been defined, clear_obsoleted_object() will be invoked automatically and periodically to move all closed objects into temp_object_can.
-	boost::container::list<temp_object> temp_object_can;
-	boost::shared_mutex temp_object_can_mutex;
+	//if ST_ASIO_CLEAR_OBJECT_INTERVAL been defined, clear_obsoleted_object() will be invoked automatically and periodically to move all invalid objects into invalid_object_can.
+	boost::container::list<invalid_object> invalid_object_can;
+	boost::shared_mutex invalid_object_can_mutex;
 };
 
 } //namespace

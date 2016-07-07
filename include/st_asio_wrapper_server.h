@@ -19,10 +19,12 @@
 #ifndef ST_ASIO_SERVER_PORT
 #define ST_ASIO_SERVER_PORT			5050
 #endif
+static_assert(ST_ASIO_SERVER_PORT > 0, "server port must be bigger than zero.");
 
 #ifndef ST_ASIO_ASYNC_ACCEPT_NUM
 #define ST_ASIO_ASYNC_ACCEPT_NUM	1 //how many async_accept delivery concurrently
 #endif
+static_assert(ST_ASIO_ASYNC_ACCEPT_NUM > 0, "async accept number must be bigger than zero.");
 
 //in set_server_addr, if the IP is empty, ST_ASIO_TCP_DEFAULT_IP_VERSION will define the IP version, or the IP version will be deduced by the IP address.
 //boost::asio::ip::tcp::v4() means ipv4 and boost::asio::ip::tcp::v6() means ipv6.

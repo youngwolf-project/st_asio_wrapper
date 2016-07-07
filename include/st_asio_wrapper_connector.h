@@ -21,9 +21,11 @@
 #ifndef ST_ASIO_SERVER_PORT
 #define ST_ASIO_SERVER_PORT			5050
 #endif
+static_assert(ST_ASIO_SERVER_PORT > 0, "server port must be bigger than zero.");
 #ifndef ST_ASIO_RECONNECT_INTERVAL
 #define ST_ASIO_RECONNECT_INTERVAL	500 //millisecond(s)
 #endif
+static_assert(ST_ASIO_RECONNECT_INTERVAL >= 0, "reconnect interval must be bigger than or equal to zero.");
 
 namespace st_asio_wrapper
 {
@@ -157,7 +159,7 @@ protected:
 			auto delay = prepare_reconnect(ec);
 			if (delay >= 0)
 			{
-				ST_THIS set_timer(TIMER_CONNECT, delay, [this](unsigned char id)->bool {assert(TIMER_CONNECT == id); ST_THIS do_start(); return false;});
+				ST_THIS set_timer(TIMER_CONNECT, delay, [this](unsigned char id)->bool {ST_THIS do_start(); return false;});
 				return true;
 			}
 		}

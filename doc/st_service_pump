@@ -1,6 +1,6 @@
 
-#ifndef ST_SERVICE_THREAD_NUM
-#define ST_SERVICE_THREAD_NUM 8
+#ifndef ST_ASIO_SERVICE_THREAD_NUM
+#define ST_ASIO_SERVICE_THREAD_NUM 8
 同时开启多少个线程执行boost::asio::io_service::run函数。
 #endif
 
@@ -69,17 +69,17 @@ public:
 	void clear();
 删除所有service（调用stop_and_free）。
 
-	void start_service(int thread_num = ST_SERVICE_THREAD_NUM);
+	void start_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM);
 	void stop_service();
 启动／停止service（调用end_service），thread_num是线程数量（用于调用io_service::run）。
 
-	void start_service(object_type i_service_, int thread_num = ST_SERVICE_THREAD_NUM);
+	void start_service(object_type i_service_, int thread_num = ST_ASIO_SERVICE_THREAD_NUM);
 	void stop_service(object_type i_service_);
 如果某个service是在前面那个start_service之后才添加的，则调用这个启动它，否则功能完全同前面那个start_service，这也是为什么带了
 thread_num这个看似无关的参数。
 stop_service停止指定的service，跟前面的stop_service一样，差别仅是前面的停止所有service。
 
-	void run_service(int thread_num = ST_SERVICE_THREAD_NUM);
+	void run_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM);
 	void end_service();
 run_service同start_service，但是会阻塞，直到所有线程（调用io_service::run的线程）都退出，所以end_service必须在另外的线程中调用。
 请注意，结束以run_service启动的service pump，必须用end_service，end_service调用之后马上返回，service pump是否结束以run_service

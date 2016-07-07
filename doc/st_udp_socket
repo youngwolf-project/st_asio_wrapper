@@ -1,11 +1,11 @@
 
-#ifndef UDP_DEFAULT_IP_VERSION
-#define UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
+#ifndef ST_ASIO_UDP_DEFAULT_IP_VERSION
+#define ST_ASIO_UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
 #endif
 绑定地址时，在不指定ip的情况下，指定ip地址的版本（v4还是v6），如果指定了ip，则ip地址的版本可以从ip中推导出来。
 
-#ifndef DEFAULT_UDP_UNPACKER
-#define DEFAULT_UDP_UNPACKER udp_unpacker
+#ifndef ST_ASIO_DEFAULT_UDP_UNPACKER
+#define ST_ASIO_DEFAULT_UDP_UNPACKER udp_unpacker
 #endif
 默认的解包器，也可以通过模板参数控制，提供这个宏可以让使用者省略相应的模板参数。
 
@@ -15,7 +15,7 @@ namespace st_udp
 {
 
 udp套接字类，实现udp数据的收发
-template <typename Packer = DEFAULT_PACKER, typename Unpacker = DEFAULT_UDP_UNPACKER, typename Socket = boost::asio::ip::udp::socket>
+template <typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_DEFAULT_UDP_UNPACKER, typename Socket = boost::asio::ip::udp::socket>
 class st_udp_socket_base : public st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>>
 {
 public:
@@ -100,7 +100,7 @@ protected:
 	virtual void on_recv_error(const error_code& ec);
 接收消息出错时回调。
 
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	virtual bool on_msg(out_msg_type& msg);
 重写st_socket的on_msg，功能是打印消息到控制台，使用者重写这个函数以处理消息。
 #endif

@@ -265,7 +265,7 @@ int main(int argc, const char* argv[])
 		}
 		else if (LIST_STATUS == str)
 		{
-			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", closed links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.closed_object_size());
+			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
 			boost::posix_time::time_duration time_recv_idle = client.recv_idle_time();
 			printf("total recv idle time: %d." fractional_seconds_format " second(s)\n", time_recv_idle.total_seconds(), time_recv_idle.fractional_seconds());
 		}

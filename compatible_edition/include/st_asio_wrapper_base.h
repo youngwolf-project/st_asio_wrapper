@@ -34,10 +34,14 @@
 //if you customized the packer and unpacker, the above principle maybe not right anymore, it should depends on your implementations.
 #ifndef ST_ASIO_MSG_BUFFER_SIZE
 #define ST_ASIO_MSG_BUFFER_SIZE	4000
+#elif ST_ASIO_MSG_BUFFER_SIZE <= 0
+	#error message buffer size must be bigger than zero.
 #endif
 //msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamicly, which means only allocate memory when needed.
 #ifndef ST_ASIO_MAX_MSG_NUM
 #define ST_ASIO_MAX_MSG_NUM		1024
+#elif ST_ASIO_MAX_MSG_NUM <= 0
+	#error message capacity must be bigger than zero.
 #endif
 
 #if defined _MSC_VER

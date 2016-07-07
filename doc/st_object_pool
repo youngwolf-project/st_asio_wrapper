@@ -1,30 +1,28 @@
 
-#ifndef MAX_OBJECT_NUM
-#define MAX_OBJECT_NUM				4096
+#ifndef ST_ASIO_MAX_OBJECT_NUM
+#define ST_ASIO_MAX_OBJECT_NUM			4096
 #endif
 
-#ifndef REUSE_OBJECT
-	#ifndef SOCKET_FREE_INTERVAL
-	#define SOCKET_FREE_INTERVAL	10
-释放（从内存中删除）已经关闭的连接的扫描频率，单位为秒。
-如果开启了对象重用，本功能不工作，但使用者仍然可以自己调用free_object来释放指定数量的已经关闭的连接。
+#ifndef ST_ASIO_REUSE_OBJECT
+	#ifndef ST_ASIO_FREE_OBJECT_INTERVAL
+	#define ST_ASIO_FREE_OBJECT_INTERVAL	10
+如果未开启对象池，将自动开启一个定时器，用于定时释放（从内存中删除）失效的对象（失效对象是指obsoleted()返回true,
+智能指针只有一个引用并且超时了的对象，超时请参看ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME宏），用这个宏指定定时器间隔，单位为秒。
+如果开启了对象池，将不会自动开启这个定时器，但使用者可以自己定义这个宏以强迫st_object_pool开启这个定时器（建议间隔
+就不能再是10秒了，应该更长一点，比如1分钟），然后失效对象将会被关闭（调用对象的close()函数以释放SOCKET句柄）而不是被释放。
+其实这个定时器就是以不同的参数调用free_object()函数而已，所以用户也可以自己开定时器来更灵活的控制如果释放或者关闭对象。
 	#endif
 #endif
 
-#ifdef AUTO_CLEAR_CLOSED_SOCKET
-自动清除（从对象池移出到临时链表）已经关闭的连接，这个功能有什么用呢？
-如果在连接断开时，你没有或者不想去从对象池中删除，那么可以让st_object_pool周期性的查找已经关闭的连接，
-然后移出对象池，这样一次遍历可以操作多条连接，对于短连接效率可能会比每条连接断开时都从对象池中移除高。
-如果每次连接断开时，你都移除了对象池（请看st_server::del_client），请务必不要定义这个宏。
-	#ifndef CLEAR_CLOSED_SOCKET_INTERVAL
-	#define CLEAR_CLOSED_SOCKET_INTERVAL	60
-清除已经关闭的连接的扫描频率，单位为秒。
-	#endif
-#endif
+//#define ST_ASIO_CLEAR_OBJECT_INTERVAL		60
+自动清除（从对象池移出到临时链表）失效对象，这个功能有什么用呢？
+如果在连接断开时，你没有或者不想去从对象池中删除，那么可以让st_object_pool周期性的查找失效连接，
+然后移出对象池，这样一次遍历可以操作多条连接，对于短连接效率可能会更高，对于长连接，建议每次连接断开时，调用
+st_server::del_client(）马上清除这条连接。用这个宏指定定时器间隔，单位为秒。
 
-#ifndef CLOSED_SOCKET_MAX_DURATION
-	#define CLOSED_SOCKET_MAX_DURATION	5
-已经关闭的连接，多久时间之后，可以重用或者释放，单位为秒。
+#ifndef ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME
+#define ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME	5
+失效对象（并且已经移动到临时链表中的对象），多久时间之后，可以重用或者释放/关闭，单位为秒。
 #endif
 
 namespace st_asio_wrapper
@@ -60,12 +58,13 @@ public:
 
 protected:
 已经关闭的连接，从对象池移出到临时链表时，将按这个结构保存，主要目的是为了记录关闭的时间（以判断是否可以释放或者重用）。
-	struct temp_object
+	struct invalid_object
 	{
-		const time_t closed_time;
 		object_type object_ptr;
-
-		temp_object(object_ctype& object_ptr_);
+#ifdef ST_ASIO_ENHANCED_STABILITY
+		const time_t kick_out_time;
+#endif
+		invalid_object(object_ctype& object_ptr_);
 		bool is_timeout() const;
 		bool is_timeout(time_t now) const;
 是否超时（超时之后就可以释放或者重用object_ptr对象了）。
@@ -81,34 +80,37 @@ protected:
 结束，关闭所有定时器。
 
 	bool add_object(object_ctype& object_ptr);
-添加一个对象，注意对象总数不能超过MAX_OBJECT_NUM。
+添加一个对象，注意对象总数不能超过ST_ASIO_MAX_OBJECT_NUM。
 
 	bool del_object(object_ctype& object_ptr);
 清除一个对象（从对象池移出到临时链表，并不真正的从内存中释放该对象）。
 
-	virtual void post_create(object_ctype& object_ptr);
-每次创建（包括重用）一个对象之后，会调用这个函数，使用者可以利用这个机会（重写这个虚函数），在对象池级别
-对新创建的对象做一些必要的设置（最典型的就是设置对象的ID，不过这个工作已经在st_object_pool::post_create里面做了，
-所以如果要做你自己的设置，必须在重写的post_create函数中调用父类的post_create函数）。
+	virtual void on_create(object_ctype& object_ptr);
+每创建（包括重用）一个对象之后，回调这个函数，用户可以做一些在对象池层面上的逻辑，比如额外的初始化工作等。
+
+	void init_object(object_ctype& object_ptr);
+内部使用，目前只是给对象赋一个唯一的ID。
 
 #ifdef ST_ASIO_REUSE_OBJECT
 	object_type reuse_object();
 查找可重用的对象，如果没有，返回空的智能指针。能被重用的对象必需是：
  1. 已经从对象池移到了临时链表里面；
- 2. 关闭超过一定的时间（CLOSED_SOCKET_MAX_DURATION）；
+ 2. 已经超时（参看ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME宏）；
  3. 对象的引用记数（对象是一个shared_ptr）必须是1；
  4. 对象的obsoleted函数必须返回true。
 #endif
 
-public:
-	object_type create_object();
+	template<typename Arg>
+	object_type create_object(Arg& arg);
+
+	template<typename Arg1, typename Arg2>
+	object_type create_object(Arg1& arg1, Arg2& arg2);
+
+        object_type create_object();
 如果定义了ST_ASIO_REUSE_OBJECT宏，则先调用reuse_object尝试重用对象，如果没有对象可被重用，或者未定义该宏，
 则创建一个新的，最后都是调用post_create。
 
-	template<typename Arg>
-	object_type create_object(Arg& arg);
-ssl使用，行为和上一个重载一样。
-
+public:
 	container_type& container();
 用于配置unordered_set，比如设置负载因子，预分配空间等。注意必须在service_pump启动之前调用，因为没有锁相应的mutex。
 
@@ -119,28 +121,28 @@ ssl使用，行为和上一个重载一样。
 	size_t size();
 对象池中的对象个数，不包括被移除到临时链表的对象。
 
-	size_t closed_object_size();
+	size_t invalid_object_size();
 获取无效对象总数（临时链表里面的对象），无效对象要么定时被删除，要么等待被重用，由宏控制。
 
-	object_type at(size_t index);
-获取指定位置的有效对象（连接池中的对象），位置序号从0开始。
-
-	object_type closed_object_at(size_t index);
-获取指定位置的无效对象，位置序号从0开始。
-
-	object_type find(uint_fast64_t id);
+        object_type find(uint_fast64_t id);
 根据id查找有效对象。
 
-	object_type closed_object_find(uint_fast64_t id);
-根据id查找无效对象。
+	object_type at(size_t index);
+获取指定位置的有效对象（连接池中的对象），位置序号从0开始，复杂度O(n)。
 
-	object_type closed_object_pop(uint_fast64_t id);
-根据id查找无效对象，并且从容器中删除。
+	object_type invalid_object_at(size_t index);
+获取指定位置的无效对象，位置序号从0开始，复杂度O(n)。
+
+	object_type invalid_object_find(uint_fast64_t id);
+根据id查找无效对象，复杂度O(n)。
+
+	object_type invalid_object_pop(uint_fast64_t id);
+根据id查找无效对象，并且从容器中删除，复杂度O(n)。
 
 	void list_all_object();
 列出所有有效对象。
 
-	void clear_all_closed_object(container_type& objects);
+	void clear_obsoleted_object(container_type& objects);
 删除对象池里面的所有无效对象（移出到临时链表）。
 
 	void free_object(size_t num = -1);
@@ -159,8 +161,8 @@ protected:
 	boost::shared_mutex object_can_mutex;
 存放有效对象（对象池）。
 
-	boost::container::list<temp_object> temp_object_can;
-	boost::shared_mutex temp_object_can_mutex;
+	boost::container::list<invalid_object> invalid_object_can;
+	boost::shared_mutex invalid_object_can_mutex;
 存放无效对象（临时链表）。
 };
 

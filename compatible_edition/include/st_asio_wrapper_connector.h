@@ -20,9 +20,13 @@
 #endif
 #ifndef ST_ASIO_SERVER_PORT
 #define ST_ASIO_SERVER_PORT			5050
+#elif ST_ASIO_SERVER_PORT <= 0
+	#error server port must be bigger than zero.
 #endif
 #ifndef ST_ASIO_RECONNECT_INTERVAL
 #define ST_ASIO_RECONNECT_INTERVAL	500 //millisecond(s)
+#elif ST_ASIO_RECONNECT_INTERVAL < 0
+	#error reconnect interval must be bigger than or equal to zero.
 #endif
 
 namespace st_asio_wrapper

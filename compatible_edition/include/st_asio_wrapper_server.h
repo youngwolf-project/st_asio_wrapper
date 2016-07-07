@@ -18,10 +18,14 @@
 
 #ifndef ST_ASIO_SERVER_PORT
 #define ST_ASIO_SERVER_PORT			5051
+#elif ST_ASIO_SERVER_PORT <= 0
+	#error server port must be bigger than zero.
 #endif
 
 #ifndef ST_ASIO_ASYNC_ACCEPT_NUM
 #define ST_ASIO_ASYNC_ACCEPT_NUM	1 //how many async_accept delivery concurrently
+#elif ST_ASIO_SERVER_PORT <= 0
+	#error async accept number must be bigger than zero.
 #endif
 
 //in set_server_addr, if the IP is empty, ST_ASIO_TCP_DEFAULT_IP_VERSION will define the IP version, or the IP version will be deduced by the IP address.

@@ -35,6 +35,9 @@ protected:
 public:
 	bool add_client(typename st_client::object_ctype& client_ptr, bool reset = true);
 添加一个连接到对象池，并调用client_ptr->start()，如果reset为true，那么在这之前还会先调用client_ptr->reset。
+
+	using Pool::create_object;
+对客户端开放对象创建功能。
 };
 
 } //namespace

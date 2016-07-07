@@ -1,5 +1,5 @@
-#ifndef DEFAULT_PACKER
-#define DEFAULT_PACKER packer
+#ifndef ST_ASIO_DEFAULT_PACKER
+#define ST_ASIO_DEFAULT_PACKER packer
 #endif
 默认的打包器，也可以通过模板参数控制，提供这个宏可以让使用者省略相应的模板参数。
 
@@ -84,7 +84,7 @@ post_msg不受这个属性的影响，所以post_msg一定只能在on_msg和on_m
 有义务解决冲突问题。不支持多线程一是为了效率，二是这个功能用得很少。
 
 	bool is_send_buffer_available();
-判断消息发送缓存是否可用，即里面的消息数量是否小于MAX_MSG_NUM条，如果以can_overflow为true调用任何消息发送函数（如send_msg），
+判断消息发送缓存是否可用，即里面的消息数量是否小于ST_ASIO_MAX_MSG_NUM条，如果以can_overflow为true调用任何消息发送函数（如send_msg），
 将马上成功而无论消息发送缓存是否可用，所以可能会造成消息发送缓存大小不可控。
 
 	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false);
@@ -131,7 +131,7 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 发送接收失败时回调，对于st_tcp_socket，如果需要连接断开事件，建议重写on_recv_error。
 
-#ifndef FORCE_TO_USE_MSG_RECV_BUFFER
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	virtual bool on_msg(OutMsgType& msg) = 0;
 收到一条消息时回调，返回true表示消息被成功处理，返回false表示消息无法立即处理，于是进入接收缓存，通过on_msg_handle再次派发。
 #endif
@@ -141,12 +141,12 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 如果link_down，则无论返回true还是false，都将当成消息已经处理，将继续派发下一条消息（同步地），在连接断开时，会置link_down为真，
 此时需要尽快的派发完所有剩余的消息。
 
-#ifdef WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	virtual void on_msg_send(InMsgType& msg);
 成功发送（消息写入底层socket缓存）一个消息之后回调，消息是打包过后的。
 #endif
 
-#ifdef WANT_ALL_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 	virtual void on_all_msg_send(InMsgType& msg);
 当发送缓存由非空变为空的时候回调，消息是打包过后的。
 #endif
