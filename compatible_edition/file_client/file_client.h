@@ -10,7 +10,11 @@
 #include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
 
+#if BOOST_VERSION >= 105300
 extern boost::atomic_ushort completed_client_num;
+#else
+extern st_atomic<unsigned short> completed_client_num;
+#endif
 extern int link_num;
 extern fl_type file_size;
 

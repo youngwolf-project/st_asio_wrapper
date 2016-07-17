@@ -21,12 +21,16 @@
  * 2016.7.7		version 1.0.0
  * First release
  *
+ * 2016.7.17	version 1.0.1
+ * Support boost-1.49, it's the minimum version for st_asio_wrapper because of boost::container.
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VERSION 10000 //[x]xxxxx -> [x]x.xx.xx
+#define ST_ASIO_WRAPPER_VER		10001	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.0.1"
 
 #ifdef _MSC_VER
 	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");
@@ -46,5 +50,7 @@
 #else
 	#error st_asio_wrapper only support Visual C++, GCC and Clang.
 #endif
+
+static_assert(BOOST_VERSION >= 104900, "st_asio_wrapper only support boost 1.49 or higher.");
 
 #endif /* ST_ASIO_WRAPPER_H_ */

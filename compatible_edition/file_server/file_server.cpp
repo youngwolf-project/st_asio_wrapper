@@ -1,4 +1,6 @@
 
+#include <iostream>
+
 //configuration
 #define ST_ASIO_SERVER_PORT		5051
 #define ST_ASIO_CLEAR_OBJECT_INTERVAL	60

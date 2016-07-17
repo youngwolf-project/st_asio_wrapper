@@ -1,4 +1,6 @@
 
+#include <iostream>
+
 //configuration
 //#define ST_ASIO_DEFAULT_PACKER replaceable_packer
 //#define ST_ASIO_DEFAULT_UDP_UNPACKER replaceable_udp_unpacker

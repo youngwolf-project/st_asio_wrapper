@@ -50,9 +50,8 @@ protected:
 protected:
 	boost::shared_ptr<char> async_call_indicator;
 #else
-	template<typename CompletionHandler>
-	BOOST_ASIO_INITFN_RESULT_TYPE(CompletionHandler, void())
-	post(BOOST_ASIO_MOVE_ARG(CompletionHandler) handler) {io_service_.post(handler);}
+	template<typename CallbackHandler>
+	void post(const CallbackHandler& handler) {io_service_.post(handler);}
 	bool is_async_calling() const {return false;}
 
 	template<typename F>

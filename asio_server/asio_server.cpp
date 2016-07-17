@@ -1,4 +1,6 @@
 
+#include <iostream>
+
 //configuration
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool

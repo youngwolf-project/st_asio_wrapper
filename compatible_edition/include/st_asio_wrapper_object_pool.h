@@ -14,7 +14,9 @@
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
 #define ST_ASIO_WRAPPER_OBJECT_POOL_H_
 
+#if BOOST_VERSION >= 105300
 #include <boost/atomic.hpp>
+#endif
 #include <boost/unordered_set.hpp>
 
 #include "st_asio_wrapper_timer.h"
@@ -66,6 +68,31 @@
 
 namespace st_asio_wrapper
 {
+
+#if BOOST_VERSION >= 105300
+typedef boost::atomic_uint_fast64_t st_atomic_uint_fast64;
+#else
+template <typename T>
+class st_atomic
+{
+public:
+	st_atomic() : data(0) {}
+	st_atomic(const T& _data) : data(_data) {}
+	T operator++() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return ++data;}
+	T operator++(int) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data++;}
+	T operator+=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data += value;}
+	T operator--() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return --data;}
+	T operator--(int) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data--;}
+	T operator-=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data -= value;}
+	T operator=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data = value;}
+	operator T() const {return data;}
+
+private:
+	T data;
+	boost::shared_mutex data_mutex;
+};
+typedef st_atomic<boost::uint_fast64_t> st_atomic_uint_fast64;
+#endif
 
 template<typename Object>
 class st_object_pool : public st_service_pump::i_service, public st_timer
@@ -403,7 +430,7 @@ private:
 #endif
 
 protected:
-	boost::atomic_uint_fast64_t cur_id;
+	st_atomic_uint_fast64 cur_id;
 
 	container_type object_can;
 	boost::shared_mutex object_can_mutex;

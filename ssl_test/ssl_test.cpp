@@ -1,4 +1,6 @@
 
+#include <iostream>
+
 //configuration
 #define ST_ASIO_SERVER_PORT		9527
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer

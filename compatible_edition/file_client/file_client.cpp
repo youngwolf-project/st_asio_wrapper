@@ -1,4 +1,5 @@
 
+#include <iostream>
 #include <boost/tokenizer.hpp>
 
 //configuration
@@ -12,7 +13,11 @@
 #define RESTART_COMMAND	"restart"
 #define REQUEST_FILE	"get"
 
+#if BOOST_VERSION >= 105300
 boost::atomic_ushort completed_client_num;
+#else
+st_atomic<unsigned short> completed_client_num;
+#endif
 int link_num = 1;
 fl_type file_size;
 

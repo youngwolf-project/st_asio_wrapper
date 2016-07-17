@@ -12,21 +12,15 @@
  * license: www.boost.org/LICENSE_1_0.txt
  *
  * change log:
- * 2012.7.7
- * Created
- *
- * 2012.7.7 - 2016.7.7
- * Beta edition
- *
- * 2016.7.7		version 1.0.0
- * First release
+ * See st_asio_wrapper.h in standard edition.
  *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VERSION 10000 //[x]xxxxx -> [x]x.xx.xx
+#define ST_ASIO_WRAPPER_VER		10001	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.0.1"
 
 #ifdef _MSC_VER
 	#if _MSC_VER >= 1600
@@ -49,6 +43,10 @@
 	#endif
 #else
 	#error st_asio_wrapper only support Visual C++, GCC and Clang.
+#endif
+
+#if BOOST_VERSION < 104900
+	#error st_asio_wrapper only support boost 1.49 or higher.
 #endif
 
 #endif /* ST_ASIO_WRAPPER_H_ */
