@@ -205,13 +205,16 @@ int main(int argc, const char* argv[])
 			//so need \0 character when printing it.
 
 			//if all clients used the same protocol, we can pack msg one time, and send it repeatedly like this:
-			packer p;
+//			packer p;
 //			auto msg = p.pack_msg(str.data(), str.size() + 1);
 			//send \0 character too, because asio_client used inflexible_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
-			auto msg = p.pack_msg(str, true); //if asio_client is using stream_unpacker
-			if (!msg.empty())
-				server_.do_something_to_all([&msg](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(msg);});
+//			if (!msg.empty())
+//				server_.do_something_to_all([&msg](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(msg);});
+
+			//if asio_client is using stream_unpacker
+			if (!str.empty())
+				server_.do_something_to_all([&str](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(str);});
 		}
 	}
 
