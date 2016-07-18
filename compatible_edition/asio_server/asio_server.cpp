@@ -213,7 +213,8 @@ int main(int argc, const char* argv[])
 			packer::msg_type msg;
 			//send \0 character too, because asio_client used inflexible_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
-			if (p.pack_msg(msg, str.data(), str.size() + 1))
+//			if (p.pack_msg(msg, str.data(), str.size() + 1))
+			if (p.pack_msg(msg, str, true)) //if asio_client is using stream_unpacker
 				server_.do_something_to_all(boost::bind((bool (normal_server_socket::*)(packer::msg_ctype&, bool)) &normal_server_socket::direct_send_msg, _1, boost::cref(msg), false));
 		}
 	}

@@ -478,6 +478,29 @@ private:
 	size_t remain_len; //half-baked msg
 };
 
+class stream_unpacker : public i_unpacker<std::string>
+{
+public:
+	virtual void reset_state() {}
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
+	{
+		if (0 == bytes_transferred)
+			return false;
+
+		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
+
+		msg_can.resize(msg_can.size() + 1);
+		msg_can.back().assign(raw_buff.data(), bytes_transferred);
+		return true;
+	}
+
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return ec || bytes_transferred > 0 ? 0 : ST_ASIO_MSG_BUFFER_SIZE;}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
+
+protected:
+	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
+};
+
 } //namespace
 
 #endif /* ST_ASIO_WRAPPER_UNPACKER_H_ */
