@@ -134,7 +134,7 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: asio_server [<port=%d> [ip=0.0.0.0]]\n", ST_ASIO_SERVER_PORT);
+	printf("usage: asio_server [service thread number=1] [<port=%d> [ip=0.0.0.0]]\n", ST_ASIO_SERVER_PORT);
 	puts("normal server's port will be 100 larger.");
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
@@ -149,24 +149,23 @@ int main(int argc, const char* argv[])
 	st_server_base<normal_server_socket> server_(service_pump);
 	echo_server echo_server_(service_pump); //echo server
 
-	if (argc > 2)
+	if (argc > 3)
 	{
-		server_.set_server_addr(atoi(argv[1]) + 100, argv[2]);
-		echo_server_.set_server_addr(atoi(argv[1]), argv[2]);
+		server_.set_server_addr(atoi(argv[2]) + 100, argv[3]);
+		echo_server_.set_server_addr(atoi(argv[2]), argv[3]);
 	}
-	else if (argc > 1)
+	else if (argc > 2)
 	{
-		server_.set_server_addr(atoi(argv[1]) + 100);
-		echo_server_.set_server_addr(atoi(argv[1]));
+		server_.set_server_addr(atoi(argv[2]) + 100);
+		echo_server_.set_server_addr(atoi(argv[2]));
 	}
 	else
 		server_.set_server_addr(ST_ASIO_SERVER_PORT + 100);
 
-#if 3 == PACKER_UNPACKER_TYPE
-	global_packer->prefix_suffix("begin", "end");
-#endif
-
-	service_pump.start_service(1);
+	auto thread_num = 1;
+	if (argc > 1)
+		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
+	service_pump.start_service(thread_num);
 	while(service_pump.is_running())
 	{
 		std::string str;
@@ -176,7 +175,7 @@ int main(int argc, const char* argv[])
 		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service();
-			service_pump.start_service(1);
+			service_pump.start_service(thread_num);
 		}
 		else if (LIST_STATUS == str)
 		{

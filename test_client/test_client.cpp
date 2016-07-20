@@ -211,7 +211,7 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: test_client [<port=%d> [<ip=%s> [link num=16]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
+	printf("usage: test_client [service thread number=1] [<port=%d> [<ip=%s> [link num=16]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -219,8 +219,8 @@ int main(int argc, const char* argv[])
 
 	///////////////////////////////////////////////////////////
 	size_t link_num = 16;
-	if (argc > 3)
-		link_num = std::min(ST_ASIO_MAX_OBJECT_NUM, std::max(atoi(argv[3]), 1));
+	if (argc > 4)
+		link_num = std::min(ST_ASIO_MAX_OBJECT_NUM, std::max(atoi(argv[4]), 1));
 
 	printf("exec: test_client with " ST_ASIO_SF " links\n", link_num);
 	///////////////////////////////////////////////////////////
@@ -230,8 +230,8 @@ int main(int argc, const char* argv[])
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4
-	unsigned short port = argc > 1 ? atoi(argv[1]) : ST_ASIO_SERVER_PORT;
-	std::string ip = argc > 2 ? argv[2] : ST_ASIO_SERVER_IP;
+	unsigned short port = argc > 2 ? atoi(argv[2]) : ST_ASIO_SERVER_PORT;
+	std::string ip = argc > 3 ? argv[3] : ST_ASIO_SERVER_IP;
 
 	//method #1, create and add clients manually.
 	auto client_ptr = client.create_object();
@@ -248,12 +248,15 @@ int main(int argc, const char* argv[])
 	for (auto i = std::max((size_t) 1, link_num / 2); i < link_num; ++i)
 		client.add_client(port, ip);
 
-	auto min_thread_num = 1;
+	auto thread_num = 1;
+	if (argc > 1)
+		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
-	++min_thread_num;
+	if (1 == thread_num)
+		++thread_num;
 #endif
 
-	service_pump.start_service(min_thread_num);
+	service_pump.start_service(thread_num);
 	while(service_pump.is_running())
 	{
 		std::string str;
@@ -263,7 +266,7 @@ int main(int argc, const char* argv[])
 		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service();
-			service_pump.start_service(min_thread_num);
+			service_pump.start_service(thread_num);
 		}
 		else if (LIST_STATUS == str)
 		{
