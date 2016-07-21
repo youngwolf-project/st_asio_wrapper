@@ -58,6 +58,7 @@ public:
 	udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr) : peer_addr(_peer_addr) {}
 
 	void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); MsgType::swap(other);}
+	void set_addr(const boost::asio::ip::udp::endpoint& addr) {peer_addr = addr;}
 };
 
 template<typename MsgType>

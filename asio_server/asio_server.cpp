@@ -114,23 +114,17 @@ class echo_server : public st_server_base<echo_socket, st_object_pool<echo_socke
 public:
 	echo_server(st_service_pump& service_pump_) : st_server_base(service_pump_) {}
 
-	boost::posix_time::time_duration recv_idle_time()
+	echo_socket::statistic get_statistic()
 	{
-		boost::posix_time::time_duration time_recv_idle;
-		ST_THIS do_something_to_all([&time_recv_idle](object_ctype& item) {time_recv_idle += item->recv_idle_time();});
+		echo_socket::statistic stat;
+		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic();});
 
-		return time_recv_idle;
+		return stat;
 	}
 
 	//from i_echo_server, pure virtual function, we must implement it.
 	virtual void test() {/*puts("in echo_server::test()");*/}
 };
-
-#if defined(_MSC_VER) || defined(__i386__)
-#define fractional_seconds_format "%lld"
-#else // defined(__GNUC__) && defined(__x86_64__)
-#define fractional_seconds_format "%ld"
-#endif
 
 int main(int argc, const char* argv[])
 {
@@ -181,8 +175,7 @@ int main(int argc, const char* argv[])
 		{
 			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
-			boost::posix_time::time_duration time_recv_idle = echo_server_.recv_idle_time();
-			printf("total recv idle time(echo server): %d." fractional_seconds_format " second(s)\n", time_recv_idle.total_seconds(), time_recv_idle.fractional_seconds());
+			puts(echo_server_.get_statistic().to_string().data());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (SUSPEND_COMMAND == str)

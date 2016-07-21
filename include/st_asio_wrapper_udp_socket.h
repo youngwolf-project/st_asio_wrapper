@@ -139,11 +139,13 @@ protected:
 			ST_THIS sending = false;
 		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
 		{
+			ST_THIS stat.send_delay_sum += boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time() - ST_THIS send_msg_buffer.front().begin_time;
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			ST_THIS send_msg_buffer.pop_front();
 
 			boost::shared_lock<boost::shared_mutex> lock(close_mutex);
+			ST_THIS last_send_msg.restart();
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()), ST_THIS last_send_msg.peer_addr,
 				ST_THIS make_handler_error_size(boost::bind(&st_udp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
@@ -197,6 +199,8 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
+			++ST_THIS stat.recv_msg_sum;
+			ST_THIS stat.recv_byte_sum += bytes_transferred;
 			ST_THIS temp_msg_buffer.resize(ST_THIS temp_msg_buffer.size() + 1);
 			ST_THIS temp_msg_buffer.back().swap(peer_addr, unpacker_->parse_msg(bytes_transferred));
 			ST_THIS dispatch_msg();
@@ -214,6 +218,10 @@ private:
 		if (!ec)
 		{
 			assert(bytes_transferred == ST_THIS last_send_msg.size());
+
+			ST_THIS stat.send_time_sum += boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time() - ST_THIS last_send_msg.begin_time;
+			ST_THIS stat.send_byte_sum += bytes_transferred;
+			++ST_THIS stat.send_msg_sum;
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(ST_THIS last_send_msg);
 #endif

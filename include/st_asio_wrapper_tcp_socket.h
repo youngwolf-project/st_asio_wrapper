@@ -121,10 +121,12 @@ protected:
 			ST_THIS sending = false;
 		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
 		{
+			ST_THIS stat.send_delay_sum += boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time() - ST_THIS send_msg_buffer.front().begin_time;
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			ST_THIS send_msg_buffer.pop_front();
 
+			ST_THIS last_send_msg.restart();
 			boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()),
 				ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
@@ -174,8 +176,21 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, ST_THIS temp_msg_buffer);
-			ST_THIS dispatch_msg();
+			typename Unpacker::container_type temp_msg_can;
+			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
+			auto msg_num = temp_msg_can.size();
+			if (msg_num > 0)
+			{
+				ST_THIS stat.recv_msg_sum += msg_num;
+				ST_THIS temp_msg_buffer.resize(ST_THIS temp_msg_buffer.size() + msg_num);
+				auto insert_iter = std::rbegin(ST_THIS temp_msg_buffer);
+				for (auto iter = std::rbegin(temp_msg_can); iter != std::rend(temp_msg_can);)
+				{
+					ST_THIS stat.recv_byte_sum += (++iter).base()->size();
+					(++insert_iter).base()->swap(*iter.base());
+				}
+				ST_THIS dispatch_msg();
+			}
 
 			if (!unpack_ok)
 			{
@@ -193,6 +208,10 @@ private:
 		if (!ec)
 		{
 			assert(bytes_transferred == ST_THIS last_send_msg.size());
+
+			ST_THIS stat.send_time_sum += boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time() - ST_THIS last_send_msg.begin_time;
+			ST_THIS stat.send_byte_sum += bytes_transferred;
+			++ST_THIS stat.send_msg_sum;
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(ST_THIS last_send_msg);
 #endif

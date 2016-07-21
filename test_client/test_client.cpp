@@ -154,12 +154,12 @@ public:
 		return total_recv_bytes;
 	}
 
-	boost::posix_time::time_duration recv_idle_time()
+	test_socket::statistic get_statistic()
 	{
-		boost::posix_time::time_duration time_recv_idle;
-		ST_THIS do_something_to_all([&time_recv_idle](object_ctype& item) {time_recv_idle += item->recv_idle_time();});
+		test_socket::statistic stat;
+		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic(); });
 
-		return time_recv_idle;
+		return stat;
 	}
 
 	void clear_status() {do_something_to_all([](object_ctype& item) {item->clear_status();});}
@@ -202,12 +202,6 @@ public:
 	//msg sending interface
 	///////////////////////////////////////////////////
 };
-
-#if defined(_MSC_VER) || defined(__i386__)
-#define fractional_seconds_format "%lld"
-#else // defined(__GNUC__) && defined(__x86_64__)
-#define fractional_seconds_format "%ld"
-#endif
 
 int main(int argc, const char* argv[])
 {
@@ -271,8 +265,7 @@ int main(int argc, const char* argv[])
 		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
-			boost::posix_time::time_duration time_recv_idle = client.recv_idle_time();
-			printf("total recv idle time: %d." fractional_seconds_format " second(s)\n", time_recv_idle.total_seconds(), time_recv_idle.fractional_seconds());
+			puts(client.get_statistic().to_string().data());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (SUSPEND_COMMAND == str)
