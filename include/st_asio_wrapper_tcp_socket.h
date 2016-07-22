@@ -183,11 +183,11 @@ private:
 			{
 				ST_THIS stat.recv_msg_sum += msg_num;
 				ST_THIS temp_msg_buffer.resize(ST_THIS temp_msg_buffer.size() + msg_num);
-				auto insert_iter = std::rbegin(ST_THIS temp_msg_buffer);
-				for (auto iter = std::rbegin(temp_msg_can); iter != std::rend(temp_msg_can);)
+				auto op_iter = ST_THIS temp_msg_buffer.rbegin();
+				for (auto iter = temp_msg_can.rbegin(); iter != temp_msg_can.rend();)
 				{
 					ST_THIS stat.recv_byte_sum += (++iter).base()->size();
-					(++insert_iter).base()->swap(*iter.base());
+					(++op_iter).base()->swap(*iter.base());
 				}
 				ST_THIS dispatch_msg();
 			}
