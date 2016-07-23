@@ -7,6 +7,7 @@
 #define ST_ASIO_FREE_OBJECT_INTERVAL	60
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_ENHANCED_STABILITY
+#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency.
 
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	1
