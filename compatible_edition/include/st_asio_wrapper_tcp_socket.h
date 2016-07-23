@@ -122,7 +122,7 @@ protected:
 			ST_THIS sending = false;
 		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
 		{
-			ST_THIS stat.send_delay_sum += boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time() - ST_THIS send_msg_buffer.front().begin_time;
+			ST_THIS stat.send_delay_sum += st_socket<Socket, Packer, Unpacker>::statistic::local_time() - ST_THIS send_msg_buffer.front().begin_time;
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			ST_THIS send_msg_buffer.pop_front();
@@ -210,7 +210,7 @@ private:
 		{
 			assert(bytes_transferred == ST_THIS last_send_msg.size());
 
-			ST_THIS stat.send_time_sum += boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time() - ST_THIS last_send_msg.begin_time;
+			ST_THIS stat.send_time_sum += st_socket<Socket, Packer, Unpacker>::statistic::local_time() - ST_THIS last_send_msg.begin_time;
 			ST_THIS stat.send_byte_sum += bytes_transferred;
 			++ST_THIS stat.send_msg_sum;
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY

@@ -34,18 +34,31 @@ class st_socket: public st_timer
 public:
 	struct statistic
 	{
+#ifdef ST_ASIO_FULL_STATISTIC
+		static bool enabled() {return true;}
+		typedef boost::posix_time::ptime stat_time;
+		static stat_time local_time() {return boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time();}
+		typedef boost::posix_time::time_duration stat_duration;
+		static stat_duration initial_duration() {return boost::posix_time::time_duration();}
+#else
+		static bool enabled() {return false;}
+		typedef int stat_time; //not a real time, just satisfy compiler(t1 - t2)
+		static stat_time local_time() {return 0;}
+		typedef int stat_duration; //not a real duration, just satisfy compiler(d = t1 - t2 or d1 += d2)
+		static stat_duration initial_duration() {return 0;} //not a real duration
+#endif
 		statistic() : send_msg_sum(0), send_byte_sum(0), recv_msg_sum(0), recv_byte_sum(0) {}
 		void reset()
 		{
 			send_msg_sum = send_byte_sum = 0;
-			send_delay_sum = send_time_sum = boost::posix_time::time_duration();
+			send_delay_sum = send_time_sum = initial_duration();
 
 			recv_msg_sum = recv_byte_sum = 0;
-			dispatch_dealy_sum = recv_idle_sum = boost::posix_time::time_duration();
+			dispatch_dealy_sum = recv_idle_sum = initial_duration();
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-			handle_time_1_sum = boost::posix_time::time_duration();
+			handle_time_1_sum = initial_duration();
 #endif
-			handle_time_2_sum = boost::posix_time::time_duration();
+			handle_time_2_sum = initial_duration();
 		}
 
 		statistic& operator +=(const struct statistic& other)
@@ -69,26 +82,34 @@ public:
 
 		std::string to_string() const
 		{
-			std::ostringstream s;
-			s << std::setfill('0') << "send corresponding statistic:" << std::endl <<
-				"message sum: " << send_msg_sum << std::endl <<
-				"size in bytes: " << send_byte_sum << std::endl <<
-				"send delay: " << send_delay_sum.total_seconds() << "." << std::setw(boost::posix_time::time_duration::num_fractional_digits()) << send_delay_sum.fractional_seconds() <<
-				std::setw(0) << std::endl <<
-				"send duration: " << send_time_sum.total_seconds() << "." << std::setw(boost::posix_time::time_duration::num_fractional_digits()) << send_time_sum.fractional_seconds() <<
-				std::setw(0) << std::endl << std::endl <<
-				"recv corresponding statistic:" << std::endl <<
-				"message sum: " << recv_msg_sum << std::endl <<
-				"size in bytes: " << recv_byte_sum << std::endl <<
-				"dispatch delay: " << dispatch_dealy_sum.total_seconds() << "." << std::setw(boost::posix_time::time_duration::num_fractional_digits()) << dispatch_dealy_sum.fractional_seconds() <<
-				std::setw(0) << std::endl <<
-				"recv idle duration: " << recv_idle_sum.total_seconds() << "." << std::setw(boost::posix_time::time_duration::num_fractional_digits()) << recv_idle_sum.fractional_seconds() <<
-				std::setw(0) << std::endl <<
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-				"on_msg duration: " << handle_time_1_sum.total_seconds() << "." << std::setw(boost::posix_time::time_duration::num_fractional_digits()) << handle_time_1_sum.fractional_seconds() <<
-				std::setw(0) << std::endl <<
+#ifdef ST_ASIO_FULL_STATISTIC
+			auto tw = boost::posix_time::time_duration::num_fractional_digits();
 #endif
-				"on_msg_handle duration: " << handle_time_2_sum.total_seconds() << "." << std::setw(boost::posix_time::time_duration::num_fractional_digits()) << handle_time_2_sum.fractional_seconds();
+			std::ostringstream s;
+			s << std::setfill('0') << "send corresponding statistic:\n"
+				<< "message sum: " << send_msg_sum << std::endl
+				<< "size in bytes: " << send_byte_sum << std::endl
+#ifdef ST_ASIO_FULL_STATISTIC
+				<< "send delay: " << send_delay_sum.total_seconds() << "." << std::setw(tw) << send_delay_sum.fractional_seconds()
+				<< std::setw(0) << std::endl
+				<< "send duration: " << send_time_sum.total_seconds() << "." << std::setw(tw) << send_time_sum.fractional_seconds()
+				<< std::setw(0) << std::endl
+#endif
+				<< "\nrecv corresponding statistic:\n"
+				<< "message sum: " << recv_msg_sum << std::endl
+				<< "size in bytes: " << recv_byte_sum << std::endl
+#ifdef ST_ASIO_FULL_STATISTIC
+				<< "dispatch delay: " << dispatch_dealy_sum.total_seconds() << "." << std::setw(tw) << dispatch_dealy_sum.fractional_seconds()
+				<< std::setw(0) << std::endl
+				<< "recv idle duration: " << recv_idle_sum.total_seconds() << "." << std::setw(tw) << recv_idle_sum.fractional_seconds()
+				<< std::setw(0) << std::endl
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+				<< "on_msg duration: " << handle_time_1_sum.total_seconds() << "." << std::setw(tw) << handle_time_1_sum.fractional_seconds()
+				<< std::setw(0) << std::endl
+#endif
+				<< "on_msg_handle duration: " << handle_time_2_sum.total_seconds() << "." << std::setw(tw) << handle_time_2_sum.fractional_seconds()
+#endif
+				;
 
 			return s.str();
 		}
@@ -96,38 +117,38 @@ public:
 		//send corresponding statistic
 		uint_fast64_t send_msg_sum; //not counted msgs in sending buffer
 		uint_fast64_t send_byte_sum; //not counted msgs in sending buffer
-		boost::posix_time::time_duration send_delay_sum; //from send_(native_)msg, post_(native_)msg(exclude msg packing) to asio::async_write
-		boost::posix_time::time_duration send_time_sum; //from asio::async_write to send_handler, this indicate your network's speed or load
+		stat_duration send_delay_sum; //from send_(native_)msg, post_(native_)msg(exclude msg packing) to asio::async_write
+		stat_duration send_time_sum; //from asio::async_write to send_handler, this indicate your network's speed or load
 
 		//recv corresponding statistic
 		uint_fast64_t recv_msg_sum; //include msgs in receiving buffer(still not dispatched)
 		uint_fast64_t recv_byte_sum; //include msgs in receiving buffer(still not dispatched)
-		boost::posix_time::time_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_handle
-		boost::posix_time::time_duration recv_idle_sum;
+		stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_handle
+		stat_duration recv_idle_sum;
 		//during this duration, st_socket suspended msg reception because of full receiving buffer, posting msgs or invoke on_msg
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-		boost::posix_time::time_duration handle_time_1_sum; //on_msg consumed time, this indicate the efficiency of msg handling
+		stat_duration handle_time_1_sum; //on_msg consumed time, this indicate the efficiency of msg handling
 #endif
-		boost::posix_time::time_duration handle_time_2_sum; //on_msg_handle consumed time, this indicate the efficiency of msg handling
+		stat_duration handle_time_2_sum; //on_msg_handle consumed time, this indicate the efficiency of msg handling
 	};
 
 protected:
 	struct in_msg : public InMsgType
 	{
 		in_msg() {restart();}
-		void restart() {restart(boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time());}
-		void restart(const boost::posix_time::ptime& begin_time_) {begin_time = begin_time_;}
+		void restart() {restart(statistic::local_time());}
+		void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
 
-		boost::posix_time::ptime begin_time;
+		typename statistic::stat_time begin_time;
 	};
 
 	struct out_msg : public OutMsgType
 	{
 		out_msg() {restart();}
-		void restart() {restart(boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time());}
-		void restart(const boost::posix_time::ptime& begin_time_) {begin_time = begin_time_;}
+		void restart() {restart(statistic::local_time());}
+		void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
 
-		boost::posix_time::ptime begin_time;
+		typename statistic::stat_time begin_time;
 	};
 
 	//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
@@ -334,13 +355,13 @@ protected:
 		auto overflow = false;
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 		out_container_type temp_2_msg_buffer;
-		auto begin_time = boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time();
+		auto begin_time = statistic::local_time();
 		for (auto iter = std::begin(temp_msg_buffer); !suspend_dispatch_msg_ && !posting && iter != std::end(temp_msg_buffer);)
 			if (on_msg(*iter))
 				temp_msg_buffer.erase(iter++);
 			else
 				temp_2_msg_buffer.splice(std::end(temp_2_msg_buffer), temp_msg_buffer, iter++);
-		auto time_duration = boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time() - begin_time;
+		auto time_duration = statistic::local_time() - begin_time;
 		stat.handle_time_1_sum += time_duration;
 		stat.recv_idle_sum += time_duration;
 
@@ -376,7 +397,7 @@ protected:
 			do_recv_msg(); //receive msg sequentially, which means second receiving only after first receiving success
 		else
 		{
-			recv_idle_begin_time = boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time();
+			recv_idle_begin_time = statistic::local_time();
 			set_timer(TIMER_DISPATCH_MSG, 50, [this](unsigned char id)->bool {return ST_THIS timer_handler(id);});
 		}
 	}
@@ -457,7 +478,7 @@ private:
 		switch (id)
 		{
 		case TIMER_DISPATCH_MSG: //delay putting msgs into receive buffer cause of receive buffer overflow
-			stat.recv_idle_sum += boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time() - recv_idle_begin_time;
+			stat.recv_idle_sum += statistic::local_time() - recv_idle_begin_time;
 			dispatch_msg();
 			break;
 		case TIMER_SUSPEND_DISPATCH_MSG: //suspend dispatching msgs
@@ -495,11 +516,11 @@ private:
 
 	void msg_handler()
 	{
-		auto begin_time = boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time();
+		auto begin_time = statistic::local_time();
 		stat.dispatch_dealy_sum += begin_time - last_dispatch_msg.begin_time;
 
 		bool re = on_msg_handle(last_dispatch_msg, false); //must before next msg dispatching to keep sequence
-		stat.handle_time_2_sum += boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time() - begin_time;
+		stat.handle_time_2_sum += statistic::local_time() - begin_time;
 		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
 		dispatching = false;
 		if (!re) //dispatch failed, re-dispatch
@@ -540,7 +561,7 @@ protected:
 	boost::shared_mutex start_mutex;
 
 	struct statistic stat;
-	boost::posix_time::ptime recv_idle_begin_time;
+	typename statistic::stat_time recv_idle_begin_time;
 };
 
 } //namespace
