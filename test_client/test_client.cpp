@@ -427,6 +427,7 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ST_ASIO_CLEAR_OBJECT_INTERVAL
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY
+#undef ST_ASIO_FULL_STATISTIC
 #undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration

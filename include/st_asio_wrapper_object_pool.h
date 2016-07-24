@@ -77,10 +77,10 @@ public:
 	st_atomic() : data(0) {}
 	st_atomic(const T& _data) : data(_data) {}
 	st_atomic<T>& operator++() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); ++data; return *this;}
-	st_atomic<T>& operator+=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); data += value; return *this;}
+	const st_atomic<T>& operator+=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); data += value; return *this;}
 	st_atomic<T>& operator--() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); --data; return *this;}
-	st_atomic<T>& operator-=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); data -= value; return *this;}
-	st_atomic<T>& operator=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); data = value; return *this;}
+	const st_atomic<T>& operator-=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); data -= value; return *this;}
+	const st_atomic<T>& operator=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); data = value; return *this;}
 	operator T() const {return data;}
 
 private:

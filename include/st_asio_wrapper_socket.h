@@ -39,26 +39,27 @@ public:
 		typedef boost::posix_time::ptime stat_time;
 		static stat_time local_time() {return boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time();}
 		typedef boost::posix_time::time_duration stat_duration;
-		static stat_duration initial_duration() {return boost::posix_time::time_duration();}
 #else
+		struct dummy_duration {const dummy_duration& operator +=(const dummy_duration& other) {return *this;}}; //not a real duration, just satisfy compiler(d1 += d2)
+		struct dummy_time {dummy_duration operator -(const dummy_time& other) {return dummy_duration();}}; //not a real time, just satisfy compiler(t1 - t2)
+
 		static bool enabled() {return false;}
-		typedef int stat_time; //not a real time, just satisfy compiler(t1 - t2)
-		static stat_time local_time() {return 0;}
-		typedef int stat_duration; //not a real duration, just satisfy compiler(d = t1 - t2 or d1 += d2)
-		static stat_duration initial_duration() {return 0;} //not a real duration
+		typedef dummy_time stat_time;
+		static stat_time local_time() {return stat_time();}
+		typedef dummy_duration stat_duration;
 #endif
 		statistic() : send_msg_sum(0), send_byte_sum(0), recv_msg_sum(0), recv_byte_sum(0) {}
 		void reset()
 		{
 			send_msg_sum = send_byte_sum = 0;
-			send_delay_sum = send_time_sum = initial_duration();
+			send_delay_sum = send_time_sum = stat_duration();
 
 			recv_msg_sum = recv_byte_sum = 0;
-			dispatch_dealy_sum = recv_idle_sum = initial_duration();
+			dispatch_dealy_sum = recv_idle_sum = stat_duration();
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-			handle_time_1_sum = initial_duration();
+			handle_time_1_sum = stat_duration();
 #endif
-			handle_time_2_sum = initial_duration();
+			handle_time_2_sum = stat_duration();
 		}
 
 		statistic& operator +=(const struct statistic& other)
@@ -82,35 +83,31 @@ public:
 
 		std::string to_string() const
 		{
+			std::ostringstream s;
 #ifdef ST_ASIO_FULL_STATISTIC
 			auto tw = boost::posix_time::time_duration::num_fractional_digits();
-#endif
-			std::ostringstream s;
 			s << std::setfill('0') << "send corresponding statistic:\n"
 				<< "message sum: " << send_msg_sum << std::endl
 				<< "size in bytes: " << send_byte_sum << std::endl
-#ifdef ST_ASIO_FULL_STATISTIC
-				<< "send delay: " << send_delay_sum.total_seconds() << "." << std::setw(tw) << send_delay_sum.fractional_seconds()
-				<< std::setw(0) << std::endl
-				<< "send duration: " << send_time_sum.total_seconds() << "." << std::setw(tw) << send_time_sum.fractional_seconds()
-				<< std::setw(0) << std::endl
-#endif
+				<< "send delay: " << send_delay_sum.total_seconds() << "." << std::setw(tw) << send_delay_sum.fractional_seconds() << std::setw(0) << std::endl
+				<< "send duration: " << send_time_sum.total_seconds() << "." << std::setw(tw) << send_time_sum.fractional_seconds() << std::setw(0) << std::endl
 				<< "\nrecv corresponding statistic:\n"
 				<< "message sum: " << recv_msg_sum << std::endl
 				<< "size in bytes: " << recv_byte_sum << std::endl
-#ifdef ST_ASIO_FULL_STATISTIC
-				<< "dispatch delay: " << dispatch_dealy_sum.total_seconds() << "." << std::setw(tw) << dispatch_dealy_sum.fractional_seconds()
-				<< std::setw(0) << std::endl
-				<< "recv idle duration: " << recv_idle_sum.total_seconds() << "." << std::setw(tw) << recv_idle_sum.fractional_seconds()
-				<< std::setw(0) << std::endl
+				<< "dispatch delay: " << dispatch_dealy_sum.total_seconds() << "." << std::setw(tw) << dispatch_dealy_sum.fractional_seconds() << std::setw(0) << std::endl
+				<< "recv idle duration: " << recv_idle_sum.total_seconds() << "." << std::setw(tw) << recv_idle_sum.fractional_seconds() << std::setw(0) << std::endl
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-				<< "on_msg duration: " << handle_time_1_sum.total_seconds() << "." << std::setw(tw) << handle_time_1_sum.fractional_seconds()
-				<< std::setw(0) << std::endl
+				<< "on_msg duration: " << handle_time_1_sum.total_seconds() << "." << std::setw(tw) << handle_time_1_sum.fractional_seconds() << std::setw(0) << std::endl
 #endif
-				<< "on_msg_handle duration: " << handle_time_2_sum.total_seconds() << "." << std::setw(tw) << handle_time_2_sum.fractional_seconds()
+				<< "on_msg_handle duration: " << handle_time_2_sum.total_seconds() << "." << std::setw(tw) << handle_time_2_sum.fractional_seconds();
+#else
+			s << std::setfill('0') << "send corresponding statistic:\n"
+				<< "message sum: " << send_msg_sum << std::endl
+				<< "size in bytes: " << send_byte_sum << std::endl
+				<< "\nrecv corresponding statistic:\n"
+				<< "message sum: " << recv_msg_sum << std::endl
+				<< "size in bytes: " << recv_byte_sum;
 #endif
-				;
-
 			return s.str();
 		}
 

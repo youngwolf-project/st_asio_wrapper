@@ -220,6 +220,7 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_FREE_OBJECT_INTERVAL
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ST_ASIO_ENHANCED_STABILITY
+#undef ST_ASIO_FULL_STATISTIC
 #undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration
