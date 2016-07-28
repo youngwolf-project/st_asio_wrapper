@@ -83,7 +83,7 @@ private:
 	}
 
 private:
-	uint64_t total_bytes, send_bytes, recv_bytes;
+	boost::uint64_t total_bytes, send_bytes, recv_bytes;
 };
 
 class echo_client : public st_tcp_client_base<echo_socket>
@@ -106,7 +106,7 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: echo_client [service thread number=1] [<port=%d> [<ip=%s> [link num=16]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
+	printf("usage: pingpong_client [service thread number=1] [<port=%d> [<ip=%s> [link num=16]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -176,10 +176,10 @@ int main(int argc, const char* argv[])
 			while (0 != completed_session_num)
 				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
-			uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
+			boost::uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
 			double used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
 			printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
-			printf("speed: %f(*2)kB/s.\n", total_msg_bytes / used_time / 1024 / 1024);
+			printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 
 			delete[] init_msg;
 		}
