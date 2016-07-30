@@ -14,6 +14,7 @@
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
 #define ST_ASIO_WRAPPER_OBJECT_POOL_H_
 
+#include <boost/version.hpp>
 #if BOOST_VERSION >= 105300
 #include <boost/atomic.hpp>
 #endif
