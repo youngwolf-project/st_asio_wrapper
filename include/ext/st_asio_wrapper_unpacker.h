@@ -14,9 +14,8 @@
 #define ST_ASIO_WRAPPER_UNPACKER_H_
 
 #include <boost/array.hpp>
-#include <boost/container/list.hpp>
 
-#include "st_asio_wrapper_base.h"
+#include "../st_asio_wrapper_base.h"
 
 #ifdef ST_ASIO_HUGE_MSG
 #define ST_ASIO_HEAD_TYPE	uint32_t
@@ -27,56 +26,7 @@
 #endif
 #define ST_ASIO_HEAD_LEN	(sizeof(ST_ASIO_HEAD_TYPE))
 
-namespace st_asio_wrapper
-{
-
-template<typename MsgType>
-class i_unpacker
-{
-public:
-	typedef MsgType msg_type;
-	typedef const msg_type msg_ctype;
-	typedef boost::container::list<msg_type> container_type;
-
-protected:
-	virtual ~i_unpacker() {}
-
-public:
-	virtual void reset_state() = 0;
-	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
-	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) = 0;
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
-};
-
-template<typename MsgType>
-class udp_msg : public MsgType
-{
-public:
-	boost::asio::ip::udp::endpoint peer_addr;
-
-	udp_msg() {}
-	udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr, MsgType&& msg) : MsgType(std::move(msg)), peer_addr(_peer_addr) {}
-
-	void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); MsgType::swap(other);}
-	void swap(boost::asio::ip::udp::endpoint& addr, MsgType&& tmp_msg) {std::swap(peer_addr, addr); MsgType::swap(tmp_msg);}
-};
-
-template<typename MsgType>
-class i_udp_unpacker
-{
-public:
-	typedef MsgType msg_type;
-	typedef const msg_type msg_ctype;
-	typedef boost::container::list<udp_msg<msg_type>> container_type;
-
-protected:
-	virtual ~i_udp_unpacker() {}
-
-public:
-	virtual void reset_state() {}
-	virtual msg_type parse_msg(size_t bytes_transferred) = 0;
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
-};
+namespace st_asio_wrapper { namespace ext {
 
 class unpacker : public i_unpacker<std::string>
 {
@@ -192,6 +142,15 @@ protected:
 class replaceable_unpacker : public i_unpacker<replaceable_buffer>
 {
 public:
+	class buffer : public std::string, public i_buffer
+	{
+	public:
+		virtual bool empty() const {return std::string::empty();}
+		virtual size_t size() const {return std::string::size();}
+		virtual const char* data() const {return std::string::data();}
+	};
+
+public:
 	virtual void reset_state() {unpacker_.reset_state();}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
@@ -218,6 +177,15 @@ protected:
 class replaceable_udp_unpacker : public i_udp_unpacker<replaceable_buffer>
 {
 public:
+	class buffer : public std::string, public i_buffer
+	{
+	public:
+		virtual bool empty() const {return std::string::empty();}
+		virtual size_t size() const {return std::string::size();}
+		virtual const char* data() const {return std::string::data();}
+	};
+
+public:
 	virtual msg_type parse_msg(size_t bytes_transferred)
 	{
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
@@ -231,15 +199,43 @@ protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
 };
 
-//this unpacker demonstrate how to forbid memory copy while parsing msgs.
-class unbuffered_unpacker : public i_unpacker<inflexible_buffer>
+class most_primitive_buffer
 {
 public:
-	unbuffered_unpacker() {reset_state();}
+	most_primitive_buffer() {do_detach();}
+	most_primitive_buffer(most_primitive_buffer&& other) {do_attach(other.buff, other.len); other.do_detach();}
+	~most_primitive_buffer() {free();}
+
+	void assign(size_t _len) {free(); do_attach(new char[_len], _len);}
+	void free() {delete buff; do_detach();}
+
+	//the following five functions (char* data() is used by unpackers, not counted in) are needed by st_asio_wrapper,
+	//for other functions, depends on the implementation of your packer and unpacker.
+	bool empty() const {return 0 == len || nullptr == buff;}
+	size_t size() const {return len;}
+	const char* data() const {return buff;}
+	char* data() {return buff;}
+	void swap(most_primitive_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len);}
+	void clear() {free();}
+
+protected:
+	void do_attach(char* _buff, size_t _len) {buff = _buff; len = _len;}
+	void do_detach() {buff = nullptr; len = 0;}
+
+protected:
+	char* buff;
+	size_t len;
+};
+
+//this unpacker demonstrate how to forbid memory copying while parsing msgs (let asio write msg directly).
+class buffer_free_unpacker : public i_unpacker<most_primitive_buffer>
+{
+public:
+	buffer_free_unpacker() {reset_state();}
 	size_t current_msg_length() const {return raw_buff.size();} //current msg's total length(not include the head), 0 means don't know
 
 public:
-	virtual void reset_state() {raw_buff.detach(); step = 0;}
+	virtual void reset_state() {raw_buff.clear(); step = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		if (0 == step) //the head been received
@@ -277,7 +273,16 @@ public:
 		if (0 == step) //want the head
 		{
 			assert(raw_buff.empty());
-			return boost::asio::detail::default_max_transfer_size;
+
+			if (bytes_transferred < ST_ASIO_HEAD_LEN)
+				return boost::asio::detail::default_max_transfer_size;
+
+			assert(ST_ASIO_HEAD_LEN == bytes_transferred);
+			auto cur_msg_len = ST_ASIO_HEAD_N2H(head) - ST_ASIO_HEAD_LEN;
+			if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE - ST_ASIO_HEAD_LEN) //invalid msg, stop reading
+				step = -1;
+			else
+				raw_buff.assign(cur_msg_len);
 		}
 		else if (1 == step) //want the body
 		{
@@ -501,6 +506,6 @@ protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
 };
 
-} //namespace
+}} //namespace
 
 #endif /* ST_ASIO_WRAPPER_UNPACKER_H_ */

@@ -5,8 +5,8 @@
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_CUSTOM_LOG
-//#define ST_ASIO_DEFAULT_UNPACKER unbuffered_unpacker
-#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
+#define ST_ASIO_DEFAULT_UNPACKER buffer_free_unpacker
+//#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 
 //the following three macros demonstrate how to support huge msg(exceed 65535 - 2).
 //huge msg will consume huge memory, for example, if we want to support 1M msg size, because every st_tcp_socket has a
@@ -39,7 +39,8 @@ public:
 	static void debug_out(const char* fmt, ...) {all_out_helper2("debug");}
 };
 
-#include "../include/st_asio_wrapper_tcp_client.h"
+#include "../include/ext/st_asio_wrapper_ext.h"
+using namespace st_asio_wrapper::ext;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"

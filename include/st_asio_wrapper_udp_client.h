@@ -19,18 +19,19 @@
 namespace st_asio_wrapper
 {
 
-typedef st_sclient<st_udp_socket> st_udp_sclient;
-
-template<typename Socket = st_udp_socket, typename Pool = st_object_pool<Socket>>
+template<typename Socket, typename Pool = st_object_pool<Socket>>
 class st_udp_client_base : public st_client<Socket, Pool>
 {
+protected:
+	typedef st_client<Socket, Pool> super;
+
 public:
-	using st_client<Socket, Pool>::TIMER_BEGIN;
-	using st_client<Socket, Pool>::TIMER_END;
+	using super::TIMER_BEGIN;
+	using super::TIMER_END;
 
-	st_udp_client_base(st_service_pump& service_pump_) : st_client<Socket, Pool>(service_pump_) {}
+	st_udp_client_base(st_service_pump& service_pump_) : super(service_pump_) {}
 
-	using st_client<Socket, Pool>::add_client;
+	using super::add_client;
 	typename Pool::object_type add_client(unsigned short port, const std::string& ip = std::string())
 	{
 		auto client_ptr(ST_THIS create_object());
@@ -49,7 +50,6 @@ public:
 protected:
 	virtual void uninit() {ST_THIS stop(); graceful_close();}
 };
-typedef st_udp_client_base<> st_udp_client;
 
 } //namespace
 

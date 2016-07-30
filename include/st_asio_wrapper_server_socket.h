@@ -27,22 +27,25 @@ public:
 	virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
 };
 
-template<typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_DEFAULT_UNPACKER, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket>
+template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket>
 class st_server_socket_base : public st_tcp_socket_base<Socket, Packer, Unpacker>, public boost::enable_shared_from_this<st_server_socket_base<Packer, Unpacker, Server, Socket>>
 {
+protected:
+	typedef st_tcp_socket_base<Socket, Packer, Unpacker> super;
+
 public:
-	static const unsigned char TIMER_BEGIN = st_tcp_socket_base<Socket, Packer, Unpacker>::TIMER_END;
+	static const unsigned char TIMER_BEGIN = super::TIMER_END;
 	static const unsigned char TIMER_ASYNC_CLOSE = TIMER_BEGIN;
 	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
 
-	st_server_socket_base(Server& server_) : st_tcp_socket_base<Socket, Packer, Unpacker>(server_.get_service_pump()), server(server_) {}
+	st_server_socket_base(Server& server_) : super(server_.get_service_pump()), server(server_) {}
 	template<typename Arg>
-	st_server_socket_base(Server& server_, Arg& arg) : st_tcp_socket_base<Socket, Packer, Unpacker>(server_.get_service_pump(), arg), server(server_) {}
+	st_server_socket_base(Server& server_, Arg& arg) : super(server_.get_service_pump(), arg), server(server_) {}
 
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
 	//please note, when reuse this socket, st_object_pool will invoke reset(), child must re-write it to initialize all member variables,
 	//and then do not forget to invoke st_server_socket_base::reset() to initialize father's member variables
-	virtual void reset() {st_tcp_socket_base<Socket, Packer, Unpacker>::reset();}
+	virtual void reset() {super::reset();}
 
 	void disconnect() {force_close();}
 	void force_close()
@@ -50,7 +53,7 @@ public:
 		if (1 != ST_THIS close_state)
 			show_info("server link:", "been closed.");
 
-		st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();
+		super::force_close();
 	}
 
 	void graceful_close(bool sync = true)
@@ -58,7 +61,7 @@ public:
 		if (!ST_THIS is_closing())
 			show_info("server link:", "been closing gracefully.");
 
-		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
+		if (super::graceful_close(sync))
 			ST_THIS set_timer(TIMER_ASYNC_CLOSE, 10, boost::bind(&st_server_socket_base::async_close_handler, this, _1, ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION * 100));
 	}
 
@@ -131,7 +134,6 @@ private:
 protected:
 	Server& server;
 };
-typedef st_server_socket_base<> st_server_socket;
 
 } //namespace
 

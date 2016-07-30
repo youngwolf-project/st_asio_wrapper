@@ -12,8 +12,9 @@
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
 //configuration
 
-#include "../include/st_asio_wrapper_tcp_client.h"
+#include "../include/ext/st_asio_wrapper_ext.h"
 using namespace st_asio_wrapper;
+using namespace st_asio_wrapper::ext;
 
 #ifdef _MSC_VER
 #define atoll _atoi64
@@ -106,7 +107,7 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: pingpong_client [service thread number=1] [<port=%d> [<ip=%s> [link num=16]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
+	printf("usage: pingpong_client [<service thread number=1> [<port=%d> [<ip=%s> [link num=16]]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else

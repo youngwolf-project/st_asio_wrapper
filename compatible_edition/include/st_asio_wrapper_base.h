@@ -24,6 +24,7 @@
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/container/list.hpp>
 #include <boost/typeof/typeof.hpp>
 
 #include "st_asio_wrapper.h"
@@ -37,7 +38,7 @@
 #elif ST_ASIO_MSG_BUFFER_SIZE <= 0
 	#error message buffer size must be bigger than zero.
 #endif
-//msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamicly, which means only allocate memory when needed.
+//msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamically, which means only allocate memory when needed.
 #ifndef ST_ASIO_MAX_MSG_NUM
 #define ST_ASIO_MAX_MSG_NUM		1024
 #elif ST_ASIO_MAX_MSG_NUM <= 0
@@ -66,14 +67,7 @@ namespace st_asio_wrapper
 		virtual const char* data() const = 0;
 	};
 
-	class buffer : public std::string, public i_buffer
-	{
-	public:
-		virtual bool empty() const {return std::string::empty();}
-		virtual size_t size() const {return std::string::size();}
-		virtual const char* data() const {return std::string::data();}
-	};
-
+	//if you want to replace packer or unpacker at runtime, please use this as the msg type
 	class replaceable_buffer
 	{
 	public:
@@ -96,43 +90,78 @@ namespace st_asio_wrapper
 		boost::shared_ptr<i_buffer> buffer;
 	};
 
-	//this buffer is more efficient than std::string if the memory is already allocated, because the replication been saved.
-	//for example, you are sending memory-mapped files.
-	class inflexible_buffer
+	//packer concept
+	template<typename MsgType>
+	class i_packer
 	{
 	public:
-		inflexible_buffer() {do_detach();}
-		~inflexible_buffer() {detach();}
-
-		void assign(const char* _buff, size_t _len)
-		{
-			assert(_len > 0 && NULL != _buff);
-			char* _buff_ = new char[_len];
-			memcpy(_buff_, _buff, _len);
-
-			attach(_buff_, _len);
-		}
-
-		void attach(char* _buff, size_t _len) {detach(); do_attach(_buff, _len);}
-		void detach() {delete buff; do_detach();}
-
-		//the following five functions (char* data() is used by inflexible_unpacker, not counted) are needed by st_asio_wrapper,
-		//for other functions, depends on the implementation of your packer and unpacker.
-		bool empty() const {return 0 == len || NULL == buff;}
-		size_t size() const {return len;}
-		const char* data() const {return buff;}
-		char* data() {return buff;}
-		void swap(inflexible_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len);}
-		void clear() {detach();}
+		typedef MsgType msg_type;
+		typedef const msg_type msg_ctype;
 
 	protected:
-		void do_attach(char* _buff, size_t _len) {buff = _buff; len = _len;}
-		void do_detach() {buff = NULL; len = 0;}
+		virtual ~i_packer() {}
 
-	protected:
-		char* buff;
-		size_t len;
+	public:
+		virtual void reset_state() {}
+		virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+		virtual char* raw_data(msg_type& msg) const {return NULL;}
+		virtual const char* raw_data(msg_ctype& msg) const {return NULL;}
+		virtual size_t raw_data_len(msg_ctype& msg) const {return 0;}
+
+		bool pack_msg(msg_type& msg, const char* pstr, size_t len, bool native = false) {return pack_msg(msg, &pstr, &len, 1, native);}
+		bool pack_msg(msg_type& msg, const std::string& str, bool native = false) {return pack_msg(msg, str.data(), str.size(), native);}
 	};
+	//packer concept
+
+	//unpacker concept
+	template<typename MsgType>
+	class i_unpacker
+	{
+	public:
+		typedef MsgType msg_type;
+		typedef const msg_type msg_ctype;
+		typedef boost::container::list<msg_type> container_type;
+
+	protected:
+		virtual ~i_unpacker() {}
+
+	public:
+		virtual void reset_state() = 0;
+		virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
+		virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) = 0;
+		virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
+	};
+
+	template<typename MsgType>
+	class udp_msg : public MsgType
+	{
+	public:
+		boost::asio::ip::udp::endpoint peer_addr;
+
+		udp_msg() {}
+		udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr) : peer_addr(_peer_addr) {}
+
+		void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); MsgType::swap(other);}
+		void set_addr(const boost::asio::ip::udp::endpoint& addr) {peer_addr = addr;}
+	};
+
+	template<typename MsgType>
+	class i_udp_unpacker
+	{
+	public:
+		typedef MsgType msg_type;
+		typedef const msg_type msg_ctype;
+		typedef boost::container::list<udp_msg<msg_type> > container_type;
+
+	protected:
+		virtual ~i_udp_unpacker() {}
+
+	public:
+		virtual void reset_state() {}
+		virtual void parse_msg(msg_type& msg, size_t bytes_transferred) = 0;
+		virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
+	};
+	//unpacker concept
 
 	//free functions, used to do something to any container(except map and multimap) optionally with any mutex
 	template<typename _Can, typename _Mutex, typename _Predicate>

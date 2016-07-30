@@ -26,8 +26,9 @@
 #endif
 //configuration
 
-#include "../include/st_asio_wrapper_server.h"
+#include "../include/ext/st_asio_wrapper_ext.h"
 using namespace st_asio_wrapper;
+using namespace st_asio_wrapper::ext;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
@@ -129,7 +130,7 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: asio_server [service thread number=1] [<port=%d> [ip=0.0.0.0]]\n", ST_ASIO_SERVER_PORT);
+	printf("usage: asio_server [<service thread number=1> [<port=%d> [ip=0.0.0.0]]]\n", ST_ASIO_SERVER_PORT);
 	puts("normal server's port will be 100 larger.");
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
@@ -194,20 +195,20 @@ int main(int argc, const char* argv[])
 		{
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
 //			server_.broadcast_msg(str.data(), str.size() + 1);
-			//send \0 character too, because asio_client used inflexible_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			//send \0 character too, because asio_client used most_primitive_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 
 			//if all clients used the same protocol, we can pack msg one time, and send it repeatedly like this:
-//			packer p;
-//			auto msg = p.pack_msg(str.data(), str.size() + 1);
-			//send \0 character too, because asio_client used inflexible_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			packer p;
+			auto msg = p.pack_msg(str.data(), str.size() + 1);
+			//send \0 character too, because asio_client used most_primitive_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
-//			if (!msg.empty())
-//				server_.do_something_to_all([&msg](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(msg);});
+			if (!msg.empty())
+				server_.do_something_to_all([&msg](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(msg);});
 
 			//if asio_client is using stream_unpacker
-			if (!str.empty())
-				server_.do_something_to_all([&str](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(str);});
+//			if (!str.empty())
+//				server_.do_something_to_all([&str](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(str);});
 		}
 	}
 

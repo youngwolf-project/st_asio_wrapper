@@ -13,7 +13,7 @@
 #ifndef ST_ASIO_WRAPPER_PACKER_H_
 #define ST_ASIO_WRAPPER_PACKER_H_
 
-#include "st_asio_wrapper_base.h"
+#include "../st_asio_wrapper_base.h"
 
 #ifdef ST_ASIO_HUGE_MSG
 #define ST_ASIO_HEAD_TYPE	boost::uint32_t
@@ -24,8 +24,7 @@
 #endif
 #define ST_ASIO_HEAD_LEN	(sizeof(ST_ASIO_HEAD_TYPE))
 
-namespace st_asio_wrapper
-{
+namespace st_asio_wrapper { namespace ext {
 
 class packer_helper
 {
@@ -52,27 +51,6 @@ public:
 
 		return total_len;
 	}
-};
-
-template<typename MsgType>
-class i_packer
-{
-public:
-	typedef MsgType msg_type;
-	typedef const msg_type msg_ctype;
-
-protected:
-	virtual ~i_packer() {}
-
-public:
-	virtual void reset_state() {}
-	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
-	virtual char* raw_data(msg_type& msg) const {return NULL;}
-	virtual const char* raw_data(msg_ctype& msg) const {return NULL;}
-	virtual size_t raw_data_len(msg_ctype& msg) const {return 0;}
-
-	bool pack_msg(msg_type& msg, const char* pstr, size_t len, bool native = false) {return pack_msg(msg, &pstr, &len, 1, native);}
-	bool pack_msg(msg_type& msg, const std::string& str, bool native = false) {return pack_msg(msg, str.data(), str.size(), native);}
 };
 
 class packer : public i_packer<std::string>
@@ -121,6 +99,15 @@ public:
 
 class replaceable_packer : public i_packer<replaceable_buffer>
 {
+public:
+	class buffer : public std::string, public i_buffer
+	{
+	public:
+		virtual bool empty() const {return std::string::empty();}
+		virtual size_t size() const {return std::string::size();}
+		virtual const char* data() const {return std::string::data();}
+	};
+
 public:
 	using i_packer<msg_type>::pack_msg;
 	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
@@ -184,6 +171,6 @@ private:
 	std::string _prefix, _suffix;
 };
 
-} //namespace
+}} //namespace
 
 #endif /* ST_ASIO_WRAPPER_PACKER_H_ */

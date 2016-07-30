@@ -14,24 +14,17 @@
 #define ST_ASIO_WRAPPER_TCP_SOCKET_H_
 
 #include "st_asio_wrapper_socket.h"
-#include "st_asio_wrapper_unpacker.h"
 
 #ifndef ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION
 #define ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION	5 //seconds, maximum waiting seconds while graceful closing
 #endif
 static_assert(ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION > 0, "graceful close duration must be bigger than zero.");
 
-#ifndef ST_ASIO_DEFAULT_UNPACKER
-#define ST_ASIO_DEFAULT_UNPACKER unpacker
-#endif
-
 namespace st_asio_wrapper
-{
-namespace st_tcp
 {
 
 template <typename Socket, typename Packer, typename Unpacker>
-class st_tcp_socket_base : public st_socket<Socket, Packer, Unpacker>
+class st_tcp_socket_base : public st_socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -40,22 +33,23 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 protected:
-	using st_socket<Socket, Packer, Unpacker>::TIMER_BEGIN;
-	using st_socket<Socket, Packer, Unpacker>::TIMER_END;
+	typedef st_socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type> super;
+	using super::TIMER_BEGIN;
+	using super::TIMER_END;
 
-	st_tcp_socket_base(boost::asio::io_service& io_service_) : st_socket<Socket, Packer, Unpacker>(io_service_), unpacker_(boost::make_shared<Unpacker>()), close_state(0) {}
+	st_tcp_socket_base(boost::asio::io_service& io_service_) : super(io_service_), unpacker_(boost::make_shared<Unpacker>()), close_state(0) {}
 	template<typename Arg>
-	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : st_socket<Socket, Packer, Unpacker>(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()), close_state(0) {}
+	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()), close_state(0) {}
 
 public:
-	virtual bool obsoleted() {return !is_closing() && st_socket<Socket, Packer, Unpacker>::obsoleted();}
+	virtual bool obsoleted() {return !is_closing() && super::obsoleted();}
 
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
-	void reset() {reset_state(); close_state = 0; st_socket<Socket, Packer, Unpacker>::reset();}
+	void reset() {reset_state(); close_state = 0; super::reset();}
 	void reset_state()
 	{
 		unpacker_->reset_state();
-		st_socket<Socket, Packer, Unpacker>::reset_state();
+		super::reset_state();
 	}
 
 	bool is_closing() const {return 0 != close_state;}
@@ -67,7 +61,7 @@ public:
 	boost::shared_ptr<const i_unpacker<out_msg_type>> inner_unpacker() const {return unpacker_;}
 	void inner_unpacker(const boost::shared_ptr<i_unpacker<out_msg_type>>& _unpacker_) {unpacker_ = _unpacker_;}
 
-	using st_socket<Socket, Packer, Unpacker>::send_msg;
+	using super::send_msg;
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
@@ -121,7 +115,7 @@ protected:
 			ST_THIS sending = false;
 		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
 		{
-			ST_THIS stat.send_delay_sum += st_socket<Socket, Packer, Unpacker>::statistic::local_time() - ST_THIS send_msg_buffer.front().begin_time;
+			ST_THIS stat.send_delay_sum += super::statistic::local_time() - ST_THIS send_msg_buffer.front().begin_time;
 			ST_THIS sending = true;
 			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
 			ST_THIS send_msg_buffer.pop_front();
@@ -144,7 +138,7 @@ protected:
 			ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
-	virtual bool is_send_allowed() const {return !is_closing() && st_socket<Socket, Packer, Unpacker>::is_send_allowed();}
+	virtual bool is_send_allowed() const {return !is_closing() && super::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
 	//msg can not be unpacked
@@ -189,8 +183,8 @@ private:
 					ST_THIS stat.recv_byte_sum += (++iter).base()->size();
 					(++op_iter).base()->swap(*iter.base());
 				}
-				ST_THIS dispatch_msg();
 			}
+			ST_THIS dispatch_msg();
 
 			if (!unpack_ok)
 			{
@@ -209,7 +203,7 @@ private:
 		{
 			assert(bytes_transferred == ST_THIS last_send_msg.size());
 
-			ST_THIS stat.send_time_sum += st_socket<Socket, Packer, Unpacker>::statistic::local_time() - ST_THIS last_send_msg.begin_time;
+			ST_THIS stat.send_time_sum += super::statistic::local_time() - ST_THIS last_send_msg.begin_time;
 			ST_THIS stat.send_byte_sum += bytes_transferred;
 			++ST_THIS stat.send_msg_sum;
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -240,9 +234,6 @@ protected:
 	int close_state; //2-the first step of graceful close, 1-force close, 0-normal state
 };
 
-} //namespace st_tcp
-} //namespace st_asio_wrapper
-
-using namespace st_asio_wrapper::st_tcp; //compatible with old version which doesn't have st_tcp namespace.
+} //namespace
 
 #endif /* ST_ASIO_WRAPPER_TCP_SOCKET_H_ */

@@ -18,17 +18,13 @@
 #include <boost/date_time.hpp>
 #include <boost/container/list.hpp>
 
-#include "st_asio_wrapper_packer.h"
+#include "st_asio_wrapper_base.h"
 #include "st_asio_wrapper_timer.h"
-
-#ifndef ST_ASIO_DEFAULT_PACKER
-#define ST_ASIO_DEFAULT_PACKER packer
-#endif
 
 namespace st_asio_wrapper
 {
 
-template<typename Socket, typename Packer, typename Unpacker, typename InMsgType = typename Packer::msg_type, typename OutMsgType = typename Unpacker::msg_type>
+template<typename Socket, typename Packer, typename Unpacker, typename InMsgType, typename OutMsgType>
 class st_socket: public st_timer
 {
 public:
@@ -349,45 +345,32 @@ protected:
 	//call this in recv_handler (in subclasses) only
 	void dispatch_msg()
 	{
-		auto overflow = false;
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-		out_container_type temp_2_msg_buffer;
-		auto begin_time = statistic::local_time();
-		for (auto iter = std::begin(temp_msg_buffer); !suspend_dispatch_msg_ && !posting && iter != std::end(temp_msg_buffer);)
-			if (on_msg(*iter))
-				temp_msg_buffer.erase(iter++);
-			else
-				temp_2_msg_buffer.splice(std::end(temp_2_msg_buffer), temp_msg_buffer, iter++);
-		auto time_duration = statistic::local_time() - begin_time;
-		stat.handle_time_1_sum += time_duration;
-		stat.recv_idle_sum += time_duration;
-
-		if (!temp_2_msg_buffer.empty())
-		{
-			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-			if (splice_helper(recv_msg_buffer, temp_2_msg_buffer))
-				do_dispatch_msg(false);
-		}
-		temp_msg_buffer.splice(std::begin(temp_msg_buffer), temp_2_msg_buffer);
-#else
 		if (!temp_msg_buffer.empty())
 		{
-			if (suspend_dispatch_msg_ || posting)
-				overflow = true;
-			else
-				for (auto iter = std::begin(temp_msg_buffer); iter != std::end(temp_msg_buffer);)
-					if (on_msg(*iter))
-						temp_msg_buffer.erase(iter++);
-					else
-						++iter;
-		}
-#endif
-		if (!overflow)
-		{
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+			out_container_type temp_2_msg_buffer;
+			auto begin_time = statistic::local_time();
+			for (auto iter = std::begin(temp_msg_buffer); !suspend_dispatch_msg_ && !posting && iter != std::end(temp_msg_buffer);)
+				if (on_msg(*iter))
+					temp_msg_buffer.erase(iter++);
+				else
+					temp_2_msg_buffer.splice(std::end(temp_2_msg_buffer), temp_msg_buffer, iter++);
+			auto time_duration = statistic::local_time() - begin_time;
+			stat.handle_time_1_sum += time_duration;
+			stat.recv_idle_sum += time_duration;
+
+			if (!temp_2_msg_buffer.empty())
+			{
+				boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
+				if (splice_helper(recv_msg_buffer, temp_2_msg_buffer))
+					do_dispatch_msg(false);
+			}
+			temp_msg_buffer.splice(std::begin(temp_msg_buffer), temp_2_msg_buffer);
+#else
 			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-			recv_msg_buffer.splice(std::end(recv_msg_buffer), temp_msg_buffer);
-			overflow = recv_msg_buffer.size() > ST_ASIO_MAX_MSG_NUM;
-			do_dispatch_msg(false);
+			if (splice_helper(recv_msg_buffer, temp_msg_buffer))
+				do_dispatch_msg(false);
+#endif
 		}
 
 		if (!overflow)
