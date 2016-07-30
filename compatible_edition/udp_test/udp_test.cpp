@@ -6,7 +6,7 @@
 //#define ST_ASIO_DEFAULT_UDP_UNPACKER replaceable_udp_unpacker
 //configuration
 
-#include "../include/ext/st_asio_wrapper_ext.h"
+#include "../include/ext/st_asio_wrapper_net.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 

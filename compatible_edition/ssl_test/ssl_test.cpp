@@ -9,8 +9,9 @@
 //#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 //configuration
 
-#include "../include/st_asio_wrapper_ssl.h"
+#include "../include/ext/st_asio_wrapper_ssl.h"
 using namespace st_asio_wrapper;
+using namespace st_asio_wrapper::ext;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"

@@ -29,7 +29,7 @@ template <typename Packer, typename Unpacker, typename Socket = boost::asio::ip:
 class st_udp_socket_base : public st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type> >
 {
 protected:
-	typedef st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>> super;
+	typedef st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type> > super;
 
 public:
 	typedef udp_msg<typename Packer::msg_type> in_msg_type;

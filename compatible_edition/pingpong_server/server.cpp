@@ -9,7 +9,7 @@
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
 //configuration
 
-#include "../include/ext/st_asio_wrapper_ext.h"
+#include "../include/ext/st_asio_wrapper_net.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 

@@ -1,5 +1,5 @@
 /*
- * st_asio_wrapper_ext.h
+ * st_asio_wrapper_net.h
  *
  *  Created on: 2016-7-30
  *      Author: youngwolf
@@ -10,10 +10,9 @@
  * extensional, replaceable and indispensable components.
  */
 
-#ifndef ST_ASIO_WRAPPER_EXT_H_
-#define ST_ASIO_WRAPPER_EXT_H_
+#ifndef ST_ASIO_WRAPPER_NET_H_
+#define ST_ASIO_WRAPPER_NET_H_
 
-#include "../st_asio_wrapper_base.h"
 #include "../st_asio_wrapper_client.h"
 #include "../st_asio_wrapper_tcp_client.h"
 #include "../st_asio_wrapper_udp_client.h"
@@ -49,4 +48,4 @@ typedef st_udp_client_base<st_udp_socket> st_udp_client;
 
 }} //namespace
 
-#endif /* ST_ASIO_WRAPPER_EXT_H_ */
+#endif /* ST_ASIO_WRAPPER_NET_H_ */
