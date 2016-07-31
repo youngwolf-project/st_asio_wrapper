@@ -14,11 +14,11 @@
 #define ST_ASIO_WRAPPER_BASE_H_
 
 #include <time.h>
+#include <string>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <assert.h>
-#include <string>
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -64,29 +64,32 @@ namespace st_asio_wrapper
 		virtual const char* data() const = 0;
 	};
 
-	//if you want to replace packer or unpacker at runtime, please use this as the msg type
-	class replaceable_buffer
+	template<typename T>
+	class shared_buffer
 	{
 	public:
-		replaceable_buffer() {}
-		replaceable_buffer(const boost::shared_ptr<i_buffer>& _buffer) : buffer(_buffer) {}
-		replaceable_buffer(replaceable_buffer&& other) : buffer(other.buffer) {other.buffer.reset();}
-		replaceable_buffer(const replaceable_buffer& other) : buffer(other.buffer) {}
+		typedef boost::shared_ptr<T> buffer_type;
+		typedef const buffer_type buffer_ctype;
 
-		boost::shared_ptr<i_buffer> raw_buffer() {return buffer;}
-		boost::shared_ptr<const i_buffer> raw_buffer() const {return buffer;}
-		void raw_buffer(const boost::shared_ptr<i_buffer>& _buffer) {buffer = _buffer;}
+		shared_buffer() {}
+		shared_buffer(buffer_ctype& _buffer) : buffer(_buffer) {}
+		shared_buffer(shared_buffer&& other) : buffer(std::move(other.buffer)) {}
+		shared_buffer(const shared_buffer& other) : buffer(other.buffer) {}
+
+		buffer_type raw_buffer() {return buffer;}
+		void raw_buffer(buffer_ctype& _buffer) {buffer = _buffer;}
 
 		//the following five functions are needed by st_asio_wrapper, for other functions, depends on the implementation of your packer and unpacker
 		bool empty() const {return !buffer || buffer->empty();}
 		size_t size() const {return buffer ? buffer->size() : 0;}
 		const char* data() const {return buffer ? buffer->data() : nullptr;}
-		void swap(replaceable_buffer& other) {buffer.swap(other.buffer);}
+		void swap(shared_buffer& other) {buffer.swap(other.buffer);}
 		void clear() {buffer.reset();}
 
 	protected:
-		boost::shared_ptr<i_buffer> buffer;
+		buffer_type buffer;
 	};
+	typedef shared_buffer<i_buffer> replaceable_buffer; //if you want to replace packer or unpacker at runtime, please use this as the msg type
 
 	//packer concept
 	template<typename MsgType>

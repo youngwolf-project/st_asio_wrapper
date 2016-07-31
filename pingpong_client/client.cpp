@@ -8,7 +8,9 @@
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
-#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
+//#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
+#define ST_ASIO_DEFAULT_PACKER pooled_stream_packer
+#define ST_ASIO_DEFAULT_UNPACKER pooled_stream_unpacker
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
 //configuration
 
@@ -192,6 +194,7 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_REUSE_OBJECT
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY
+#undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER
 #undef ST_ASIO_MSG_BUFFER_SIZE
 //restore configuration

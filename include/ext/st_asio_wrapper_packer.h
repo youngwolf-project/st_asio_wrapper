@@ -13,7 +13,7 @@
 #ifndef ST_ASIO_WRAPPER_PACKER_H_
 #define ST_ASIO_WRAPPER_PACKER_H_
 
-#include "../st_asio_wrapper_base.h"
+#include "st_asio_wrapper_ext.h"
 
 #ifdef ST_ASIO_HUGE_MSG
 #define ST_ASIO_HEAD_TYPE	uint32_t
@@ -100,21 +100,12 @@ public:
 class replaceable_packer : public i_packer<replaceable_buffer>
 {
 public:
-	class buffer : public std::string, public i_buffer
-	{
-	public:
-		virtual bool empty() const {return std::string::empty();}
-		virtual size_t size() const {return std::string::size();}
-		virtual const char* data() const {return std::string::data();}
-	};
-
-public:
 	using i_packer<msg_type>::pack_msg;
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		packer p;
 		auto msg = p.pack_msg(pstr, len, num, native);
-		auto com = boost::make_shared<buffer>();
+		auto com = boost::make_shared<string_buffer>();
 		com->swap(msg);
 
 		return msg_type(com);
@@ -162,6 +153,37 @@ public:
 
 private:
 	std::string _prefix, _suffix;
+};
+
+class pooled_stream_packer : public i_packer<shared_buffer<most_primitive_buffer>>
+{
+public:
+	using i_packer<msg_type>::pack_msg;
+	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) //native will not take effect
+	{
+		msg_type msg(boost::make_shared<most_primitive_buffer>());
+		auto total_len = packer_helper::msg_size_check(0, pstr, len, num);
+		if ((size_t) -1 == total_len)
+			return msg;
+		else if (total_len > 0)
+		{
+			msg.raw_buffer()->assign(total_len);
+
+			total_len = 0;
+			for (size_t i = 0; i < num; ++i)
+				if (nullptr != pstr[i])
+				{
+					memcpy(std::next(msg.raw_buffer()->data(), total_len), pstr[i], len[i]);
+					total_len += len[i];
+				}
+		} //if (total_len > 0)
+
+		return msg;
+	}
+
+	virtual char* raw_data(msg_type& msg) const {return msg.raw_buffer()->data();}
+	virtual const char* raw_data(msg_ctype& msg) const {return msg.data();}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size();}
 };
 
 }} //namespace
