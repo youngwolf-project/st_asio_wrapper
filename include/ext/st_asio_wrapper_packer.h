@@ -161,13 +161,13 @@ public:
 	using i_packer<msg_type>::pack_msg;
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) //native will not take effect
 	{
-		msg_type msg(boost::make_shared<most_primitive_buffer>());
+		msg_type msg;
 		auto total_len = packer_helper::msg_size_check(0, pstr, len, num);
 		if ((size_t) -1 == total_len)
 			return msg;
 		else if (total_len > 0)
 		{
-			msg.raw_buffer()->assign(total_len);
+			msg.raw_buffer(msg_pool.ask_memory(total_len));
 
 			total_len = 0;
 			for (size_t i = 0; i < num; ++i)
@@ -184,6 +184,9 @@ public:
 	virtual char* raw_data(msg_type& msg) const {return msg.raw_buffer()->data();}
 	virtual const char* raw_data(msg_ctype& msg) const {return msg.data();}
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size();}
+
+protected:
+	memory_pool msg_pool;
 };
 
 }} //namespace

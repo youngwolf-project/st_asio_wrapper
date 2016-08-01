@@ -470,6 +470,7 @@ public:
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
 
 		msg_can.resize(msg_can.size() + 1);
+		buff->size(bytes_transferred);
 		msg_can.back().raw_buffer(buff);
 		return true;
 	}
@@ -477,28 +478,13 @@ public:
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return ec || bytes_transferred > 0 ? 0 : boost::asio::detail::default_max_transfer_size;}
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		bool found = false;
-		for (auto iter = std::begin(msg_pool); iter != std::end(msg_pool); ++iter)
-			if (iter->unique())
-			{
-				buff = *iter;
-				found = true;
-				break;
-			}
-
-		if (!found)
-		{
-			msg_pool.push_back(boost::make_shared<most_primitive_buffer>());
-			msg_pool.back()->assign(ST_ASIO_MSG_BUFFER_SIZE);
-			buff = msg_pool.back();
-		}
-
+		buff = msg_pool.ask_memory(ST_ASIO_MSG_BUFFER_SIZE);
 		return boost::asio::buffer(buff->data(), buff->size());
 	}
 
 protected:
 	msg_type::buffer_type buff;
-	boost::container::list<msg_type::buffer_type> msg_pool;
+	memory_pool msg_pool;
 };
 
 }} //namespace
