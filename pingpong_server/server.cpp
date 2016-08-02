@@ -5,10 +5,19 @@
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-//#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
+#define ST_ASIO_MSG_BUFFER_SIZE 65536
+
+//use the following macro to control the type of packer and unpacker
+#define PACKER_UNPACKER_TYPE	2
+//1-stream unpacker (non-protocol)
+//2-pooled_stream_packer and pooled_stream_unpacker (non-protocol)
+
+#if 1 == PACKER_UNPACKER_TYPE
+#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
+#elif 2 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER pooled_stream_packer
 #define ST_ASIO_DEFAULT_UNPACKER pooled_stream_unpacker
-#define ST_ASIO_MSG_BUFFER_SIZE 65536
+#endif
 //configuration
 
 #include "../include/ext/st_asio_wrapper_net.h"
@@ -22,10 +31,20 @@ using namespace st_asio_wrapper::ext;
 #define QUIT_COMMAND	"quit"
 #define LIST_STATUS		"status"
 
+#if 2 == PACKER_UNPACKER_TYPE
+memory_pool pool;
+#endif
+
 class echo_socket : public st_server_socket
 {
 public:
-	echo_socket(i_server& server_) : st_server_socket(server_) {}
+	echo_socket(i_server& server_) : st_server_socket(server_)
+	{
+#if 2 == PACKER_UNPACKER_TYPE
+		dynamic_cast<ST_ASIO_DEFAULT_PACKER*>(&*inner_packer())->mem_pool(pool);
+		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->mem_pool(pool);
+#endif
+	}
 
 protected:
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
@@ -78,6 +97,10 @@ int main(int argc, const char* argv[])
 		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
+#if 2 == PACKER_UNPACKER_TYPE
+			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.size(), pool.buffer_size());
+#endif
+			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
 		}
 	}

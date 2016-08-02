@@ -13,10 +13,11 @@
 //configuration
 
 //use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	1
+#define PACKER_UNPACKER_TYPE	4
 //1-default packer and unpacker, head(length) + body
 //2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
+//4-pooled packer and unpacker, head(length) + body
 
 #if 1 == PACKER_UNPACKER_TYPE
 //#define ST_ASIO_DEFAULT_PACKER replaceable_packer
@@ -26,6 +27,9 @@
 #elif 3 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
 #define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
+#elif 4 == PACKER_UNPACKER_TYPE
+#define ST_ASIO_DEFAULT_PACKER pooled_packer
+#define ST_ASIO_DEFAULT_UNPACKER pooled_unpacker
 #endif
 
 #include "../include/ext/st_asio_wrapper_net.h"
@@ -44,7 +48,9 @@ using namespace st_asio_wrapper::ext;
 #define RESUME_COMMAND	"resume"
 
 static bool check_msg;
-
+#if 4 == PACKER_UNPACKER_TYPE
+memory_pool pool;
+#endif
 ///////////////////////////////////////////////////
 //msg sending interface
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
@@ -63,10 +69,13 @@ public:
 	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0)
 	{
 #if 2 == PACKER_UNPACKER_TYPE
-		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
+		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->fixed_length(1024);
 #elif 3 == PACKER_UNPACKER_TYPE
-		dynamic_cast<prefix_suffix_packer*>(&*inner_packer())->prefix_suffix("begin", "end");
-		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
+		dynamic_cast<ST_ASIO_DEFAULT_PACKER*>(&*inner_packer())->prefix_suffix("begin", "end");
+		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->prefix_suffix("begin", "end");
+#elif 4 == PACKER_UNPACKER_TYPE
+		dynamic_cast<ST_ASIO_DEFAULT_PACKER*>(&*inner_packer())->mem_pool(pool);
+		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->mem_pool(pool);
 #endif
 	}
 
@@ -83,11 +92,13 @@ public:
 		memset(buff, msg_fill, msg_len);
 		memcpy(buff, &recv_index, sizeof(size_t)); //seq
 
-#if 2 == PACKER_UNPACKER_TYPE //there's no fixed_length_packer
+#if 2 == PACKER_UNPACKER_TYPE
+		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
 		send_native_msg(buff, msg_len);
 #else
 		send_msg(buff, msg_len);
 #endif
+
 		delete[] buff;
 	}
 
@@ -113,14 +124,19 @@ protected:
 #else
 		auto pstr = inner_packer()->raw_data(msg);
 		auto msg_len = inner_packer()->raw_data_len(msg);
+#if 2 == PACKER_UNPACKER_TYPE
+		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+		std::advance(pstr, -ST_ASIO_HEAD_LEN);
+		msg_len += ST_ASIO_HEAD_LEN;
 #endif
 
 		size_t send_index;
 		memcpy(&send_index, pstr, sizeof(size_t));
 		++send_index;
-		memcpy(pstr, &send_index, sizeof(size_t));
+		memcpy(pstr, &send_index, sizeof(size_t)); //seq
 
-#if 2 == PACKER_UNPACKER_TYPE //there's no fixed_length_packer
+#if 2 == PACKER_UNPACKER_TYPE
+		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
 		send_native_msg(pstr, msg_len);
 #else
 		send_msg(pstr, msg_len);
@@ -267,6 +283,10 @@ int main(int argc, const char* argv[])
 		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
+#if 4 == PACKER_UNPACKER_TYPE
+			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.size(), pool.buffer_size());
+#endif
+			puts("");
 			puts(client.get_statistic().to_string().data());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
@@ -312,14 +332,12 @@ int main(int argc, const char* argv[])
 			auto iter = std::begin(tok);
 			if (iter != std::end(tok)) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
 
-			auto native = false;
 #if 1 == PACKER_UNPACKER_TYPE
 			if (iter != std::end(tok)) msg_len = std::min(packer::get_max_msg_size(),
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq
 #elif 2 == PACKER_UNPACKER_TYPE
 			if (iter != std::end(tok)) ++iter;
 			msg_len = 1024; //we hard code this because we fixedly initialized the length of fixed_length_unpacker to 1024
-			native = true; //we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
 #elif 3 == PACKER_UNPACKER_TYPE
 			if (iter != std::end(tok)) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE,
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t)));
@@ -387,11 +405,21 @@ int main(int argc, const char* argv[])
 					switch (model)
 					{
 					case 0:
-						native ? client.safe_broadcast_native_msg(buff, msg_len) : client.safe_broadcast_msg(buff, msg_len);
+#if 2 == PACKER_UNPACKER_TYPE
+						//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+						client.safe_broadcast_native_msg(buff, msg_len);
+#else
+						client.safe_broadcast_msg(buff, msg_len);
+#endif
 						send_bytes += link_num * msg_len;
 						break;
 					case 1:
-						native ? client.safe_random_send_native_msg(buff, msg_len) : client.safe_random_send_msg(buff, msg_len);
+#if 2 == PACKER_UNPACKER_TYPE
+						//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+						client.safe_random_send_native_msg(buff, msg_len);
+#else
+						client.safe_random_send_msg(buff, msg_len);
+#endif
 						send_bytes += msg_len;
 						break;
 					default:

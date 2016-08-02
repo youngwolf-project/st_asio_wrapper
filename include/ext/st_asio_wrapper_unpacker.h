@@ -26,6 +26,7 @@
 
 namespace st_asio_wrapper { namespace ext {
 
+//protocol: length + body
 class unpacker : public i_unpacker<std::string>
 {
 public:
@@ -127,6 +128,48 @@ protected:
 	size_t remain_len; //half-baked msg
 };
 
+//protocol: length + body
+//use memory pool
+class pooled_unpacker : public i_unpacker<shared_buffer<most_primitive_buffer>>, public unpacker
+{
+public:
+	using i_unpacker<shared_buffer<most_primitive_buffer>>::msg_type;
+	using i_unpacker<shared_buffer<most_primitive_buffer>>::msg_ctype;
+	using i_unpacker<shared_buffer<most_primitive_buffer>>::container_type;
+
+	pooled_unpacker() : pool(nullptr) {}
+	void mem_pool(memory_pool& _pool) {pool = &_pool;}
+	memory_pool& mem_pool() {return *pool;}
+
+	virtual void reset_state() {unpacker::reset_state();}
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
+	{
+		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
+		auto unpack_ok = unpacker::parse_msg(bytes_transferred, msg_pos_can);
+		do_something_to_all(msg_pos_can, [this, &msg_can](decltype(*std::begin(msg_pos_can))& item) {
+			auto buff = pool->ask_memory(item.second);
+			memcpy(buff->data(), item.first, item.second);
+			msg_can.push_back(shared_buffer<most_primitive_buffer>(buff));
+		});
+
+		if (unpack_ok && remain_len > 0)
+		{
+			auto pnext = std::next(msg_pos_can.back().first, msg_pos_can.back().second);
+			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed data
+		}
+
+		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
+		return unpack_ok;
+	}
+
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return unpacker::completion_condition(ec, bytes_transferred);}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return unpacker::prepare_next_recv();}
+
+protected:
+	memory_pool* pool;
+};
+
+//protocol: UDP has message boundary, so we don't need a specific protocol to unpack it.
 class udp_unpacker : public i_udp_unpacker<std::string>
 {
 public:
@@ -137,6 +180,7 @@ protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
 };
 
+//protocol: length + body
 class replaceable_unpacker : public i_unpacker<replaceable_buffer>
 {
 public:
@@ -146,10 +190,10 @@ public:
 		unpacker::container_type tmp_can;
 		auto unpack_ok = unpacker_.parse_msg(bytes_transferred, tmp_can);
 		do_something_to_all(tmp_can, [&msg_can](decltype(*std::begin(tmp_can))& item) {
-			auto com = boost::make_shared<string_buffer>();
-			com->swap(item);
+			auto raw_buffer = boost::make_shared<string_buffer>();
+			raw_buffer->swap(item);
 			msg_can.resize(msg_can.size() + 1);
-			msg_can.back().raw_buffer(com);
+			msg_can.back().raw_buffer(raw_buffer);
 		});
 
 		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
@@ -163,6 +207,7 @@ protected:
 	unpacker unpacker_;
 };
 
+//protocol: UDP has message boundary, so we don't need a specific protocol to unpack it.
 class replaceable_udp_unpacker : public i_udp_unpacker<replaceable_buffer>
 {
 public:
@@ -179,6 +224,7 @@ protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
 };
 
+//protocol: length + body
 //this unpacker demonstrate how to forbid memory copying while parsing msgs (let asio write msg directly).
 class buffer_free_unpacker : public i_unpacker<most_primitive_buffer>
 {
@@ -260,6 +306,7 @@ private:
 	int step; //-1-error format, 0-want the head, 1-want the body
 };
 
+//protocol: fixed lenght
 class fixed_length_unpacker : public i_unpacker<std::string>
 {
 public:
@@ -321,6 +368,7 @@ private:
 	size_t remain_len; //half-baked msg
 };
 
+//protocol: [prefix] + body + suffix
 class prefix_suffix_unpacker : public i_unpacker<std::string>
 {
 public:
@@ -435,6 +483,7 @@ private:
 	size_t remain_len; //half-baked msg
 };
 
+//protocol: stream (non-protocol)
 class stream_unpacker : public i_unpacker<std::string>
 {
 public:
@@ -458,9 +507,15 @@ protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
 };
 
+//protocol: stream (non-protocol)
+//use memory pool
 class pooled_stream_unpacker : public i_unpacker<shared_buffer<most_primitive_buffer>>
 {
 public:
+	pooled_stream_unpacker() : pool(nullptr) {}
+	void mem_pool(memory_pool& _pool) {pool = &_pool;}
+	memory_pool& mem_pool() {return *pool;}
+
 	virtual void reset_state() {}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
@@ -469,22 +524,21 @@ public:
 
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
 
-		msg_can.resize(msg_can.size() + 1);
 		buff->size(bytes_transferred);
-		msg_can.back().raw_buffer(buff);
+		msg_can.push_back(shared_buffer<most_primitive_buffer>(buff));
 		return true;
 	}
 
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return ec || bytes_transferred > 0 ? 0 : boost::asio::detail::default_max_transfer_size;}
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		buff = msg_pool.ask_memory(ST_ASIO_MSG_BUFFER_SIZE);
-		return boost::asio::buffer(buff->data(), buff->size());
+		buff = pool->ask_memory(ST_ASIO_MSG_BUFFER_SIZE);
+		return boost::asio::buffer(buff->data(), buff->buffer_size());
 	}
 
 protected:
-	msg_type::buffer_type buff;
-	memory_pool msg_pool;
+	msg_type::buffer_type buff; //equal to memory_pool::object_type
+	memory_pool* pool;
 };
 
 }} //namespace

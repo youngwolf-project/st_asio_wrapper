@@ -53,6 +53,7 @@ public:
 	}
 };
 
+//protocol: length + body
 class packer : public i_packer<std::string>
 {
 public:
@@ -97,6 +98,64 @@ public:
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
 };
 
+//protocol: length + body
+//use memory pool
+class pooled_packer : public i_packer<shared_buffer<memory_pool::raw_object_type>>
+{
+public:
+	static size_t get_max_msg_size() {return ST_ASIO_MSG_BUFFER_SIZE - ST_ASIO_HEAD_LEN;}
+
+	pooled_packer() : pool(nullptr) {}
+	void mem_pool(memory_pool& _pool) {pool = &_pool;}
+	memory_pool& mem_pool() {return *pool;}
+
+	using i_packer<msg_type>::pack_msg;
+	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
+	{
+		msg_type msg;
+		auto pre_len = native ? 0 : ST_ASIO_HEAD_LEN;
+		auto total_len = packer_helper::msg_size_check(pre_len, pstr, len, num);
+		if ((size_t) -1 == total_len)
+			return msg;
+		else if (total_len > pre_len)
+		{
+			if (!native)
+			{
+				auto head_len = (ST_ASIO_HEAD_TYPE) total_len;
+				if (total_len != head_len)
+				{
+					unified_out::error_out("pack msg error: length exceeded the header's range!");
+					return msg;
+				}
+
+				msg.raw_buffer(pool->ask_memory(total_len));
+				head_len = ST_ASIO_HEAD_H2N(head_len);
+				memcpy(msg.raw_buffer()->data(), (const char*) &head_len, ST_ASIO_HEAD_LEN);
+			}
+			else
+				msg.raw_buffer(pool->ask_memory(total_len));
+
+			total_len = pre_len;
+			for (size_t i = 0; i < num; ++i)
+				if (nullptr != pstr[i])
+				{
+					memcpy(std::next(msg.raw_buffer()->data(), total_len), pstr[i], len[i]);
+					total_len += len[i];
+				}
+		} //if (total_len > pre_len)
+
+		return msg;
+	}
+
+	virtual char* raw_data(msg_type& msg) const {return std::next(msg.raw_buffer()->data(), ST_ASIO_HEAD_LEN);}
+	virtual const char* raw_data(msg_ctype& msg) const {return std::next(msg.data(), ST_ASIO_HEAD_LEN);}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
+
+protected:
+	memory_pool* pool;
+};
+
+//protocol: length + body
 class replaceable_packer : public i_packer<replaceable_buffer>
 {
 public:
@@ -116,6 +175,7 @@ public:
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
 };
 
+//protocol: [prefix] + body + suffix
 class prefix_suffix_packer : public i_packer<std::string>
 {
 public:
@@ -155,9 +215,15 @@ private:
 	std::string _prefix, _suffix;
 };
 
-class pooled_stream_packer : public i_packer<shared_buffer<most_primitive_buffer>>
+//protocol: stream (non-protocol)
+//use memory pool
+class pooled_stream_packer : public i_packer<shared_buffer<memory_pool::raw_object_type>>
 {
 public:
+	pooled_stream_packer() : pool(nullptr) {}
+	void mem_pool(memory_pool& _pool) {pool = &_pool;}
+	memory_pool& mem_pool() {return *pool;}
+
 	using i_packer<msg_type>::pack_msg;
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) //native will not take effect
 	{
@@ -167,7 +233,7 @@ public:
 			return msg;
 		else if (total_len > 0)
 		{
-			msg.raw_buffer(msg_pool.ask_memory(total_len));
+			msg.raw_buffer(pool->ask_memory(total_len));
 
 			total_len = 0;
 			for (size_t i = 0; i < num; ++i)
@@ -186,7 +252,7 @@ public:
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size();}
 
 protected:
-	memory_pool msg_pool;
+	memory_pool* pool;
 };
 
 }} //namespace

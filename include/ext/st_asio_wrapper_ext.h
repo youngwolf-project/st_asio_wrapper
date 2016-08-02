@@ -65,14 +65,23 @@ protected:
 class memory_pool
 {
 public:
+	typedef most_primitive_buffer raw_object_type;
+	typedef const raw_object_type raw_object_ctype;
 	typedef boost::shared_ptr<most_primitive_buffer> object_type;
+	typedef const object_type object_ctype;
 
 	memory_pool() {}
-	memory_pool(size_t block_count, size_t block_size) {for (size_t i = 0; i < block_count; ++i) pool.push_back(boost::make_shared<most_primitive_buffer>(block_size));}
+	memory_pool(size_t block_count, size_t block_size) {init_pool(block_count, block_size);}
+	//not thread safe
+	void init_pool(size_t block_count, size_t block_size) {for (size_t i = 0; i < block_count; ++i) pool.push_back(boost::make_shared<most_primitive_buffer>(block_size));}
 
-	size_t size() const {return pool.size();}
+	size_t size() {boost::shared_lock<boost::shared_mutex> lock(mutex); return pool.size();} //memory block amount
+	uint_fast64_t buffer_size() {uint_fast64_t size = 0; do_something_to_all(pool, mutex, [&](object_ctype& item) {size += item->buffer_size();}); return size;}
+
 	object_type ask_memory(size_t block_size, bool best_fit = false)
 	{
+		boost::unique_lock<boost::shared_mutex> lock(mutex);
+
 		object_type re;
 		if (best_fit)
 		{
@@ -109,6 +118,7 @@ public:
 
 protected:
 	boost::container::list<object_type> pool;
+	boost::shared_mutex mutex;
 };
 
 }} //namespace
