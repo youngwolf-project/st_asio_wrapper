@@ -5,7 +5,7 @@
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_CUSTOM_LOG
-#define ST_ASIO_DEFAULT_UNPACKER buffer_free_unpacker
+#define ST_ASIO_DEFAULT_UNPACKER non_copy_unpacker
 //#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 
 //the following three macros demonstrate how to support huge msg(exceed 65535 - 2).

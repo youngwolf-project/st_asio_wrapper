@@ -284,7 +284,7 @@ int main(int argc, const char* argv[])
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
 #if 4 == PACKER_UNPACKER_TYPE
-			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.size(), pool.buffer_size());
+			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.available_size(), pool.available_buffer_size());
 #endif
 			puts("");
 			puts(client.get_statistic().to_string().data());
@@ -446,6 +446,10 @@ int main(int argc, const char* argv[])
 			} // if (total_data_num > 0)
 		}
 	}
+
+#if 4 == PACKER_UNPACKER_TYPE
+	pool.stop();
+#endif
 
     return 0;
 }

@@ -100,7 +100,7 @@ public:
 
 //protocol: length + body
 //use memory pool
-class pooled_packer : public i_packer<shared_buffer<memory_pool::raw_object_type>>
+class pooled_packer : public i_packer<shared_buffer<memory_pool::raw_buffer_type>>
 {
 public:
 	static size_t get_max_msg_size() {return ST_ASIO_MSG_BUFFER_SIZE - ST_ASIO_HEAD_LEN;}
@@ -128,12 +128,12 @@ public:
 					return msg;
 				}
 
-				msg.raw_buffer(pool->ask_memory(total_len));
+				msg.raw_buffer(pool->checkout(total_len));
 				head_len = ST_ASIO_HEAD_H2N(head_len);
 				memcpy(msg.raw_buffer()->data(), (const char*) &head_len, ST_ASIO_HEAD_LEN);
 			}
 			else
-				msg.raw_buffer(pool->ask_memory(total_len));
+				msg.raw_buffer(pool->checkout(total_len));
 
 			total_len = pre_len;
 			for (size_t i = 0; i < num; ++i)
@@ -217,7 +217,7 @@ private:
 
 //protocol: stream (non-protocol)
 //use memory pool
-class pooled_stream_packer : public i_packer<shared_buffer<memory_pool::raw_object_type>>
+class pooled_stream_packer : public i_packer<shared_buffer<memory_pool::raw_buffer_type>>
 {
 public:
 	pooled_stream_packer() : pool(nullptr) {}
@@ -233,7 +233,7 @@ public:
 			return msg;
 		else if (total_len > 0)
 		{
-			msg.raw_buffer(pool->ask_memory(total_len));
+			msg.raw_buffer(pool->checkout(total_len));
 
 			total_len = 0;
 			for (size_t i = 0; i < num; ++i)

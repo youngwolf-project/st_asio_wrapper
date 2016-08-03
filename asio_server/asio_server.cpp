@@ -190,7 +190,7 @@ int main(int argc, const char* argv[])
 			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
 #if 4 == PACKER_UNPACKER_TYPE
-			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.size(), pool.buffer_size());
+			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.available_size(), pool.available_buffer_size());
 #endif
 			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
@@ -227,6 +227,10 @@ int main(int argc, const char* argv[])
 //				server_.do_something_to_all([&str](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(str);});
 		}
 	}
+
+#if 4 == PACKER_UNPACKER_TYPE
+	pool.stop();
+#endif
 
 	return 0;
 }

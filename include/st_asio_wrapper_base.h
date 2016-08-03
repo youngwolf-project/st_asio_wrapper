@@ -64,6 +64,7 @@ namespace st_asio_wrapper
 		virtual const char* data() const = 0;
 	};
 
+	//convert '->' operation to '.' operation
 	template<typename T>
 	class shared_buffer
 	{

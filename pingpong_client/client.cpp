@@ -7,11 +7,11 @@
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-#define ST_ASIO_WANT_MSG_SEND_NOTIFY
+//#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
 
 //use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	2
+#define PACKER_UNPACKER_TYPE	1
 //1-stream unpacker (non-protocol)
 //2-pooled_stream_packer and pooled_stream_unpacker (non-protocol)
 
@@ -169,7 +169,7 @@ int main(int argc, const char* argv[])
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
 #if 2 == PACKER_UNPACKER_TYPE
-			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.size(), pool.buffer_size());
+			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.available_size(), pool.available_buffer_size());
 #endif
 			puts("");
 			puts(client.get_statistic().to_string().data());
@@ -207,6 +207,10 @@ int main(int argc, const char* argv[])
 			delete[] init_msg;
 		}
 	}
+
+#if 2 == PACKER_UNPACKER_TYPE
+	pool.stop();
+#endif
 
     return 0;
 }

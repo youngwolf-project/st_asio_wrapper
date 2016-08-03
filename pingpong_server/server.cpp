@@ -8,7 +8,7 @@
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
 
 //use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	2
+#define PACKER_UNPACKER_TYPE	1
 //1-stream unpacker (non-protocol)
 //2-pooled_stream_packer and pooled_stream_unpacker (non-protocol)
 
@@ -98,12 +98,16 @@ int main(int argc, const char* argv[])
 		{
 			printf("link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
 #if 2 == PACKER_UNPACKER_TYPE
-			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.size(), pool.buffer_size());
+			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.available_size(), pool.available_buffer_size());
 #endif
 			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
 		}
 	}
+
+#if 2 == PACKER_UNPACKER_TYPE
+	pool.stop();
+#endif
 
 	return 0;
 }

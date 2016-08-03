@@ -15,6 +15,7 @@
 
 #include <string>
 #include <boost/array.hpp>
+#include <boost/container/set.hpp>
 
 #include "../st_asio_wrapper_base.h"
 
@@ -29,13 +30,13 @@ public:
 	virtual const char* data() const {return std::string::data();}
 };
 
-class most_primitive_buffer
+class basic_buffer
 {
 public:
-	most_primitive_buffer() {do_detach();}
-	most_primitive_buffer(size_t len) {do_detach(); assign(len);}
-	most_primitive_buffer(most_primitive_buffer&& other) {do_attach(other.buff, other.len, other.buff_len); other.do_detach();}
-	~most_primitive_buffer() {free();}
+	basic_buffer() {do_detach();}
+	basic_buffer(size_t len) {do_detach(); assign(len);}
+	basic_buffer(basic_buffer&& other) {do_attach(other.buff, other.len, other.buff_len); other.do_detach();}
+	~basic_buffer() {free();}
 
 	void assign(size_t len) {free(); do_attach(new char[len], len, len);}
 	void free() {delete[] buff; do_detach();}
@@ -44,7 +45,7 @@ public:
 	bool empty() const {return 0 == len || nullptr == buff;}
 	size_t size() const {return len;}
 	const char* data() const {return buff;}
-	void swap(most_primitive_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len);}
+	void swap(basic_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len);}
 	void clear() {free();}
 
 	//functions needed by packer and unpacker
@@ -61,64 +62,85 @@ protected:
 	size_t len, buff_len;
 };
 
-//not thread safe, please pay attention
-class memory_pool
+class pooled_buffer : public basic_buffer
 {
 public:
-	typedef most_primitive_buffer raw_object_type;
-	typedef const raw_object_type raw_object_ctype;
-	typedef boost::shared_ptr<most_primitive_buffer> object_type;
-	typedef const object_type object_ctype;
-
-	memory_pool() {}
-	memory_pool(size_t block_count, size_t block_size) {init_pool(block_count, block_size);}
-	//not thread safe
-	void init_pool(size_t block_count, size_t block_size) {for (size_t i = 0; i < block_count; ++i) pool.push_back(boost::make_shared<most_primitive_buffer>(block_size));}
-
-	size_t size() {boost::shared_lock<boost::shared_mutex> lock(mutex); return pool.size();} //memory block amount
-	uint_fast64_t buffer_size() {uint_fast64_t size = 0; do_something_to_all(pool, mutex, [&](object_ctype& item) {size += item->buffer_size();}); return size;}
-
-	object_type ask_memory(size_t block_size, bool best_fit = false)
+	class i_memory_pool
 	{
+	public:
+		typedef pooled_buffer raw_buffer_type;
+		typedef const raw_buffer_type raw_buffer_ctype;
+		typedef boost::shared_ptr<raw_buffer_type> buffer_type;
+		typedef const buffer_type buffer_ctype;
+
+		virtual buffer_type checkout(size_t block_size, bool best_fit = false) = 0;
+		virtual void checkin(raw_buffer_type& buff) = 0;
+	};
+
+public:
+	pooled_buffer(i_memory_pool& _pool) : pool(_pool) {}
+	pooled_buffer(i_memory_pool& _pool, size_t len) : basic_buffer(len), pool(_pool) {}
+	pooled_buffer(pooled_buffer&& other) : basic_buffer(std::move(other)), pool(other.pool) {}
+	~pooled_buffer() {pool.checkin(*this);}
+
+protected:
+	i_memory_pool& pool;
+};
+
+class memory_pool : public pooled_buffer::i_memory_pool
+{
+public:
+	memory_pool() : stopped_(false) {}
+	memory_pool(size_t block_count, size_t block_size) : stopped_(false) {init_pool(block_count, block_size);}
+
+	void stop() {stopped_ = true;}
+	bool stopped() const {return stopped_;}
+
+	//not thread safe, and can call many times before using this memory pool
+	void init_pool(size_t block_count, size_t block_size) {for (size_t i = 0; i < block_count; ++i) pool.insert(boost::make_shared<raw_buffer_type>(*this, block_size));}
+	size_t available_size() {boost::shared_lock<boost::shared_mutex> lock(mutex); return pool.size();}
+	uint_fast64_t available_buffer_size() {uint_fast64_t size = 0; do_something_to_all(pool, mutex, [&](buffer_ctype& item) {size += item->buffer_size();}); return size;}
+
+public:
+	virtual buffer_type checkout(size_t block_size, bool best_fit = false)
+	{
+		if (stopped())
+			return buffer_type();
+
+		auto find_buffer_predicate = [block_size](buffer_ctype& item)->bool {return item->buffer_size() >= block_size;};
+
 		boost::unique_lock<boost::shared_mutex> lock(mutex);
+		auto iter = best_fit ? std::prev(std::find_if(pool.rbegin(), pool.rend(), find_buffer_predicate).base()) :
+			std::find_if(std::begin(pool), std::end(pool), find_buffer_predicate);
 
-		object_type re;
-		if (best_fit)
+		if (iter != std::end(pool))
 		{
-			object_type candidate;
-			size_t gap = -1;
-			for (auto iter = std::begin(pool); iter != std::end(pool); ++iter)
-				if (iter->unique() && (*iter)->buffer_size() >= block_size)
-				{
-					auto this_gap = (*iter)->buffer_size() - block_size;
-					if (this_gap < gap)
-					{
-						candidate = *iter;
-						if (0 == (gap = this_gap))
-							break;
-					}
-				}
-			re = candidate;
-		}
-		else
-			for (auto iter = std::begin(pool); !re && iter != std::end(pool); ++iter)
-				if (iter->unique() && (*iter)->buffer_size() >= block_size)
-					re = *iter;
+			auto buff(std::move(*iter));
+			buff->size(block_size);
+			pool.erase(iter);
 
-		if (re)
-			re->size(block_size);
-		else
-		{
-			re = boost::make_shared<most_primitive_buffer>(block_size);
-			pool.push_back(re);
+			return buff;
 		}
+		lock.unlock();
 
-		return re;
+		return boost::make_shared<raw_buffer_type>(*this, block_size);
+	}
+
+	virtual void checkin(raw_buffer_type& buff)
+	{
+		if (stopped())
+			return;
+
+		boost::unique_lock<boost::shared_mutex> lock(mutex);
+		pool.insert(boost::make_shared<raw_buffer_type>(std::move(buff)));
 	}
 
 protected:
-	boost::container::list<object_type> pool;
+	struct buffer_compare {bool operator()(buffer_ctype& left, buffer_ctype& right) const {return left->buffer_size() > right->buffer_size();}};
+
+	boost::container::multiset<buffer_type, buffer_compare> pool;
 	boost::shared_mutex mutex;
+	bool stopped_;
 };
 
 }} //namespace

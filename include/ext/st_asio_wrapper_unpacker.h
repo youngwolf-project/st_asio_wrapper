@@ -130,12 +130,12 @@ protected:
 
 //protocol: length + body
 //use memory pool
-class pooled_unpacker : public i_unpacker<shared_buffer<most_primitive_buffer>>, public unpacker
+class pooled_unpacker : public i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>, public unpacker
 {
 public:
-	using i_unpacker<shared_buffer<most_primitive_buffer>>::msg_type;
-	using i_unpacker<shared_buffer<most_primitive_buffer>>::msg_ctype;
-	using i_unpacker<shared_buffer<most_primitive_buffer>>::container_type;
+	using i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>::msg_type;
+	using i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>::msg_ctype;
+	using i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>::container_type;
 
 	pooled_unpacker() : pool(nullptr) {}
 	void mem_pool(memory_pool& _pool) {pool = &_pool;}
@@ -147,9 +147,9 @@ public:
 		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
 		auto unpack_ok = unpacker::parse_msg(bytes_transferred, msg_pos_can);
 		do_something_to_all(msg_pos_can, [this, &msg_can](decltype(*std::begin(msg_pos_can))& item) {
-			auto buff = pool->ask_memory(item.second);
+			auto buff = pool->checkout(item.second);
 			memcpy(buff->data(), item.first, item.second);
-			msg_can.push_back(shared_buffer<most_primitive_buffer>(buff));
+			msg_can.push_back(msg_type(buff));
 		});
 
 		if (unpack_ok && remain_len > 0)
@@ -226,10 +226,10 @@ protected:
 
 //protocol: length + body
 //this unpacker demonstrate how to forbid memory copying while parsing msgs (let asio write msg directly).
-class buffer_free_unpacker : public i_unpacker<most_primitive_buffer>
+class non_copy_unpacker : public i_unpacker<basic_buffer>
 {
 public:
-	buffer_free_unpacker() {reset_state();}
+	non_copy_unpacker() {reset_state();}
 	size_t current_msg_length() const {return raw_buff.size();} //current msg's total length(not include the head), 0 means not available
 
 public:
@@ -509,7 +509,7 @@ protected:
 
 //protocol: stream (non-protocol)
 //use memory pool
-class pooled_stream_unpacker : public i_unpacker<shared_buffer<most_primitive_buffer>>
+class pooled_stream_unpacker : public i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>
 {
 public:
 	pooled_stream_unpacker() : pool(nullptr) {}
@@ -525,19 +525,19 @@ public:
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
 
 		buff->size(bytes_transferred);
-		msg_can.push_back(shared_buffer<most_primitive_buffer>(buff));
+		msg_can.push_back(msg_type(buff));
 		return true;
 	}
 
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return ec || bytes_transferred > 0 ? 0 : boost::asio::detail::default_max_transfer_size;}
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		buff = pool->ask_memory(ST_ASIO_MSG_BUFFER_SIZE);
+		buff = pool->checkout(ST_ASIO_MSG_BUFFER_SIZE);
 		return boost::asio::buffer(buff->data(), buff->buffer_size());
 	}
 
 protected:
-	msg_type::buffer_type buff; //equal to memory_pool::object_type
+	msg_type::buffer_type buff; //equal to memory_pool::buffer_type
 	memory_pool* pool;
 };
 
