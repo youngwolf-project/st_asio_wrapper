@@ -34,6 +34,12 @@
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 
+#if defined(_MSC_VER) || defined(__i386__)
+#define uint64_format "%llu"
+#else // defined(__GNUC__) && defined(__x86_64__)
+#define uint64_format "%lu"
+#endif
+
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
@@ -190,7 +196,7 @@ int main(int argc, const char* argv[])
 			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
 #if 4 == PACKER_UNPACKER_TYPE
-			printf("pool block amount: " ST_ASIO_SF ", pool total size: %llu\n", pool.available_size(), pool.available_buffer_size());
+			printf("pool block amount: " ST_ASIO_SF ", pool total size: " uint64_format "\n", pool.available_size(), pool.available_buffer_size());
 #endif
 			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
