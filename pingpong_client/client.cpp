@@ -11,7 +11,7 @@
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
 
 //use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	1
+#define PACKER_UNPACKER_TYPE	2
 //1-stream unpacker (non-protocol)
 //2-pooled_stream_packer and pooled_stream_unpacker (non-protocol)
 

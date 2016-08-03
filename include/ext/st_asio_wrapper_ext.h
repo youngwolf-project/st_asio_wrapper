@@ -107,17 +107,30 @@ public:
 		if (stopped())
 			return buffer_type();
 
-		auto find_buffer_predicate = [block_size](buffer_ctype& item)->bool {return item->buffer_size() >= block_size;};
-
 		boost::unique_lock<boost::shared_mutex> lock(mutex);
-		auto iter = best_fit ? std::prev(std::find_if(pool.rbegin(), pool.rend(), find_buffer_predicate).base()) :
-			std::find_if(std::begin(pool), std::end(pool), find_buffer_predicate);
-
-		if (iter != std::end(pool))
+		auto hit_iter = std::end(pool);
+		if (!pool.empty())
 		{
-			auto buff(std::move(*iter));
+			auto max_buffer_size = (*std::begin(pool))->buffer_size();
+			if (max_buffer_size >= block_size)
+			{
+				if (!best_fit || max_buffer_size == block_size)
+					hit_iter = std::begin(pool); //worst fit
+				else
+					for (auto iter = pool.rbegin(); iter != pool.rend(); ++iter)
+						if ((*iter)->buffer_size() >= block_size)
+						{
+							hit_iter = std::prev(iter.base());
+							break;
+						}
+			}
+		}
+
+		if (hit_iter != std::end(pool))
+		{
+			auto buff(std::move(*hit_iter));
 			buff->size(block_size);
-			pool.erase(iter);
+			pool.erase(hit_iter);
 
 			return buff;
 		}
