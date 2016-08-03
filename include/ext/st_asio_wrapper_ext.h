@@ -108,31 +108,32 @@ public:
 			return buffer_type();
 
 		boost::unique_lock<boost::shared_mutex> lock(mutex);
-		auto hit_iter = std::end(pool);
 		if (!pool.empty())
 		{
 			auto max_buffer_size = (*std::begin(pool))->buffer_size();
 			if (max_buffer_size >= block_size)
 			{
-				if (!best_fit || max_buffer_size == block_size)
-					hit_iter = std::begin(pool); //worst fit
-				else
+				auto hit_iter = std::begin(pool); //worst fit
+				if (best_fit && max_buffer_size > block_size)
+				{
+					hit_iter = std::end(pool);
 					for (auto iter = pool.rbegin(); iter != pool.rend(); ++iter)
 						if ((*iter)->buffer_size() >= block_size)
 						{
 							hit_iter = std::prev(iter.base());
 							break;
 						}
+				}
+
+				if (hit_iter != std::end(pool))
+				{
+					auto buff(std::move(*hit_iter));
+					buff->size(block_size);
+					pool.erase(hit_iter);
+
+					return buff;
+				}
 			}
-		}
-
-		if (hit_iter != std::end(pool))
-		{
-			auto buff(std::move(*hit_iter));
-			buff->size(block_size);
-			pool.erase(hit_iter);
-
-			return buff;
 		}
 		lock.unlock();
 
