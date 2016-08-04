@@ -100,14 +100,14 @@ public:
 
 //protocol: length + body
 //use memory pool
-class pooled_packer : public i_packer<shared_buffer<memory_pool::raw_buffer_type>>
+class pooled_packer : public i_packer<memory_pool::buffer_type>
 {
 public:
 	static size_t get_max_msg_size() {return ST_ASIO_MSG_BUFFER_SIZE - ST_ASIO_HEAD_LEN;}
 
 	pooled_packer() : pool(nullptr) {}
 	void mem_pool(memory_pool& _pool) {pool = &_pool;}
-	memory_pool& mem_pool() {return *pool;}
+	memory_pool* mem_pool() const {return pool;}
 
 	using i_packer<msg_type>::pack_msg;
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
@@ -128,18 +128,18 @@ public:
 					return msg;
 				}
 
-				msg.raw_buffer(pool->checkout(total_len));
+				msg.swap(pool->checkout(total_len));
 				head_len = ST_ASIO_HEAD_H2N(head_len);
-				memcpy(msg.raw_buffer()->data(), (const char*) &head_len, ST_ASIO_HEAD_LEN);
+				memcpy(msg.data(), (const char*) &head_len, ST_ASIO_HEAD_LEN);
 			}
 			else
-				msg.raw_buffer(pool->checkout(total_len));
+				msg.swap(pool->checkout(total_len));
 
 			total_len = pre_len;
 			for (size_t i = 0; i < num; ++i)
 				if (nullptr != pstr[i])
 				{
-					memcpy(std::next(msg.raw_buffer()->data(), total_len), pstr[i], len[i]);
+					memcpy(std::next(msg.data(), total_len), pstr[i], len[i]);
 					total_len += len[i];
 				}
 		} //if (total_len > pre_len)
@@ -147,7 +147,7 @@ public:
 		return msg;
 	}
 
-	virtual char* raw_data(msg_type& msg) const {return std::next(msg.raw_buffer()->data(), ST_ASIO_HEAD_LEN);}
+	virtual char* raw_data(msg_type& msg) const {return std::next(msg.data(), ST_ASIO_HEAD_LEN);}
 	virtual const char* raw_data(msg_ctype& msg) const {return std::next(msg.data(), ST_ASIO_HEAD_LEN);}
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
 
@@ -162,12 +162,10 @@ public:
 	using i_packer<msg_type>::pack_msg;
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
-		packer p;
-		auto msg = p.pack_msg(pstr, len, num, native);
-		auto com = boost::make_shared<string_buffer>();
-		com->swap(msg);
-
-		return msg_type(com);
+		auto raw_msg = new string_buffer();
+		auto str = packer().pack_msg(pstr, len, num, native);
+		raw_msg->swap(str);
+		return msg_type(raw_msg);
 	}
 
 	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(std::next(msg.data(), ST_ASIO_HEAD_LEN));}
@@ -217,12 +215,12 @@ private:
 
 //protocol: stream (non-protocol)
 //use memory pool
-class pooled_stream_packer : public i_packer<shared_buffer<memory_pool::raw_buffer_type>>
+class pooled_stream_packer : public i_packer<memory_pool::buffer_type>
 {
 public:
 	pooled_stream_packer() : pool(nullptr) {}
 	void mem_pool(memory_pool& _pool) {pool = &_pool;}
-	memory_pool& mem_pool() {return *pool;}
+	memory_pool* mem_pool() const {return pool;}
 
 	using i_packer<msg_type>::pack_msg;
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) //native will not take effect
@@ -233,13 +231,13 @@ public:
 			return msg;
 		else if (total_len > 0)
 		{
-			msg.raw_buffer(pool->checkout(total_len));
+			msg.swap(pool->checkout(total_len));
 
 			total_len = 0;
 			for (size_t i = 0; i < num; ++i)
 				if (nullptr != pstr[i])
 				{
-					memcpy(std::next(msg.raw_buffer()->data(), total_len), pstr[i], len[i]);
+					memcpy(std::next(msg.data(), total_len), pstr[i], len[i]);
 					total_len += len[i];
 				}
 		} //if (total_len > 0)
@@ -247,7 +245,7 @@ public:
 		return msg;
 	}
 
-	virtual char* raw_data(msg_type& msg) const {return msg.raw_buffer()->data();}
+	virtual char* raw_data(msg_type& msg) const {return msg.data();}
 	virtual const char* raw_data(msg_ctype& msg) const {return msg.data();}
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size();}
 

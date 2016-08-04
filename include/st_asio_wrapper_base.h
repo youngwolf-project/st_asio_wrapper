@@ -55,42 +55,42 @@ namespace st_asio_wrapper
 {
 	class i_buffer
 	{
-	protected:
+	public:
 		virtual ~i_buffer() {}
 
-	public:
 		virtual bool empty() const = 0;
 		virtual size_t size() const = 0;
 		virtual const char* data() const = 0;
 	};
 
 	//convert '->' operation to '.' operation
+	//user need to allocate object for this class, and this class will free it
 	template<typename T>
-	class shared_buffer
+	class proxy_buffer : public boost::noncopyable
 	{
 	public:
-		typedef boost::shared_ptr<T> buffer_type;
-		typedef const buffer_type buffer_ctype;
+		typedef T* buffer_type;
+		typedef const T* buffer_ctype;
 
-		shared_buffer() {}
-		shared_buffer(buffer_ctype& _buffer) : buffer(_buffer) {}
-		shared_buffer(shared_buffer&& other) : buffer(std::move(other.buffer)) {}
-		shared_buffer(const shared_buffer& other) : buffer(other.buffer) {}
+		proxy_buffer() : buffer(nullptr) {}
+		proxy_buffer(buffer_type _buffer) : buffer(_buffer) {}
+		proxy_buffer(proxy_buffer&& other) : buffer(other.buffer) {other.buffer = nullptr;}
+		~proxy_buffer() {clear();}
 
 		buffer_type raw_buffer() {return buffer;}
-		void raw_buffer(buffer_ctype& _buffer) {buffer = _buffer;}
+		void raw_buffer(buffer_type _buffer) {buffer = _buffer;}
 
-		//the following five functions are needed by st_asio_wrapper, for other functions, depends on the implementation of your packer and unpacker
-		bool empty() const {return !buffer || buffer->empty();}
-		size_t size() const {return buffer ? buffer->size() : 0;}
-		const char* data() const {return buffer ? buffer->data() : nullptr;}
-		void swap(shared_buffer& other) {buffer.swap(other.buffer);}
-		void clear() {buffer.reset();}
+		//the following five functions are needed by st_asio_wrapper
+		bool empty() const {return nullptr == buffer || buffer->empty();}
+		size_t size() const {return nullptr == buffer ? 0 : buffer->size();}
+		const char* data() const {return nullptr == buffer ? nullptr : buffer->data();}
+		void swap(proxy_buffer& other) {std::swap(buffer, other.buffer);}
+		void clear() {delete buffer; buffer = nullptr;}
 
 	protected:
 		buffer_type buffer;
 	};
-	typedef shared_buffer<i_buffer> replaceable_buffer; //if you want to replace packer or unpacker at runtime, please use this as the msg type
+	typedef proxy_buffer<i_buffer> replaceable_buffer; //if you want to replace packer or unpacker at runtime, please use this as the msg type
 
 	//packer concept
 	template<typename MsgType>

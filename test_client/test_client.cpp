@@ -14,14 +14,15 @@
 
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	4
-//1-default packer and unpacker, head(length) + body
+//0-default packer and unpacker, head(length) + body
+//1-default replaceable_packer and replaceable_unpacker, head(length) + body
 //2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
 //4-pooled packer and unpacker, head(length) + body
 
 #if 1 == PACKER_UNPACKER_TYPE
-//#define ST_ASIO_DEFAULT_PACKER replaceable_packer
-//#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
+#define ST_ASIO_DEFAULT_PACKER replaceable_packer
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 #elif 2 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
@@ -230,6 +231,11 @@ public:
 int main(int argc, const char* argv[])
 {
 	printf("usage: test_client [<service thread number=1> [<port=%d> [<ip=%s> [link num=16]]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
+/*	memory_pool pool;
+	pooled_buffer a(&pool, 100);
+	pool.checkin(a);
+	if (a.empty()) puts("a is empty");
+	printf("pool block amount: " ST_ASIO_SF ", pool total size: " uint64_format "\n", pool.available_size(), pool.available_buffer_size());*/
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -290,7 +296,8 @@ int main(int argc, const char* argv[])
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
 #if 4 == PACKER_UNPACKER_TYPE
-			printf("pool block amount: " ST_ASIO_SF ", pool total size: " uint64_format "\n", pool.available_size(), pool.available_buffer_size());
+			puts("");
+			puts(pool.get_statistic().data());
 #endif
 			puts("");
 			puts(client.get_statistic().to_string().data());
@@ -452,10 +459,6 @@ int main(int argc, const char* argv[])
 			} // if (total_data_num > 0)
 		}
 	}
-
-#if 4 == PACKER_UNPACKER_TYPE
-	pool.stop();
-#endif
 
     return 0;
 }

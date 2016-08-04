@@ -87,13 +87,16 @@ protected:
 #endif
 
 private:
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	void handle_msg(out_msg_ctype& msg)
 	{
-#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 		recv_bytes += msg.size();
 		if (recv_bytes >= total_bytes && 0 == --completed_session_num)
 			begin_time.stop();
+	}
 #else
+	void handle_msg(out_msg_type& msg)
+	{
 		if (0 == total_bytes)
 			return;
 
@@ -106,8 +109,8 @@ private:
 		}
 		else
 			direct_send_msg(std::move(msg));
-#endif
 	}
+#endif
 
 private:
 	uint64_t total_bytes, send_bytes, recv_bytes;
@@ -175,7 +178,8 @@ int main(int argc, const char* argv[])
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
 #if 2 == PACKER_UNPACKER_TYPE
-			printf("pool block amount: " ST_ASIO_SF ", pool total size: " uint64_format "\n", pool.available_size(), pool.available_buffer_size());
+			puts("");
+			puts(pool.get_statistic().data());
 #endif
 			puts("");
 			puts(client.get_statistic().to_string().data());
@@ -213,10 +217,6 @@ int main(int argc, const char* argv[])
 			delete[] init_msg;
 		}
 	}
-
-#if 2 == PACKER_UNPACKER_TYPE
-	pool.stop();
-#endif
 
     return 0;
 }

@@ -130,16 +130,16 @@ protected:
 
 //protocol: length + body
 //use memory pool
-class pooled_unpacker : public i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>, public unpacker
+class pooled_unpacker : public i_unpacker<memory_pool::buffer_type>, public unpacker
 {
 public:
-	using i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>::msg_type;
-	using i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>::msg_ctype;
-	using i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>::container_type;
+	using i_unpacker<memory_pool::buffer_type>::msg_type;
+	using i_unpacker<memory_pool::buffer_type>::msg_ctype;
+	using i_unpacker<memory_pool::buffer_type>::container_type;
 
 	pooled_unpacker() : pool(nullptr) {}
 	void mem_pool(memory_pool& _pool) {pool = &_pool;}
-	memory_pool& mem_pool() {return *pool;}
+	memory_pool* mem_pool() const {return pool;}
 
 	virtual void reset_state() {unpacker::reset_state();}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
@@ -148,8 +148,8 @@ public:
 		auto unpack_ok = unpacker::parse_msg(bytes_transferred, msg_pos_can);
 		do_something_to_all(msg_pos_can, [this, &msg_can](decltype(*std::begin(msg_pos_can))& item) {
 			auto buff = pool->checkout(item.second);
-			memcpy(buff->data(), item.first, item.second);
-			msg_can.push_back(msg_type(buff));
+			memcpy(buff.data(), item.first, item.second);
+			msg_can.push_back(std::move(buff));
 		});
 
 		if (unpack_ok && remain_len > 0)
@@ -190,7 +190,7 @@ public:
 		unpacker::container_type tmp_can;
 		auto unpack_ok = unpacker_.parse_msg(bytes_transferred, tmp_can);
 		do_something_to_all(tmp_can, [&msg_can](decltype(*std::begin(tmp_can))& item) {
-			auto raw_buffer = boost::make_shared<string_buffer>();
+			auto raw_buffer = new string_buffer();
 			raw_buffer->swap(item);
 			msg_can.resize(msg_can.size() + 1);
 			msg_can.back().raw_buffer(raw_buffer);
@@ -214,9 +214,10 @@ public:
 	virtual msg_type parse_msg(size_t bytes_transferred)
 	{
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
-		auto com = boost::make_shared<string_buffer>();
-		com->assign(raw_buff.data(), bytes_transferred);
-		return msg_type(com);
+
+		auto raw_msg = new string_buffer();
+		raw_msg->assign(raw_buff.data(), bytes_transferred);
+		return msg_type(raw_msg);
 	}
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
 
@@ -509,12 +510,12 @@ protected:
 
 //protocol: stream (non-protocol)
 //use memory pool
-class pooled_stream_unpacker : public i_unpacker<shared_buffer<memory_pool::raw_buffer_type>>
+class pooled_stream_unpacker : public i_unpacker<memory_pool::buffer_type>
 {
 public:
 	pooled_stream_unpacker() : pool(nullptr) {}
 	void mem_pool(memory_pool& _pool) {pool = &_pool;}
-	memory_pool& mem_pool() {return *pool;}
+	memory_pool* mem_pool() const {return pool;}
 
 	virtual void reset_state() {}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
@@ -524,20 +525,20 @@ public:
 
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
 
-		buff->size(bytes_transferred);
-		msg_can.push_back(msg_type(buff));
+		buff.size(bytes_transferred);
+		msg_can.push_back(std::move(buff));
 		return true;
 	}
 
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return ec || bytes_transferred > 0 ? 0 : boost::asio::detail::default_max_transfer_size;}
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
 	{
-		buff = pool->checkout(ST_ASIO_MSG_BUFFER_SIZE);
-		return boost::asio::buffer(buff->data(), buff->buffer_size());
+		buff.swap(pool->checkout(ST_ASIO_MSG_BUFFER_SIZE));
+		return boost::asio::buffer(buff.data(), buff.buffer_size());
 	}
 
 protected:
-	msg_type::buffer_type buff; //equal to memory_pool::buffer_type
+	msg_type buff; //equal to memory_pool::buffer_type
 	memory_pool* pool;
 };
 

@@ -11,14 +11,15 @@
 
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	4
-//1-default packer and unpacker, head(length) + body
+//0-default packer and unpacker, head(length) + body
+//1-default replaceable_packer and replaceable_unpacker, head(length) + body
 //2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
 //4-pooled packer and unpacker, head(length) + body
 
 #if 1 == PACKER_UNPACKER_TYPE
-//#define ST_ASIO_DEFAULT_PACKER replaceable_packer
-//#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
+#define ST_ASIO_DEFAULT_PACKER replaceable_packer
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 #elif 2 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
@@ -196,7 +197,8 @@ int main(int argc, const char* argv[])
 			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
 #if 4 == PACKER_UNPACKER_TYPE
-			printf("pool block amount: " ST_ASIO_SF ", pool total size: " uint64_format "\n", pool.available_size(), pool.available_buffer_size());
+			puts("");
+			puts(pool.get_statistic().data());
 #endif
 			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
@@ -233,10 +235,6 @@ int main(int argc, const char* argv[])
 //				server_.do_something_to_all([&str](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(str);});
 		}
 	}
-
-#if 4 == PACKER_UNPACKER_TYPE
-	pool.stop();
-#endif
 
 	return 0;
 }

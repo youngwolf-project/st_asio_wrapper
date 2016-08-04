@@ -104,16 +104,13 @@ int main(int argc, const char* argv[])
 		{
 			printf("link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
 #if 2 == PACKER_UNPACKER_TYPE
-			printf("pool block amount: " ST_ASIO_SF ", pool total size: " uint64_format "\n", pool.available_size(), pool.available_buffer_size());
+			puts("");
+			puts(pool.get_statistic().data());
 #endif
 			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
 		}
 	}
-
-#if 2 == PACKER_UNPACKER_TYPE
-	pool.stop();
-#endif
 
 	return 0;
 }
