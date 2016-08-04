@@ -41,12 +41,6 @@ using namespace st_asio_wrapper::ext;
 #define atoll _atoi64
 #endif
 
-#if defined(_MSC_VER) || defined(__i386__)
-#define uint64_format "%llu"
-#else // defined(__GNUC__) && defined(__x86_64__)
-#define uint64_format "%lu"
-#endif
-
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
@@ -58,6 +52,7 @@ static bool check_msg;
 #if 4 == PACKER_UNPACKER_TYPE
 memory_pool pool;
 #endif
+
 ///////////////////////////////////////////////////
 //msg sending interface
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
@@ -231,11 +226,6 @@ public:
 int main(int argc, const char* argv[])
 {
 	printf("usage: test_client [<service thread number=1> [<port=%d> [<ip=%s> [link num=16]]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
-/*	memory_pool pool;
-	pooled_buffer a(&pool, 100);
-	pool.checkin(a);
-	if (a.empty()) puts("a is empty");
-	printf("pool block amount: " ST_ASIO_SF ", pool total size: " uint64_format "\n", pool.available_size(), pool.available_buffer_size());*/
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else

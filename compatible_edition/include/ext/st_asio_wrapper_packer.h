@@ -13,7 +13,7 @@
 #ifndef ST_ASIO_WRAPPER_PACKER_H_
 #define ST_ASIO_WRAPPER_PACKER_H_
 
-#include "../st_asio_wrapper_base.h"
+#include "st_asio_wrapper_ext.h"
 
 #ifdef ST_ASIO_HUGE_MSG
 #define ST_ASIO_HEAD_TYPE	boost::uint32_t
@@ -53,6 +53,7 @@ public:
 	}
 };
 
+//protocol: length + body
 class packer : public i_packer<std::string>
 {
 public:
@@ -97,17 +98,9 @@ public:
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
 };
 
+//protocol: length + body
 class replaceable_packer : public i_packer<replaceable_buffer>
 {
-public:
-	class buffer : public std::string, public i_buffer
-	{
-	public:
-		virtual bool empty() const {return std::string::empty();}
-		virtual size_t size() const {return std::string::size();}
-		virtual const char* data() const {return std::string::data();}
-	};
-
 public:
 	using i_packer<msg_type>::pack_msg;
 	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
@@ -117,9 +110,9 @@ public:
 		packer::msg_type str;
 		if (p.pack_msg(str, pstr, len, num, native))
 		{
-			BOOST_AUTO(com, boost::make_shared<buffer>());
-			com->swap(str);
-			msg.raw_buffer(com);
+			BOOST_AUTO(raw_msg, new string_buffer());
+			raw_msg->swap(str);
+			msg.raw_buffer(raw_msg);
 
 			return true;
 		}
@@ -132,6 +125,7 @@ public:
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
 };
 
+//protocol: [prefix] + body + suffix
 class prefix_suffix_packer : public i_packer<std::string>
 {
 public:

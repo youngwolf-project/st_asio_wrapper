@@ -31,12 +31,6 @@ using namespace st_asio_wrapper::ext;
 #define atoll _atoi64
 #endif
 
-#if defined(_MSC_VER) || defined(__i386__)
-#define uint64_format "%llu"
-#else // defined(__GNUC__) && defined(__x86_64__)
-#define uint64_format "%lu"
-#endif
-
 #define QUIT_COMMAND	"quit"
 #define LIST_STATUS		"status"
 
@@ -46,6 +40,7 @@ boost::atomic_ushort completed_session_num;
 #else
 st_atomic<unsigned short> completed_session_num;
 #endif
+
 #if 2 == PACKER_UNPACKER_TYPE
 memory_pool pool;
 #endif

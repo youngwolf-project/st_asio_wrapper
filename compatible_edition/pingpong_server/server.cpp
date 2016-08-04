@@ -5,8 +5,10 @@
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
+
+//stream unpacker (non-protocol)
+#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 //configuration
 
 #include "../include/ext/st_asio_wrapper_net.h"
@@ -78,6 +80,7 @@ int main(int argc, const char* argv[])
 		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
+			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
 		}
 	}
@@ -89,6 +92,7 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_SERVER_PORT
 #undef ST_ASIO_REUSE_OBJECT
 #undef ST_ASIO_FREE_OBJECT_INTERVAL
+#undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER
 #undef ST_ASIO_MSG_BUFFER_SIZE
 //restore configuration

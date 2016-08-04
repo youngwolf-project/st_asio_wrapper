@@ -128,47 +128,6 @@ protected:
 	size_t remain_len; //half-baked msg
 };
 
-//protocol: length + body
-//use memory pool
-class pooled_unpacker : public i_unpacker<memory_pool::buffer_type>, public unpacker
-{
-public:
-	using i_unpacker<memory_pool::buffer_type>::msg_type;
-	using i_unpacker<memory_pool::buffer_type>::msg_ctype;
-	using i_unpacker<memory_pool::buffer_type>::container_type;
-
-	pooled_unpacker() : pool(nullptr) {}
-	void mem_pool(memory_pool& _pool) {pool = &_pool;}
-	memory_pool* mem_pool() const {return pool;}
-
-	virtual void reset_state() {unpacker::reset_state();}
-	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
-	{
-		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
-		auto unpack_ok = unpacker::parse_msg(bytes_transferred, msg_pos_can);
-		do_something_to_all(msg_pos_can, [this, &msg_can](decltype(*std::begin(msg_pos_can))& item) {
-			auto buff = pool->checkout(item.second);
-			memcpy(buff.data(), item.first, item.second);
-			msg_can.push_back(std::move(buff));
-		});
-
-		if (unpack_ok && remain_len > 0)
-		{
-			auto pnext = std::next(msg_pos_can.back().first, msg_pos_can.back().second);
-			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed data
-		}
-
-		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
-		return unpack_ok;
-	}
-
-	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return unpacker::completion_condition(ec, bytes_transferred);}
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return unpacker::prepare_next_recv();}
-
-protected:
-	memory_pool* pool;
-};
-
 //protocol: UDP has message boundary, so we don't need a specific protocol to unpack it.
 class udp_unpacker : public i_udp_unpacker<std::string>
 {
@@ -506,6 +465,47 @@ public:
 
 protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
+};
+
+//protocol: length + body
+//use memory pool
+class pooled_unpacker : public i_unpacker<memory_pool::buffer_type>, public unpacker
+{
+public:
+	using i_unpacker<memory_pool::buffer_type>::msg_type;
+	using i_unpacker<memory_pool::buffer_type>::msg_ctype;
+	using i_unpacker<memory_pool::buffer_type>::container_type;
+
+	pooled_unpacker() : pool(nullptr) {}
+	void mem_pool(memory_pool& _pool) {pool = &_pool;}
+	memory_pool* mem_pool() const {return pool;}
+
+	virtual void reset_state() {unpacker::reset_state();}
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
+	{
+		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
+		auto unpack_ok = unpacker::parse_msg(bytes_transferred, msg_pos_can);
+		do_something_to_all(msg_pos_can, [this, &msg_can](decltype(*std::begin(msg_pos_can))& item) {
+			auto buff = pool->checkout(item.second);
+			memcpy(buff.data(), item.first, item.second);
+			msg_can.push_back(std::move(buff));
+		});
+
+		if (unpack_ok && remain_len > 0)
+		{
+			auto pnext = std::next(msg_pos_can.back().first, msg_pos_can.back().second);
+			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed data
+		}
+
+		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
+		return unpack_ok;
+	}
+
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return unpacker::completion_condition(ec, bytes_transferred);}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return unpacker::prepare_next_recv();}
+
+protected:
+	memory_pool* pool;
 };
 
 //protocol: stream (non-protocol)

@@ -37,7 +37,7 @@ public:
 	basic_buffer() {do_detach();}
 	basic_buffer(size_t len) {do_detach(); assign(len);}
 	basic_buffer(basic_buffer&& other) {do_attach(other.buff, other.len, other.buff_len); other.do_detach();}
-	virtual ~basic_buffer() {free();}
+	~basic_buffer() {free();}
 
 	void assign(size_t len) {free(); do_attach(new char[len], len, len);}
 

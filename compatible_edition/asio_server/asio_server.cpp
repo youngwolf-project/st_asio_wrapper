@@ -10,14 +10,15 @@
 #define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency.
 
 //use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	1
-//1-default packer and unpacker, head(length) + body
+#define PACKER_UNPACKER_TYPE	0
+//0-default packer and unpacker, head(length) + body
+//1-default replaceable_packer and replaceable_unpacker, head(length) + body
 //2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-//#define ST_ASIO_DEFAULT_PACKER replaceable_packer
-//#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
+#define ST_ASIO_DEFAULT_PACKER replaceable_packer
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 #elif 2 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
@@ -41,11 +42,7 @@ using namespace st_asio_wrapper::ext;
 //under the default behavior, each st_tcp_socket has their own packer, and cause memory waste
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
-#if 1 == PACKER_UNPACKER_TYPE || 2 == PACKER_UNPACKER_TYPE
 BOOST_AUTO(global_packer, boost::make_shared<ST_ASIO_DEFAULT_PACKER>());
-#elif 3 == PACKER_UNPACKER_TYPE
-BOOST_AUTO(global_packer, boost::make_shared<prefix_suffix_packer>());
-#endif
 
 //demonstrate how to control the type of st_server_socket_base::server from template parameter
 class i_echo_server : public i_server
@@ -63,9 +60,9 @@ public:
 		inner_packer(global_packer);
 
 #if 2 == PACKER_UNPACKER_TYPE
-		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
+		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->fixed_length(1024);
 #elif 3 == PACKER_UNPACKER_TYPE
-		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
+		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->prefix_suffix("begin", "end");
 #endif
 	}
 
@@ -165,6 +162,11 @@ int main(int argc, const char* argv[])
 	int thread_num = 1;
 	if (argc > 1)
 		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
+
+#if 3 == PACKER_UNPACKER_TYPE
+		global_packer->prefix_suffix("begin", "end");
+#endif
+
 	service_pump.start_service(thread_num);
 	while(service_pump.is_running())
 	{
@@ -181,6 +183,7 @@ int main(int argc, const char* argv[])
 		{
 			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
+			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not

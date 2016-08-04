@@ -8,8 +8,10 @@
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
-#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
+
+//stream unpacker (non-protocol)
+#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 //configuration
 
 #include "../include/ext/st_asio_wrapper_net.h"
@@ -61,13 +63,16 @@ protected:
 #endif
 
 private:
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	void handle_msg(out_msg_ctype& msg)
 	{
-#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 		recv_bytes += msg.size();
 		if (recv_bytes >= total_bytes && 0 == --completed_session_num)
 			begin_time.stop();
+	}
 #else
+	void handle_msg(out_msg_type& msg)
+	{
 		if (0 == total_bytes)
 			return;
 
@@ -80,8 +85,8 @@ private:
 		}
 		else
 			direct_send_msg(msg);
-#endif
 	}
+#endif
 
 private:
 	boost::uint64_t total_bytes, send_bytes, recv_bytes;
@@ -150,6 +155,7 @@ int main(int argc, const char* argv[])
 		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
+			puts("");
 			puts(client.get_statistic().to_string().data());
 		}
 		else if (!str.empty())
@@ -194,6 +200,7 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_REUSE_OBJECT
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY
+#undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER
 #undef ST_ASIO_MSG_BUFFER_SIZE
 //restore configuration

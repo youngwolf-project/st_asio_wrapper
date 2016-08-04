@@ -13,9 +13,7 @@
 #ifndef ST_ASIO_WRAPPER_UNPACKER_H_
 #define ST_ASIO_WRAPPER_UNPACKER_H_
 
-#include <boost/array.hpp>
-
-#include "../st_asio_wrapper_base.h"
+#include "st_asio_wrapper_ext.h"
 
 #ifdef ST_ASIO_HUGE_MSG
 #define ST_ASIO_HEAD_TYPE	boost::uint32_t
@@ -28,11 +26,12 @@
 
 namespace st_asio_wrapper { namespace ext {
 
+//protocol: length + body
 class unpacker : public i_unpacker<std::string>
 {
 public:
 	unpacker() {reset_state();}
-	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means don't know
+	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means not available
 
 	bool parse_msg(size_t bytes_transferred, boost::container::list<std::pair<const char*, size_t> >& msg_can)
 	{
@@ -126,10 +125,11 @@ public:
 
 protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
-	size_t cur_msg_len; //-1 means head has not received, so doesn't know the whole msg length.
+	size_t cur_msg_len; //-1 means head not received, so msg length is not available.
 	size_t remain_len; //half-baked msg
 };
 
+//protocol: UDP has message boundary, so we don't need a specific protocol to unpack it.
 class udp_unpacker : public i_udp_unpacker<std::string>
 {
 public:
@@ -140,17 +140,9 @@ protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
 };
 
+//protocol: length + body
 class replaceable_unpacker : public i_unpacker<replaceable_buffer>
 {
-public:
-	class buffer : public std::string, public i_buffer
-	{
-	public:
-		virtual bool empty() const {return std::string::empty();}
-		virtual size_t size() const {return std::string::size();}
-		virtual const char* data() const {return std::string::data();}
-	};
-
 public:
 	virtual void reset_state() {unpacker_.reset_state();}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
@@ -159,10 +151,10 @@ public:
 		bool unpack_ok = unpacker_.parse_msg(bytes_transferred, tmp_can);
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
 		{
-			BOOST_AUTO(com, boost::make_shared<buffer>());
-			com->swap(*iter);
+			BOOST_AUTO(raw_buffer, new string_buffer());
+			raw_buffer->swap(*iter);
 			msg_can.resize(msg_can.size() + 1);
-			msg_can.back().raw_buffer(com);
+			msg_can.back().raw_buffer(raw_buffer);
 		}
 
 		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
@@ -176,24 +168,16 @@ protected:
 	unpacker unpacker_;
 };
 
+//protocol: UDP has message boundary, so we don't need a specific protocol to unpack it.
 class replaceable_udp_unpacker : public i_udp_unpacker<replaceable_buffer>
 {
-public:
-	class buffer : public std::string, public i_buffer
-	{
-	public:
-		virtual bool empty() const {return std::string::empty();}
-		virtual size_t size() const {return std::string::size();}
-		virtual const char* data() const {return std::string::data();}
-	};
-
 public:
 	virtual void parse_msg(msg_type& msg, size_t bytes_transferred)
 	{
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
-		BOOST_AUTO(com, boost::make_shared<buffer>());
-		com->assign(raw_buff.data(), bytes_transferred);
-		msg.raw_buffer(com);
+		BOOST_AUTO(raw_msg, new string_buffer());
+		raw_msg->assign(raw_buff.data(), bytes_transferred);
+		msg.raw_buffer(raw_msg);
 	}
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
 
@@ -201,39 +185,13 @@ protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
 };
 
-class most_primitive_buffer
-{
-public:
-	most_primitive_buffer() {do_detach();}
-	~most_primitive_buffer() {free();}
-
-	void assign(size_t _len) {free(); do_attach(new char[_len], _len);}
-	void free() {delete buff; do_detach();}
-
-	//the following five functions (char* data() is used by unpackers, not counted in) are needed by st_asio_wrapper,
-	//for other functions, depends on the implementation of your packer and unpacker.
-	bool empty() const {return 0 == len || NULL == buff;}
-	size_t size() const {return len;}
-	const char* data() const {return buff;}
-	char* data() {return buff;}
-	void swap(most_primitive_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len);}
-	void clear() {free();}
-
-protected:
-	void do_attach(char* _buff, size_t _len) {buff = _buff; len = _len;}
-	void do_detach() {buff = NULL; len = 0;}
-
-protected:
-	char* buff;
-	size_t len;
-};
-
+//protocol: length + body
 //this unpacker demonstrate how to forbid memory copying while parsing msgs (let asio write msg directly).
-class buffer_free_unpacker : public i_unpacker<most_primitive_buffer>
+class non_copy_unpacker : public i_unpacker<basic_buffer>
 {
 public:
-	buffer_free_unpacker() {reset_state();}
-	size_t current_msg_length() const {return raw_buff.size();} //current msg's total length(not include the head), 0 means don't know
+	non_copy_unpacker() {reset_state();}
+	size_t current_msg_length() const {return raw_buff.size();} //current msg's total length(not include the head), 0 means not available
 
 public:
 	virtual void reset_state() {raw_buff.clear(); step = 0;}
@@ -309,6 +267,7 @@ private:
 	int step; //-1-error format, 0-want the head, 1-want the body
 };
 
+//protocol: fixed lenght
 class fixed_length_unpacker : public i_unpacker<std::string>
 {
 public:
@@ -370,6 +329,7 @@ private:
 	size_t remain_len; //half-baked msg
 };
 
+//protocol: [prefix] + body + suffix
 class prefix_suffix_unpacker : public i_unpacker<std::string>
 {
 public:
@@ -484,6 +444,7 @@ private:
 	size_t remain_len; //half-baked msg
 };
 
+//protocol: stream (non-protocol)
 class stream_unpacker : public i_unpacker<std::string>
 {
 public:
@@ -500,7 +461,7 @@ public:
 		return true;
 	}
 
-	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return ec || bytes_transferred > 0 ? 0 : ST_ASIO_MSG_BUFFER_SIZE;}
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return ec || bytes_transferred > 0 ? 0 : boost::asio::detail::default_max_transfer_size;}
 	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return boost::asio::buffer(raw_buff);}
 
 protected:
