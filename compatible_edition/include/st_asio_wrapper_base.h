@@ -69,7 +69,7 @@ namespace st_asio_wrapper
 	//convert '->' operation to '.' operation
 	//user need to allocate object for this class, and this class will free it
 	template<typename T>
-	class proxy_buffer/* : public boost::noncopyable*/ //TBD
+	class proxy_buffer : public boost::noncopyable
 	{
 	public:
 		typedef T* buffer_type;

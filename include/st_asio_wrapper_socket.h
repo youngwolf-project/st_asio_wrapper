@@ -404,9 +404,12 @@ protected:
 				else if (!recv_msg_buffer.empty())
 				{
 					dispatching = true;
-					last_dispatch_msg.restart(recv_msg_buffer.front().begin_time);
-					last_dispatch_msg.swap(recv_msg_buffer.front());
-					recv_msg_buffer.pop_front();
+					if (last_dispatch_msg.empty())
+					{
+						last_dispatch_msg.restart(recv_msg_buffer.front().begin_time);
+						last_dispatch_msg.swap(recv_msg_buffer.front());
+						recv_msg_buffer.pop_front();
+					}
 
 					post([this]() {ST_THIS msg_handler();});
 				}
@@ -498,22 +501,21 @@ private:
 	{
 		auto begin_time = statistic::local_time();
 		stat.dispatch_dealy_sum += begin_time - last_dispatch_msg.begin_time;
-
 		bool re = on_msg_handle(last_dispatch_msg, false); //must before next msg dispatching to keep sequence
-		stat.handle_time_2_sum += statistic::local_time() - begin_time;
+		auto end_time = statistic::local_time();
+		stat.handle_time_2_sum += end_time - begin_time;
 		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
 		dispatching = false;
 		if (!re) //dispatch failed, re-dispatch
 		{
-			recv_msg_buffer.push_front(out_msg());
-			recv_msg_buffer.front().swap(last_dispatch_msg);
+			last_dispatch_msg.restart(end_time);
 			set_timer(TIMER_RE_DISPATCH_MSG, 50, [this](unsigned char id)->bool {return ST_THIS timer_handler(id);});
 		}
 		else //dispatch msg sequentially, which means second dispatching only after first dispatching success
-			do_dispatch_msg(false);
-
-		if (!dispatching)
+		{
 			last_dispatch_msg.clear();
+			do_dispatch_msg(false);
+		}
 	}
 
 protected:

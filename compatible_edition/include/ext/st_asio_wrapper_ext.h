@@ -31,7 +31,7 @@ public:
 	virtual const char* data() const {return std::string::data();}
 };
 
-class basic_buffer/* : public boost::noncopyable*/ //TBD
+class basic_buffer : public boost::noncopyable
 {
 public:
 	basic_buffer() {do_detach();}
