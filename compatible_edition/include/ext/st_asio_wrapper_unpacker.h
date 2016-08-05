@@ -175,6 +175,7 @@ public:
 	virtual void parse_msg(msg_type& msg, size_t bytes_transferred)
 	{
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
+
 		BOOST_AUTO(raw_msg, new string_buffer());
 		raw_msg->assign(raw_buff.data(), bytes_transferred);
 		msg.raw_buffer(raw_msg);

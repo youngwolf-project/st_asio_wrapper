@@ -105,10 +105,8 @@ public:
 	using i_packer<msg_type>::pack_msg;
 	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
-		msg.clear();
-		packer p;
 		packer::msg_type str;
-		if (p.pack_msg(str, pstr, len, num, native))
+		if (packer().pack_msg(str, pstr, len, num, native))
 		{
 			BOOST_AUTO(raw_msg, new string_buffer());
 			raw_msg->swap(str);
