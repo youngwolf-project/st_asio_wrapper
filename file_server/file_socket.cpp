@@ -93,7 +93,7 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 			{
 				state = TRANS_BUSY;
 				fseeko(file, offset, SEEK_SET);
-				direct_send_msg(replaceable_buffer(new file_buffer(file, length)), true);
+				direct_send_msg(in_msg_type(new file_buffer(file, length)), true);
 			}
 		}
 		break;
