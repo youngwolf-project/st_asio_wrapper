@@ -269,65 +269,37 @@ private:
 };
 
 //protocol: fixed lenght
-class fixed_length_unpacker : public i_unpacker<std::string>
+//non-copy
+class fixed_length_unpacker : public i_unpacker<basic_buffer>
 {
 public:
-	fixed_length_unpacker() {reset_state();}
+	fixed_length_unpacker() : _fixed_length(0) {}
 
 	void fixed_length(size_t fixed_length) {assert(0 < fixed_length && fixed_length <= ST_ASIO_MSG_BUFFER_SIZE); _fixed_length = fixed_length;}
 	size_t fixed_length() const {return _fixed_length;}
 
 public:
-	virtual void reset_state() {remain_len = 0;}
+	virtual void reset_state() {}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
-		//length + msg
-		remain_len += bytes_transferred;
-		assert(remain_len <= ST_ASIO_MSG_BUFFER_SIZE);
-
-		const char* pnext = raw_buff.begin();
-		while (remain_len >= _fixed_length) //considering stick package problem, we need a loop
-		{
-			msg_can.resize(msg_can.size() + 1);
-			msg_can.back().assign(pnext, _fixed_length);
-			remain_len -= _fixed_length;
-			std::advance(pnext, _fixed_length);
-		}
-
-		if (pnext == raw_buff.begin()) //we should have at least got one msg.
+		if (bytes_transferred != raw_buff.size())
 			return false;
-		else if (remain_len > 0) //left behind unparsed msg
-			memcpy(raw_buff.begin(), pnext, remain_len);
 
+		msg_can.resize(msg_can.size() + 1);
+		msg_can.back().swap(raw_buff);
 		return true;
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
-	//read as many as possible to reduce asynchronous call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
-	//stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
-	{
-		if (ec)
-			return 0;
+		{return ec || bytes_transferred == raw_buff.size() ? 0 : boost::asio::detail::default_max_transfer_size;}
 
-		size_t data_len = remain_len + bytes_transferred;
-		assert(data_len <= ST_ASIO_MSG_BUFFER_SIZE);
-
-		return data_len >= _fixed_length ? 0 : boost::asio::detail::default_max_transfer_size;
-		//read as many as possible except that we have already got an entire msg
-	}
-
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
-	{
-		assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE);
-		return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
-	}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {raw_buff.assign(_fixed_length); return boost::asio::buffer(raw_buff.data(), raw_buff.size());}
 
 private:
-	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
+	basic_buffer raw_buff;
 	size_t _fixed_length;
-	size_t remain_len; //half-baked msg
 };
 
 //protocol: [prefix] + body + suffix

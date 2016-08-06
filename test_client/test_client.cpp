@@ -13,12 +13,11 @@
 //configuration
 
 //use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	4
+#define PACKER_UNPACKER_TYPE	0
 //0-default packer and unpacker, head(length) + body
 //1-default replaceable_packer and replaceable_unpacker, head(length) + body
 //2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
-//4-pooled packer and unpacker, head(length) + body
 
 #if 1 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER replaceable_packer
@@ -28,9 +27,6 @@
 #elif 3 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
 #define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
-#elif 4 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER pooled_packer
-#define ST_ASIO_DEFAULT_UNPACKER pooled_unpacker
 #endif
 
 #include "../include/ext/st_asio_wrapper_net.h"
@@ -49,9 +45,6 @@ using namespace st_asio_wrapper::ext;
 #define RESUME_COMMAND	"resume"
 
 static bool check_msg;
-#if 4 == PACKER_UNPACKER_TYPE
-memory_pool pool;
-#endif
 
 ///////////////////////////////////////////////////
 //msg sending interface
@@ -75,9 +68,6 @@ public:
 #elif 3 == PACKER_UNPACKER_TYPE
 		dynamic_cast<ST_ASIO_DEFAULT_PACKER*>(&*inner_packer())->prefix_suffix("begin", "end");
 		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->prefix_suffix("begin", "end");
-#elif 4 == PACKER_UNPACKER_TYPE
-		dynamic_cast<ST_ASIO_DEFAULT_PACKER*>(&*inner_packer())->mem_pool(pool);
-		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->mem_pool(pool);
 #endif
 	}
 
@@ -285,10 +275,6 @@ int main(int argc, const char* argv[])
 		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
-#if 4 == PACKER_UNPACKER_TYPE
-			puts("");
-			puts(pool.get_statistic().data());
-#endif
 			puts("");
 			puts(client.get_statistic().to_string().data());
 		}

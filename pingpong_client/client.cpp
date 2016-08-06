@@ -9,18 +9,7 @@
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
-
-//use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	2
-//1-stream unpacker (non-protocol)
-//2-pooled_stream_packer and pooled_stream_unpacker (non-protocol)
-
-#if 1 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
-#elif 2 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER pooled_stream_packer
-#define ST_ASIO_DEFAULT_UNPACKER pooled_stream_unpacker
-#endif
 //configuration
 
 #include "../include/ext/st_asio_wrapper_net.h"
@@ -41,20 +30,10 @@ boost::atomic_ushort completed_session_num;
 st_atomic<unsigned short> completed_session_num;
 #endif
 
-#if 2 == PACKER_UNPACKER_TYPE
-memory_pool pool;
-#endif
-
 class echo_socket : public st_connector
 {
 public:
-	echo_socket(boost::asio::io_service& io_service_) : st_connector(io_service_)
-	{
-#if 2 == PACKER_UNPACKER_TYPE
-		dynamic_cast<ST_ASIO_DEFAULT_PACKER*>(&*inner_packer())->mem_pool(pool);
-		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->mem_pool(pool);
-#endif
-	}
+	echo_socket(boost::asio::io_service& io_service_) : st_connector(io_service_) {}
 
 	void begin(size_t msg_num, const char* msg, size_t msg_len)
 	{
@@ -172,10 +151,6 @@ int main(int argc, const char* argv[])
 		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
-#if 2 == PACKER_UNPACKER_TYPE
-			puts("");
-			puts(pool.get_statistic().data());
-#endif
 			puts("");
 			puts(client.get_statistic().to_string().data());
 		}

@@ -267,65 +267,37 @@ private:
 };
 
 //protocol: fixed lenght
-class fixed_length_unpacker : public i_unpacker<std::string>
+//non-copy
+class fixed_length_unpacker : public i_unpacker<basic_buffer>
 {
 public:
-	fixed_length_unpacker() {reset_state();}
+	fixed_length_unpacker() : _fixed_length(0) {}
 
 	void fixed_length(size_t fixed_length) {assert(0 < fixed_length && fixed_length <= ST_ASIO_MSG_BUFFER_SIZE); _fixed_length = fixed_length;}
 	size_t fixed_length() const {return _fixed_length;}
 
 public:
-	virtual void reset_state() {remain_len = 0;}
+	virtual void reset_state() {}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
-		//length + msg
-		remain_len += bytes_transferred;
-		assert(remain_len <= ST_ASIO_MSG_BUFFER_SIZE);
-
-		auto pnext = std::begin(raw_buff);
-		while (remain_len >= _fixed_length) //considering stick package problem, we need a loop
-		{
-			msg_can.resize(msg_can.size() + 1);
-			msg_can.back().assign(pnext, _fixed_length);
-			remain_len -= _fixed_length;
-			std::advance(pnext, _fixed_length);
-		}
-
-		if (pnext == std::begin(raw_buff)) //we should have at least got one msg.
+		if (bytes_transferred != raw_buff.size())
 			return false;
-		else if (remain_len > 0) //left behind unparsed msg
-			memcpy(std::begin(raw_buff), pnext, remain_len);
 
+		msg_can.resize(msg_can.size() + 1);
+		msg_can.back().swap(raw_buff);
 		return true;
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
-	//read as many as possible to reduce asynchronous call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
-	//stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
-	{
-		if (ec)
-			return 0;
+		{return ec || bytes_transferred == raw_buff.size() ? 0 : boost::asio::detail::default_max_transfer_size;}
 
-		auto data_len = remain_len + bytes_transferred;
-		assert(data_len <= ST_ASIO_MSG_BUFFER_SIZE);
-
-		return data_len >= _fixed_length ? 0 : boost::asio::detail::default_max_transfer_size;
-		//read as many as possible except that we have already got an entire msg
-	}
-
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
-	{
-		assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE);
-		return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
-	}
+	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {raw_buff.assign(_fixed_length); return boost::asio::buffer(raw_buff.data(), raw_buff.size());}
 
 private:
-	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
+	basic_buffer raw_buff;
 	size_t _fixed_length;
-	size_t remain_len; //half-baked msg
 };
 
 //protocol: [prefix] + body + suffix
@@ -465,81 +437,6 @@ public:
 
 protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
-};
-
-//protocol: length + body
-//use memory pool
-class pooled_unpacker : public i_unpacker<memory_pool::buffer_type>, public unpacker
-{
-public:
-	using i_unpacker<memory_pool::buffer_type>::msg_type;
-	using i_unpacker<memory_pool::buffer_type>::msg_ctype;
-	using i_unpacker<memory_pool::buffer_type>::container_type;
-
-	pooled_unpacker() : pool(nullptr) {}
-	void mem_pool(memory_pool& _pool) {pool = &_pool;}
-	memory_pool* mem_pool() const {return pool;}
-
-	virtual void reset_state() {unpacker::reset_state();}
-	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
-	{
-		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
-		auto unpack_ok = unpacker::parse_msg(bytes_transferred, msg_pos_can);
-		do_something_to_all(msg_pos_can, [this, &msg_can](decltype(*std::begin(msg_pos_can))& item) {
-			auto buff = pool->checkout(item.second);
-			memcpy(buff.data(), item.first, item.second);
-			msg_can.push_back(std::move(buff));
-		});
-
-		if (unpack_ok && remain_len > 0)
-		{
-			auto pnext = std::next(msg_pos_can.back().first, msg_pos_can.back().second);
-			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed data
-		}
-
-		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
-		return unpack_ok;
-	}
-
-	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return unpacker::completion_condition(ec, bytes_transferred);}
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() {return unpacker::prepare_next_recv();}
-
-protected:
-	memory_pool* pool;
-};
-
-//protocol: stream (non-protocol)
-//use memory pool
-class pooled_stream_unpacker : public i_unpacker<memory_pool::buffer_type>
-{
-public:
-	pooled_stream_unpacker() : pool(nullptr) {}
-	void mem_pool(memory_pool& _pool) {pool = &_pool;}
-	memory_pool* mem_pool() const {return pool;}
-
-	virtual void reset_state() {}
-	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
-	{
-		if (0 == bytes_transferred)
-			return false;
-
-		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
-
-		buff.size(bytes_transferred);
-		msg_can.push_back(std::move(buff));
-		return true;
-	}
-
-	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return ec || bytes_transferred > 0 ? 0 : boost::asio::detail::default_max_transfer_size;}
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv()
-	{
-		buff.swap(pool->checkout(ST_ASIO_MSG_BUFFER_SIZE));
-		return boost::asio::buffer(buff.data(), buff.buffer_size());
-	}
-
-protected:
-	msg_type buff; //equal to memory_pool::buffer_type
-	memory_pool* pool;
 };
 
 }} //namespace

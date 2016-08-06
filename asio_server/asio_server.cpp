@@ -10,12 +10,11 @@
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency.
 
 //use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	4
+#define PACKER_UNPACKER_TYPE	0
 //0-default packer and unpacker, head(length) + body
 //1-default replaceable_packer and replaceable_unpacker, head(length) + body
 //2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
-//4-pooled packer and unpacker, head(length) + body
 
 #if 1 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER replaceable_packer
@@ -25,9 +24,6 @@
 #elif 3 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
 #define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
-#elif 4 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER pooled_packer
-#define ST_ASIO_DEFAULT_UNPACKER pooled_unpacker
 #endif
 //configuration
 
@@ -47,9 +43,6 @@ using namespace st_asio_wrapper::ext;
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
 auto global_packer(boost::make_shared<ST_ASIO_DEFAULT_PACKER>());
-#if 4 == PACKER_UNPACKER_TYPE
-memory_pool pool;
-#endif
 
 //demonstrate how to control the type of st_server_socket_base::server from template parameter
 class i_echo_server : public i_server
@@ -69,8 +62,6 @@ public:
 		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->fixed_length(1024);
 #elif 3 == PACKER_UNPACKER_TYPE
 		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->prefix_suffix("begin", "end");
-#elif 4 == PACKER_UNPACKER_TYPE
-		dynamic_cast<ST_ASIO_DEFAULT_UNPACKER*>(&*inner_unpacker())->mem_pool(pool);
 #endif
 	}
 
@@ -170,8 +161,6 @@ int main(int argc, const char* argv[])
 
 #if 3 == PACKER_UNPACKER_TYPE
 		global_packer->prefix_suffix("begin", "end");
-#elif 4 == PACKER_UNPACKER_TYPE
-		global_packer->mem_pool(pool);
 #endif
 
 	service_pump.start_service(thread_num);
@@ -190,10 +179,6 @@ int main(int argc, const char* argv[])
 		{
 			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
-#if 4 == PACKER_UNPACKER_TYPE
-			puts("");
-			puts(pool.get_statistic().data());
-#endif
 			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
 		}
