@@ -120,6 +120,9 @@ namespace st_asio_wrapper
 	class dummy_packer : public i_packer<MsgType>
 	{
 	public:
+		using typename i_packer<MsgType>::msg_type;
+		using typename i_packer<MsgType>::msg_ctype;
+
 		virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) {assert(false); return msg_type();}
 	};
 
