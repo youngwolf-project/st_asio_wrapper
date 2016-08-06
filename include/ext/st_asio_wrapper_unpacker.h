@@ -13,6 +13,8 @@
 #ifndef ST_ASIO_WRAPPER_UNPACKER_H_
 #define ST_ASIO_WRAPPER_UNPACKER_H_
 
+#include <boost/array.hpp>
+
 #include "st_asio_wrapper_ext.h"
 
 #ifdef ST_ASIO_HUGE_MSG

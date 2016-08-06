@@ -117,6 +117,14 @@ namespace st_asio_wrapper
 	};
 	//packer concept
 
+	//just provide msg_type definition, you should not call any functions of it, and send msgs directly
+	template<typename MsgType>
+	class dummy_packer : public i_packer<MsgType>
+	{
+	public:
+		virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false) {assert(false); return msg_type();}
+	};
+
 	//unpacker concept
 	template<typename MsgType>
 	class i_unpacker

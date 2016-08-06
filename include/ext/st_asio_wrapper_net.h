@@ -13,13 +13,13 @@
 #ifndef ST_ASIO_WRAPPER_NET_H_
 #define ST_ASIO_WRAPPER_NET_H_
 
+#include "st_asio_wrapper_packer.h"
+#include "st_asio_wrapper_unpacker.h"
+
 #include "../st_asio_wrapper_client.h"
 #include "../st_asio_wrapper_tcp_client.h"
 #include "../st_asio_wrapper_udp_client.h"
 #include "../st_asio_wrapper_server.h"
-
-#include "st_asio_wrapper_packer.h"
-#include "st_asio_wrapper_unpacker.h"
 
 #ifndef ST_ASIO_DEFAULT_PACKER
 #define ST_ASIO_DEFAULT_PACKER packer

@@ -6,9 +6,7 @@
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
-
-//stream unpacker (non-protocol)
-#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
+#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 //configuration
 
 #include "../include/ext/st_asio_wrapper_net.h"

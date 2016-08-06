@@ -14,9 +14,6 @@
 #define ST_ASIO_WRAPPER_EXT_H_
 
 #include <string>
-#include <sstream>
-#include <boost/array.hpp>
-#include <boost/container/set.hpp>
 
 #include "../st_asio_wrapper_base.h"
 
