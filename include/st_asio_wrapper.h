@@ -24,7 +24,7 @@
  * 2016.7.17	version 1.0.1
  * Support boost-1.49, it's the minimum version for st_asio_wrapper because of boost::container.
  *
- * 2016.x.xx	version 1.1.0
+ * 2016.8.7	version 1.1.0
  * Add stream_unpacker to receive native data.
  * asio_server and test_client are now able to start with configurable thread number.
  * Add efficiency statistic for performance tuning, and it can be shut down.
