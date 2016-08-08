@@ -114,9 +114,9 @@ public:
 		stat_duration send_time_sum; //from asio::async_write to send_handler, this indicate your network's speed or load
 
 		//recv corresponding statistic
-		boost::uint_fast64_t recv_msg_sum; //include msgs in receiving buffer(still not dispatched)
-		boost::uint_fast64_t recv_byte_sum; //include msgs in receiving buffer(still not dispatched)
-		stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_handle
+		boost::uint_fast64_t recv_msg_sum; //include msgs in receiving buffer
+		boost::uint_fast64_t recv_byte_sum; //include msgs in receiving buffer
+		stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
 		stat_duration recv_idle_sum;
 		//during this duration, st_socket suspended msg reception because of full receiving buffer, posting msgs or invoke on_msg
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER

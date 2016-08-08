@@ -10,10 +10,41 @@ template<typename Socket, typename Packer, typename Unpacker, typename InMsgType
 class st_socket: public st_timer
 {
 public:
+	效率统计，注意这个功能会轻微的影响性能，默认关闭，可以通过ST_ASIO_FULL_STATISTIC宏来开启。在关闭情况下，所有整数项统计（uint_fast64_t）仍然有效，
+	所有时间统计项将无效（stat_duration）。在打开情况下，时间统计的数据类型其实是boost::posix_time::time_duration。
+	struct statistic
+	{
+		statistic();
+		void reset();
+		由于统计涉及多个方面，并且是多线程修改不同的部分，这个函数只是在某些特殊情况下才可以调用，比如在构造函数里面，或者只有一个service线程，
+		所以这个函数基本上还是用在对象重用时。
+
+		statistic& operator +=(const struct statistic& other);
+		std::string to_string() const;
+
+		消息发送相关的统计
+		uint_fast64_t send_msg_sum; 成功发送到asio的消息条数
+		uint_fast64_t send_byte_sum; 成功发送到asio的消息总字节数
+		stat_duration send_delay_sum; 从消息发送（send_(native_)msg, post_(native_)msg，不包括打包时间）到真正发送（asio::async_write）的延迟时间
+		stat_duration send_time_sum; 从真正的消息发送（asio::async_write）到发送完成（发送到SOCKET缓存），这一项体现了你的网络吞吐率，注意吞吐率低
+		不代表是你的问题，也有可能是接收方慢了。
+
+		消息接收相关统计
+		uint_fast64_t recv_msg_sum; 收到的消息条数
+		uint_fast64_t recv_byte_sum; 收到的消息总字节数
+		stat_duration dispatch_dealy_sum; 从消息解包完成之后，到on_msg_handle的时间延迟，如果这项偏大，可能是因为service线程总不够用
+		stat_duration recv_idle_sum; 暂停消息接收的总时间，如果接收缓存满，或者在发送缓存满的情况下调用了post_(native_)msg，将会暂停消息接收，
+		注意，在回调on_msg期间，也算是暂停了消息接收。
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+		stat_duration handle_time_1_sum; 调用on_msg花费的总时间
+#endif
+		stat_duration handle_time_2_sum; 调用on_msg_handle花费的总时间
+	};
+
+protected:
 	typedef boost::container::list<InMsgType> in_container_type;
 	typedef typename Unpacker::container_type out_container_type;
 
-protected:
 	st_socket(boost::asio::io_service& io_service_);
 
 	template<typename Arg>
@@ -95,7 +126,7 @@ post_msg不受这个属性的影响，所以post_msg一定只能在on_msg和on_m
 	bool direct_post_msg(const InMsgType& msg, bool can_overflow = false);
 	bool direct_post_msg(InMsgType&& msg, bool can_overflow = false);
 同上，它们之前的区别就是send_msg和post_msg之间的区别。
-	
+
 	size_t get_pending_post_msg_num();
 	size_t get_pending_send_msg_num();
 	size_t get_pending_recv_msg_num();
