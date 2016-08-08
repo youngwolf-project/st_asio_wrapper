@@ -14,6 +14,7 @@
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
 #define ST_ASIO_WRAPPER_OBJECT_POOL_H_
 
+#include <boost/version.hpp>
 #if BOOST_VERSION >= 105300
 #include <boost/atomic.hpp>
 #endif
@@ -79,10 +80,10 @@ public:
 	st_atomic() : data(0) {}
 	st_atomic(const T& _data) : data(_data) {}
 	T operator++() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return ++data;}
-	T operator++(int) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data++;}
+	//deliberately omitted operator++(int)
 	T operator+=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data += value;}
 	T operator--() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return --data;}
-	T operator--(int) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data--;}
+	//deliberately omitted operator--(int)
 	T operator-=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data -= value;}
 	T operator=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data = value;}
 	operator T() const {return data;}

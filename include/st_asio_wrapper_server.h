@@ -35,7 +35,7 @@ static_assert(ST_ASIO_ASYNC_ACCEPT_NUM > 0, "async accept number must be bigger 
 namespace st_asio_wrapper
 {
 
-template<typename Socket = st_server_socket, typename Pool = st_object_pool<Socket>, typename Server = i_server>
+template<typename Socket, typename Pool = st_object_pool<Socket>, typename Server = i_server>
 class st_server_base : public Server, public Pool
 {
 public:
@@ -154,7 +154,6 @@ protected:
 	boost::asio::ip::tcp::endpoint server_addr;
 	boost::asio::ip::tcp::acceptor acceptor;
 };
-typedef st_server_base<> st_server;
 
 } //namespace
 

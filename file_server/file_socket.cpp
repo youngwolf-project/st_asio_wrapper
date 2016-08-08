@@ -25,7 +25,7 @@ bool file_socket::on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(m
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 void file_socket::on_msg_send(in_msg_type& msg)
 {
-	auto buffer = boost::dynamic_pointer_cast<file_buffer>(msg.raw_buffer());
+	auto buffer = dynamic_cast<file_buffer*>(msg.raw_buffer());
 	if (nullptr != buffer)
 	{
 		buffer->read();
@@ -93,7 +93,7 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 			{
 				state = TRANS_BUSY;
 				fseeko(file, offset, SEEK_SET);
-				direct_send_msg(replaceable_buffer(boost::make_shared<file_buffer>(file, length)), true);
+				direct_send_msg(in_msg_type(new file_buffer(file, length)), true);
 			}
 		}
 		break;

@@ -30,27 +30,30 @@ static_assert(ST_ASIO_RECONNECT_INTERVAL >= 0, "reconnect interval must be bigge
 namespace st_asio_wrapper
 {
 
-template <typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_DEFAULT_UNPACKER, typename Socket = boost::asio::ip::tcp::socket>
+template <typename Packer, typename Unpacker, typename Socket = boost::asio::ip::tcp::socket>
 class st_connector_base : public st_tcp_socket_base<Socket, Packer, Unpacker>
 {
+protected:
+	typedef st_tcp_socket_base<Socket, Packer, Unpacker> super;
+
 public:
-	static const unsigned char TIMER_BEGIN = st_tcp_socket_base<Socket, Packer, Unpacker>::TIMER_END;
+	static const unsigned char TIMER_BEGIN = super::TIMER_END;
 	static const unsigned char TIMER_CONNECT = TIMER_BEGIN;
 	static const unsigned char TIMER_ASYNC_CLOSE = TIMER_BEGIN + 1;
 	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
 
-	st_connector_base(boost::asio::io_service& io_service_) : st_tcp_socket_base<Socket, Packer, Unpacker>(io_service_), connected(false), reconnecting(true)
+	st_connector_base(boost::asio::io_service& io_service_) : super(io_service_), connected(false), reconnecting(true)
 		{set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 
 	template<typename Arg>
-	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) : st_tcp_socket_base<Socket, Packer, Unpacker>(io_service_, arg), connected(false), reconnecting(true)
+	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), connected(false), reconnecting(true)
 		{set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 
 	//reset all, be ensure that there's no any operations performed on this st_connector_base when invoke it
 	//notice, when reusing this st_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
 	//all member variables, and then do not forget to invoke st_connector_base::reset() to initialize father's member variables
-	virtual void reset() {connected = false; reconnecting = true; st_tcp_socket_base<Socket, Packer, Unpacker>::reset();}
-	virtual bool obsoleted() {return !reconnecting && st_tcp_socket_base<Socket, Packer, Unpacker>::obsoleted();}
+	virtual void reset() {connected = false; reconnecting = true; super::reset();}
+	virtual bool obsoleted() {return !reconnecting && super::obsoleted();}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
 	{
@@ -77,7 +80,7 @@ public:
 			connected = false;
 		}
 
-		st_tcp_socket_base<Socket, Packer, Unpacker>::force_close();
+		super::force_close();
 	}
 
 	//sync must be false if you call graceful_close in on_msg
@@ -92,7 +95,7 @@ public:
 		reconnecting = reconnect;
 		connected = false;
 
-		if (st_tcp_socket_base<Socket, Packer, Unpacker>::graceful_close(sync))
+		if (super::graceful_close(sync))
 			ST_THIS set_timer(TIMER_ASYNC_CLOSE, 10, boost::bind(&st_connector_base::async_close_handler, this, _1, ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION * 100));
 	}
 
@@ -131,7 +134,7 @@ protected:
 	//after how much time(ms), st_connector will try to reconnect to the server, negative means give up.
 	virtual int prepare_reconnect(const boost::system::error_code& ec) {return ST_ASIO_RECONNECT_INTERVAL;}
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
-	virtual bool is_send_allowed() const {return is_connected() && st_tcp_socket_base<Socket, Packer, Unpacker>::is_send_allowed();}
+	virtual bool is_send_allowed() const {return is_connected() && super::is_send_allowed();}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_close();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
@@ -209,7 +212,6 @@ protected:
 	bool connected;
 	bool reconnecting;
 };
-typedef st_connector_base<> st_connector;
 
 } //namespace
 

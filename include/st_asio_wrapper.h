@@ -24,13 +24,20 @@
  * 2016.7.17	version 1.0.1
  * Support boost-1.49, it's the minimum version for st_asio_wrapper because of boost::container.
  *
+ * 2016.8.7	version 1.1.0
+ * Add stream_unpacker to receive native data.
+ * asio_server and test_client are now able to start with configurable thread number.
+ * Add efficiency statistic for performance tuning, and it can be shut down.
+ * Add pingpong test.
+ * Move packers and unpackers out of 'include' directory (now in 'ext' directory), they don't belong to st_asio_wrapper library.
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10001	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.0.1"
+#define ST_ASIO_WRAPPER_VER		10100	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.1.0"
 
 #ifdef _MSC_VER
 	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");

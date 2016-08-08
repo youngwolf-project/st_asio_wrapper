@@ -9,17 +9,19 @@
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 //#define ST_ASIO_CLEAR_OBJECT_INTERVAL	1
 #define ST_ASIO_WANT_MSG_SEND_NOTIFY
+#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency.
 //configuration
 
 //use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	1
-//1-default packer and unpacker, head(length) + body
+#define PACKER_UNPACKER_TYPE	0
+//0-default packer and unpacker, head(length) + body
+//1-default replaceable_packer and replaceable_unpacker, head(length) + body
 //2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-//#define ST_ASIO_DEFAULT_PACKER replaceable_packer
-//#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
+#define ST_ASIO_DEFAULT_PACKER replaceable_packer
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 #elif 2 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
@@ -27,8 +29,9 @@
 #define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
 
-#include "../include/st_asio_wrapper_tcp_client.h"
+#include "../include/ext/st_asio_wrapper_net.h"
 using namespace st_asio_wrapper;
+using namespace st_asio_wrapper::ext;
 
 #ifdef _MSC_VER
 #define atoll _atoi64
@@ -61,10 +64,10 @@ public:
 	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0)
 	{
 #if 2 == PACKER_UNPACKER_TYPE
-		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
+		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(inner_unpacker())->fixed_length(1024);
 #elif 3 == PACKER_UNPACKER_TYPE
-		dynamic_cast<prefix_suffix_packer*>(&*inner_packer())->prefix_suffix("begin", "end");
-		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
+		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_PACKER>(inner_packer())->prefix_suffix("begin", "end");
+		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(inner_unpacker())->prefix_suffix("begin", "end");
 #endif
 	}
 
@@ -81,7 +84,13 @@ public:
 		memset(buff, msg_fill, msg_len);
 		memcpy(buff, &recv_index, sizeof(size_t)); //seq
 
+#if 2 == PACKER_UNPACKER_TYPE
+		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+		send_native_msg(buff, msg_len);
+#else
 		send_msg(buff, msg_len);
+#endif
+
 		delete[] buff;
 	}
 
@@ -103,13 +112,23 @@ protected:
 
 		auto pstr = inner_packer()->raw_data(msg);
 		auto msg_len = inner_packer()->raw_data_len(msg);
+#if 2 == PACKER_UNPACKER_TYPE
+		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+		std::advance(pstr, -ST_ASIO_HEAD_LEN);
+		msg_len += ST_ASIO_HEAD_LEN;
+#endif
 
 		size_t send_index;
 		memcpy(&send_index, pstr, sizeof(size_t));
 		++send_index;
-		memcpy(pstr, &send_index, sizeof(size_t));
+		memcpy(pstr, &send_index, sizeof(size_t)); //seq
 
+#if 2 == PACKER_UNPACKER_TYPE
+		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+		send_native_msg(pstr, msg_len);
+#else
 		send_msg(pstr, msg_len);
+#endif
 	}
 #endif
 
@@ -141,12 +160,12 @@ public:
 		return total_recv_bytes;
 	}
 
-	boost::posix_time::time_duration recv_idle_time()
+	test_socket::statistic get_statistic()
 	{
-		boost::posix_time::time_duration time_recv_idle;
-		ST_THIS do_something_to_all([&time_recv_idle](object_ctype& item) {time_recv_idle += item->recv_idle_time();});
+		test_socket::statistic stat;
+		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic(); });
 
-		return time_recv_idle;
+		return stat;
 	}
 
 	void clear_status() {do_something_to_all([](object_ctype& item) {item->clear_status();});}
@@ -190,15 +209,9 @@ public:
 	///////////////////////////////////////////////////
 };
 
-#if defined(_MSC_VER) || defined(__i386__)
-#define fractional_seconds_format "%lld"
-#else // defined(__GNUC__) && defined(__x86_64__)
-#define fractional_seconds_format "%ld"
-#endif
-
 int main(int argc, const char* argv[])
 {
-	printf("usage: test_client [<port=%d> [<ip=%s> [link num=16]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
+	printf("usage: test_client [<service thread number=1> [<port=%d> [<ip=%s> [link num=16]]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -206,8 +219,8 @@ int main(int argc, const char* argv[])
 
 	///////////////////////////////////////////////////////////
 	size_t link_num = 16;
-	if (argc > 3)
-		link_num = std::min(ST_ASIO_MAX_OBJECT_NUM, std::max(atoi(argv[3]), 1));
+	if (argc > 4)
+		link_num = std::min(ST_ASIO_MAX_OBJECT_NUM, std::max(atoi(argv[4]), 1));
 
 	printf("exec: test_client with " ST_ASIO_SF " links\n", link_num);
 	///////////////////////////////////////////////////////////
@@ -217,8 +230,8 @@ int main(int argc, const char* argv[])
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4
-	unsigned short port = argc > 1 ? atoi(argv[1]) : ST_ASIO_SERVER_PORT;
-	std::string ip = argc > 2 ? argv[2] : ST_ASIO_SERVER_IP;
+	unsigned short port = argc > 2 ? atoi(argv[2]) : ST_ASIO_SERVER_PORT;
+	std::string ip = argc > 3 ? argv[3] : ST_ASIO_SERVER_IP;
 
 	//method #1, create and add clients manually.
 	auto client_ptr = client.create_object();
@@ -235,12 +248,15 @@ int main(int argc, const char* argv[])
 	for (auto i = std::max((size_t) 1, link_num / 2); i < link_num; ++i)
 		client.add_client(port, ip);
 
-	auto min_thread_num = 1;
+	auto thread_num = 1;
+	if (argc > 1)
+		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
-	++min_thread_num;
+	if (1 == thread_num)
+		++thread_num;
 #endif
 
-	service_pump.start_service(min_thread_num);
+	service_pump.start_service(thread_num);
 	while(service_pump.is_running())
 	{
 		std::string str;
@@ -250,13 +266,13 @@ int main(int argc, const char* argv[])
 		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service();
-			service_pump.start_service(min_thread_num);
+			service_pump.start_service(thread_num);
 		}
 		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
-			boost::posix_time::time_duration time_recv_idle = client.recv_idle_time();
-			printf("total recv idle time: %d." fractional_seconds_format " second(s)\n", time_recv_idle.total_seconds(), time_recv_idle.fractional_seconds());
+			puts("");
+			puts(client.get_statistic().to_string().data());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (SUSPEND_COMMAND == str)
@@ -301,14 +317,12 @@ int main(int argc, const char* argv[])
 			auto iter = std::begin(tok);
 			if (iter != std::end(tok)) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
 
-			auto native = false;
 #if 1 == PACKER_UNPACKER_TYPE
 			if (iter != std::end(tok)) msg_len = std::min(packer::get_max_msg_size(),
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq
 #elif 2 == PACKER_UNPACKER_TYPE
 			if (iter != std::end(tok)) ++iter;
 			msg_len = 1024; //we hard code this because we fixedly initialized the length of fixed_length_unpacker to 1024
-			native = true; //we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
 #elif 3 == PACKER_UNPACKER_TYPE
 			if (iter != std::end(tok)) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE,
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t)));
@@ -376,11 +390,21 @@ int main(int argc, const char* argv[])
 					switch (model)
 					{
 					case 0:
-						native ? client.safe_broadcast_native_msg(buff, msg_len) : client.safe_broadcast_msg(buff, msg_len);
+#if 2 == PACKER_UNPACKER_TYPE
+						//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+						client.safe_broadcast_native_msg(buff, msg_len);
+#else
+						client.safe_broadcast_msg(buff, msg_len);
+#endif
 						send_bytes += link_num * msg_len;
 						break;
 					case 1:
-						native ? client.safe_random_send_native_msg(buff, msg_len) : client.safe_random_send_msg(buff, msg_len);
+#if 2 == PACKER_UNPACKER_TYPE
+						//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
+						client.safe_random_send_native_msg(buff, msg_len);
+#else
+						client.safe_random_send_msg(buff, msg_len);
+#endif
 						send_bytes += msg_len;
 						break;
 					default:
@@ -417,6 +441,7 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ST_ASIO_CLEAR_OBJECT_INTERVAL
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY
+#undef ST_ASIO_FULL_STATISTIC
 #undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration

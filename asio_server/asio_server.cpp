@@ -7,16 +7,18 @@
 #define ST_ASIO_FREE_OBJECT_INTERVAL	60
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_ENHANCED_STABILITY
+//#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency.
 
 //use the following macro to control the type of packer and unpacker
-#define PACKER_UNPACKER_TYPE	1
-//1-default packer and unpacker, head(length) + body
+#define PACKER_UNPACKER_TYPE	0
+//0-default packer and unpacker, head(length) + body
+//1-default replaceable_packer and replaceable_unpacker, head(length) + body
 //2-fixed length unpacker
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-//#define ST_ASIO_DEFAULT_PACKER replaceable_packer
-//#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
+#define ST_ASIO_DEFAULT_PACKER replaceable_packer
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 #elif 2 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
@@ -25,8 +27,9 @@
 #endif
 //configuration
 
-#include "../include/st_asio_wrapper_server.h"
+#include "../include/ext/st_asio_wrapper_net.h"
 using namespace st_asio_wrapper;
+using namespace st_asio_wrapper::ext;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
@@ -39,11 +42,7 @@ using namespace st_asio_wrapper;
 //under the default behavior, each st_tcp_socket has their own packer, and cause memory waste
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
-#if 1 == PACKER_UNPACKER_TYPE || 2 == PACKER_UNPACKER_TYPE
 auto global_packer(boost::make_shared<ST_ASIO_DEFAULT_PACKER>());
-#elif 3 == PACKER_UNPACKER_TYPE
-auto global_packer(boost::make_shared<prefix_suffix_packer>());
-#endif
 
 //demonstrate how to control the type of st_server_socket_base::server from template parameter
 class i_echo_server : public i_server
@@ -60,10 +59,9 @@ public:
 		inner_packer(global_packer);
 
 #if 2 == PACKER_UNPACKER_TYPE
-		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
+		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(inner_unpacker())->fixed_length(1024);
 #elif 3 == PACKER_UNPACKER_TYPE
-		dynamic_cast<prefix_suffix_packer*>(&*inner_packer())->prefix_suffix("begin", "end");
-		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
+		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(inner_unpacker())->prefix_suffix("begin", "end");
 #endif
 	}
 
@@ -115,27 +113,21 @@ class echo_server : public st_server_base<echo_socket, st_object_pool<echo_socke
 public:
 	echo_server(st_service_pump& service_pump_) : st_server_base(service_pump_) {}
 
-	boost::posix_time::time_duration recv_idle_time()
+	echo_socket::statistic get_statistic()
 	{
-		boost::posix_time::time_duration time_recv_idle;
-		ST_THIS do_something_to_all([&time_recv_idle](object_ctype& item) {time_recv_idle += item->recv_idle_time();});
+		echo_socket::statistic stat;
+		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic();});
 
-		return time_recv_idle;
+		return stat;
 	}
 
 	//from i_echo_server, pure virtual function, we must implement it.
 	virtual void test() {/*puts("in echo_server::test()");*/}
 };
 
-#if defined(_MSC_VER) || defined(__i386__)
-#define fractional_seconds_format "%lld"
-#else // defined(__GNUC__) && defined(__x86_64__)
-#define fractional_seconds_format "%ld"
-#endif
-
 int main(int argc, const char* argv[])
 {
-	printf("usage: asio_server [<port=%d> [ip=0.0.0.0]]\n", ST_ASIO_SERVER_PORT);
+	printf("usage: asio_server [<service thread number=1> [<port=%d> [ip=0.0.0.0]]]\n", ST_ASIO_SERVER_PORT);
 	puts("normal server's port will be 100 larger.");
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
@@ -150,20 +142,28 @@ int main(int argc, const char* argv[])
 	st_server_base<normal_server_socket> server_(service_pump);
 	echo_server echo_server_(service_pump); //echo server
 
-	if (argc > 2)
+	if (argc > 3)
 	{
-		server_.set_server_addr(atoi(argv[1]) + 100, argv[2]);
-		echo_server_.set_server_addr(atoi(argv[1]), argv[2]);
+		server_.set_server_addr(atoi(argv[2]) + 100, argv[3]);
+		echo_server_.set_server_addr(atoi(argv[2]), argv[3]);
 	}
-	else if (argc > 1)
+	else if (argc > 2)
 	{
-		server_.set_server_addr(atoi(argv[1]) + 100);
-		echo_server_.set_server_addr(atoi(argv[1]));
+		server_.set_server_addr(atoi(argv[2]) + 100);
+		echo_server_.set_server_addr(atoi(argv[2]));
 	}
 	else
 		server_.set_server_addr(ST_ASIO_SERVER_PORT + 100);
 
-	service_pump.start_service(1);
+	auto thread_num = 1;
+	if (argc > 1)
+		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
+
+#if 3 == PACKER_UNPACKER_TYPE
+		global_packer->prefix_suffix("begin", "end");
+#endif
+
+	service_pump.start_service(thread_num);
 	while(service_pump.is_running())
 	{
 		std::string str;
@@ -173,14 +173,14 @@ int main(int argc, const char* argv[])
 		else if (RESTART_COMMAND == str)
 		{
 			service_pump.stop_service();
-			service_pump.start_service(1);
+			service_pump.start_service(thread_num);
 		}
 		else if (LIST_STATUS == str)
 		{
 			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
-			boost::posix_time::time_duration time_recv_idle = echo_server_.recv_idle_time();
-			printf("total recv idle time(echo server): %d." fractional_seconds_format " second(s)\n", time_recv_idle.total_seconds(), time_recv_idle.fractional_seconds());
+			puts("");
+			puts(echo_server_.get_statistic().to_string().data());
 		}
 		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
 		else if (SUSPEND_COMMAND == str)
@@ -198,16 +198,20 @@ int main(int argc, const char* argv[])
 		{
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
 //			server_.broadcast_msg(str.data(), str.size() + 1);
-			//send \0 character too, because asio_client used inflexible_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			//send \0 character too, because asio_client used most_primitive_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 
 			//if all clients used the same protocol, we can pack msg one time, and send it repeatedly like this:
 			packer p;
 			auto msg = p.pack_msg(str.data(), str.size() + 1);
-			//send \0 character too, because asio_client used inflexible_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			//send \0 character too, because asio_client used most_primitive_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (!msg.empty())
 				server_.do_something_to_all([&msg](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(msg);});
+
+			//if asio_client is using stream_unpacker
+//			if (!str.empty())
+//				server_.do_something_to_all([&str](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(str);});
 		}
 	}
 
@@ -220,6 +224,7 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_FREE_OBJECT_INTERVAL
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ST_ASIO_ENHANCED_STABILITY
+#undef ST_ASIO_FULL_STATISTIC
 #undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration

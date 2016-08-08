@@ -19,18 +19,18 @@
 namespace st_asio_wrapper
 {
 
-typedef st_sclient<st_connector> st_tcp_sclient;
-
-template<typename Socket = st_connector, typename Pool = st_object_pool<Socket>>
+template<typename Socket, typename Pool = st_object_pool<Socket>>
 class st_tcp_client_base : public st_client<Socket, Pool>
 {
+protected:
+	typedef st_client<Socket, Pool> super;
 public:
-	using st_client<Socket, Pool>::TIMER_BEGIN;
-	using st_client<Socket, Pool>::TIMER_END;
+	using super::TIMER_BEGIN;
+	using super::TIMER_END;
 
-	st_tcp_client_base(st_service_pump& service_pump_) : st_client<Socket, Pool>(service_pump_) {}
+	st_tcp_client_base(st_service_pump& service_pump_) : super(service_pump_) {}
 	template<typename Arg>
-	st_tcp_client_base(st_service_pump& service_pump_, Arg arg) : st_client<Socket, Pool>(service_pump_, arg) {}
+	st_tcp_client_base(st_service_pump& service_pump_, Arg arg) : super(service_pump_, arg) {}
 
 	//connected link size, may smaller than total object size(st_object_pool::size)
 	size_t valid_size()
@@ -43,7 +43,7 @@ public:
 		return size;
 	}
 
-	using st_client<Socket, Pool>::add_client;
+	using super::add_client;
 	typename Pool::object_type add_client()
 	{
 		auto client_ptr(ST_THIS create_object());
@@ -79,7 +79,6 @@ public:
 protected:
 	virtual void uninit() {ST_THIS stop(); graceful_close();}
 };
-typedef st_tcp_client_base<> st_tcp_client;
 
 } //namespace
 
