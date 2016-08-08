@@ -125,7 +125,7 @@ namespace st_asio_wrapper
 		using typename i_packer<MsgType>::msg_type;
 		using typename i_packer<MsgType>::msg_ctype;
 
-		virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false) {assert(false); return msg_type();}
+		virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false) {assert(false); return false;}
 	};
 
 	//unpacker concept

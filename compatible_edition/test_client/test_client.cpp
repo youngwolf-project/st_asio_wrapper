@@ -35,6 +35,10 @@
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 
+#ifdef _MSC_VER
+#define atoll _atoi64
+#endif
+
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
