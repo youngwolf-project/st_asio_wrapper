@@ -111,7 +111,8 @@ public:
 		uint_fast64_t send_msg_sum; //not counted msgs in sending buffer
 		uint_fast64_t send_byte_sum; //not counted msgs in sending buffer
 		stat_duration send_delay_sum; //from send_(native_)msg, post_(native_)msg(exclude msg packing) to asio::async_write
-		stat_duration send_time_sum; //from asio::async_write to send_handler, this indicate your network's speed or load
+		stat_duration send_time_sum; //from asio::async_write to send_handler
+		//above two items indicate your network's speed or load
 
 		//recv corresponding statistic
 		uint_fast64_t recv_msg_sum; //include msgs in receiving buffer
@@ -186,7 +187,6 @@ protected:
 		recv_msg_buffer.clear();
 		temp_msg_buffer.clear();
 
-		last_send_msg.clear();
 		last_dispatch_msg.clear();
 	}
 
@@ -418,7 +418,7 @@ protected:
 			if (dispatch_all)
 			{
 #ifndef ST_ASIO_DISCARD_MSG_WHEN_LINK_DOWN
-				st_asio_wrapper::do_something_to_all(recv_msg_buffer, [this](OutMsgType& msg) {ST_THIS on_msg_handle(msg, true);});
+				st_asio_wrapper::do_something_to_all(recv_msg_buffer, [this](out_msg& msg) {ST_THIS on_msg_handle(msg, true);});
 #endif
 				recv_msg_buffer.clear();
 			}
@@ -522,7 +522,6 @@ protected:
 	uint_fast64_t _id;
 	Socket next_layer_;
 
-	in_msg last_send_msg;
 	out_msg last_dispatch_msg;
 	boost::shared_ptr<i_packer<typename Packer::msg_type>> packer_;
 

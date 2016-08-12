@@ -115,7 +115,7 @@ namespace st_asio_wrapper
 	};
 	//packer concept
 
-	//just provide msg_type definition, you should not call any functions of it, and send msgs directly
+	//just provide msg_type definition, you should not call any functions of it, but send msgs directly
 	template<typename MsgType>
 	class dummy_packer : public i_packer<MsgType>
 	{
