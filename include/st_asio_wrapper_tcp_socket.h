@@ -124,23 +124,20 @@ protected:
 			const size_t max_send_size = boost::asio::detail::default_max_transfer_size;
 #endif
 			size_t size = 0;
-			std::vector<boost::asio::const_buffer> bufs;
 			auto end_time = super::statistic::local_time();
+			std::vector<boost::asio::const_buffer> bufs;
 			last_send_msg.clear();
-			for (auto iter = std::begin(ST_THIS send_msg_buffer); true;)
+			for (auto iter = std::begin(ST_THIS send_msg_buffer); last_send_msg.empty();)
 			{
 				size += iter->size();
 				bufs.push_back(boost::asio::buffer(iter->data(), iter->size()));
 				ST_THIS stat.send_delay_sum += end_time - iter->begin_time;
 				++iter;
 				if (size >= max_send_size || iter == std::end(ST_THIS send_msg_buffer))
-				{
 					last_send_msg.splice(std::end(last_send_msg), ST_THIS send_msg_buffer, std::begin(ST_THIS send_msg_buffer), iter);
-					last_send_msg.front().restart();
-					break;
-				}
 			}
 
+			last_send_msg.front().restart();
 			boost::asio::async_write(ST_THIS next_layer(), bufs,
 				ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}

@@ -45,6 +45,8 @@ public:
 	}
 
 protected:
+	virtual void on_connect() {boost::asio::ip::tcp::no_delay option(true); lowest_layer().set_option(option); st_connector::on_connect();}
+
 	//msg handling
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}

@@ -79,10 +79,7 @@ public:
 	{
 		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
 		auto unpack_ok = parse_msg(bytes_transferred, msg_pos_can);
-		do_something_to_all(msg_pos_can, [&msg_can](decltype(*std::begin(msg_pos_can))& item) {
-			msg_can.resize(msg_can.size() + 1);
-			msg_can.back().assign(item.first, item.second);
-		});
+		do_something_to_all(msg_pos_can, [&msg_can](decltype(msg_pos_can.front())& item) {msg_can.resize(msg_can.size() + 1); msg_can.back().assign(item.first, item.second);});
 
 		if (unpack_ok && remain_len > 0)
 		{

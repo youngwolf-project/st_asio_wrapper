@@ -46,6 +46,9 @@ public:
 
 		return stat;
 	}
+
+protected:
+	virtual bool on_accept(object_ctype& client_ptr) {boost::asio::ip::tcp::no_delay option(true); client_ptr->lowest_layer().set_option(option); return true;}
 };
 
 int main(int argc, const char* argv[])

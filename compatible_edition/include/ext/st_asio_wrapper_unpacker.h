@@ -189,7 +189,7 @@ protected:
 };
 
 //protocol: length + body
-//this unpacker demonstrate how to forbid memory copying while parsing msgs (let asio write msg directly).
+//this unpacker demonstrate how to forbid memory replication while parsing msgs (let asio write msg directly).
 class non_copy_unpacker : public i_unpacker<basic_buffer>
 {
 public:
@@ -262,10 +262,10 @@ public:
 private:
 	ST_ASIO_HEAD_TYPE head;
 	//please note that we don't have a fixed size array with maximum size any more(like the default unpacker).
-	//this is very useful if you have very few but very large msgs, fox example:
-	//you have a very large msg(1M size), but all others are very small, if you use a fixed size array to hold msgs in the unpackers,
-	//all the unpackers must have an array with at least 1M size, each st_socket will have a unpacker, this will cause your application occupy very large memory but with very low utilization ratio.
-	//this unbuffered_unpacker will resolve above problem, and with another benefit: no memory replication needed any more.
+	//this is very useful if you have a few type of msgs which are very large, fox example: you have a type of very large msg(1M size),
+	//but all others are very small, if you use the default unpacker, all unpackers must have a fixed buffer with at least 1M size, each st_socket has a unpacker,
+	//this will cause your application to occupy very large memory but with very low utilization ratio.
+	//this non_copy_unpacker will resolve above problem, and with another benefit: no memory replication needed any more.
 	msg_type raw_buff;
 	int step; //-1-error format, 0-want the head, 1-want the body
 };
@@ -393,8 +393,7 @@ public:
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
 	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
-	//read as many as possible to reduce asynchronous call-back(st_tcp_socket_base::recv_handler), and don't forget to handle
-	//stick package carefully in parse_msg function.
+	//read as many as possible to reduce asynchronous call-back, and don't forget to handle stick package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (ec)
