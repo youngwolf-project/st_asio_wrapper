@@ -34,14 +34,16 @@
  * 2016.8.16	version 1.1.1
  * Fix bug: the last msg will not be re-dispatched if on_msg_handle returned false until new msgs come in.
  * Drop timer TIMER_SUSPEND_DISPATCH_MSG, it's useless.
+ * Send more msgs in one async_write call.
+ * Fix annotations.
  *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10100	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.1.0"
+#define ST_ASIO_WRAPPER_VER		10101	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.1.1"
 
 #ifdef _MSC_VER
 	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");

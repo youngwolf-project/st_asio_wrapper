@@ -19,8 +19,8 @@
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10100	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.1.0"
+#define ST_ASIO_WRAPPER_VER		10101	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.1.1"
 
 #ifdef _MSC_VER
 	#if _MSC_VER >= 1600
