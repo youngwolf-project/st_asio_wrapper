@@ -119,7 +119,7 @@ public:
 		uint_fast64_t recv_byte_sum; //include msgs in receiving buffer
 		stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
 		stat_duration recv_idle_sum;
-		//during this duration, st_socket suspended msg reception because of full receiving buffer, posting msgs or invoke on_msg
+		//during this duration, st_socket suspended msg reception because of full receiving buffer or posting msgs
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 		stat_duration handle_time_1_sum; //on_msg consumed time, this indicate the efficiency of msg handling
 #endif
