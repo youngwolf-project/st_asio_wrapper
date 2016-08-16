@@ -31,6 +31,10 @@
  * Add pingpong test.
  * Move packers and unpackers out of 'include' directory (now in 'ext' directory), they don't belong to st_asio_wrapper library.
  *
+ * 2016.8.16	version 1.1.1
+ * Fix bug: the last msg will not be re-dispatched if on_msg_handle returned false until new msgs come in.
+ * Drop timer TIMER_SUSPEND_DISPATCH_MSG, it's useless.
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
