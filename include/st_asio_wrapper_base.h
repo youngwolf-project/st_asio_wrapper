@@ -115,7 +115,7 @@ namespace st_asio_wrapper
 	};
 	//packer concept
 
-	//just provide msg_type definition, you should not call any functions of it, and send msgs directly
+	//just provide msg_type definition, you should not call any functions of it, but send msgs directly
 	template<typename MsgType>
 	class dummy_packer : public i_packer<MsgType>
 	{
@@ -333,7 +333,7 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const 
 	boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex); \
 	if (can_overflow || ST_THIS send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM) \
 	{ \
-		udp_msg<typename Packer::msg_type> msg(peer_addr, ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)); \
+		in_msg_type msg(peer_addr, ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)); \
 		return ST_THIS do_direct_send_msg(std::move(msg)); \
 	} \
 	return false; \
@@ -343,7 +343,7 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 #define UDP_POST_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	udp_msg<typename Packer::msg_type> msg(peer_addr, ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)); \
+	in_msg_type msg(peer_addr, ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)); \
 	return ST_THIS direct_post_msg(std::move(msg), can_overflow); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)

@@ -198,13 +198,13 @@ int main(int argc, const char* argv[])
 		{
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
 //			server_.broadcast_msg(str.data(), str.size() + 1);
-			//send \0 character too, because asio_client used most_primitive_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			//send \0 character too, because asio_client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 
 			//if all clients used the same protocol, we can pack msg one time, and send it repeatedly like this:
 			packer p;
 			auto msg = p.pack_msg(str.data(), str.size() + 1);
-			//send \0 character too, because asio_client used most_primitive_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			//send \0 character too, because asio_client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (!msg.empty())
 				server_.do_something_to_all([&msg](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(msg);});

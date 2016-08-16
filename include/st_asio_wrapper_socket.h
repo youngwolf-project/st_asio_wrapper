@@ -111,14 +111,15 @@ public:
 		uint_fast64_t send_msg_sum; //not counted msgs in sending buffer
 		uint_fast64_t send_byte_sum; //not counted msgs in sending buffer
 		stat_duration send_delay_sum; //from send_(native_)msg, post_(native_)msg(exclude msg packing) to asio::async_write
-		stat_duration send_time_sum; //from asio::async_write to send_handler, this indicate your network's speed or load
+		stat_duration send_time_sum; //from asio::async_write to send_handler
+		//above two items indicate your network's speed or load
 
 		//recv corresponding statistic
 		uint_fast64_t recv_msg_sum; //include msgs in receiving buffer
 		uint_fast64_t recv_byte_sum; //include msgs in receiving buffer
 		stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
 		stat_duration recv_idle_sum;
-		//during this duration, st_socket suspended msg reception because of full receiving buffer, posting msgs or invoke on_msg
+		//during this duration, st_socket suspended msg reception because of full receiving buffer or posting msgs
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 		stat_duration handle_time_1_sum; //on_msg consumed time, this indicate the efficiency of msg handling
 #endif
@@ -150,9 +151,8 @@ protected:
 
 	static const unsigned char TIMER_BEGIN = st_timer::TIMER_END;
 	static const unsigned char TIMER_DISPATCH_MSG = TIMER_BEGIN;
-	static const unsigned char TIMER_SUSPEND_DISPATCH_MSG = TIMER_BEGIN + 1;
-	static const unsigned char TIMER_HANDLE_POST_BUFFER = TIMER_BEGIN + 2;
-	static const unsigned char TIMER_RE_DISPATCH_MSG = TIMER_BEGIN + 3;
+	static const unsigned char TIMER_HANDLE_POST_BUFFER = TIMER_BEGIN + 1;
+	static const unsigned char TIMER_RE_DISPATCH_MSG = TIMER_BEGIN + 2;
 	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
 
 	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()), started_(false) {reset_state();}
@@ -186,7 +186,6 @@ protected:
 		recv_msg_buffer.clear();
 		temp_msg_buffer.clear();
 
-		last_send_msg.clear();
 		last_dispatch_msg.clear();
 	}
 
@@ -241,7 +240,6 @@ public:
 	void suspend_dispatch_msg(bool suspend)
 	{
 		suspend_dispatch_msg_ = suspend;
-		stop_timer(TIMER_SUSPEND_DISPATCH_MSG);
 		do_dispatch_msg(true);
 	}
 	bool suspend_dispatch_msg() const {return suspend_dispatch_msg_;}
@@ -347,24 +345,27 @@ protected:
 		if (!temp_msg_buffer.empty())
 		{
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-			out_container_type temp_2_msg_buffer;
-			auto begin_time = statistic::local_time();
-			for (auto iter = std::begin(temp_msg_buffer); !suspend_dispatch_msg_ && !posting && iter != std::end(temp_msg_buffer);)
-				if (on_msg(*iter))
-					temp_msg_buffer.erase(iter++);
-				else
-					temp_2_msg_buffer.splice(std::end(temp_2_msg_buffer), temp_msg_buffer, iter++);
-			auto time_duration = statistic::local_time() - begin_time;
-			stat.handle_time_1_sum += time_duration;
-			stat.recv_idle_sum += time_duration;
-
-			if (!temp_2_msg_buffer.empty())
+			if (!suspend_dispatch_msg_ && !posting)
 			{
-				boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-				if (splice_helper(recv_msg_buffer, temp_2_msg_buffer))
-					do_dispatch_msg(false);
+				out_container_type temp_2_msg_buffer;
+				auto begin_time = statistic::local_time();
+				for (auto iter = std::begin(temp_msg_buffer); iter != std::end(temp_msg_buffer);)
+					if (on_msg(*iter))
+						temp_msg_buffer.erase(iter++);
+					else
+						temp_2_msg_buffer.splice(std::end(temp_2_msg_buffer), temp_msg_buffer, iter++);
+				auto time_duration = statistic::local_time() - begin_time;
+				stat.handle_time_1_sum += time_duration;
+				stat.recv_idle_sum += time_duration;
+
+				if (!temp_2_msg_buffer.empty())
+				{
+					boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
+					if (splice_helper(recv_msg_buffer, temp_2_msg_buffer))
+						do_dispatch_msg(false);
+				}
+				temp_msg_buffer.splice(std::begin(temp_msg_buffer), temp_2_msg_buffer);
 			}
-			temp_msg_buffer.splice(std::begin(temp_msg_buffer), temp_2_msg_buffer);
 #else
 			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
 			if (splice_helper(recv_msg_buffer, temp_msg_buffer))
@@ -384,44 +385,44 @@ protected:
 	//must mutex recv_msg_buffer before invoke this function
 	void do_dispatch_msg(bool need_lock)
 	{
+		if (suspend_dispatch_msg_ || posting)
+			return;
+
 		boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex, boost::defer_lock);
 		if (need_lock) lock.lock();
 
-		if (suspend_dispatch_msg_)
+		auto dispatch_all = false;
+		if (stopped())
+			dispatch_all = !(dispatching = false);
+		else if (!dispatching)
 		{
-			if (!dispatching && !recv_msg_buffer.empty())
-				set_timer(TIMER_SUSPEND_DISPATCH_MSG, 24 * 60 * 60 * 1000, [this](unsigned char id)->bool {return ST_THIS timer_handler(id);}); //one day
+			if (!started())
+				dispatch_all = true;
+			else if (!last_dispatch_msg.empty())
+			{
+				dispatching = true;
+				post([this]() {ST_THIS msg_handler();});
+			}
+			else if (!recv_msg_buffer.empty())
+			{
+				last_dispatch_msg.restart(recv_msg_buffer.front().begin_time);
+				last_dispatch_msg.swap(recv_msg_buffer.front());
+				recv_msg_buffer.pop_front();
+
+				dispatching = true;
+				post([this]() {ST_THIS msg_handler();});
+			}
 		}
-		else if (!posting)
+
+		if (dispatch_all)
 		{
-			auto dispatch_all = false;
-			if (stopped())
-				dispatch_all = !(dispatching = false);
-			else if (!dispatching)
-			{
-				if (!started())
-					dispatch_all = true;
-				else if (!recv_msg_buffer.empty())
-				{
-					dispatching = true;
-					if (last_dispatch_msg.empty())
-					{
-						last_dispatch_msg.restart(recv_msg_buffer.front().begin_time);
-						last_dispatch_msg.swap(recv_msg_buffer.front());
-						recv_msg_buffer.pop_front();
-					}
-
-					post([this]() {ST_THIS msg_handler();});
-				}
-			}
-
-			if (dispatch_all)
-			{
 #ifndef ST_ASIO_DISCARD_MSG_WHEN_LINK_DOWN
-				st_asio_wrapper::do_something_to_all(recv_msg_buffer, [this](OutMsgType& msg) {ST_THIS on_msg_handle(msg, true);});
+			if (!last_dispatch_msg.empty())
+				on_msg_handle(last_dispatch_msg, true);
+			st_asio_wrapper::do_something_to_all(recv_msg_buffer, [this](out_msg& msg) {ST_THIS on_msg_handle(msg, true);});
 #endif
-				recv_msg_buffer.clear();
-			}
+			last_dispatch_msg.clear();
+			recv_msg_buffer.clear();
 		}
 	}
 
@@ -463,9 +464,6 @@ private:
 		case TIMER_DISPATCH_MSG: //delay putting msgs into receive buffer cause of receive buffer overflow
 			stat.recv_idle_sum += statistic::local_time() - recv_idle_begin_time;
 			dispatch_msg();
-			break;
-		case TIMER_SUSPEND_DISPATCH_MSG: //suspend dispatching msgs
-			do_dispatch_msg(true);
 			break;
 		case TIMER_HANDLE_POST_BUFFER:
 			{
@@ -522,7 +520,6 @@ protected:
 	uint_fast64_t _id;
 	Socket next_layer_;
 
-	in_msg last_send_msg;
 	out_msg last_dispatch_msg;
 	boost::shared_ptr<i_packer<typename Packer::msg_type>> packer_;
 

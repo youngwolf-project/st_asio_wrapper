@@ -13,6 +13,8 @@
 #ifndef ST_ASIO_WRAPPER_TCP_SOCKET_H_
 #define ST_ASIO_WRAPPER_TCP_SOCKET_H_
 
+#include <vector>
+
 #include "st_asio_wrapper_socket.h"
 
 #ifndef ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION
@@ -120,13 +122,28 @@ protected:
 			ST_THIS sending = false;
 		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
 		{
-			ST_THIS stat.send_delay_sum += super::statistic::local_time() - ST_THIS send_msg_buffer.front().begin_time;
 			ST_THIS sending = true;
-			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
-			ST_THIS send_msg_buffer.pop_front();
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+			const size_t max_send_size = 0;
+#else
+			const size_t max_send_size = boost::asio::detail::default_max_transfer_size;
+#endif
+			size_t size = 0;
+			BOOST_AUTO(end_time, super::statistic::local_time());
+			std::vector<boost::asio::const_buffer> bufs;
+			last_send_msg.clear();
+			for (BOOST_AUTO(iter, ST_THIS send_msg_buffer.begin()); last_send_msg.empty();)
+			{
+				size += iter->size();
+				bufs.push_back(boost::asio::buffer(iter->data(), iter->size()));
+				ST_THIS stat.send_delay_sum += end_time - iter->begin_time;
+				++iter;
+				if (size >= max_send_size || iter == ST_THIS send_msg_buffer.end())
+					last_send_msg.splice(last_send_msg.end(), ST_THIS send_msg_buffer, ST_THIS send_msg_buffer.begin(), iter);
+			}
 
-			ST_THIS last_send_msg.restart();
-			boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()),
+			last_send_msg.front().restart();
+			boost::asio::async_write(ST_THIS next_layer(), bufs,
 				ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
 
@@ -206,13 +223,11 @@ private:
 	{
 		if (!ec)
 		{
-			assert(bytes_transferred == ST_THIS last_send_msg.size());
-
-			ST_THIS stat.send_time_sum += super::statistic::local_time() - ST_THIS last_send_msg.begin_time;
+			ST_THIS stat.send_time_sum += super::statistic::local_time() - last_send_msg.front().begin_time;
 			ST_THIS stat.send_byte_sum += bytes_transferred;
-			++ST_THIS stat.send_msg_sum;
+			ST_THIS stat.send_msg_sum += last_send_msg.size();
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-			ST_THIS on_msg_send(ST_THIS last_send_msg);
+			ST_THIS on_msg_send(last_send_msg.front());
 #endif
 		}
 		else
@@ -225,16 +240,17 @@ private:
 		if (!ec)
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 			if (!do_send_msg())
-				ST_THIS on_all_msg_send(ST_THIS last_send_msg);
+				ST_THIS on_all_msg_send(last_send_msg.back());
 #else
 			do_send_msg();
 #endif
 
 		if (!ST_THIS sending)
-			ST_THIS last_send_msg.clear();
+			last_send_msg.clear();
 	}
 
 protected:
+	typename super::in_container_type last_send_msg;
 	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker_;
 	int close_state; //2-the first step of graceful close, 1-force close, 0-normal state
 };

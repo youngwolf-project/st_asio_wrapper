@@ -133,14 +133,14 @@ protected:
 			ST_THIS sending = false;
 		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
 		{
-			ST_THIS stat.send_delay_sum += super::statistic::local_time() - ST_THIS send_msg_buffer.front().begin_time;
 			ST_THIS sending = true;
-			ST_THIS last_send_msg.swap(ST_THIS send_msg_buffer.front());
+			ST_THIS stat.send_delay_sum += super::statistic::local_time() - ST_THIS send_msg_buffer.front().begin_time;
+			ST_THIS send_msg_buffer.front().swap(last_send_msg);
 			ST_THIS send_msg_buffer.pop_front();
 
 			boost::shared_lock<boost::shared_mutex> lock(close_mutex);
-			ST_THIS last_send_msg.restart();
-			ST_THIS next_layer().async_send_to(boost::asio::buffer(ST_THIS last_send_msg.data(), ST_THIS last_send_msg.size()), ST_THIS last_send_msg.peer_addr,
+			last_send_msg.restart();
+			ST_THIS next_layer().async_send_to(boost::asio::buffer(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr,
 				ST_THIS make_handler_error_size(boost::bind(&st_udp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
 
@@ -212,13 +212,13 @@ private:
 	{
 		if (!ec)
 		{
-			assert(bytes_transferred == ST_THIS last_send_msg.size());
+			assert(bytes_transferred == last_send_msg.size());
 
-			ST_THIS stat.send_time_sum += super::statistic::local_time() - ST_THIS last_send_msg.begin_time;
+			ST_THIS stat.send_time_sum += super::statistic::local_time() - last_send_msg.begin_time;
 			ST_THIS stat.send_byte_sum += bytes_transferred;
 			++ST_THIS stat.send_msg_sum;
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-			ST_THIS on_msg_send(ST_THIS last_send_msg);
+			ST_THIS on_msg_send(last_send_msg);
 #endif
 		}
 		else
@@ -232,16 +232,17 @@ private:
 		//for UDP in st_asio_wrapper, sending error will not stop the following sending.
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 		if (!do_send_msg())
-			ST_THIS on_all_msg_send(ST_THIS last_send_msg);
+			ST_THIS on_all_msg_send(last_send_msg);
 #else
 		do_send_msg();
 #endif
 
 		if (!ST_THIS sending)
-			ST_THIS last_send_msg.clear();
+			last_send_msg.clear();
 	}
 
 protected:
+	typename super::in_msg last_send_msg;
 	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type> > unpacker_;
 	boost::asio::ip::udp::endpoint peer_addr, local_addr;
 

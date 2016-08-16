@@ -36,10 +36,7 @@ public:
 	size_t valid_size()
 	{
 		size_t size = 0;
-		ST_THIS do_something_to_all([&size](typename Pool::object_ctype& item) {
-			if (item->is_connected())
-				++size;
-		});
+		ST_THIS do_something_to_all([&size](typename Pool::object_ctype& item) {if (item->is_connected()) ++size;});
 		return size;
 	}
 
