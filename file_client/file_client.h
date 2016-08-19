@@ -182,7 +182,7 @@ public:
 	{
 		stop_timer(UPDATE_PROGRESS);
 
-		auto used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
+		auto used_time = (double) begin_time.elapsed().wall / 1000000000;
 		printf("\r100%%\ntransfer %s end, speed: %.0f kB/s.\n", file_name.data(), file_size / used_time / 1024);
 	}
 

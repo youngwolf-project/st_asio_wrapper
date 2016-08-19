@@ -69,7 +69,6 @@ int main(int argc, const char* argv[])
 			{
 				completed_client_num = 0;
 				file_size = 0;
-				boost::timer::cpu_timer begin_time;
 
 				printf("transfer %s begin.\n", iter->data());
 				if (client.find(0)->get_file(*iter))
