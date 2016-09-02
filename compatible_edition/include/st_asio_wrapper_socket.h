@@ -345,35 +345,32 @@ protected:
 	//call this in recv_handler (in subclasses) only
 	void dispatch_msg()
 	{
+		bool overflow = false;
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 		if (!temp_msg_buffer.empty())
 		{
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-			if (!suspend_dispatch_msg_ && !posting)
+			if (suspend_dispatch_msg_ || posting)
+				overflow = true;
+			else
 			{
-				out_container_type temp_2_msg_buffer;
 				BOOST_AUTO(begin_time, statistic::local_time());
 				for (BOOST_AUTO(iter, temp_msg_buffer.begin()); iter != temp_msg_buffer.end();)
 					if (on_msg(*iter))
 						temp_msg_buffer.erase(iter++);
 					else
-						temp_2_msg_buffer.splice(temp_2_msg_buffer.end(), temp_msg_buffer, iter++);
+						++iter;
 				BOOST_AUTO(time_duration, statistic::local_time() - begin_time);
 				stat.handle_time_1_sum += time_duration;
 				stat.recv_idle_sum += time_duration;
-
-				if (!temp_2_msg_buffer.empty())
-				{
-					boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-					if (splice_helper(recv_msg_buffer, temp_2_msg_buffer))
-						do_dispatch_msg(false);
-				}
-				temp_msg_buffer.splice(temp_msg_buffer.begin(), temp_2_msg_buffer);
 			}
-#else
-			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-			if (splice_helper(recv_msg_buffer, temp_msg_buffer))
-				do_dispatch_msg(false);
+		}
 #endif
+		if (!overflow)
+		{
+			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
+			recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer);
+			overflow = recv_msg_buffer.size() > ST_ASIO_MAX_MSG_NUM;
+			do_dispatch_msg(false);
 		}
 
 		if (!overflow)
