@@ -68,7 +68,6 @@ int main(int argc, const char* argv[])
 			do_something_to_all(tok, [&](boost::tokenizer<boost::char_separator<char>>::const_reference item) {
 				completed_client_num = 0;
 				file_size = 0;
-				boost::timer::cpu_timer begin_time;
 
 				printf("transfer %s begin.\n", item.data());
 				if (client.find(0)->get_file(item))

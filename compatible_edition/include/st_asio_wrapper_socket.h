@@ -342,40 +342,38 @@ protected:
 	virtual void on_all_msg_send(InMsgType& msg) {}
 #endif
 
+	//call this in recv_handler (in subclasses) only
 	void dispatch_msg()
 	{
+		bool overflow = false;
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 		if (!temp_msg_buffer.empty())
 		{
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-			if (!suspend_dispatch_msg_ && !posting)
+			if (suspend_dispatch_msg_ || posting)
+				overflow = true;
+			else
 			{
-				out_container_type temp_2_msg_buffer;
 				BOOST_AUTO(begin_time, statistic::local_time());
 				for (BOOST_AUTO(iter, temp_msg_buffer.begin()); iter != temp_msg_buffer.end();)
 					if (on_msg(*iter))
 						temp_msg_buffer.erase(iter++);
 					else
-						temp_2_msg_buffer.splice(temp_2_msg_buffer.end(), temp_msg_buffer, iter++);
+						++iter;
 				BOOST_AUTO(time_duration, statistic::local_time() - begin_time);
 				stat.handle_time_1_sum += time_duration;
 				stat.recv_idle_sum += time_duration;
-
-				if (!temp_2_msg_buffer.empty())
-				{
-					boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-					if (splice_helper(recv_msg_buffer, temp_2_msg_buffer))
-						do_dispatch_msg(false);
-				}
-				temp_msg_buffer.splice(temp_msg_buffer.begin(), temp_2_msg_buffer);
 			}
-#else
-			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
-			if (splice_helper(recv_msg_buffer, temp_msg_buffer))
-				do_dispatch_msg(false);
+		}
 #endif
+		if (!overflow)
+		{
+			boost::unique_lock<boost::shared_mutex> lock(recv_msg_buffer_mutex);
+			recv_msg_buffer.splice(recv_msg_buffer.end(), temp_msg_buffer);
+			overflow = recv_msg_buffer.size() > ST_ASIO_MAX_MSG_NUM;
+			do_dispatch_msg(false);
 		}
 
-		if (temp_msg_buffer.empty())
+		if (!overflow)
 			do_recv_msg(); //receive msg sequentially, which means second receiving only after first receiving success
 		else
 		{
@@ -384,7 +382,6 @@ protected:
 		}
 	}
 
-	//must mutex recv_msg_buffer before invoke this function
 	void do_dispatch_msg(bool need_lock)
 	{
 		if (suspend_dispatch_msg_ || posting)
@@ -527,7 +524,9 @@ protected:
 
 	in_container_type post_msg_buffer, send_msg_buffer;
 	out_container_type recv_msg_buffer, temp_msg_buffer;
-	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't push into recv_msg_buffer because of receive buffer overflow,
+	//st_socket will invoke dispatch_msg() when got some msgs. if these msgs can't be pushed into recv_msg_buffer because of:
+	// 1. msg dispatching suspended;
+	// 2. post_msg_buffer not empty.
 	//st_socket will delay 50 milliseconds(non-blocking) to invoke dispatch_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
 	boost::shared_mutex post_msg_buffer_mutex, send_msg_buffer_mutex;
 	boost::shared_mutex recv_msg_buffer_mutex;

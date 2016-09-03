@@ -37,13 +37,19 @@
  * Send more msgs in one async_write call.
  * Fix annotations.
  *
+ * 2016.9.4		version 1.1.2
+ * Renamed proxy_buffer to auto_buffer.
+ * Added a new replaceable buffer shared_buffer.
+ * Fix bug: if receive buffer overflow and on_msg() returns false (which means using receive buffer),
+ *  st_socket will call on_msg() again and again (asynchronously) for the same msg until receive buffer becomes available.
+ * 
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10101	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.1.1"
+#define ST_ASIO_WRAPPER_VER		10102	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.1.2"
 
 #ifdef _MSC_VER
 	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");

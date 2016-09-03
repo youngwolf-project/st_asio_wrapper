@@ -182,7 +182,7 @@ int main(int argc, const char* argv[])
 				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
 			uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
-			auto used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
+			auto used_time = (double) begin_time.elapsed().wall / 1000000000;
 			printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
 			printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 

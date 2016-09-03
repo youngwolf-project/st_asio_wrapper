@@ -67,32 +67,64 @@ namespace st_asio_wrapper
 	};
 
 	//convert '->' operation to '.' operation
-	//user need to allocate object for this class, and this class will free it
+	//user need to allocate object, and auto_buffer will free it
 	template<typename T>
-	class proxy_buffer : public boost::noncopyable
+	class auto_buffer : public boost::noncopyable
 	{
 	public:
 		typedef T* buffer_type;
-		typedef const T* buffer_ctype;
+		typedef const buffer_type buffer_ctype;
 
-		proxy_buffer() : buffer(NULL) {}
-		proxy_buffer(buffer_type _buffer) : buffer(_buffer) {}
-		~proxy_buffer() {clear();}
+		auto_buffer() : buffer(NULL) {}
+		auto_buffer(buffer_type _buffer) : buffer(_buffer) {}
+		~auto_buffer() {clear();}
 
-		buffer_type raw_buffer() {return buffer;}
+		buffer_type raw_buffer() const {return buffer;}
 		void raw_buffer(buffer_type _buffer) {buffer = _buffer;}
 
 		//the following five functions are needed by st_asio_wrapper
 		bool empty() const {return NULL == buffer || buffer->empty();}
 		size_t size() const {return NULL == buffer ? 0 : buffer->size();}
 		const char* data() const {return NULL == buffer ? NULL : buffer->data();}
-		void swap(proxy_buffer& other) {std::swap(buffer, other.buffer);}
+		void swap(auto_buffer& other) {std::swap(buffer, other.buffer);}
 		void clear() {delete buffer; buffer = NULL;}
 
 	protected:
 		buffer_type buffer;
 	};
-	typedef proxy_buffer<i_buffer> replaceable_buffer; //if you want to replace packer or unpacker at runtime, please use this as the msg type
+	typedef auto_buffer<i_buffer> replaceable_buffer;
+	//replaceable_packer and replaceable_unpacker used replaceable_buffer as their msg type, so they're replaceable,
+	//shared_buffer<i_buffer> is available too.
+
+	//convert '->' operation to '.' operation
+	//user need to allocate object, and shared_buffer will free it
+	template<typename T>
+	class shared_buffer
+	{
+	public:
+		typedef boost::shared_ptr<T> buffer_type;
+		typedef const buffer_type buffer_ctype;
+
+		shared_buffer() {}
+		shared_buffer(buffer_type _buffer) : buffer(_buffer) {}
+		shared_buffer(const shared_buffer& other) : buffer(other.buffer) {}
+		const shared_buffer& operator=(const shared_buffer& other) {buffer = other.buffer; return *this;}
+		~shared_buffer() {clear();}
+
+		buffer_type raw_buffer() const {return buffer;}
+		void raw_buffer(buffer_ctype _buffer) {buffer = _buffer;}
+
+		//the following five functions are needed by st_asio_wrapper
+		bool empty() const {return !buffer || buffer->empty();}
+		size_t size() const {return !buffer ? 0 : buffer->size();}
+		const char* data() const {return !buffer ? NULL : buffer->data();}
+		void swap(shared_buffer& other) {buffer.swap(other.buffer);}
+		void clear() {buffer.reset();}
+
+	protected:
+		buffer_type buffer;
+	};
+	//not like auto_buffer, shared_buffer is copyable, but auto_buffer is a bit more efficient.
 
 	//packer concept
 	template<typename MsgType>

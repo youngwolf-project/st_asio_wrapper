@@ -373,7 +373,7 @@ int main(int argc, const char* argv[])
 						}
 					} while (100 != new_percent);
 
-					auto used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
+					auto used_time = (double) begin_time.elapsed().wall / 1000000000;
 					printf("\r100%%\ntime spent statistics: %.1f seconds.\n", used_time);
 					printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
 				}
@@ -424,7 +424,7 @@ int main(int argc, const char* argv[])
 				while(client.get_recv_bytes() != total_msg_bytes)
 					boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
-				auto used_time = (double) (begin_time.elapsed().wall / 1000000) / 1000;
+				auto used_time = (double) begin_time.elapsed().wall / 1000000000;
 				printf("\r100%%\ntime spent statistics: %.1f seconds.\n", used_time);
 				printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
 #endif
