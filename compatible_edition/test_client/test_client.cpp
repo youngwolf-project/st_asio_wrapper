@@ -32,10 +32,6 @@
 #include "../include/st_asio_wrapper_tcp_client.h"
 using namespace st_asio_wrapper;
 
-#ifdef _MSC_VER
-#define atoll _atoi64
-#endif
-
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
@@ -311,7 +307,7 @@ int main(int argc, const char* argv[])
 			boost::char_separator<char> sep(" \t");
 			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
 			BOOST_AUTO(iter, tok.begin());
-			if (iter != tok.end()) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
+			if (iter != tok.end()) msg_num = std::max((size_t) atoi(iter++->data()), (size_t) 1);
 
 			bool native = false;
 #if 1 == PACKER_UNPACKER_TYPE
