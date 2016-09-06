@@ -16,10 +16,6 @@
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 
-#ifdef _MSC_VER
-#define atoll _atoi64
-#endif
-
 #define QUIT_COMMAND	"quit"
 #define LIST_STATUS		"status"
 
@@ -167,7 +163,7 @@ int main(int argc, const char* argv[])
 			boost::char_separator<char> sep(" \t");
 			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
 			BOOST_AUTO(iter, tok.begin());
-			if (iter != tok.end()) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
+			if (iter != tok.end()) msg_num = std::max((size_t) atoi(iter++->data()), (size_t) 1);
 			if (iter != tok.end()) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE, std::max((size_t) atoi(iter++->data()), (size_t) 1));
 			if (iter != tok.end()) msg_fill = *iter++->data();
 
