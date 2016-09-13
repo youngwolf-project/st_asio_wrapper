@@ -7,7 +7,7 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * extensional, replaceable and indispensable components.
+ * extensional common.
  */
 
 #ifndef ST_ASIO_WRAPPER_EXT_H_

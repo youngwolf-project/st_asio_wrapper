@@ -26,7 +26,7 @@ release debug : ${target}
 ${target} : ${objects}
 	${CXX} -o $@ $^ ${lflag}
 ${objects} : ${dir}/%.o : %.cpp
-	${CXX} ${cflag} -E -MMD -MT '$@' -MF ${subst .cpp,.d,${dir}/$<} $< 1>/dev/null
+	${CXX} ${cflag} -E -MMD -w -MT '$@' -MF ${subst .cpp,.d,${dir}/$<} $< 1>/dev/null
 	${CXX} ${cflag} -c $< -o $@
 
 .PHONY : clean

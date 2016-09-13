@@ -119,6 +119,21 @@ protected:
 	virtual void uninit() {ST_THIS stop(); stop_listen(); close_all_client();}
 	virtual bool on_accept(typename Pool::object_ctype& client_ptr) {return true;}
 
+	//if you want to ignore this error and continue to accept new connections immediately, return true in this virtual function;
+	//if you want to ignore this error and continue to accept new connections after a specific delay, start a timer immediately and return false (don't call stop_listen()),
+	// when the timer ends up, call start_next_accept() in the callback function.
+	//otherwise, don't rewrite this virtual function or call st_server_base::on_accept_error() directly after your code.
+	virtual bool on_accept_error(const boost::system::error_code& ec, typename Pool::object_ctype& client_ptr)
+	{
+		if (boost::asio::error::operation_aborted != ec)
+		{
+			unified_out::error_out("failed to accept new connection because of %s, will stop listening.", ec.message().data());
+			stop_listen();
+		}
+
+		return false;
+	}
+
 	virtual void start_next_accept()
 	{
 		typename Pool::object_type client_ptr = ST_THIS create_object(boost::ref(*this));
@@ -148,8 +163,8 @@ protected:
 
 			start_next_accept();
 		}
-		else
-			stop_listen();
+		else if (on_accept_error(ec, client_ptr))
+			start_next_accept();
 	}
 
 protected:

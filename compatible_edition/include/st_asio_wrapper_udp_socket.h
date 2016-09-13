@@ -224,6 +224,12 @@ private:
 		else
 			ST_THIS on_send_error(ec);
 
+#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
+		typename super::in_msg msg;
+		msg.swap(last_send_msg);
+#endif
+		last_send_msg.clear();
+
 		boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex);
 		ST_THIS sending = false;
 
@@ -232,13 +238,10 @@ private:
 		//for UDP in st_asio_wrapper, sending error will not stop the following sending.
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 		if (!do_send_msg())
-			ST_THIS on_all_msg_send(last_send_msg);
+			ST_THIS on_all_msg_send(msg);
 #else
 		do_send_msg();
 #endif
-
-		if (!ST_THIS sending)
-			last_send_msg.clear();
 	}
 
 protected:

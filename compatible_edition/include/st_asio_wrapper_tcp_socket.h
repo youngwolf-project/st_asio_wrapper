@@ -23,10 +23,6 @@
 	#error graceful close duration must be bigger than zero.
 #endif
 
-#ifndef ST_ASIO_DEFAULT_UNPACKER
-#define ST_ASIO_DEFAULT_UNPACKER unpacker
-#endif
-
 namespace st_asio_wrapper
 {
 
@@ -131,7 +127,6 @@ protected:
 			size_t size = 0;
 			BOOST_AUTO(end_time, super::statistic::local_time());
 			std::vector<boost::asio::const_buffer> bufs;
-			last_send_msg.clear();
 			for (BOOST_AUTO(iter, ST_THIS send_msg_buffer.begin()); last_send_msg.empty();)
 			{
 				size += iter->size();
@@ -233,20 +228,23 @@ private:
 		else
 			ST_THIS on_send_error(ec);
 
+#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
+		typename super::in_msg msg;
+		msg.swap(last_send_msg.back());
+#endif
+		last_send_msg.clear();
+
 		boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex);
 		ST_THIS sending = false;
 
 		//send msg sequentially, that means second send only after first send success
-		if (!ec)
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-			if (!do_send_msg())
-				ST_THIS on_all_msg_send(last_send_msg.back());
+		if (!ec && !do_send_msg())
+			ST_THIS on_all_msg_send(msg);
 #else
+		if (!ec)
 			do_send_msg();
 #endif
-
-		if (!ST_THIS sending)
-			last_send_msg.clear();
 	}
 
 protected:

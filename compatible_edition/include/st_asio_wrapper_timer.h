@@ -14,6 +14,11 @@
 #define ST_ASIO_WRAPPER_TIMER_H_
 
 #include <boost/container/set.hpp>
+#ifdef ST_ASIO_USE_STEADY_TIMER
+#include <boost/asio/steady_timer.hpp>
+#elif defined(ST_ASIO_USE_SYSTEM_TIMER)
+#include <boost/asio/system_timer.hpp>
+#endif
 
 #include "st_asio_wrapper_object.h"
 
@@ -32,6 +37,17 @@ namespace st_asio_wrapper
 class st_timer : public st_object
 {
 protected:
+#ifdef ST_ASIO_USE_STEADY_TIMER
+	typedef boost::chrono::milliseconds milliseconds;
+	typedef boost::asio::steady_timer timer_type;
+#elif defined(ST_ASIO_USE_SYSTEM_TIMER)
+	typedef boost::chrono::milliseconds milliseconds;
+	typedef boost::asio::system_timer timer_type;
+#else
+	typedef boost::posix_time::milliseconds milliseconds;
+	typedef boost::asio::deadline_timer timer_type;
+#endif
+
 	struct timer_info
 	{
 		enum timer_status {TIMER_OK, TIMER_CANCELED};
@@ -40,7 +56,7 @@ protected:
 		timer_status status;
 		size_t milliseconds;
 		boost::function<bool (unsigned char)> call_back;
-		boost::shared_ptr<boost::asio::deadline_timer> timer;
+		boost::shared_ptr<timer_type> timer;
 
 		bool operator <(const timer_info& other) const {return id < other.id;}
 	};
@@ -69,7 +85,7 @@ public:
 			iter = timer_can.insert(ti).first;
 			timer_can_mutex.unlock();
 
-			iter->timer = boost::make_shared<boost::asio::deadline_timer>(boost::ref(io_service_));
+			iter->timer = boost::make_shared<timer_type>(boost::ref(io_service_));
 		}
 		else
 			timer_can_mutex.unlock_upgrade();
@@ -139,7 +155,7 @@ protected:
 
 	void start_timer(object_ctype& ti)
 	{
-		ti.timer->expires_from_now(boost::posix_time::milliseconds(ti.milliseconds));
+		ti.timer->expires_from_now(milliseconds(ti.milliseconds));
 		ti.timer->async_wait(make_handler_error(boost::bind(&st_timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti))));
 	}
 

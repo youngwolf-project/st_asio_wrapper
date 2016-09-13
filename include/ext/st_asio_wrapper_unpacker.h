@@ -7,11 +7,11 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * unpacker base class
+ * unpackers
  */
 
-#ifndef ST_ASIO_WRAPPER_UNPACKER_H_
-#define ST_ASIO_WRAPPER_UNPACKER_H_
+#ifndef ST_ASIO_WRAPPER_EXT_UNPACKER_H_
+#define ST_ASIO_WRAPPER_EXT_UNPACKER_H_
 
 #include <boost/array.hpp>
 
@@ -435,4 +435,4 @@ protected:
 
 }} //namespace
 
-#endif /* ST_ASIO_WRAPPER_UNPACKER_H_ */
+#endif /* ST_ASIO_WRAPPER_EXT_UNPACKER_H_ */

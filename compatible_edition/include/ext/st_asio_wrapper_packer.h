@@ -7,11 +7,11 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * packer base class
+ * packers
  */
 
-#ifndef ST_ASIO_WRAPPER_PACKER_H_
-#define ST_ASIO_WRAPPER_PACKER_H_
+#ifndef ST_ASIO_WRAPPER_EXT_PACKER_H_
+#define ST_ASIO_WRAPPER_EXT_PACKER_H_
 
 #include "st_asio_wrapper_ext.h"
 
@@ -165,4 +165,4 @@ private:
 
 }} //namespace
 
-#endif /* ST_ASIO_WRAPPER_PACKER_H_ */
+#endif /* ST_ASIO_WRAPPER_EXT_PACKER_H_ */

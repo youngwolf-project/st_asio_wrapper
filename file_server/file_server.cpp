@@ -3,6 +3,7 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		5050
+#define ST_ASIO_ASYNC_ACCEPT_NUM	5
 #define ST_ASIO_CLEAR_OBJECT_INTERVAL	60
 #define ST_ASIO_ENHANCED_STABILITY
 #define ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -56,6 +57,7 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_ASYNC_ACCEPT_NUM
 #undef ST_ASIO_CLEAR_OBJECT_INTERVAL
 #undef ST_ASIO_ENHANCED_STABILITY
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY
