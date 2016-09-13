@@ -3,13 +3,14 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		9527
+#define ST_ASIO_ASYNC_ACCEPT_NUM	5
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 //configuration
 
-#include "../include/ext/st_asio_wrapper_net.h"
+#include "../include/ext/st_asio_wrapper_server.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 
@@ -91,6 +92,7 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_ASYNC_ACCEPT_NUM
 #undef ST_ASIO_REUSE_OBJECT
 #undef ST_ASIO_FREE_OBJECT_INTERVAL
 #undef ST_ASIO_DEFAULT_PACKER

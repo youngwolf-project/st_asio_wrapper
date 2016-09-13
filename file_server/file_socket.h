@@ -3,7 +3,7 @@
 #define FILE_SOCKET_H_
 
 #include "packer_unpacker.h"
-#include "../include/ext/st_asio_wrapper_net.h"
+#include "../include/ext/st_asio_wrapper_server.h"
 using namespace st_asio_wrapper::ext;
 
 class file_socket : public base_socket, public st_server_socket

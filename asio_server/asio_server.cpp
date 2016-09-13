@@ -3,11 +3,14 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		9527
+#define ST_ASIO_ASYNC_ACCEPT_NUM	5
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_FREE_OBJECT_INTERVAL	60
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_ENHANCED_STABILITY
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency.
+//#define ST_ASIO_USE_STEADY_TIMER
+//#define ST_ASIO_USE_SYSTEM_TIMER
 
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	0
@@ -27,7 +30,7 @@
 #endif
 //configuration
 
-#include "../include/ext/st_asio_wrapper_net.h"
+#include "../include/ext/st_asio_wrapper_server.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 
@@ -220,6 +223,7 @@ int main(int argc, const char* argv[])
 
 //restore configuration
 #undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_ASYNC_ACCEPT_NUM
 #undef ST_ASIO_REUSE_OBJECT
 #undef ST_ASIO_FREE_OBJECT_INTERVAL
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
@@ -227,4 +231,6 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_FULL_STATISTIC
 #undef ST_ASIO_DEFAULT_PACKER
 #undef ST_ASIO_DEFAULT_UNPACKER
+#undef ST_ASIO_USE_STEADY_TIMER
+#undef ST_ASIO_USE_SYSTEM_TIMER
 //restore configuration

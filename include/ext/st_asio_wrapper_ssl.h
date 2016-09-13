@@ -7,7 +7,7 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * extensional, replaceable and indispensable components.
+ * ssl related conveniences.
  */
 
 #ifndef ST_ASIO_WRAPPER_EXT_SSL_H_
