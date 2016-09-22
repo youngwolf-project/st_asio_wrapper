@@ -82,7 +82,7 @@ int main(int argc, const char* argv[])
 			service_pump.start_service();
 		}
 		else if (RECONNECT_COMMAND == str)
-			client.graceful_close(true);
+			client.graceful_shutdown(true);
 		//the following two commands demonstrate how to suspend msg sending, no matter recv buffer been used or not
 		else if (SUSPEND_COMMAND == str)
 			client.suspend_send_msg(true);

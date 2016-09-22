@@ -41,23 +41,23 @@ public:
 	virtual void reset() {authorized_ = false; super::reset();}
 	bool authorized() const {return authorized_;}
 
-	void disconnect(bool reconnect = false) {force_close(reconnect);}
-	void force_close(bool reconnect = false)
+	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
+	void force_shutdown(bool reconnect = false)
 	{
 		if (reconnect)
 			unified_out::error_out("boost::asio::ssl::stream not support reuse!");
 
 		if (!shutdown_ssl())
-			super::force_close(false);
+			super::force_shutdown(false);
 	}
 
-	void graceful_close(bool reconnect = false, bool sync = true)
+	void graceful_shutdown(bool reconnect = false, bool sync = true)
 	{
 		if (reconnect)
 			unified_out::error_out("boost::asio::ssl::stream not support reuse!");
 
 		if (!shutdown_ssl())
-			super::graceful_close(false, sync);
+			super::graceful_shutdown(false, sync);
 	}
 
 protected:
@@ -88,15 +88,15 @@ protected:
 		else
 			unified_out::error_out("handshake failed: %s", ec.message().data());
 	}
-	virtual bool is_send_allowed() const {return authorized() && super::is_send_allowed();}
+	virtual bool is_send_allowed() {return authorized() && super::is_send_allowed();}
 
 	bool shutdown_ssl()
 	{
 		bool re = false;
-		if (!ST_THIS is_closing() && authorized_)
+		if (!ST_THIS is_shutting_down() && authorized_)
 		{
-			ST_THIS show_info("ssl client link:", "been shutting down.");
-			ST_THIS close_state = 2;
+			ST_THIS show_info("ssl client link:", "been shut down.");
+			ST_THIS shutdown_state = 2;
 			ST_THIS reconnecting = false;
 			authorized_ = false;
 
@@ -133,7 +133,7 @@ private:
 			do_start();
 		}
 		else
-			force_close(false);
+			force_shutdown(false);
 	}
 
 protected:

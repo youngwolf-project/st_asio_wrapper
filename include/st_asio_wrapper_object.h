@@ -33,6 +33,7 @@ public:
 	template<typename CallbackHandler>
 	void post(CallbackHandler&& handler) {auto unused(ST_THIS async_call_indicator); io_service_.post([=]() {handler();});}
 	bool is_async_calling() const {return !async_call_indicator.unique();}
+	bool is_last_async_call() const {return async_call_indicator.use_count() <= 2;} //can only be called in callbacks
 
 	template<typename CallbackHandler>
 	std::function<void(const boost::system::error_code&)> make_handler_error(CallbackHandler&& handler) const
@@ -59,6 +60,7 @@ protected:
 	template<typename CallbackHandler>
 	void post(CallbackHandler&& handler) {io_service_.post(std::move(handler));}
 	bool is_async_calling() const {return false;}
+	bool is_last_async_call() const {return true;}
 
 	template<typename F>
 	inline F&& make_handler_error(F&& f) const {return std::move(f);}

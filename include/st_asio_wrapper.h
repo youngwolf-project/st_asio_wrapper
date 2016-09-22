@@ -48,13 +48,42 @@
  * Split ext/st_asio_wrapper_net.h into ext/st_asio_wrapper_client.h, ext/st_asio_wrapper_server.h and ext/st_asio_wrapper_udp.h.
  * Add virtual function st_server_base::on_accept_error, it controls whether to continue the acception or not when error occurred.
  * 
+ * 2016.9.22	version 1.2.0
+ * Add st_socket::on_close() virtual function, if you defined ST_ASIO_ENHANCED_STABILITY macro, st_asio_wrapper guarantee this is the
+ *  last invocation on this st_socket, you can free any resources that belong to this st_socket, except this st_socket itself, because
+ *  this st_socket may is being maintained by st_object_pool, in other words, you will never free an object which is maintained by shared_ptr.
+ * Add st_socket::is_closable() virtual function, st_connector need it when the link is broken and reconnecting is taking place, under this
+ *  situation, we will never reuse or free this st_connector.
+ * Add st_object::is_last_async_call() function, it provide 100% safety to reuse or free an object (need to define ST_ASIO_ENHANCED_STABILITY macro).
+ * Rename all force_close functions to force_shutdown;
+ * Rename all graceful_close functions to graceful_shutdown;
+ * Rename all do_close functions to shutdown;
+ * Rename close_all_client function to shutdown_all_client.
+ * Rename ST_ASIO_GRACEFUL_CLOSE_MAX_DURATION macro to ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION.
+ * Rename ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME macro to ST_ASIO_DELAY_CLOSE.
+ * Change default value of ST_ASIO_FREE_OBJECT_INTERVAL macro from 10 to 60.
+ * Drop const qualifier for is_send_allowed() function.
+ * Strip boost::bind and boost::ref for standard edition.
+ *
+ * known issues:
+ * 1. On boost-1.49, st_object::is_last_async_call() cannot work properly, it is because before asio call any callbacks, it copied the callback(not a
+ *    good behaviour), this cause st_object::is_last_async_call() never return true, so objects in st_object_pool can never be reused or freed.
+ *    To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro.
+ *    BTW, boost-1.61 doesn't have such issue, I'm not sure in which edition, asio fixed this defect, if you have other versions, please help me to
+ *    find out the minimum version via the following steps:
+ *     1. Compile demo asio_server and test_client;
+ *     2. Run asio_server and test_client without any parameters;
+ *     3. Stop test_client (input 'quit');
+ *     4. Stop asio_server (input 'quit');
+ *     5. If asio_server successfully quitted, means this edition doesn't have above defect.
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10103	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.1.3"
+#define ST_ASIO_WRAPPER_VER		10200	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.2.0"
 
 #ifdef _MSC_VER
 	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");
