@@ -171,7 +171,7 @@ public:
 	void clear_status() {do_something_to_all(boost::mem_fn(&test_socket::clear_status));}
 	void begin(size_t msg_num, size_t msg_len, char msg_fill) {do_something_to_all(boost::bind(&test_socket::begin, _1, msg_num, msg_len, msg_fill));}
 
-	void close_some_client(size_t n)
+	void shutdown_some_client(size_t n)
 	{
 		static int test_index = -1;
 		++test_index;
@@ -188,23 +188,23 @@ public:
 		{
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 			//method #1
-			//notice: these methods need to define ST_ASIO_CLEAR_OBJECT_INTERVAL macro, because it just close the st_socket,
+			//notice: these methods need to define ST_ASIO_CLEAR_OBJECT_INTERVAL macro, because it just shut down the st_socket,
 			//not really remove them from object pool, this will cause test_client still send data via them, and wait responses from them.
 			//for this scenario, the smaller ST_ASIO_CLEAR_OBJECT_INTERVAL macro is, the better experience you will get, so set it to 1 second.
-		case 0: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_close();				break;
-		case 1: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_close(false, false);	break;
-		case 2: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->force_close();					break;
+		case 0: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_shutdown();				break;
+		case 1: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_shutdown(false, false);	break;
+		case 2: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->force_shutdown();					break;
 #else
 			//method #2
 			//this is a equivalence of calling i_server::del_client in st_server_socket_base::on_recv_error(see st_server_socket_base for more details).
-		case 0: while (n-- > 0) graceful_close(at(0));			break;
-		case 1: while (n-- > 0) graceful_close(at(0), false);	break;
-		case 2: while (n-- > 0) force_close(at(0));				break;
+		case 0: while (n-- > 0) graceful_shutdown(at(0));			break;
+		case 1: while (n-- > 0) graceful_shutdown(at(0), false);	break;
+		case 2: while (n-- > 0) force_shutdown(at(0));				break;
 #endif
 			//if you just want to reconnect to the server, you should do it like this:
-		case 3: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_close(true);			break;
-		case 4: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_close(true, false);	break;
-		case 5: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->force_close(true);				break;
+		case 3: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_shutdown(true);			break;
+		case 4: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->graceful_shutdown(true, false);	break;
+		case 5: for (BOOST_AUTO(iter, object_can.begin()); n-- > 0 && iter != object_can.end(); ++iter) (*iter)->force_shutdown(true);				break;
 		}
 	}
 
@@ -246,6 +246,7 @@ int main(int argc, const char* argv[])
 	//client_ptr->set_server_addr(port, ip); //we don't have to set server address at here, the following do_something_to_all will do it for me
 	//some other initializations according to your business
 	client.add_client(client_ptr, false);
+	client_ptr.reset(); //important, otherwise, st_object_pool will not be able to free or reuse this object.
 
 	//method #2, add clients first without any arguments, then set the server address.
 	for (size_t i = 1; i < link_num / 2; ++i)
@@ -304,7 +305,7 @@ int main(int argc, const char* argv[])
 					if (n > client.size())
 						n = client.size();
 
-					client.close_some_client(n);
+					client.shutdown_some_client(n);
 					link_num = client.size();
 				}
 

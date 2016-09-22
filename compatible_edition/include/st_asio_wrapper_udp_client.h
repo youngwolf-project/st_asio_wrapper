@@ -42,13 +42,13 @@ public:
 	//functions with a client_ptr parameter will remove the link from object pool first, then call corresponding function
 	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect();}
 	void disconnect() {ST_THIS do_something_to_all(boost::mem_fn(&Socket::disconnect));}
-	void force_close(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_close();}
-	void force_close() {ST_THIS do_something_to_all(boost::mem_fn(&Socket::force_close));}
-	void graceful_close(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->graceful_close();}
-	void graceful_close() {ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_close));}
+	void force_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_shutdown();}
+	void force_shutdown() {ST_THIS do_something_to_all(boost::mem_fn(&Socket::force_shutdown));}
+	void graceful_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown();}
+	void graceful_shutdown() {ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_shutdown));}
 
 protected:
-	virtual void uninit() {ST_THIS stop(); graceful_close();}
+	virtual void uninit() {ST_THIS stop(); graceful_shutdown();}
 };
 
 } //namespace

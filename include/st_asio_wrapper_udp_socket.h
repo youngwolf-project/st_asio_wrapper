@@ -86,9 +86,9 @@ public:
 	}
 	const boost::asio::ip::udp::endpoint& get_local_addr() const {return local_addr;}
 
-	void disconnect() {force_close();}
-	void force_close() {show_info("link:", "been closed."); do_close();}
-	void graceful_close() {force_close();}
+	void disconnect() {force_shutdown();}
+	void force_shutdown() {show_info("link:", "been shut down."); shutdown();}
+	void graceful_shutdown() {force_shutdown();}
 
 	//get or change the unpacker at runtime
 	//changing unpacker at runtime is not thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
@@ -138,10 +138,10 @@ protected:
 			ST_THIS send_msg_buffer.front().swap(last_send_msg);
 			ST_THIS send_msg_buffer.pop_front();
 
-			boost::shared_lock<boost::shared_mutex> lock(close_mutex);
+			boost::shared_lock<boost::shared_mutex> lock(shutdown_mutex);
 			last_send_msg.restart();
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr,
-				ST_THIS make_handler_error_size(boost::bind(&st_udp_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+				ST_THIS make_handler_error_size([this](const boost::system::error_code& ec, size_t bytes_transferred) {ST_THIS send_handler(ec, bytes_transferred);}));
 		}
 
 		return ST_THIS sending;
@@ -152,12 +152,12 @@ protected:
 		auto recv_buff = unpacker_->prepare_next_recv();
 		assert(boost::asio::buffer_size(recv_buff) > 0);
 
-		boost::shared_lock<boost::shared_mutex> lock(close_mutex);
+		boost::shared_lock<boost::shared_mutex> lock(shutdown_mutex);
 		ST_THIS next_layer().async_receive_from(recv_buff, peer_addr,
-			ST_THIS make_handler_error_size(boost::bind(&st_udp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+			ST_THIS make_handler_error_size([this](const boost::system::error_code& ec, size_t bytes_transferred) {ST_THIS recv_handler(ec, bytes_transferred);}));
 	}
 
-	virtual bool is_send_allowed() const {return ST_THIS lowest_layer().is_open() && super::is_send_allowed();}
+	virtual bool is_send_allowed() {return ST_THIS lowest_layer().is_open() && super::is_send_allowed();}
 	//can send data or not(just put into send buffer)
 
 	virtual void on_recv_error(const boost::system::error_code& ec)
@@ -172,18 +172,19 @@ protected:
 
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 
-	void do_close()
+	void shutdown()
 	{
 		ST_THIS stop_all_timer();
+		ST_THIS close(); //must after stop_all_timer(), it's very important
 		ST_THIS started_ = false;
-//		ST_THIS reset_state();
+//		reset_state();
 
 		if (ST_THIS lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
 
-			boost::unique_lock<boost::shared_mutex> lock(close_mutex);
+			boost::unique_lock<boost::shared_mutex> lock(shutdown_mutex);
 			ST_THIS lowest_layer().close(ec);
 		}
 	}
@@ -248,7 +249,7 @@ protected:
 	boost::shared_ptr<i_udp_unpacker<typename Unpacker::msg_type>> unpacker_;
 	boost::asio::ip::udp::endpoint peer_addr, local_addr;
 
-	boost::shared_mutex close_mutex;
+	boost::shared_mutex shutdown_mutex;
 };
 
 } //namespace

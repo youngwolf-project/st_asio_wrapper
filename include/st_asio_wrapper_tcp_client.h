@@ -24,6 +24,7 @@ class st_tcp_client_base : public st_client<Socket, Pool>
 {
 protected:
 	typedef st_client<Socket, Pool> super;
+
 public:
 	using super::TIMER_BEGIN;
 	using super::TIMER_END;
@@ -65,16 +66,16 @@ public:
 	///////////////////////////////////////////////////
 
 	//functions with a client_ptr parameter will remove the link from object pool first, then call corresponding function, if you want to reconnect to the server,
-	//please call client_ptr's 'disconnect' 'force_close' or 'graceful_close' with true 'reconnect' directly.
+	//please call client_ptr's 'disconnect' 'force_shutdown' or 'graceful_shutdown' with true 'reconnect' directly.
 	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect(false);}
 	void disconnect(bool reconnect = false) {ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->disconnect(reconnect);});}
-	void force_close(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_close(false);}
-	void force_close(bool reconnect = false) {ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->force_close(reconnect);});}
-	void graceful_close(typename Pool::object_ctype& client_ptr, bool sync = true) {ST_THIS del_object(client_ptr); client_ptr->graceful_close(false, sync);}
-	void graceful_close(bool reconnect = false, bool sync = true) {ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->graceful_close(reconnect, sync);});}
+	void force_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_shutdown(false);}
+	void force_shutdown(bool reconnect = false) {ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->force_shutdown(reconnect);});}
+	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = true) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown(false, sync);}
+	void graceful_shutdown(bool reconnect = false, bool sync = true) {ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->graceful_shutdown(reconnect, sync);});}
 
 protected:
-	virtual void uninit() {ST_THIS stop(); graceful_close();}
+	virtual void uninit() {ST_THIS stop(); graceful_shutdown();}
 };
 
 } //namespace

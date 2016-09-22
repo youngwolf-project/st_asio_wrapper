@@ -41,23 +41,23 @@ public:
 	virtual void reset() {authorized_ = false; super::reset();}
 	bool authorized() const {return authorized_;}
 
-	void disconnect(bool reconnect = false) {force_close(reconnect);}
-	void force_close(bool reconnect = false)
+	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
+	void force_shutdown(bool reconnect = false)
 	{
 		if (reconnect)
 			unified_out::error_out("boost::asio::ssl::stream not support reuse!");
 
 		if (!shutdown_ssl())
-			super::force_close(false);
+			super::force_shutdown(false);
 	}
 
-	void graceful_close(bool reconnect = false, bool sync = true)
+	void graceful_shutdown(bool reconnect = false, bool sync = true)
 	{
 		if (reconnect)
 			unified_out::error_out("boost::asio::ssl::stream not support reuse!");
 
 		if (!shutdown_ssl())
-			super::graceful_close(false, sync);
+			super::graceful_shutdown(false, sync);
 	}
 
 protected:
@@ -66,10 +66,9 @@ protected:
 		if (!ST_THIS stopped())
 		{
 			if (ST_THIS reconnecting && !ST_THIS is_connected())
-				ST_THIS lowest_layer().async_connect(ST_THIS server_addr, ST_THIS make_handler_error(boost::bind(&st_ssl_connector_base::connect_handler, this, boost::asio::placeholders::error)));
+				ST_THIS lowest_layer().async_connect(ST_THIS server_addr, ST_THIS make_handler_error([this](const boost::system::error_code& ec) {ST_THIS connect_handler(ec);}));
 			else if (!authorized_)
-				ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client, ST_THIS make_handler_error(boost::bind(&st_ssl_connector_base::handshake_handler, this,
-					boost::asio::placeholders::error)));
+				ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client, ST_THIS make_handler_error([this](const boost::system::error_code& ec) {ST_THIS handshake_handler(ec);}));
 			else
 				ST_THIS do_recv_msg();
 
@@ -88,15 +87,15 @@ protected:
 		else
 			unified_out::error_out("handshake failed: %s", ec.message().data());
 	}
-	virtual bool is_send_allowed() const {return authorized() && super::is_send_allowed();}
+	virtual bool is_send_allowed() {return authorized() && super::is_send_allowed();}
 
 	bool shutdown_ssl()
 	{
 		bool re = false;
-		if (!ST_THIS is_closing() && authorized_)
+		if (!ST_THIS is_shutting_down() && authorized_)
 		{
-			ST_THIS show_info("ssl client link:", "been shutting down.");
-			ST_THIS close_state = 2;
+			ST_THIS show_info("ssl client link:", "been shut down.");
+			ST_THIS shutdown_state = 2;
 			ST_THIS reconnecting = false;
 			authorized_ = false;
 
@@ -133,7 +132,7 @@ private:
 			do_start();
 		}
 		else
-			force_close(false);
+			force_shutdown(false);
 	}
 
 protected:
@@ -192,8 +191,8 @@ protected:
 
 	virtual void start_next_accept()
 	{
-		auto client_ptr = ST_THIS create_object(boost::ref(*this));
-		ST_THIS acceptor.async_accept(client_ptr->lowest_layer(), boost::bind(&st_ssl_server_base::accept_handler, this, boost::asio::placeholders::error, client_ptr));
+		auto client_ptr = ST_THIS create_object(*this);
+		ST_THIS acceptor.async_accept(client_ptr->lowest_layer(), [client_ptr, this](const boost::system::error_code& ec) {ST_THIS accept_handler(ec, client_ptr);});
 	}
 
 private:
@@ -202,20 +201,16 @@ private:
 		if (!ec)
 		{
 			if (ST_THIS on_accept(client_ptr))
-				client_ptr->next_layer().async_handshake(boost::asio::ssl::stream_base::server,
-					boost::bind(&st_ssl_server_base::handshake_handler, this, boost::asio::placeholders::error, client_ptr));
+				client_ptr->next_layer().async_handshake(boost::asio::ssl::stream_base::server, [client_ptr, this](const boost::system::error_code& ec) {
+					ST_THIS on_handshake(ec, client_ptr);
+					if (!ec && ST_THIS add_client(client_ptr))
+						client_ptr->start();
+				});
 
 			start_next_accept();
 		}
 		else
 			ST_THIS stop_listen();
-	}
-
-	void handshake_handler(const boost::system::error_code& ec, typename st_ssl_server_base::object_ctype& client_ptr)
-	{
-		on_handshake(ec, client_ptr);
-		if (!ec && ST_THIS add_client(client_ptr))
-			client_ptr->start();
 	}
 };
 
