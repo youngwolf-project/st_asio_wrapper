@@ -1,7 +1,16 @@
-#ifndef ST_ASIO_DEFAULT_PACKER
-#define ST_ASIO_DEFAULT_PACKER packer
+
+#ifdef ST_ASIO_ENHANCED_STABILITY
+	#if defined(ST_ASIO_DELAY_CLOSE) && ST_ASIO_DELAY_CLOSE != 0
+		#warning ST_ASIO_DELAY_CLOSE will always be zero if ST_ASIO_ENHANCED_STABILITY macro been defined.
+	#endif
+	#undef ST_ASIO_DELAY_CLOSE
+	#define ST_ASIO_DELAY_CLOSE 0
+#else
+	#ifndef ST_ASIO_DELAY_CLOSE
+	#define ST_ASIO_DELAY_CLOSE	5 //seconds
+	#endif
+	static_assert(ST_ASIO_DELAY_CLOSE > 0, "ST_ASIO_DELAY_CLOSE must be bigger than zero.");
 #endif
-默认的打包器，也可以通过模板参数控制，提供这个宏可以让使用者省略相应的模板参数。
 
 namespace st_asio_wrapper
 {
@@ -14,6 +23,21 @@ public:
 	所有时间统计项将无效（stat_duration）。在打开情况下，时间统计的数据类型其实是boost::posix_time::time_duration。
 	struct statistic
 	{
+#ifdef ST_ASIO_FULL_STATISTIC
+		static bool enabled();
+		typedef boost::posix_time::ptime stat_time;
+		static stat_time local_time();
+		typedef boost::posix_time::time_duration stat_duration;
+#else
+		struct dummy_duration;
+		struct dummy_time;
+
+		static bool enabled();
+		typedef dummy_time stat_time;
+		static stat_time local_time();
+		typedef dummy_duration stat_duration;
+#endif
+
 		statistic();
 		void reset();
 		由于统计涉及多个方面，并且是多线程修改不同的部分，这个函数只是在某些特殊情况下才可以调用，比如在构造函数里面，或者只有一个service线程，
@@ -42,8 +66,15 @@ public:
 	};
 
 protected:
-	typedef boost::container::list<InMsgType> in_container_type;
-	typedef typename Unpacker::container_type out_container_type;
+	struct in_msg : public InMsgType;
+	struct out_msg : public OutMsgType;
+	在InMsgType或OutMsgType的基础上增加了一个stat_time，用于统计时间消耗
+
+	typedef boost::container::list<in_msg> in_container_type;
+	typedef boost::container::list<out_msg> out_container_type;
+
+	static const unsigned char TIMER_BEGIN = st_timer::TIMER_END;
+	static const unsigned char TIMER_END = TIMER_BEGIN+ 10;
 
 	st_socket(boost::asio::io_service& io_service_);
 
@@ -58,9 +89,9 @@ ssl使用。
 清空所有buffer。
 
 public:
-	void id(uint_fast64_t id) {_id = id;}
+	void id(uint_fast64_t id);
 
-	uint_fast64_t id() const {return _id;}
+	uint_fast64_t id() const;
 id的设置与获取，注意使用者不可设置id，只有st_socket的创建者（st_object_pool或者其继承者）才可设置id，
 除非这个st_socket没有被任何对象池管理。
 
@@ -154,6 +185,9 @@ protected:
 	virtual bool do_send_msg() = 0;
 真正的消息发送（调用asio函数），具体怎么发请看st_tcp_socket和st_udp_socket的实现。
 
+	virtual bool is_closable();
+当连接主动或者被被关闭时（shutdown），是否可以close它，只有close之后的对象才可以被释放或者被重用，默认返回true。
+
 	virtual bool is_send_allowed() const;
 是否允许发送消息，对于st_socket来说，只要未暂停消息发送，就是允许消息发送，子类重写这个函数实现自己的判断逻辑，然后加上
 st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_socket、st_connector和st_udp_socket的实现。
@@ -161,6 +195,9 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 	virtual void on_send_error(const error_code& ec);
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 发送接收失败时回调，对于st_tcp_socket，如果需要连接断开事件，建议重写on_recv_error。
+
+	virtual void on_close();
+当对象真正被close之前，会调用这个回调，用户可以在这里面释放资源，在这之后，对象可能会被重用或者被释放。
 
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	virtual bool on_msg(OutMsgType& msg) = 0;
@@ -181,6 +218,12 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 	virtual void on_all_msg_send(InMsgType& msg);
 当发送缓存由非空变为空的时候回调，消息是打包过后的。
 #endif
+
+	void close();
+开启close流程，由继承者调用。st_socket会定时检测自己是否可以安全的被重用或被释放（即所有异步调用都已结束，包括正常结束和非正常结束），
+如果是，调用上面的on_close()， 然后st_object_pool将完全接管这个st_socket，以便在适当的时候重用或者释放它。
+如果定义了ST_ASIO_ENHANCED_STABILITY宏，则st_socket将保证以上说的行为，如果没有定义，则简单地在ST_ASIO_DELAY_CLOSE秒后，调用on_close()，
+然后两样的道理，st_object_pool将完全接管这个st_socket，以便在适当的时候重用或者释放它。
 
 	void dispatch_msg();
 派发消息，它要么直接调用on_msg，要么把消息放入消息接收缓存，最后调用do_dispatch_msg，如果消息处理完毕（调用on_msg）
@@ -206,8 +249,7 @@ protected:
 	Socket next_layer_;
 前面在next_layer里面解释过了。
 
-	InMsgType last_send_msg;
-	OutMsgType last_dispatch_msg;
+	out_msg last_dispatch_msg;
 由于是异步发送和派发消息，这两个成员变量保证其在异步处理过程中的有效性。
 	boost::shared_ptr<i_packer<MsgDataType>> packer_;
 打包器。
@@ -216,8 +258,8 @@ protected:
 	out_container_type recv_msg_buffer, temp_msg_buffer;
 	boost::shared_mutex post_msg_buffer_mutex, send_msg_buffer_mutex;
 	boost::shared_mutex recv_msg_buffer_mutex;
-缓存及操作它们时需要的互斥体，访问temp_msg_buffer无需互斥，它只能在内部访问，作用是当收到消息之后，发现需要存入接收缓存
-（on_msg返回false），但接收缓存已满，那么多余的消息将被存放于temp_msg_buffer，并且不再继续接收消息，直到temp_msg_buffer
+缓存及操作它们时需要的互斥体，访问temp_msg_buffer无需互斥，它只能在内部访问，作用是当收到消息之后，消息无法存入接收缓存
+（消息派发被暂停，或者正在post消息，即post_msg_buffer非空），那么消息将被存放于temp_msg_buffer，并且不再继续接收消息，直到temp_msg_buffer
 里面的消息全部被处理掉，或者移到了recv_msg_buffer，st_socket会周期性的做以上尝试。
 post_msg_buffer和send_msg_buffer里面存放的都是待发送的消息，通过send_msg发送的消息，只会进入send_msg_buffer，通过post_msg
 发送的消息，如果发送缓存足够的话，会进入send_msg_buffer，如果不够的话，则会进入post_msg_buffer，当post_msg_buffer非空时，
@@ -236,10 +278,19 @@ post_msg_buffer中的消息。
 	bool sending, suspend_send_msg_;
 	bool dispatching, suspend_dispatch_msg_;
 内部使用的一些状态，看名字应该能猜到其意思。
+#ifndef ST_ASIO_ENHANCED_STABILITY
+	bool closing;
+#endif
+正在closing，意思是正在周期性的检测当前st_socket是否可以被安全的重用或释放。如果未定义ST_ASIO_ENHANCED_STABILITY宏，则无法做任何检测，
+只是简单的等待ST_ASIO_DELAY_CLOSE秒（异步的）。
 
 	bool started_;
 	boost::shared_mutex start_mutex;
 是否已经开始，开始的概念由子类具体实现，st_socket只是记录是否已经调用过start函数而已。
+
+	struct statistic stat;
+	typename statistic::stat_time recv_idle_begin_time;
+时间消耗统计。
 };
 
 } //namespace

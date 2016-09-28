@@ -1,7 +1,9 @@
 
+#ifndef ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION
+#define ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION	5 //seconds, maximum duration while graceful shutdown
+#endif
+
 namespace st_asio_wrapper
-{
-namespace st_tcp
 {
 
 tcp套接字类，实现tcp数据的收发
@@ -78,14 +80,17 @@ post_msg和send_msg的区别请看st_socket里面的post_msg_buffer和send_msg_b
 同上，只是以native为true调用i_packer::pack_msg接口。
 
 protected:
-	void force_close();
-	void graceful_close(bool sync = true);
-前两个函数功能完全一样（为了完整性而提供了它们），都是直接调用clean_up。
-第三个函数优雅关闭套接字，所谓优雅关闭，就是先关闭自己的数据发送，然后接收完遗留数据之后，才完全关闭套接字。当sync为假时，graceful_close马上返回，
-优雅关闭将在后台继承进行，当回调到on_recv_error的时候，关闭结束（有可能优雅关闭成功，有可能超时被强制关闭）。
+	void force_shutdown();
+	void graceful_shutdown(bool sync = true);
+第一个直接直接调用shutdown()。
+第二个函数优雅关闭套接字，所谓优雅关闭，就是先关闭自己的数据发送，然后接收完遗留数据之后，才完全关闭套接字。当sync为假时，graceful_shutdown马上返回，
+优雅关闭将在后台继承进行，当回调到on_recv_error的时候，关闭结束（有可能优雅关闭成功，有可能超时被强制关闭，超时由ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION宏决定）。
 
 	virtual bool do_send_msg();
 马上开始消息发送，重写自st_socket的do_send_msg，由st_socket调用。
+
+	void do_recv_msg();
+马上开始接收数据，由子类调用，因为st_tcp_socket不知道什么时候可以接收数据（比如是否连接成功等）。
 
 	virtual bool is_send_allowed() const;
 重写st_socket的is_send_allowed，记住，自己的判断（is_closing）加上st_socket的判断，才是最终结果。
@@ -101,11 +106,9 @@ protected:
 	virtual bool on_msg_handle(msg_type& msg, bool link_down);
 重写st_socket的on_msg_handle，功能是打印消息到控制台，使用者重写这个函数以处理消息。
 
-	void do_recv_msg();
-马上开始接收数据，由子类调用，因为st_tcp_socket不知道什么时候可以接收数据（比如是否连接成功等）。
-
-	void clean_up();
-关闭套接字，停止所有定时器，直接派发所有剩余消息，重置所有状态（调用reset_state）。
+	void shutdown();
+关闭套接字，停止所有定时器，直接派发所有剩余消息，最后启动一个定时器，如果定义了ST_ASIO_ENHANCED_STABILITY宏，则这个将周期性的检测
+当前套接字是否可以安全地被重用或释放，如果未定义，则简单的在ST_ASIO_DELAY_CLOSE秒后认为当前大量接字可被安全地重用或释放。
 
 	void recv_handler(const error_code& ec, size_t bytes_transferred);
 收到数据时后asio回调。
@@ -114,12 +117,12 @@ protected:
 成功发送消息（写入底层套接字）后由asio回调。
 
 protected:
+	typename super::in_container_type last_send_msg;
 	boost::shared_ptr<i_unpacker<out_msg_type>> unpacker_;
-	int close_state; //2-the first step of graceful close, 1-force close, 0-normal state
+	int shutdown_state; //2-the first step of graceful close, 1-force close, 0-normal state
+
+	boost::shared_mutex shutdown_mutex;
+让shutdown函数线程安全。
 };
 
-} //namespace st_tcp
 } //namespace st_asio_wrapper
-
-using namespace st_asio_wrapper::st_tcp;
-兼容老版本。

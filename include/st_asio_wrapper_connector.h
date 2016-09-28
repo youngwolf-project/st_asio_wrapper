@@ -83,6 +83,9 @@ public:
 	}
 
 	//sync must be false if you call graceful_shutdown in on_msg
+	//furthermore, you're recommended to call this function with sync equal to false in all service threads,
+	//all callbacks will be called in service threads.
+	//this function is not thread safe, please note.
 	void graceful_shutdown(bool reconnect = false, bool sync = true)
 	{
 		if (ST_THIS is_shutting_down())
@@ -171,7 +174,7 @@ protected:
 	}
 
 private:
-	bool async_shutdown_handler(unsigned char id, ssize_t loop_num)
+	bool async_shutdown_handler(unsigned char id, size_t loop_num)
 	{
 		assert(TIMER_ASYNC_SHUTDOWN == id);
 

@@ -29,25 +29,25 @@ public:
 
 #ifdef ST_ASIO_ENHANCED_STABILITY
 	template<typename CallbackHandler>
-	void post(const CallbackHandler& handler) {auto unused(ST_THIS async_call_indicator); io_service_.post([=]() {handler();});}
+	void post(const CallbackHandler& handler) {auto unused(async_call_indicator); io_service_.post([=]() {handler();});}
 	template<typename CallbackHandler>
-	void post(CallbackHandler&& handler) {auto unused(ST_THIS async_call_indicator); io_service_.post([=]() {handler();});}
+	void post(CallbackHandler&& handler) {auto unused(async_call_indicator); io_service_.post([=]() {handler();});}
 	bool is_async_calling() const {return !async_call_indicator.unique();}
 	bool is_last_async_call() const {return async_call_indicator.use_count() <= 2;} //can only be called in callbacks
 
 	template<typename CallbackHandler>
 	std::function<void(const boost::system::error_code&)> make_handler_error(CallbackHandler&& handler) const
-		{boost::shared_ptr<char>unused(async_call_indicator); return [=](const boost::system::error_code& ec) {handler(ec);};}
+		{auto unused(async_call_indicator); return [=](const boost::system::error_code& ec) {handler(ec);};}
 	template<typename CallbackHandler>
 	std::function<void(const boost::system::error_code&)> make_handler_error(const CallbackHandler& handler) const
-		{boost::shared_ptr<char>unused(async_call_indicator); return [=](const boost::system::error_code& ec) {handler(ec);};}
+		{auto unused(async_call_indicator); return [=](const boost::system::error_code& ec) {handler(ec);};}
 
 	template<typename CallbackHandler>
 	std::function<void(const boost::system::error_code&, size_t)> make_handler_error_size(CallbackHandler&& handler) const
-		{boost::shared_ptr<char>unused(async_call_indicator); return [=](const boost::system::error_code& ec, size_t bytes_transferred) {handler(ec, bytes_transferred);};}
+		{auto unused(async_call_indicator); return [=](const boost::system::error_code& ec, size_t bytes_transferred) {handler(ec, bytes_transferred);};}
 	template<typename CallbackHandler>
 	std::function<void(const boost::system::error_code&, size_t)> make_handler_error_size(CallbackHandler& handler) const
-		{boost::shared_ptr<char>unused(async_call_indicator); return [=](const boost::system::error_code& ec, size_t bytes_transferred) {handler(ec, bytes_transferred);};}
+		{auto unused(async_call_indicator); return [=](const boost::system::error_code& ec, size_t bytes_transferred) {handler(ec, bytes_transferred);};}
 
 protected:
 	void reset() {async_call_indicator = boost::make_shared<char>('\0');}

@@ -13,7 +13,6 @@
 #ifndef ST_ASIO_WRAPPER_SERVER_H_
 #define ST_ASIO_WRAPPER_SERVER_H_
 
-#include "st_asio_wrapper_server_socket.h"
 #include "st_asio_wrapper_object_pool.h"
 
 #ifndef ST_ASIO_SERVER_PORT
@@ -92,7 +91,7 @@ public:
 
 	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect();}
 	void force_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_shutdown();}
-	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = true) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown(sync);}
+	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = false) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown(sync);}
 
 protected:
 	virtual bool init()
