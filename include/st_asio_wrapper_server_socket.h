@@ -13,19 +13,10 @@
 #ifndef ST_ASIO_WRAPPER_SERVER_SOCKET_H_
 #define ST_ASIO_WRAPPER_SERVER_SOCKET_H_
 
-#include "st_asio_wrapper_service_pump.h"
 #include "st_asio_wrapper_tcp_socket.h"
 
 namespace st_asio_wrapper
 {
-
-class i_server
-{
-public:
-	virtual st_service_pump& get_service_pump() = 0;
-	virtual const st_service_pump& get_service_pump() const = 0;
-	virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
-};
 
 template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket>
 class st_server_socket_base : public st_tcp_socket_base<Socket, Packer, Unpacker>, public boost::enable_shared_from_this<st_server_socket_base<Packer, Unpacker, Server, Socket>>
@@ -56,7 +47,11 @@ public:
 		super::force_shutdown();
 	}
 
-	void graceful_shutdown(bool sync = true)
+	//sync must be false if you call graceful_shutdown in on_msg
+	//furthermore, you're recommended to call this function with sync equal to false in all service threads,
+	//all callbacks will be called in service threads.
+	//this function is not thread safe, please note.
+	void graceful_shutdown(bool sync = false)
 	{
 		if (!ST_THIS is_shutting_down())
 			show_info("server link:", "being shut down gracefully.");
@@ -104,12 +99,11 @@ protected:
 #else
 		server.del_client(boost::dynamic_pointer_cast<st_timer>(ST_THIS shared_from_this()));
 #endif
-
 		ST_THIS shutdown_state = 0;
 	}
 
 private:
-	bool async_shutdown_handler(unsigned char id, ssize_t loop_num)
+	bool async_shutdown_handler(unsigned char id, size_t loop_num)
 	{
 		assert(TIMER_ASYNC_SHUTDOWN == id);
 

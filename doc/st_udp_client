@@ -2,11 +2,8 @@
 namespace st_asio_wrapper
 {
 
-typedef st_sclient<st_udp_socket> st_udp_sclient;
-一个只支持一个套接字的udp客户端（也可以说是服务端，udp不区分服务端还是客户端）
-
 支持多个套接字的udp客户端
-template<typename Socket = st_udp_socket, typename Pool = st_object_pool<Socket>>
+template<typename Socket, typename Pool = st_object_pool<Socket>>
 class st_udp_client_base : public st_client<Socke, Pool>
 {
 public:
@@ -18,15 +15,16 @@ public:
 创建或者重用一个对象，然后以reset为true调用父类的add_client。
 
 	void disconnect(typename Pool::object_ctype& client_ptr);
-	void force_close(typename Pool::object_ctype& client_ptr);
-	void graceful_close(typename Pool::object_ctype& client_ptr);
-从对象池中删除，然后调用client_ptr的同名函数。
+	void disconnect();
+	void force_shutdown(typename Pool::object_ctype& client_ptr);
+	void force_shutdown();
+	void graceful_shutdown(typename Pool::object_ctype& client_ptr);
+	void graceful_shutdown();
+先从对象池中删除client_ptr，然后调用client_ptr的同名函数。对于没有client_ptr参数的重载，对所有对象调用同名函数。
 
 protected:
 	virtual void uninit();
-实现i_service的纯虚接口，由st_service_pump调用（stop_service时调用），跟st_sclient::uninit功能一样，只是对所有
-客户端都做一个“结束”操作。
+实现i_service的纯虚接口，由st_service_pump在stop_service时调用，跟st_sclient::uninit功能一样，只是对所有客户端都做一个“结束”操作。
 };
-typedef st_udp_client_base<> st_udp_client;
 
 } //namespace

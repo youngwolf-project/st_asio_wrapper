@@ -13,7 +13,6 @@
 #ifndef ST_ASIO_WRAPPER_UDP_CLIENT_H_
 #define ST_ASIO_WRAPPER_UDP_CLIENT_H_
 
-#include "st_asio_wrapper_udp_socket.h"
 #include "st_asio_wrapper_client.h"
 
 namespace st_asio_wrapper

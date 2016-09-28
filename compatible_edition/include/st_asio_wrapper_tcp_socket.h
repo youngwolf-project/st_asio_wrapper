@@ -170,6 +170,8 @@ protected:
 
 	void shutdown()
 	{
+		boost::unique_lock<boost::shared_mutex> lock(shutdown_mutex);
+
 		shutdown_state = 1;
 		ST_THIS stop_all_timer();
 		ST_THIS close(); //must after stop_all_timer(), it's very important
@@ -252,6 +254,8 @@ protected:
 	typename super::in_container_type last_send_msg;
 	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker_;
 	int shutdown_state; //2-the first step of graceful shutdown, 1-force shutdown, 0-normal state
+
+	boost::shared_mutex shutdown_mutex;
 };
 
 } //namespace

@@ -2,11 +2,8 @@
 namespace st_asio_wrapper
 {
 
-typedef st_sclient<st_connector> st_tcp_sclient;
-一个只支持一条连接的tcp客户端
-
 支持多条连接的tcp客户端
-template<typename Socket = st_connector, typename Pool = st_object_pool<Socket>>
+template<typename Socket, typename Pool = st_object_pool<Socket>>
 class st_tcp_client_base : public st_client<Socket, Pool>
 {
 public:
@@ -23,7 +20,7 @@ ssl使用。
 
 	typename Pool::object_type add_client();
 创建或者重用一个对象，然后以reset为true调用父类的add_client。注意未设地址，将使用SERVER_IP和SERVER_PORT
-作为服务端地址，如果你要用别的地方，请用下面那个add_client。
+作为服务端地址，如果你要用别的地址，请用下面那个add_client。
 
 	typename Pool::object_type add_client(unsigned short port, const std::string& ip = std::string());
 创建或者重用一个对象，设置服务端地址，然后以reset为true调用父类的add_client。
@@ -45,16 +42,19 @@ ssl使用。
 	void safe_broadcast_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
 对每一个连接调用st_tcp_socket中的同名函数。
 
-	void disconnect(typename Pool::object_ctype& client_ptr, bool reconnect = false);
-	void force_close(typename Pool::object_ctype& client_ptr, bool reconnect = false);
-	void graceful_close(typename Pool::object_ctype& client_ptr, bool reconnect = false, bool sync = true);
-如果reconnect为假，则从对象池中删除，最后均调用client_ptr的同名函数。
+	void disconnect(typename Pool::object_ctype& client_ptr);
+	void disconnect(bool reconnect = false);
+	void force_shutdown(typename Pool::object_ctype& client_ptr);
+	void force_shutdown(bool reconnect = false);
+	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = true);
+	void graceful_shutdown(bool reconnect = false, bool sync = true);
+先从对象池中删除client_ptr，然后以默认参数调用client_ptr的同名函数。对于没有client_ptr参数的重载，对所有对象调用同名函数，参数直接传递。
+那么如果我想以非默认参数调用client_ptr的同名函数怎么办呢，你可以直接通过client_ptr调用，这就没st_tcp_client什么事了。
 
 protected:
 	virtual void uninit();
 实现i_service的纯虚接口，由st_service_pump调用（stop_service时调用），跟st_sclient::uninit功能一样，只是对所有
 客户端都做一个“结束”操作。
 };
-typedef st_tcp_client_base<> st_tcp_client;
 
 } //namespace

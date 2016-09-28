@@ -18,7 +18,7 @@ namespace st_asio_wrapper
 {
 
 服务端服务器类，主要功能是监听和接受连接，连接管理继承于Pool
-template<typename Socket = st_server_socket, typename Pool = st_object_pool<Socket>, typename Server = i_server>
+template<typename Socket, typename Pool = st_object_pool<Socket>, typename Server = i_server>
 class st_server_base : public Server, public Pool
 {
 public:
@@ -64,6 +64,11 @@ ssl使用。
 	void safe_broadcast_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
 对每一个连接调用st_tcp_socket中的同名函数。
 
+	void disconnect(typename Pool::object_ctype& client_ptr);
+	void force_shutdown(typename Pool::object_ctype& client_ptr);
+	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = true);
+先从对象池中删除client_ptr，然后调用client_ptr的同名函数。
+
 protected:
 	virtual void init();
 	virtual void uninit();
@@ -74,6 +79,11 @@ protected:
 （你应该在返回false之前关闭这个st_socket）或者你想自己管理这个连接（你应该在返回false之前调用client_ptr->start以开始数据接收），
 总之st_ojbect_pool不再维护这个连接。
 
+	virtual bool on_accept_error(const boost::system::error_code& ec, typename Pool::object_ctype& client_ptr);
+在接受连接失败时回调这个函数，如果你想忽略这个错误且马上继续接受新连接，则返回true；如果你想忽略这个错误且等一段时间之后再继续接受新连接，
+则启动一个定时器并返回fale，当定时器到达时，调用start_next_accept()函数；如果你想永远终止再接受新连接，则不要重写这个虚函数，如果你
+非要重写，那么在你的代码后面调用stop_listen()且返回false。
+
 	void start_next_accept();
 开始下一次异步接受连接，抽象成一个方法是因为两个地方需要调用，一是init内，一accept_handler内。
 使用者也可以随时调用这个方法，如果你想增加一些异步accept的话（参看ST_ASIO_ASYNC_ACCEPT_NUM宏）。
@@ -83,7 +93,8 @@ protected:
 添加一条连接到对象池（调用st_object_pool::add_object），如果成功，打印一些连接建议相关的信息。
 
 	void accept_handler(const error_code& ec, typename st_server_base::object_ctype& client_ptr);
-异步接受到连接时asio回调，如果出错（ec为真），将调用stop_listen，否则继承异步接受连接（start_next_accept）。
+异步接受到连接时asio回调，如果出错（ec为真），将调用on_accept_error()，否则继续异步接受连接（start_next_accept）,
+如果on_accept_error()返回true，也将继续异步接受连接（start_next_accept）。
 
 protected:
 	boost::asio::ip::tcp::endpoint server_addr;
@@ -91,7 +102,6 @@ protected:
 	boost::asio::ip::tcp::acceptor acceptor;
 连接异步接受器。
 };
-typedef st_server_base<> st_server;
 
 } //namespace
 

@@ -15,8 +15,7 @@
 
 #include "st_asio_wrapper_packer.h"
 #include "st_asio_wrapper_unpacker.h"
-
-#include "../st_asio_wrapper_client.h"
+#include "../st_asio_wrapper_udp_socket.h"
 #include "../st_asio_wrapper_udp_client.h"
 
 #ifndef ST_ASIO_DEFAULT_PACKER

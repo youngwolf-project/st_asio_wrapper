@@ -138,8 +138,8 @@ protected:
 			ST_THIS send_msg_buffer.front().swap(last_send_msg);
 			ST_THIS send_msg_buffer.pop_front();
 
-			boost::shared_lock<boost::shared_mutex> lock(shutdown_mutex);
 			last_send_msg.restart();
+			boost::shared_lock<boost::shared_mutex> lock(shutdown_mutex);
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr,
 				ST_THIS make_handler_error_size([this](const boost::system::error_code& ec, size_t bytes_transferred) {ST_THIS send_handler(ec, bytes_transferred);}));
 		}
@@ -174,6 +174,8 @@ protected:
 
 	void shutdown()
 	{
+		boost::unique_lock<boost::shared_mutex> lock(shutdown_mutex);
+
 		ST_THIS stop_all_timer();
 		ST_THIS close(); //must after stop_all_timer(), it's very important
 		ST_THIS started_ = false;
@@ -183,8 +185,6 @@ protected:
 		{
 			boost::system::error_code ec;
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
-
-			boost::unique_lock<boost::shared_mutex> lock(shutdown_mutex);
 			ST_THIS lowest_layer().close(ec);
 		}
 	}

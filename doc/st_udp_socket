@@ -4,18 +4,11 @@
 #endif
 绑定地址时，在不指定ip的情况下，指定ip地址的版本（v4还是v6），如果指定了ip，则ip地址的版本可以从ip中推导出来。
 
-#ifndef ST_ASIO_DEFAULT_UDP_UNPACKER
-#define ST_ASIO_DEFAULT_UDP_UNPACKER udp_unpacker
-#endif
-默认的解包器，也可以通过模板参数控制，提供这个宏可以让使用者省略相应的模板参数。
-
 namespace st_asio_wrapper
-{
-namespace st_udp
 {
 
 udp套接字类，实现udp数据的收发
-template <typename Packer = ST_ASIO_DEFAULT_PACKER, typename Unpacker = ST_ASIO_DEFAULT_UDP_UNPACKER, typename Socket = boost::asio::ip::udp::socket>
+template <typename Packer, typename Unpacker, typename Socket = boost::asio::ip::udp::socket>
 class st_udp_socket_base : public st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>>
 {
 public:
@@ -108,7 +101,7 @@ protected:
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down);
 重写st_socket的on_msg_handle，功能是打印消息到控制台，使用者重写这个函数以处理消息。
 
-	void clean_up();
+	void shutdown();
 关闭套接字，停止所有定时器，直接派发所有剩余消息，重置所有状态（调用reset_state）。
 
 	void recv_handler(const error_code& ec, size_t bytes_transferred);
@@ -118,15 +111,14 @@ protected:
 成功发送消息（写入底层套接字）后由asio回调。
 
 protected:
+	typename super::in_msg last_send_msg;
 	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>> unpacker_;
 	boost::asio::ip::udp::endpoint peer_addr, local_addr;
 异步接收udp消息时，asio需要一个endpoint，在整个异步接收过程中，这个endpoint必须有效，所以它是一个成员变量，
-它只代表上一次接收udp消息时的对端地址，对于已经接收到的udp消息，对端地方保存在out_msg_type里面。
+它只代表上一次接收udp消息时的对端地址，对于已经接收到的udp消息，对端地址保存在out_msg_type里面。
+
+	boost::shared_mutex shutdown_mutex;
+让shutdown函数线程安全。
 };
-typedef st_udp_socket_base<> st_udp_socket;
 
-} //namespace st_udp
 } //namespace st_asio_wrapper
-
-using namespace st_asio_wrapper::st_udp;
-兼容老版本。

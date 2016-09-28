@@ -48,7 +48,6 @@
 #if defined _MSC_VER
 #define ST_ASIO_SF "%Iu"
 #define ST_THIS //workaround to make up the BOOST_AUTO's defect under vc2008 and compiler bugs before vc2012
-#define ssize_t SSIZE_T
 #else // defined __GNUC__
 #define ST_ASIO_SF "%zu"
 #define ST_THIS this->
@@ -56,6 +55,16 @@
 
 namespace st_asio_wrapper
 {
+	class st_service_pump;
+	class st_timer;
+	class i_server
+	{
+	public:
+		virtual st_service_pump& get_service_pump() = 0;
+		virtual const st_service_pump& get_service_pump() const = 0;
+		virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
+	};
+
 	class i_buffer
 	{
 	public:
@@ -245,7 +254,7 @@ namespace st_asio_wrapper
 				if (left_num > size) //find the minimum movement
 					std::advance(end_iter = begin_iter, size);
 				else
-					std::advance(end_iter, -(ssize_t) left_num);
+					std::advance(end_iter, -(int) left_num);
 			}
 			else
 				size = src_can.size();

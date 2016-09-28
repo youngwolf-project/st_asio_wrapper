@@ -299,22 +299,26 @@ int main(int argc, const char* argv[])
 					n = 1;
 
 				if ('+' == str[0])
-					for (; n > 0 && client.add_client(port, ip); ++link_num, --n);
+					for (; n > 0 && client.add_client(port, ip); --n);
 				else
 				{
 					if (n > client.size())
 						n = client.size();
 
 					client.shutdown_some_client(n);
-					link_num = client.size();
 				}
 
+				link_num = client.size();
 				continue;
 			}
 
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 			link_num = client.size();
-			printf("link number: " ST_ASIO_SF "\n", link_num);
+			if (link_num != client.valid_size())
+			{
+				puts("please wait for a while, because st_object_pool has not cleaned up invalid links.");
+				continue;
+			}
 #endif
 			size_t msg_num = 1024;
 			size_t msg_len = 1024; //must greater than or equal to sizeof(size_t)
