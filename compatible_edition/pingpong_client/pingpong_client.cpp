@@ -16,10 +16,6 @@
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 
-#ifdef _MSC_VER
-#define atoll _atoi64
-#endif
-
 #define QUIT_COMMAND	"quit"
 #define LIST_STATUS		"status"
 
@@ -29,6 +25,25 @@ boost::atomic_ushort completed_session_num;
 #else
 st_atomic<unsigned short> completed_session_num;
 #endif
+
+//about congestion control
+//
+//in 1.3, congestion control has been removed (no post_msg nor post_native_msg anymore), this is because
+//without known the business (or logic), framework cannot always do congestion control properly.
+//now, users should take the responsibility to do congestion control, there're two ways:
+//
+//1. for receiver, if you cannot handle msgs timely, which means the bottleneck is in your business,
+//    you should open/close congestion control intermittently;
+//   for sender, send msgs in on_msg_send() or use sending buffer limitation (like safe_send_msg(..., false)),
+//    but must not in service threads, please note.
+//
+//2. for sender, if responses are available (like pingpong test), send msgs in on_msg()/on_msg_handle().
+//    this will reduce IO throughput because, SOCKET's sliding window is not fully used, pleae note.
+//
+//pingpong_client will choose method #1 if defined ST_ASIO_WANT_MSG_SEND_NOTIFY, otherwise #2
+//BTW, if pingpong_client chose method #2, then pingpong_server can work properly without any congestion control,
+//which means pingpong_server can send msgs back with can_overflow parameter equal to true, and memory occupation
+//will be under control.
 
 class echo_socket : public st_connector
 {
@@ -54,16 +69,17 @@ protected:
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+	//congestion control, method #1, the peer needs its own congestion control too.
 	virtual void on_msg_send(in_msg_type& msg)
 	{
 		send_bytes += msg.size();
 		if (send_bytes < total_bytes)
-			direct_send_msg(std::move(msg));
+			direct_send_msg(msg);
+			//this invocation has no chance to fail (by insufficient sending buffer), even can_overflow is false
+			//this is because here is the only place that will send msgs and here also means the receiving buffer at least can hold one more msg.
 	}
-#endif
 
 private:
-#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	void handle_msg(out_msg_ctype& msg)
 	{
 		recv_bytes += msg.size();
@@ -71,6 +87,8 @@ private:
 			begin_time.stop();
 	}
 #else
+private:
+	//congestion control, method #2, the peer totally doesn't have to consider congestion control.
 	void handle_msg(out_msg_type& msg)
 	{
 		if (0 == total_bytes)
@@ -84,12 +102,15 @@ private:
 				begin_time.stop();
 		}
 		else
-			direct_send_msg(std::move(msg));
+			direct_send_msg(msg);
+			//this invocation has no chance to fail (by insufficient sending buffer), even can_overflow is false
+			//this is because pingpong_server never send msgs initiatively, and,
+			//here is the only place that will send msgs and here also means the receiving buffer at least can hold one more msg.
 	}
 #endif
 
 private:
-	uint64_t total_bytes, send_bytes, recv_bytes;
+	boost::uint64_t total_bytes, send_bytes, recv_bytes;
 };
 
 class echo_client : public st_tcp_client_base<echo_socket>
@@ -100,17 +121,19 @@ public:
 	echo_socket::statistic get_statistic()
 	{
 		echo_socket::statistic stat;
-		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic(); });
+		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
+		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
+			stat += (*iter)->get_statistic();
 
 		return stat;
 	}
 
-	void begin(size_t msg_num, const char* msg, size_t msg_len) {do_something_to_all([=](object_ctype& item) {item->begin(msg_num, msg, msg_len);});}
+	void begin(size_t msg_num, const char* msg, size_t msg_len) {do_something_to_all(boost::bind(&echo_socket::begin, _1, msg_num, msg, msg_len));}
 };
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: pingpong_client [<service thread number=1> [<port=%d> [<ip=%s> [link num=16]]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
+	printf("usage: %s [<service thread number=1> [<port=%d> [<ip=%s> [link num=16]]]]\n", argv[0], ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -124,15 +147,15 @@ int main(int argc, const char* argv[])
 	printf("exec: echo_client with " ST_ASIO_SF " links\n", link_num);
 	///////////////////////////////////////////////////////////
 
-	st_service_pump service_pump;
-	echo_client client(service_pump);
+	st_service_pump sp;
+	echo_client client(sp);
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4
 	std::string ip = argc > 3 ? argv[3] : ST_ASIO_SERVER_IP;
 	unsigned short port = argc > 2 ? atoi(argv[2]) : ST_ASIO_SERVER_PORT;
 
-	auto thread_num = 1;
+	int thread_num = 1;
 	if (argc > 1)
 		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
@@ -143,13 +166,13 @@ int main(int argc, const char* argv[])
 	for (size_t i = 0; i < link_num; ++i)
 		client.add_client(port, ip);
 
-	service_pump.start_service(thread_num);
-	while(service_pump.is_running())
+	sp.start_service(thread_num);
+	while(sp.is_running())
 	{
 		std::string str;
 		std::getline(std::cin, str);
 		if (QUIT_COMMAND == str)
-			service_pump.stop_service();
+			sp.stop_service();
 		else if (LIST_STATUS == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
@@ -160,20 +183,20 @@ int main(int argc, const char* argv[])
 		{
 			size_t msg_num = 1024;
 			size_t msg_len = 1024; //must greater than or equal to sizeof(size_t)
-			auto msg_fill = '0';
+			char msg_fill = '0';
 
 			boost::char_separator<char> sep(" \t");
-			boost::tokenizer<boost::char_separator<char>> tok(str, sep);
-			auto iter = std::begin(tok);
-			if (iter != std::end(tok)) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
-			if (iter != std::end(tok)) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE, std::max((size_t) atoi(iter++->data()), (size_t) 1));
-			if (iter != std::end(tok)) msg_fill = *iter++->data();
+			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
+			BOOST_AUTO(iter, tok.begin());
+			if (iter != tok.end()) msg_num = std::max((size_t) atoi(iter++->data()), (size_t) 1);
+			if (iter != tok.end()) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE, std::max((size_t) atoi(iter++->data()), (size_t) 1));
+			if (iter != tok.end()) msg_fill = *iter++->data();
 
 			printf("test parameters after adjustment: " ST_ASIO_SF " " ST_ASIO_SF " %c\n", msg_num, msg_len, msg_fill);
 			puts("performance test begin, this application will have no response during the test!");
 
 			completed_session_num = (unsigned short) link_num;
-			auto init_msg = new char[msg_len];
+			char* init_msg = new char[msg_len];
 			memset(init_msg, msg_fill, msg_len);
 			client.begin(msg_num, init_msg, msg_len);
 			begin_time.start();
@@ -181,8 +204,8 @@ int main(int argc, const char* argv[])
 			while (0 != completed_session_num)
 				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
-			uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
-			auto used_time = (double) begin_time.elapsed().wall / 1000000000;
+			boost::uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
+			double used_time = (double) begin_time.elapsed().wall / 1000000000;
 			printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
 			printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 
@@ -198,7 +221,6 @@ int main(int argc, const char* argv[])
 #undef ST_ASIO_REUSE_OBJECT
 #undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY
-#undef ST_ASIO_DEFAULT_PACKER
-#undef ST_ASIO_DEFAULT_UNPACKER
 #undef ST_ASIO_MSG_BUFFER_SIZE
+#undef ST_ASIO_DEFAULT_UNPACKER
 //restore configuration

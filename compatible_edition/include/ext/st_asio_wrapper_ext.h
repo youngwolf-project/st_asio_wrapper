@@ -33,16 +33,16 @@ class basic_buffer : public boost::noncopyable
 public:
 	basic_buffer() {do_detach();}
 	basic_buffer(size_t len) {do_detach(); assign(len);}
-	~basic_buffer() {free();}
+	~basic_buffer() {clear();}
 
-	void assign(size_t len) {free(); do_attach(new char[len], len, len);}
+	void assign(size_t len) {clear(); do_attach(new char[len], len, len);}
 
 	//the following five functions are needed by st_asio_wrapper
 	bool empty() const {return 0 == len || NULL == buff;}
 	size_t size() const {return NULL == buff ? 0 : len;}
 	const char* data() const {return buff;}
 	void swap(basic_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len); std::swap(buff_len, other.buff_len);}
-	void clear() {free();}
+	void clear() {delete[] buff; do_detach();}
 
 	//functions needed by packer and unpacker
 	char* data() {return buff;}
@@ -52,7 +52,6 @@ public:
 protected:
 	void do_attach(char* _buff, size_t _len, size_t _buff_len) {buff = _buff; len = _len; buff_len = _buff_len;}
 	void do_detach() {buff = NULL; len = buff_len = 0;}
-	void free() {delete[] buff; do_detach();}
 
 protected:
 	char* buff;

@@ -37,10 +37,10 @@ protected:
 	typedef st_tcp_socket_base<Socket, Packer, Unpacker> super;
 
 public:
-	static const unsigned char TIMER_BEGIN = super::TIMER_END;
-	static const unsigned char TIMER_CONNECT = TIMER_BEGIN;
-	static const unsigned char TIMER_ASYNC_SHUTDOWN = TIMER_BEGIN + 1;
-	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
+	static const st_timer::tid TIMER_BEGIN = super::TIMER_END;
+	static const st_timer::tid TIMER_CONNECT = TIMER_BEGIN;
+	static const st_timer::tid TIMER_ASYNC_SHUTDOWN = TIMER_BEGIN + 1;
+	static const st_timer::tid TIMER_END = TIMER_BEGIN + 10;
 
 	st_connector_base(boost::asio::io_service& io_service_) : super(io_service_), connected(false), reconnecting(true)
 		{set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
@@ -73,7 +73,7 @@ public:
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false)
 	{
-		if (1 != ST_THIS shutdown_state)
+		if (super::FORCE != ST_THIS shutdown_state)
 		{
 			show_info("client link:", "been shut down.");
 			reconnecting = reconnect;
@@ -107,7 +107,7 @@ public:
 		boost::system::error_code ec;
 		BOOST_AUTO(ep, ST_THIS lowest_layer().local_endpoint(ec));
 		if (!ec)
-			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().c_str(), ep.port(), tail);
+			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().data(), ep.port(), tail);
 	}
 
 	void show_info(const char* head, const char* tail, const boost::system::error_code& ec) const
@@ -115,7 +115,7 @@ public:
 		boost::system::error_code ec2;
 		BOOST_AUTO(ep, ST_THIS lowest_layer().local_endpoint(ec2));
 		if (!ec2)
-			unified_out::info_out("%s %s:%hu %s (%d %s)", head, ep.address().to_string().c_str(), ep.port(), tail, ec.value(), ec.message().data());
+			unified_out::info_out("%s %s:%hu %s (%d %s)", head, ep.address().to_string().data(), ep.port(), tail, ec.value(), ec.message().data());
 	}
 
 protected:
@@ -145,7 +145,7 @@ protected:
 		show_info("client link:", "broken/been shut down", ec);
 
 		force_shutdown(ST_THIS is_shutting_down() ? reconnecting : prepare_reconnect(ec) >= 0);
-		ST_THIS shutdown_state = 0;
+		ST_THIS shutdown_state = super::NONE;
 
 		if (reconnecting)
 			ST_THIS start();
@@ -175,19 +175,13 @@ protected:
 	}
 
 private:
-	bool reconnect_handler(unsigned char id)
-	{
-		assert(TIMER_CONNECT == id);
+	bool reconnect_handler(st_timer::tid id) {assert(TIMER_CONNECT == id); do_start(); return false;}
 
-		do_start();
-		return false;
-	}
-
-	bool async_shutdown_handler(unsigned char id, size_t loop_num)
+	bool async_shutdown_handler(st_timer::tid id, size_t loop_num)
 	{
 		assert(TIMER_ASYNC_SHUTDOWN == id);
 
-		if (2 == ST_THIS shutdown_state)
+		if (super::GRACEFUL == ST_THIS shutdown_state)
 		{
 			--loop_num;
 			if (loop_num > 0)

@@ -39,22 +39,24 @@ protected:
 	using super::TIMER_BEGIN;
 	using super::TIMER_END;
 
-	st_tcp_socket_base(boost::asio::io_service& io_service_) : super(io_service_), unpacker_(boost::make_shared<Unpacker>()), shutdown_state(0) {}
+	enum shutdown_states {NONE, FORCE, GRACEFUL};
+
+	st_tcp_socket_base(boost::asio::io_service& io_service_) : super(io_service_), unpacker_(boost::make_shared<Unpacker>()), shutdown_state(shutdown_states::NONE) {}
 	template<typename Arg>
-	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()), shutdown_state(0) {}
+	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()), shutdown_state(shutdown_states::NONE) {}
 
 public:
 	virtual bool obsoleted() {return !is_shutting_down() && super::obsoleted();}
 
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
-	void reset() {reset_state(); shutdown_state = 0; super::reset();}
+	void reset() {reset_state(); shutdown_state = shutdown_states::NONE; super::reset();}
 	void reset_state()
 	{
 		unpacker_->reset_state();
 		super::reset_state();
 	}
 
-	bool is_shutting_down() const {return 0 != shutdown_state;}
+	bool is_shutting_down() const {return shutdown_states::NONE != shutdown_state;}
 
 	//get or change the unpacker at runtime
 	//changing unpacker at runtime is not thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
@@ -72,20 +74,17 @@ public:
 	//success at here just means put the msg into st_tcp_socket_base's send buffer
 	TCP_SAFE_SEND_MSG(safe_send_msg, send_msg)
 	TCP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
-	//like safe_send_msg and safe_send_native_msg, but non-block
-	TCP_POST_MSG(post_msg, false)
-	TCP_POST_MSG(post_native_msg, true)
 	//msg sending interface
 	///////////////////////////////////////////////////
 
 protected:
-	void force_shutdown() {if (1 != shutdown_state) shutdown();}
-	bool graceful_shutdown(bool sync = true) //will block until shutdown success or time out if sync equal to true
+	void force_shutdown() {if (shutdown_states::FORCE != shutdown_state) shutdown();}
+	bool graceful_shutdown(bool sync) //will block until shutdown success or time out if sync equal to true
 	{
 		if (is_shutting_down())
 			return false;
 		else
-			shutdown_state = 2;
+			shutdown_state = shutdown_states::GRACEFUL;
 
 		boost::system::error_code ec;
 		ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
@@ -110,38 +109,46 @@ protected:
 		return !sync;
 	}
 
-	//must mutex send_msg_buffer before invoke this function
+	//ascs::socket will guarantee not call this function in more than one thread concurrently.
+	//return false if send buffer is empty or sending not allowed or io_service stopped
 	virtual bool do_send_msg()
 	{
-		if (!is_send_allowed() || ST_THIS stopped())
-			ST_THIS sending = false;
-		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
+		if (is_send_allowed() && !ST_THIS stopped() && !ST_THIS send_msg_buffer.empty())
 		{
-			ST_THIS sending = true;
-#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-			const size_t max_send_size = 0;
-#else
-			const size_t max_send_size = boost::asio::detail::default_max_transfer_size;
-#endif
-			size_t size = 0;
-			auto end_time = super::statistic::local_time();
 			std::vector<boost::asio::const_buffer> bufs;
-			for (auto iter = std::begin(ST_THIS send_msg_buffer); last_send_msg.empty();)
 			{
-				size += iter->size();
-				bufs.push_back(boost::asio::buffer(iter->data(), iter->size()));
-				ST_THIS stat.send_delay_sum += end_time - iter->begin_time;
-				++iter;
-				if (size >= max_send_size || iter == std::end(ST_THIS send_msg_buffer))
-					last_send_msg.splice(std::end(last_send_msg), ST_THIS send_msg_buffer, std::begin(ST_THIS send_msg_buffer), iter);
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+				const size_t max_send_size = 0;
+#else
+				const size_t max_send_size = boost::asio::detail::default_max_transfer_size;
+#endif
+				size_t size = 0;
+				typename super::in_msg msg;
+				auto end_time = super::statistic::local_time();
+
+				typename super::in_container_type::lock_guard lock(ST_THIS send_msg_buffer);
+				while (ST_THIS send_msg_buffer.try_dequeue_(msg))
+				{
+					ST_THIS stat.send_delay_sum += end_time - msg.begin_time;
+					size += msg.size();
+					last_send_msg.push_back(std::move(msg));
+					bufs.push_back(boost::asio::buffer(last_send_msg.back().data(), last_send_msg.back().size()));
+					if (size >= max_send_size)
+						break;
+				}
 			}
 
-			last_send_msg.front().restart();
-			boost::asio::async_write(ST_THIS next_layer(), bufs,
-				ST_THIS make_handler_error_size([this](const boost::system::error_code& ec, size_t bytes_transferred) {ST_THIS send_handler(ec, bytes_transferred);}));
+			if (!bufs.empty())
+			{
+				last_send_msg.front().restart();
+				boost::asio::async_write(ST_THIS next_layer(), bufs,
+					ST_THIS make_handler_error_size([this](const boost::system::error_code& ec, size_t bytes_transferred) {ST_THIS send_handler(ec, bytes_transferred);}));
+
+				return true;
+			}
 		}
 
-		return ST_THIS sending;
+		return false;
 	}
 
 	virtual void do_recv_msg()
@@ -171,7 +178,7 @@ protected:
 	{
 		boost::unique_lock<boost::shared_mutex> lock(shutdown_mutex);
 
-		shutdown_state = 1;
+		shutdown_state = shutdown_states::FORCE;
 		ST_THIS stop_all_timer();
 		ST_THIS close(); //must after stop_all_timer(), it's very important
 		ST_THIS started_ = false;
@@ -203,7 +210,7 @@ private:
 					(++op_iter).base()->swap(*iter.base());
 				}
 			}
-			ST_THIS dispatch_msg();
+			ST_THIS handle_msg();
 
 			if (!unpack_ok)
 			{
@@ -226,33 +233,26 @@ private:
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(last_send_msg.front());
 #endif
+#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
+			if (ST_THIS send_msg_buffer.empty())
+				ST_THIS on_all_msg_send(last_send_msg.back());
+#endif
 		}
 		else
 			ST_THIS on_send_error(ec);
-
-#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-		typename super::in_msg msg;
-		msg.swap(last_send_msg.back());
-#endif
 		last_send_msg.clear();
 
-		boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex);
-		ST_THIS sending = false;
-
-		//send msg sequentially, that means second send only after first send success
-#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-		if (!ec && !do_send_msg())
-			ST_THIS on_all_msg_send(msg);
-#else
-		if (!ec)
-			do_send_msg();
-#endif
+		if (ec || !do_send_msg()) //send msg sequentially, which means second sending only after first sending success
+		{
+			ST_THIS sending = false;
+			ST_THIS send_msg(); //just make sure no pending msgs
+		}
 	}
 
 protected:
-	typename super::in_container_type last_send_msg;
+	boost::container::list<typename super::in_msg> last_send_msg;
 	boost::shared_ptr<i_unpacker<out_msg_type>> unpacker_;
-	int shutdown_state; //2-the first step of graceful shutdown, 1-force shutdown, 0-normal state
+	shutdown_states shutdown_state;
 
 	boost::shared_mutex shutdown_mutex;
 };

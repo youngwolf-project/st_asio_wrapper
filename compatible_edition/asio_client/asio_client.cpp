@@ -50,14 +50,14 @@ using namespace st_asio_wrapper::ext;
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: asio_client [<port=%d> [ip=%s]]\n", ST_ASIO_SERVER_PORT + 100, ST_ASIO_SERVER_IP);
+	printf("usage: %s [<port=%d> [ip=%s]]\n", argv[0], ST_ASIO_SERVER_PORT + 100, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
-	st_service_pump service_pump;
-	st_tcp_sclient client(service_pump);
+	st_service_pump sp;
+	st_tcp_sclient client(sp);
 	//there is no corresponding echo client, because echo server with echo client will cause dead loop, and occupy almost all the network resource
 
 //	argv[2] = "::1" //ipv6
@@ -69,17 +69,17 @@ int main(int argc, const char* argv[])
 	else
 		client.set_server_addr(ST_ASIO_SERVER_PORT + 100, ST_ASIO_SERVER_IP);
 
-	service_pump.start_service();
-	while(service_pump.is_running())
+	sp.start_service();
+	while(sp.is_running())
 	{
 		std::string str;
 		std::cin >> str;
 		if (QUIT_COMMAND == str)
-			service_pump.stop_service();
+			sp.stop_service();
 		else if (RESTART_COMMAND == str)
 		{
-			service_pump.stop_service();
-			service_pump.start_service();
+			sp.stop_service();
+			sp.start_service();
 		}
 		else if (RECONNECT_COMMAND == str)
 			client.graceful_shutdown(true);

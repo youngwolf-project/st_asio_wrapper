@@ -73,7 +73,7 @@ public:
 		return false;
 	}
 
-	//unseal object creation for client endpoint object pool.
+	//unseal object creation.
 	using Pool::create_object;
 };
 

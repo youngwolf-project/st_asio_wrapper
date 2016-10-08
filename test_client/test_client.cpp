@@ -23,6 +23,7 @@
 #define ST_ASIO_DEFAULT_PACKER replaceable_packer
 #define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
 #elif 2 == PACKER_UNPACKER_TYPE
+#define ST_ASIO_DEFAULT_PACKER fixed_length_packer
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
@@ -45,6 +46,22 @@ using namespace st_asio_wrapper::ext;
 #define RESUME_COMMAND	"resume"
 
 static bool check_msg;
+
+//about congestion control
+//
+//in 1.3, congestion control has been removed (no post_msg nor post_native_msg anymore), this is because
+//without known the business (or logic), framework cannot always do congestion control properly.
+//now, users should take the responsibility to do congestion control, there're two ways:
+//
+//1. for receiver, if you cannot handle msgs timely, which means the bottleneck is in your business,
+//    you should open/close congestion control intermittently;
+//   for sender, send msgs in on_msg_send() or use sending buffer limitation (like safe_send_msg(..., false)),
+//    but must not in service threads, please note.
+//
+//2. for sender, if responses are available (like pingpong test), send msgs in on_msg()/on_msg_handle().
+//    this will reduce IO throughput, because SOCKET's sliding window is not fully used, pleae note.
+//
+//test_client chose method #1
 
 ///////////////////////////////////////////////////
 //msg sending interface
@@ -84,27 +101,21 @@ public:
 		memset(buff, msg_fill, msg_len);
 		memcpy(buff, &recv_index, sizeof(size_t)); //seq
 
-#if 2 == PACKER_UNPACKER_TYPE
-		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
-		send_native_msg(buff, msg_len);
-#else
 		send_msg(buff, msg_len);
-#endif
-
 		delete[] buff;
 	}
 
 protected:
 	//msg handling
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //not force to use msg recv buffer(so on_msg will make the decision)
-	//we can handle msg very fast, so we don't use recv buffer(return true)
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+	//this virtual function doesn't exists if ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER been defined
 	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
-	//we should handle msg in on_msg_handle for time-consuming task like this:
 	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
 	//msg handling end
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+	//congestion control, method #1, the peer needs its own congestion control too.
 	virtual void on_msg_send(in_msg_type& msg)
 	{
 		if (0 == --msg_num)
@@ -112,23 +123,15 @@ protected:
 
 		auto pstr = inner_packer()->raw_data(msg);
 		auto msg_len = inner_packer()->raw_data_len(msg);
-#if 2 == PACKER_UNPACKER_TYPE
-		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
-		std::advance(pstr, -ST_ASIO_HEAD_LEN);
-		msg_len += ST_ASIO_HEAD_LEN;
-#endif
 
 		size_t send_index;
 		memcpy(&send_index, pstr, sizeof(size_t));
 		++send_index;
 		memcpy(pstr, &send_index, sizeof(size_t)); //seq
 
-#if 2 == PACKER_UNPACKER_TYPE
-		//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
-		send_native_msg(pstr, msg_len);
-#else
 		send_msg(pstr, msg_len);
-#endif
+		//this invocation has no chance to fail (by insufficient sending buffer), even can_overflow is false
+		//this is because here is the only place that will send msgs and here also means the receiving buffer at least can hold one more msg.
 	}
 #endif
 
@@ -139,6 +142,9 @@ private:
 		if (check_msg && (msg.size() < sizeof(size_t) || 0 != memcmp(&recv_index, msg.data(), sizeof(size_t))))
 			printf("check msg error: " ST_ASIO_SF ".\n", recv_index);
 		++recv_index;
+
+		//i'm the bottleneck -_-
+//		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
 	}
 
 private:
@@ -163,7 +169,7 @@ public:
 	test_socket::statistic get_statistic()
 	{
 		test_socket::statistic stat;
-		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic(); });
+		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic();});
 
 		return stat;
 	}
@@ -173,10 +179,10 @@ public:
 
 	void shutdown_some_client(size_t n)
 	{
-		static auto test_index = -1;
-		++test_index;
+		static auto index = -1;
+		++index;
 
-		switch (test_index % 6)
+		switch (index % 6)
 		{
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 			//method #1
@@ -202,7 +208,7 @@ public:
 
 	///////////////////////////////////////////////////
 	//msg sending interface
-	//guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into st_tcp_socket's send buffer successfully
+	//guarantee send msg successfully even if can_overflow is false, success at here just means putting the msg into st_tcp_socket's send buffer successfully
 	TCP_RANDOM_SEND_MSG(safe_random_send_msg, safe_send_msg)
 	TCP_RANDOM_SEND_MSG(safe_random_send_native_msg, safe_send_native_msg)
 	//msg sending interface
@@ -211,7 +217,7 @@ public:
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: test_client [<service thread number=1> [<port=%d> [<ip=%s> [link num=16]]]]\n", ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
+	printf("usage: %s [<service thread number=1> [<port=%d> [<ip=%s> [link num=16]]]]\n", argv[0], ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -222,11 +228,11 @@ int main(int argc, const char* argv[])
 	if (argc > 4)
 		link_num = std::min(ST_ASIO_MAX_OBJECT_NUM, std::max(atoi(argv[4]), 1));
 
-	printf("exec: test_client with " ST_ASIO_SF " links\n", link_num);
+	printf("exec: %s with " ST_ASIO_SF " links\n", argv[0], link_num);
 	///////////////////////////////////////////////////////////
 
-	st_service_pump service_pump;
-	test_client client(service_pump);
+	st_service_pump sp;
+	test_client client(sp);
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4
@@ -235,7 +241,7 @@ int main(int argc, const char* argv[])
 
 	//method #1, create and add clients manually.
 	auto client_ptr = client.create_object();
-	//client_ptr->set_server_addr(port, ip); //we don't have to set server address at here, the following do_something_to_all will do it for me
+	//client_ptr->set_server_addr(port, ip); //we don't have to set server address at here, the following do_something_to_all will do it for us
 	//some other initializations according to your business
 	client.add_client(client_ptr, false);
 	client_ptr.reset(); //important, otherwise, st_object_pool will not be able to free or reuse this object.
@@ -255,19 +261,22 @@ int main(int argc, const char* argv[])
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 	if (1 == thread_num)
 		++thread_num;
+	//add one thread will seriously impact IO throughput when doing performance benchmark, this is because the business logic is very simple (send original messages back,
+	//or just add up total message size), under this scenario, just one service thread without receiving buffer will obtain the best IO throughput.
+	//the server has such behavior too.
 #endif
 
-	service_pump.start_service(thread_num);
-	while(service_pump.is_running())
+	sp.start_service(thread_num);
+	while(sp.is_running())
 	{
 		std::string str;
 		std::getline(std::cin, str);
 		if (QUIT_COMMAND == str)
-			service_pump.stop_service();
+			sp.stop_service();
 		else if (RESTART_COMMAND == str)
 		{
-			service_pump.stop_service();
-			service_pump.start_service(thread_num);
+			sp.stop_service();
+			sp.start_service(thread_num);
 		}
 		else if (LIST_STATUS == str)
 		{
@@ -392,24 +401,15 @@ int main(int argc, const char* argv[])
 				{
 					memcpy(buff, &i, sizeof(size_t)); //seq
 
+					//congestion control, method #1, the peer needs its own congestion control too.
 					switch (model)
 					{
 					case 0:
-#if 2 == PACKER_UNPACKER_TYPE
-						//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
-						client.safe_broadcast_native_msg(buff, msg_len);
-#else
-						client.safe_broadcast_msg(buff, msg_len);
-#endif
+						client.safe_broadcast_msg(buff, msg_len); //can_overflow is false, it's important
 						send_bytes += link_num * msg_len;
 						break;
 					case 1:
-#if 2 == PACKER_UNPACKER_TYPE
-						//we don't have fixed_length_packer, so use packer instead, but need to pack msgs with native manner.
-						client.safe_random_send_native_msg(buff, msg_len);
-#else
-						client.safe_random_send_msg(buff, msg_len);
-#endif
+						client.safe_random_send_msg(buff, msg_len); //can_overflow is false, it's important
 						send_bytes += msg_len;
 						break;
 					default:

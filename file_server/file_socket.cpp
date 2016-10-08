@@ -1,6 +1,7 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		5050
+#define ST_ASIO_ASYNC_ACCEPT_NUM	5
 #define ST_ASIO_CLEAR_OBJECT_INTERVAL	60
 #define ST_ASIO_ENHANCED_STABILITY
 #define ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -107,6 +108,7 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 
 //restore configuration
 #undef ST_ASIO_SERVER_PORT
+#undef ST_ASIO_ASYNC_ACCEPT_NUM
 #undef ST_ASIO_CLEAR_OBJECT_INTERVAL
 #undef ST_ASIO_ENHANCED_STABILITY
 #undef ST_ASIO_WANT_MSG_SEND_NOTIFY

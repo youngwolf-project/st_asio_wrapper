@@ -77,7 +77,7 @@ typedef st_atomic<uint_fast64_t> st_atomic_uint_fast64;
 #endif
 
 template<typename Object>
-class st_object_pool : public st_service_pump::i_service, public st_timer
+class st_object_pool : public st_service_pump::i_service, protected st_timer
 {
 public:
 	typedef boost::shared_ptr<Object> object_type;
@@ -101,20 +101,20 @@ protected:
 	typedef boost::unordered::unordered_set<object_type, st_object_hasher, st_object_equal> container_type;
 
 protected:
-	static const unsigned char TIMER_BEGIN = st_timer::TIMER_END;
-	static const unsigned char TIMER_FREE_SOCKET = TIMER_BEGIN;
-	static const unsigned char TIMER_CLEAR_SOCKET = TIMER_BEGIN + 1;
-	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
+	static const tid TIMER_BEGIN = st_timer::TIMER_END;
+	static const tid TIMER_FREE_SOCKET = TIMER_BEGIN;
+	static const tid TIMER_CLEAR_SOCKET = TIMER_BEGIN + 1;
+	static const tid TIMER_END = TIMER_BEGIN + 10;
 
 	st_object_pool(st_service_pump& service_pump_) : i_service(service_pump_), st_timer(service_pump_), cur_id(-1), max_size_(ST_ASIO_MAX_OBJECT_NUM) {}
 
 	void start()
 	{
 #ifndef ST_ASIO_REUSE_OBJECT
-		set_timer(TIMER_FREE_SOCKET, 1000 * ST_ASIO_FREE_OBJECT_INTERVAL, [this](unsigned char id)->bool {ST_THIS free_object(); return true;});
+		set_timer(TIMER_FREE_SOCKET, 1000 * ST_ASIO_FREE_OBJECT_INTERVAL, [this](tid id)->bool {ST_THIS free_object(); return true;});
 #endif
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
-		set_timer(TIMER_CLEAR_SOCKET, 1000 * ST_ASIO_CLEAR_OBJECT_INTERVAL, [this](unsigned char id)->bool {ST_THIS clear_obsoleted_object(); return true;});
+		set_timer(TIMER_CLEAR_SOCKET, 1000 * ST_ASIO_CLEAR_OBJECT_INTERVAL, [this](tid id)->bool {ST_THIS clear_obsoleted_object(); return true;});
 #endif
 	}
 
@@ -217,7 +217,7 @@ protected:
 	}
 #endif
 
-	object_type create_object() {return create_object(service_pump);}
+	object_type create_object() {return create_object(sp);}
 
 public:
 	//to configure unordered_set(for example, set factor or reserved size), not locked the mutex, so must be called before service_pump starting up.

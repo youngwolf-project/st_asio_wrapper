@@ -22,31 +22,31 @@ using namespace st_asio_wrapper;
 int main(int argc, const char* argv[])
 {
 	puts("this is a file transfer server.");
-	printf("usage: file_server [<port=%d> [ip=0.0.0.0]]\n", ST_ASIO_SERVER_PORT);
+	printf("usage: %s [<port=%d> [ip=0.0.0.0]]\n", argv[0], ST_ASIO_SERVER_PORT);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
-	st_service_pump service_pump;
-	st_server_base<file_socket> file_server_(service_pump);
+	st_service_pump sp;
+	st_server_base<file_socket> file_server_(sp);
 
 	if (argc > 2)
 		file_server_.set_server_addr(atoi(argv[1]), argv[2]);
 	else if (argc > 1)
 		file_server_.set_server_addr(atoi(argv[1]));
 
-	service_pump.start_service();
-	while(service_pump.is_running())
+	sp.start_service();
+	while(sp.is_running())
 	{
 		std::string str;
 		std::getline(std::cin, str);
 		if (QUIT_COMMAND == str)
-			service_pump.stop_service();
+			sp.stop_service();
 		else if (RESTART_COMMAND == str)
 		{
-			service_pump.stop_service();
-			service_pump.start_service();
+			sp.stop_service();
+			sp.start_service();
 		}
 		else if (LIST_ALL_CLIENT == str)
 			file_server_.list_all_object();
