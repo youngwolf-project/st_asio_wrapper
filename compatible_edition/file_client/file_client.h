@@ -172,9 +172,9 @@ private:
 class file_client : public st_tcp_client_base<file_socket>
 {
 public:
-	static const unsigned char TIMER_BEGIN = st_tcp_client_base<file_socket>::TIMER_END;
-	static const unsigned char UPDATE_PROGRESS = TIMER_BEGIN;
-	static const unsigned char TIMER_END = TIMER_BEGIN + 10;
+	static const tid TIMER_BEGIN = st_tcp_client_base<file_socket>::TIMER_END;
+	static const tid UPDATE_PROGRESS = TIMER_BEGIN;
+	static const tid TIMER_END = TIMER_BEGIN + 10;
 
 	file_client(st_service_pump& service_pump_) : st_tcp_client_base<file_socket>(service_pump_) {}
 
@@ -202,7 +202,7 @@ public:
 	}
 
 private:
-	bool update_progress_handler(unsigned char id, unsigned last_percent)
+	bool update_progress_handler(tid id, unsigned last_percent)
 	{
 		assert(UPDATE_PROGRESS == id);
 

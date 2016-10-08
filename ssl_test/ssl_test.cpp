@@ -20,15 +20,15 @@ using namespace st_asio_wrapper::ext;
 
 int main(int argc, const char* argv[])
 {
-	puts("Directories certs and client_certs must be in the current directory.");
+	puts("Directories 'certs' and 'client_certs' must available in current directory.");
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
-	st_service_pump service_pump;
+	st_service_pump sp;
 
-	st_ssl_server server_(service_pump, boost::asio::ssl::context::sslv23_server);
+	st_ssl_server server_(sp, boost::asio::ssl::context::sslv23_server);
 	server_.ssl_context().set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
 	server_.ssl_context().set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
 	server_.ssl_context().load_verify_file("client_certs/server.crt");
@@ -38,7 +38,7 @@ int main(int argc, const char* argv[])
 
 ///*
 	//method #1
-	st_ssl_tcp_client ssl_client(service_pump, boost::asio::ssl::context::sslv23_client);
+	st_ssl_tcp_client ssl_client(sp, boost::asio::ssl::context::sslv23_client);
 	ssl_client.ssl_context().set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
 	ssl_client.ssl_context().set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
 	ssl_client.ssl_context().load_verify_file("certs/server.crt");
@@ -61,19 +61,18 @@ int main(int argc, const char* argv[])
 	ctx.use_private_key_file("client_certs/server.key", boost::asio::ssl::context::pem);
 	ctx.use_tmp_dh_file("client_certs/dh1024.pem");
 
-	st_ssl_tcp_sclient ssl_sclient(service_pump, ctx);
-#define ssl_client ssl_sclient
+	st_ssl_tcp_sclient ssl_client(sp, ctx);
 */
-	service_pump.start_service();
-	while(service_pump.is_running())
+	sp.start_service();
+	while(sp.is_running())
 	{
 		std::string str;
 		std::cin >> str;
 		if (QUIT_COMMAND == str)
 		{
-			service_pump.stop_service(&ssl_client);
+			sp.stop_service(&ssl_client);
 			sleep(1);
-			service_pump.stop_service();
+			sp.stop_service();
 		}
 		else if (RESTART_COMMAND == str || RECONNECT_COMMAND == str)
 			puts("I still not find a way to reuse a boost::asio::ssl::stream,\n"
@@ -82,11 +81,11 @@ int main(int argc, const char* argv[])
 		/*
 		else if (RESTART_COMMAND == str)
 		{
-			service_pump.stop_service(&ssl_client);
+			sp.stop_service(&ssl_client);
 			sleep(1);
-			service_pump.stop_service();
+			sp.stop_service();
 
-			service_pump.start_service();
+			sp.start_service();
 		}
 		else if (RECONNECT_COMMAND == str)
 			ssl_client.graceful_shutdown(true);

@@ -106,13 +106,10 @@ public:
 	//success at here just means put the msg into st_udp_socket's send buffer
 	UDP_SAFE_SEND_MSG(safe_send_msg, send_msg)
 	UDP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
-	//like safe_send_msg and safe_send_native_msg, but non-block
-	UDP_POST_MSG(post_msg, false)
-	UDP_POST_MSG(post_native_msg, true)
 	//msg sending interface
 	///////////////////////////////////////////////////
 
-	void show_info(const char* head, const char* tail) const {unified_out::info_out("%s %s:%hu %s", head, local_addr.address().to_string().c_str(), local_addr.port(), tail);}
+	void show_info(const char* head, const char* tail) const {unified_out::info_out("%s %s:%hu %s", head, local_addr.address().to_string().data(), local_addr.port(), tail);}
 
 protected:
 	virtual bool do_start()
@@ -126,25 +123,23 @@ protected:
 		return false;
 	}
 
-	//must mutex send_msg_buffer before invoke this function
+	//ascs::socket will guarantee not call this function in more than one thread concurrently.
+	//return false if send buffer is empty or sending not allowed or io_service stopped
 	virtual bool do_send_msg()
 	{
-		if (!is_send_allowed() || ST_THIS stopped())
-			ST_THIS sending = false;
-		else if (!ST_THIS sending && !ST_THIS send_msg_buffer.empty())
+		if (is_send_allowed() && !ST_THIS stopped() && !ST_THIS send_msg_buffer.empty() && ST_THIS send_msg_buffer.try_dequeue(last_send_msg))
 		{
-			ST_THIS sending = true;
-			ST_THIS stat.send_delay_sum += super::statistic::local_time() - ST_THIS send_msg_buffer.front().begin_time;
-			ST_THIS send_msg_buffer.front().swap(last_send_msg);
-			ST_THIS send_msg_buffer.pop_front();
+			ST_THIS stat.send_delay_sum += super::statistic::local_time() - last_send_msg.begin_time;
 
 			last_send_msg.restart();
 			boost::shared_lock<boost::shared_mutex> lock(shutdown_mutex);
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr,
 				ST_THIS make_handler_error_size([this](const boost::system::error_code& ec, size_t bytes_transferred) {ST_THIS send_handler(ec, bytes_transferred);}));
+
+			return true;
 		}
 
-		return ST_THIS sending;
+		return false;
 	}
 
 	virtual void do_recv_msg()
@@ -198,7 +193,7 @@ private:
 			ST_THIS stat.recv_byte_sum += bytes_transferred;
 			ST_THIS temp_msg_buffer.resize(ST_THIS temp_msg_buffer.size() + 1);
 			ST_THIS temp_msg_buffer.back().swap(peer_addr, unpacker_->parse_msg(bytes_transferred));
-			ST_THIS dispatch_msg();
+			ST_THIS handle_msg();
 		}
 #ifdef _MSC_VER
 		else if (boost::asio::error::connection_refused == ec || boost::asio::error::connection_reset == ec)
@@ -220,28 +215,23 @@ private:
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(last_send_msg);
 #endif
+#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
+			if (ST_THIS send_msg_buffer.empty())
+				ST_THIS on_all_msg_send(last_send_msg);
+#endif
 		}
 		else
 			ST_THIS on_send_error(ec);
-
-#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-		typename super::in_msg msg;
-		msg.swap(last_send_msg);
-#endif
 		last_send_msg.clear();
 
-		boost::unique_lock<boost::shared_mutex> lock(ST_THIS send_msg_buffer_mutex);
-		ST_THIS sending = false;
-
-		//send msg sequentially, that means second send only after first send success
-		//under windows, send a msg to addr_any may cause sending errors, please note
-		//for UDP in st_asio_wrapper, sending error will not stop the following sending.
-#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
+		//send msg sequentially, which means second sending only after first sending success
+		//on windows, sending a msg to addr_any may cause errors, please note
+		//for UDP, sending error will not stop subsequence sendings.
 		if (!do_send_msg())
-			ST_THIS on_all_msg_send(msg);
-#else
-		do_send_msg();
-#endif
+		{
+			ST_THIS sending = false;
+			ST_THIS send_msg(); //just make sure no pending msgs
+		}
 	}
 
 protected:

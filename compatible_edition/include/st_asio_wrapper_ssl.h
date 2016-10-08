@@ -98,7 +98,7 @@ protected:
 		if (!ST_THIS is_shutting_down() && authorized_)
 		{
 			ST_THIS show_info("ssl client link:", "been shut down.");
-			ST_THIS shutdown_state = 2;
+			ST_THIS shutdown_state = super::GRACEFUL;
 			ST_THIS reconnecting = false;
 			authorized_ = false;
 
@@ -156,7 +156,7 @@ public:
 	boost::asio::ssl::context& ssl_context() {return ctx;}
 
 	using super::create_object;
-	typename st_ssl_object_pool::object_type create_object() {return create_object(boost::ref(ST_THIS service_pump), boost::ref(ctx));}
+	typename st_ssl_object_pool::object_type create_object() {return create_object(boost::ref(ST_THIS sp), boost::ref(ctx));}
 	template<typename Arg>
 	typename st_ssl_object_pool::object_type create_object(Arg& arg) {return create_object(arg, boost::ref(ctx));}
 

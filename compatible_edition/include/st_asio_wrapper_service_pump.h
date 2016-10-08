@@ -13,8 +13,6 @@
 #ifndef ST_ASIO_WRAPPER_SERVICE_PUMP_H_
 #define ST_ASIO_WRAPPER_SERVICE_PUMP_H_
 
-#include <boost/container/list.hpp>
-
 #include "st_asio_wrapper_base.h"
 
 //IO thread number
@@ -35,7 +33,7 @@ public:
 	class i_service
 	{
 	protected:
-		i_service(st_service_pump& service_pump_) : service_pump(service_pump_), started(false), id_(0), data(NULL) {service_pump_.add(this);}
+		i_service(st_service_pump& service_pump_) : sp(service_pump_), started(false), id_(0), data(NULL) {service_pump_.add(this);}
 		virtual ~i_service() {}
 
 	public:
@@ -51,15 +49,15 @@ public:
 		void user_data(void* data_) {data = data_;}
 		void* user_data() const {return data;}
 
-		st_service_pump& get_service_pump() {return service_pump;}
-		const st_service_pump& get_service_pump() const {return service_pump;}
+		st_service_pump& get_service_pump() {return sp;}
+		const st_service_pump& get_service_pump() const {return sp;}
 
 	protected:
 		virtual bool init() = 0;
 		virtual void uninit() = 0;
 
 	protected:
-		st_service_pump& service_pump;
+		st_service_pump& sp;
 
 	private:
 		bool started;
