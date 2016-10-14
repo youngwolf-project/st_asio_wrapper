@@ -245,7 +245,7 @@ private:
 
 protected:
 	typename super::in_msg last_send_msg;
-	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>> unpacker_;
+	boost::shared_ptr<i_udp_unpacker<typename Unpacker::msg_type>> unpacker_;
 	boost::asio::ip::udp::endpoint peer_addr, local_addr;
 
 	boost::shared_mutex close_mutex;
