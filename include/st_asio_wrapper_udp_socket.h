@@ -99,9 +99,9 @@ public:
 	//get or change the unpacker at runtime
 	//changing unpacker at runtime is not thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
 	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
-	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>> inner_unpacker() {return unpacker_;}
-	boost::shared_ptr<const i_udp_unpacker<typename Packer::msg_type>> inner_unpacker() const {return unpacker_;}
-	void inner_unpacker(const boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>>& _unpacker_) {unpacker_ = _unpacker_;}
+	boost::shared_ptr<i_udp_unpacker<typename Unpacker::msg_type>> inner_unpacker() {return unpacker_;}
+	boost::shared_ptr<const i_udp_unpacker<typename Unpacker::msg_type>> inner_unpacker() const {return unpacker_;}
+	void inner_unpacker(const boost::shared_ptr<i_udp_unpacker<typename Unpacker::msg_type>>& _unpacker_) {unpacker_ = _unpacker_;}
 
 	using st_socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type>::send_msg;
 	///////////////////////////////////////////////////
@@ -239,7 +239,7 @@ private:
 	}
 
 protected:
-	boost::shared_ptr<i_udp_unpacker<typename Packer::msg_type>> unpacker_;
+	boost::shared_ptr<i_udp_unpacker<typename Unpacker::msg_type>> unpacker_;
 	boost::asio::ip::udp::endpoint peer_addr, local_addr;
 
 	boost::shared_mutex close_mutex;
