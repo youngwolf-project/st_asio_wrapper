@@ -143,20 +143,25 @@ protected:
 };
 
 //protocol: length + body
-class replaceable_unpacker : public i_unpacker<replaceable_buffer>
+//T can be replaceable_buffer (an alias of auto_buffer) or shared_buffer, the latter makes output messages seemingly copyable,
+template<typename T = replaceable_buffer>
+class replaceable_unpacker : public i_unpacker<T>
 {
+protected:
+	typedef i_unpacker<T> super;
+
 public:
 	virtual void reset_state() {unpacker_.reset_state();}
-	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
+	virtual bool parse_msg(size_t bytes_transferred, typename super::container_type& msg_can)
 	{
 		unpacker::container_type tmp_can;
 		bool unpack_ok = unpacker_.parse_msg(bytes_transferred, tmp_can);
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
 		{
-			BOOST_AUTO(raw_buffer, new string_buffer());
-			raw_buffer->swap(*iter);
+			BOOST_AUTO(raw_msg, new string_buffer());
+			raw_msg->swap(*iter);
 			msg_can.resize(msg_can.size() + 1);
-			msg_can.back().raw_buffer(raw_buffer);
+			msg_can.back().raw_buffer(raw_msg);
 		}
 
 		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
@@ -171,10 +176,15 @@ protected:
 };
 
 //protocol: UDP has message boundary, so we don't need a specific protocol to unpack it.
-class replaceable_udp_unpacker : public i_udp_unpacker<replaceable_buffer>
+//T can be replaceable_buffer (an alias of auto_buffer) or shared_buffer, the latter makes output messages seemingly copyable.
+template<typename T = replaceable_buffer>
+class replaceable_udp_unpacker : public i_udp_unpacker<T>
 {
+protected:
+	typedef i_packer<T> super;
+
 public:
-	virtual void parse_msg(msg_type& msg, size_t bytes_transferred)
+	virtual void parse_msg(typename super::msg_type& msg, size_t bytes_transferred)
 	{
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
 

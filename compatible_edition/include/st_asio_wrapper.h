@@ -1,5 +1,5 @@
 /*
- * st_asio_wrapper_verification.h
+ * st_asio_wrapper.h
  *
  *  Created on: 2012-10-21
  *      Author: youngwolf
@@ -19,8 +19,8 @@
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10300	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.3.0"
+#define ST_ASIO_WRAPPER_VER		10301	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.3.1"
 
 #ifdef _MSC_VER
 	#if _MSC_VER >= 1600

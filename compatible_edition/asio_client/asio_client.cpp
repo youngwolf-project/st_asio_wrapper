@@ -58,7 +58,6 @@ int main(int argc, const char* argv[])
 
 	st_service_pump sp;
 	st_tcp_sclient client(sp);
-	//there is no corresponding echo client, because echo server with echo client will cause dead loop, and occupy almost all the network resource
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4
@@ -94,14 +93,3 @@ int main(int argc, const char* argv[])
 
 	return 0;
 }
-
-//restore configuration
-#undef ST_ASIO_SERVER_PORT
-#undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-#undef ST_ASIO_CUSTOM_LOG
-#undef ST_ASIO_DEFAULT_UNPACKER
-
-//#undef ST_ASIO_HUGE_MSG
-//#undef ST_ASIO_MAX_MSG_LEN
-//#undef ST_ASIO_MAX_MSG_NUM
-//restore configuration

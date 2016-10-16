@@ -25,11 +25,13 @@
 namespace st_asio_wrapper
 {
 
-template <typename Packer, typename Unpacker, typename Socket = boost::asio::ip::udp::socket>
-class st_udp_socket_base : public st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>>
+template <typename Packer, typename Unpacker, typename Socket = boost::asio::ip::udp::socket,
+	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class st_udp_socket_base : public st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>, InQueue, InContainer, OutQueue, OutContainer>
 {
 protected:
-	typedef st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>> super;
+	typedef st_socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	typedef udp_msg<typename Packer::msg_type> in_msg_type;
@@ -129,7 +131,7 @@ protected:
 	{
 		if (is_send_allowed() && !ST_THIS stopped() && !ST_THIS send_msg_buffer.empty() && ST_THIS send_msg_buffer.try_dequeue(last_send_msg))
 		{
-			ST_THIS stat.send_delay_sum += super::statistic::local_time() - last_send_msg.begin_time;
+			ST_THIS stat.send_delay_sum += statistic::local_time() - last_send_msg.begin_time;
 
 			last_send_msg.restart();
 			boost::shared_lock<boost::shared_mutex> lock(shutdown_mutex);
@@ -209,7 +211,7 @@ private:
 		{
 			assert(bytes_transferred == last_send_msg.size());
 
-			ST_THIS stat.send_time_sum += super::statistic::local_time() - last_send_msg.begin_time;
+			ST_THIS stat.send_time_sum += statistic::local_time() - last_send_msg.begin_time;
 			ST_THIS stat.send_byte_sum += bytes_transferred;
 			++ST_THIS stat.send_msg_sum;
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -230,7 +232,8 @@ private:
 		if (!do_send_msg())
 		{
 			ST_THIS sending = false;
-			ST_THIS send_msg(); //just make sure no pending msgs
+			if (!ST_THIS send_msg_buffer.empty())
+				ST_THIS send_msg(); //just make sure no pending msgs
 		}
 	}
 

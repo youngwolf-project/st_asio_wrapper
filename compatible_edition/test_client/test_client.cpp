@@ -12,6 +12,9 @@
 #define ST_ASIO_CLEAR_OBJECT_INTERVAL	1
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency.
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+#define ST_ASIO_INPUT_QUEUE non_lock_queue //we will never operate sending buffer concurrently, so need no locks.
+#endif
 //configuration
 
 //use the following macro to control the type of packer and unpacker
@@ -22,8 +25,8 @@
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER replaceable_packer
-#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
+#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
 #elif 2 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER fixed_length_packer
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
@@ -127,9 +130,7 @@ protected:
 		++send_index;
 		memcpy(pstr, &send_index, sizeof(size_t)); //seq
 
-		send_msg(pstr, msg_len);
-		//this invocation has no chance to fail (by insufficient sending buffer), even can_overflow is false
-		//this is because here is the only place that will send msgs and here also means the receiving buffer at least can hold one more msg.
+		send_msg(pstr, msg_len, true);
 	}
 #endif
 
@@ -164,9 +165,9 @@ public:
 		return total_recv_bytes;
 	}
 
-	test_socket::statistic get_statistic()
+	statistic get_statistic()
 	{
-		test_socket::statistic stat;
+		statistic stat;
 		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
 		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
 			stat += (*iter)->get_statistic();
@@ -240,6 +241,8 @@ int main(int argc, const char* argv[])
 
 	st_service_pump sp;
 	test_client client(sp);
+	//test_client means to cooperate with echo server while doing performance test, it will not send msgs back as echo server does,
+	//otherwise, dead loop will occur, network resource will be exhausted.
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4
@@ -446,14 +449,3 @@ int main(int argc, const char* argv[])
 
     return 0;
 }
-
-//restore configuration
-#undef ST_ASIO_SERVER_PORT
-#undef ST_ASIO_REUSE_OBJECT
-#undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-#undef ST_ASIO_CLEAR_OBJECT_INTERVAL
-#undef ST_ASIO_WANT_MSG_SEND_NOTIFY
-#undef ST_ASIO_FULL_STATISTIC
-#undef ST_ASIO_DEFAULT_PACKER
-#undef ST_ASIO_DEFAULT_UNPACKER
-//restore configuration

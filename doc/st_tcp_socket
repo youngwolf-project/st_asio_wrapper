@@ -7,8 +7,10 @@ namespace st_asio_wrapper
 {
 
 tcp套接字类，实现tcp数据的收发
-template <typename Socket, typename Packer, typename Unpacker>
-class st_tcp_socket_base : public st_socket<Socket, Packer, Unpacker>
+template <typename Socket, typename Packer, typename Unpacker,
+	template<typename, typename> class InQueue, template<typename> class InContainer,
+	template<typename, typename> class OutQueue, template<typename> class OutContainer>
+class st_tcp_socket_base : public st_socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -17,6 +19,8 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 protected:
+	enum shutdown_states {NONE, FORCE, GRACEFUL};
+
 	st_tcp_socket(boost::asio::io_service& io_service_);
 
 	template<typename Arg>
@@ -81,7 +85,7 @@ post_msg和send_msg的区别请看st_socket里面的post_msg_buffer和send_msg_b
 
 protected:
 	void force_shutdown();
-	void graceful_shutdown(bool sync = true);
+	void graceful_shutdown(bool sync);
 第一个直接直接调用shutdown()。
 第二个函数优雅关闭套接字，所谓优雅关闭，就是先关闭自己的数据发送，然后接收完遗留数据之后，才完全关闭套接字。当sync为假时，graceful_shutdown马上返回，
 优雅关闭将在后台继承进行，当回调到on_recv_error的时候，关闭结束（有可能优雅关闭成功，有可能超时被强制关闭，超时由ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION宏决定）。

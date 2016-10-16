@@ -29,11 +29,13 @@ static_assert(ST_ASIO_SERVER_PORT > 0, "server port must be bigger than zero.");
 namespace st_asio_wrapper
 {
 
-template <typename Packer, typename Unpacker, typename Socket = boost::asio::ip::tcp::socket>
-class st_connector_base : public st_tcp_socket_base<Socket, Packer, Unpacker>
+template <typename Packer, typename Unpacker, typename Socket = boost::asio::ip::tcp::socket,
+	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class st_connector_base : public st_tcp_socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>
 {
 protected:
-	typedef st_tcp_socket_base<Socket, Packer, Unpacker> super;
+	typedef st_tcp_socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	static const st_timer::tid TIMER_BEGIN = super::TIMER_END;

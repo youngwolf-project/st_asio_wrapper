@@ -9,6 +9,7 @@
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
+#define ST_ASIO_INPUT_QUEUE non_lock_queue //we will never operate sending buffer concurrently, so need no locks.
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 //configuration
 
@@ -74,9 +75,7 @@ protected:
 	{
 		send_bytes += msg.size();
 		if (send_bytes < total_bytes)
-			direct_send_msg(msg);
-			//this invocation has no chance to fail (by insufficient sending buffer), even can_overflow is false
-			//this is because here is the only place that will send msgs and here also means the receiving buffer at least can hold one more msg.
+			direct_send_msg(msg, true);
 	}
 
 private:
@@ -102,10 +101,7 @@ private:
 				begin_time.stop();
 		}
 		else
-			direct_send_msg(msg);
-			//this invocation has no chance to fail (by insufficient sending buffer), even can_overflow is false
-			//this is because pingpong_server never send msgs initiatively, and,
-			//here is the only place that will send msgs and here also means the receiving buffer at least can hold one more msg.
+			direct_send_msg(msg, true);
 	}
 #endif
 
@@ -118,9 +114,9 @@ class echo_client : public st_tcp_client_base<echo_socket>
 public:
 	echo_client(st_service_pump& service_pump_) : st_tcp_client_base<echo_socket>(service_pump_) {}
 
-	echo_socket::statistic get_statistic()
+	statistic get_statistic()
 	{
-		echo_socket::statistic stat;
+		statistic stat;
 		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
 		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
 			stat += (*iter)->get_statistic();
@@ -161,6 +157,9 @@ int main(int argc, const char* argv[])
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 	if (1 == thread_num)
 		++thread_num;
+	//add one thread will seriously impact IO throughput when doing performance benchmark, this is because the business logic is very simple (send original messages back,
+	//or just add up total message size), under this scenario, just one service thread without receiving buffer will obtain the best IO throughput.
+	//the server has such behavior too.
 #endif
 
 	for (size_t i = 0; i < link_num; ++i)
@@ -215,12 +214,3 @@ int main(int argc, const char* argv[])
 
     return 0;
 }
-
-//restore configuration
-#undef ST_ASIO_SERVER_PORT
-#undef ST_ASIO_REUSE_OBJECT
-#undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-#undef ST_ASIO_WANT_MSG_SEND_NOTIFY
-#undef ST_ASIO_MSG_BUFFER_SIZE
-#undef ST_ASIO_DEFAULT_UNPACKER
-//restore configuration
