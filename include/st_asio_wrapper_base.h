@@ -20,13 +20,14 @@
 #include <stdarg.h>
 #include <assert.h>
 
+#include <sstream>
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
-#include <boost/thread.hpp>
+#include <boost/date_time.hpp>
 #include <boost/smart_ptr.hpp>
-#include <boost/container/list.hpp>
 
-#include "st_asio_wrapper.h"
+#include "st_asio_wrapper_container.h"
 
 //the size of the buffer used when receiving msg, must equal to or larger than the biggest msg size,
 //the bigger this buffer is, the more msgs can be received in one time if there are enough msgs buffered in the SOCKET.
@@ -116,6 +117,7 @@ public:
 	typedef const buffer_type buffer_ctype;
 
 	shared_buffer() {}
+	shared_buffer(T* _buffer) {buffer.reset(_buffer);}
 	shared_buffer(buffer_type _buffer) : buffer(_buffer) {}
 	shared_buffer(const shared_buffer& other) : buffer(other.buffer) {}
 	shared_buffer(shared_buffer&& other) : buffer(std::move(other.buffer)) {}
@@ -125,6 +127,7 @@ public:
 	shared_buffer& operator=(shared_buffer&& other) {clear(); swap(other); return *this;}
 
 	buffer_type raw_buffer() const {return buffer;}
+	void raw_buffer(T* _buffer) {buffer.reset(_buffer);}
 	void raw_buffer(buffer_ctype _buffer) {buffer = _buffer;}
 
 	//the following five functions are needed by st_asio_wrapper
@@ -171,97 +174,6 @@ public:
 	using typename i_packer<MsgType>::msg_ctype;
 
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) {assert(false); return msg_type();}
-};
-
-//keep size() constant time would better, because we invoke it frequently, so don't use std::list(gcc)
-template<typename T>
-class message_queue_ : public boost::container::list<T>
-{
-public:
-	typedef boost::container::list<T> super;
-	typedef message_queue_<T> me;
-	typedef boost::lock_guard<me> lock_guard;
-
-	message_queue_() {}
-	message_queue_(size_t) {}
-
-	//not thread-safe
-	void clear() {super::clear();}
-	void swap(me& other) {super::swap(other);}
-
-	//lockable
-	void lock() {mutex.lock();}
-	void unlock() {mutex.unlock();}
-
-	bool idle() {boost::unique_lock<boost::shared_mutex> lock(mutex, boost::try_to_lock); return lock.owns_lock();}
-
-	bool enqueue(const T& item) {lock_guard lock(*this); return enqueue_(item);}
-	bool enqueue(T&& item) {lock_guard lock(*this); return enqueue_(std::move(item));}
-	bool try_enqueue(const T& item) {lock_guard lock(*this); return try_enqueue_(item);}
-	bool try_enqueue(T&& item) {lock_guard lock(*this); return try_enqueue_(std::move(item));}
-	bool try_dequeue(T& item) {lock_guard lock(*this); return try_dequeue_(item);}
-
-	bool enqueue_(const T& item) {ST_THIS push_back(item); return true;}
-	bool enqueue_(T&& item) {ST_THIS push_back(std::move(item)); return true;}
-	bool try_enqueue_(const T& item) {return enqueue_(item);}
-	bool try_enqueue_(T&& item) {return enqueue_(std::move(item));}
-	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); return true;}
-
-private:
-	boost::shared_mutex mutex;
-};
-
-template<typename T>
-class message_queue : public message_queue_<T>
-{
-public:
-	typedef message_queue_<T> super;
-
-	message_queue() {}
-	message_queue(size_t size) : super(size) {}
-
-	//it's not thread safe for 'other', please note.
-	size_t move_items_in(typename super::me& other, size_t max_size = ST_ASIO_MAX_MSG_NUM)
-	{
-		typename super::lock_guard lock(*this);
-		auto cur_size = ST_THIS size();
-		if (cur_size >= max_size)
-			return 0;
-
-		size_t num = 0;
-		while (cur_size < max_size)
-		{
-			T item;
-			if (!other.try_dequeue_(item)) //not thread safe for 'other', because we called 'try_dequeue_'
-				break;
-
-			ST_THIS enqueue_(std::move(item));
-			++cur_size;
-			++num;
-		}
-
-		return num;
-	}
-
-	//it's no thread safe for 'other', please note.
-	size_t move_items_in(boost::container::list<T>& other, size_t max_size = ST_ASIO_MAX_MSG_NUM)
-	{
-		typename super::lock_guard lock(*this);
-		auto cur_size = ST_THIS size();
-		if (cur_size >= max_size)
-			return 0;
-
-		size_t num = 0;
-		while (cur_size < max_size && !other.empty())
-		{
-			ST_THIS enqueue_(std::move(other.front()));
-			other.pop_front();
-			++cur_size;
-			++num;
-		}
-
-		return num;
-	}
 };
 
 //unpacker concept
@@ -314,6 +226,117 @@ public:
 };
 //unpacker concept
 
+struct statistic
+{
+#ifdef ST_ASIO_FULL_STATISTIC
+	static bool enabled() {return true;}
+	typedef boost::posix_time::ptime stat_time;
+	static stat_time local_time() {return boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time();}
+	typedef boost::posix_time::time_duration stat_duration;
+#else
+	struct dummy_duration {const dummy_duration& operator +=(const dummy_duration& other) {return *this;}}; //not a real duration, just satisfy compiler(d1 += d2)
+	struct dummy_time {dummy_duration operator -(const dummy_time& other) {return dummy_duration();}}; //not a real time, just satisfy compiler(t1 - t2)
+
+	static bool enabled() {return false;}
+	typedef dummy_time stat_time;
+	static stat_time local_time() {return stat_time();}
+	typedef dummy_duration stat_duration;
+#endif
+	statistic() : send_msg_sum(0), send_byte_sum(0), recv_msg_sum(0), recv_byte_sum(0) {}
+	void reset()
+	{
+		send_msg_sum = send_byte_sum = 0;
+		send_delay_sum = send_time_sum = stat_duration();
+
+		recv_msg_sum = recv_byte_sum = 0;
+		dispatch_dealy_sum = recv_idle_sum = stat_duration();
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+		handle_time_1_sum = stat_duration();
+#endif
+		handle_time_2_sum = stat_duration();
+	}
+
+	statistic& operator +=(const struct statistic& other)
+	{
+		send_msg_sum += other.send_msg_sum;
+		send_byte_sum += other.send_byte_sum;
+		send_delay_sum += other.send_delay_sum;
+		send_time_sum += other.send_time_sum;
+
+		recv_msg_sum += other.recv_msg_sum;
+		recv_byte_sum += other.recv_byte_sum;
+		dispatch_dealy_sum += other.dispatch_dealy_sum;
+		recv_idle_sum += other.recv_idle_sum;
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+		handle_time_1_sum += other.handle_time_1_sum;
+#endif
+		handle_time_2_sum += other.handle_time_2_sum;
+
+		return *this;
+	}
+
+	std::string to_string() const
+	{
+		std::ostringstream s;
+#ifdef ST_ASIO_FULL_STATISTIC
+		auto tw = boost::posix_time::time_duration::num_fractional_digits();
+		s << std::setfill('0') << "send corresponding statistic:\n"
+			<< "message sum: " << send_msg_sum << std::endl
+			<< "size in bytes: " << send_byte_sum << std::endl
+			<< "send delay: " << send_delay_sum.total_seconds() << "." << std::setw(tw) << send_delay_sum.fractional_seconds() << std::setw(0) << std::endl
+			<< "send duration: " << send_time_sum.total_seconds() << "." << std::setw(tw) << send_time_sum.fractional_seconds() << std::setw(0) << std::endl
+			<< "\nrecv corresponding statistic:\n"
+			<< "message sum: " << recv_msg_sum << std::endl
+			<< "size in bytes: " << recv_byte_sum << std::endl
+			<< "dispatch delay: " << dispatch_dealy_sum.total_seconds() << "." << std::setw(tw) << dispatch_dealy_sum.fractional_seconds() << std::setw(0) << std::endl
+			<< "recv idle duration: " << recv_idle_sum.total_seconds() << "." << std::setw(tw) << recv_idle_sum.fractional_seconds() << std::setw(0) << std::endl
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+			<< "on_msg duration: " << handle_time_1_sum.total_seconds() << "." << std::setw(tw) << handle_time_1_sum.fractional_seconds() << std::setw(0) << std::endl
+#endif
+			<< "on_msg_handle duration: " << handle_time_2_sum.total_seconds() << "." << std::setw(tw) << handle_time_2_sum.fractional_seconds();
+#else
+		s << std::setfill('0') << "send corresponding statistic:\n"
+			<< "message sum: " << send_msg_sum << std::endl
+			<< "size in bytes: " << send_byte_sum << std::endl
+			<< "\nrecv corresponding statistic:\n"
+			<< "message sum: " << recv_msg_sum << std::endl
+			<< "size in bytes: " << recv_byte_sum;
+#endif
+		return s.str();
+	}
+
+	//send corresponding statistic
+	uint_fast64_t send_msg_sum; //not counted msgs in sending buffer
+	uint_fast64_t send_byte_sum; //not counted msgs in sending buffer
+	stat_duration send_delay_sum; //from send_(native_)msg (exclude msg packing) to asio::async_write
+	stat_duration send_time_sum; //from asio::async_write to send_handler
+	//above two items indicate your network's speed or load
+
+	//recv corresponding statistic
+	uint_fast64_t recv_msg_sum; //include msgs in receiving buffer
+	uint_fast64_t recv_byte_sum; //include msgs in receiving buffer
+	stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
+	stat_duration recv_idle_sum;
+	//during this duration, st_socket suspended msg reception (receiving buffer overflow, msg dispatching suspended or doing congestion control)
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
+	stat_duration handle_time_1_sum; //on_msg consumed time, this indicate the efficiency of msg handling
+#endif
+	stat_duration handle_time_2_sum; //on_msg_handle consumed time, this indicate the efficiency of msg handling
+};
+
+template<typename T>
+struct obj_with_begin_time : public T
+{
+	obj_with_begin_time() {restart();}
+	obj_with_begin_time(T&& msg) : T(std::move(msg)) {restart();}
+	void restart() {restart(statistic::local_time());}
+	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
+	using T::swap;
+	void swap(obj_with_begin_time& other) {T::swap(other); std::swap(begin_time, other.begin_time);}
+
+	typename statistic::stat_time begin_time;
+};
+
 //free functions, used to do something to any container(except map and multimap) optionally with any mutex
 #if !defined _MSC_VER || _MSC_VER >= 1700
 	template<typename _Can, typename _Mutex, typename _Predicate>
@@ -338,30 +361,6 @@ void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 
 template<typename _Can, typename _Predicate>
 void do_something_to_one(_Can& __can, const _Predicate& __pred) {for (auto iter = std::begin(__can); iter != std::end(__can); ++iter) if (__pred(*iter)) break;}
-
-template<typename _Can>
-bool splice_helper(_Can& dest_can, _Can& src_can, size_t max_size = ST_ASIO_MAX_MSG_NUM)
-{
-	auto size = dest_can.size();
-	if (size < max_size) //dest_can can hold more items.
-	{
-		size = max_size - size; //maximum items this time can handle
-		auto begin_iter = std::begin(src_can), end_iter = std::end(src_can);
-		if (src_can.size() > size) //some items left behind
-		{
-			auto left_num = src_can.size() - size;
-			end_iter = left_num > size ? std::next(begin_iter, size) : std::prev(end_iter, left_num); //find the minimum movement
-		}
-		else
-			size = src_can.size();
-		//use size to avoid std::distance() call, so, size must correct
-		dest_can.splice(std::end(dest_can), src_can, begin_iter, end_iter, size);
-
-		return size > 0;
-	}
-
-	return false;
-}
 
 //member functions, used to do something to any member container(except map and multimap) optionally with any member mutex
 #define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)

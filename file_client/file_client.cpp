@@ -4,7 +4,8 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		5050
-#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
+//we cannot use non_lock_queue, because we also send messages (talking messages) out of ascs::socket::on_msg_send().
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
 //configuration
 
 #include "file_client.h"
@@ -91,8 +92,3 @@ int main(int argc, const char* argv[])
 
 	return 0;
 }
-
-//restore configuration
-#undef ST_ASIO_SERVER_PORT
-#undef ST_ASIO_DEFAULT_UNPACKER
-//restore configuration

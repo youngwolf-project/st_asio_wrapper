@@ -7,6 +7,13 @@
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #define ST_ASIO_MSG_BUFFER_SIZE 65536
+#define ST_ASIO_INPUT_QUEUE non_lock_queue
+//if pingpong_client only send message in on_msg() or on_msg_handle(), which means a responsive system, a real pingpong test,
+//then, before pingpong_server send each message, the previous message has been sent to pingpong_client,
+//so sending buffer will always be empty, which means we will never operate sending buffer concurrently, so need no locks.
+//
+//if pingpong_client send message in on_msg_send(), then using non_lock_queue as input queue in pingpong_server will lead
+//undefined behavior, please note.
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 //configuration
 
@@ -83,9 +90,9 @@ class echo_server : public st_server_base<echo_socket>
 public:
 	echo_server(st_service_pump& service_pump_) : st_server_base(service_pump_) {}
 
-	echo_socket::statistic get_statistic()
+	statistic get_statistic()
 	{
-		echo_socket::statistic stat;
+		statistic stat;
 		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
 		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
 			stat += (*iter)->get_statistic();
@@ -134,12 +141,3 @@ int main(int argc, const char* argv[])
 
 	return 0;
 }
-
-//restore configuration
-#undef ST_ASIO_SERVER_PORT
-#undef ST_ASIO_ASYNC_ACCEPT_NUM
-#undef ST_ASIO_REUSE_OBJECT
-#undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-#undef ST_ASIO_MSG_BUFFER_SIZE
-#undef ST_ASIO_DEFAULT_UNPACKER
-//restore configuration

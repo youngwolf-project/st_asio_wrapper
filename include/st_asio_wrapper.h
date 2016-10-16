@@ -1,5 +1,5 @@
 /*
- * st_asio_wrapper_verification.h
+ * st_asio_wrapper.h
  *
  *  Created on: 2012-10-21
  *      Author: youngwolf
@@ -69,7 +69,7 @@
  * 1. On boost-1.49, compatible edition's st_object::is_last_async_call() cannot work properly, it is because before asio calling any callbacks, it copied
  *    the callback(not a good behaviour), this cause st_object::is_last_async_call() never return true, so objects in st_object_pool can never be reused or freed.
  *    To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro.
- *    BTW, boost-1.61 and standard editon even with boost-1.49 don't have such issue, I'm not sure in which edition, asio fixed this defect,
+ *    BTW, boost-1.61 and standard edition even with boost-1.49 don't have such issue, I'm not sure in which edition, asio fixed this defect,
  *    if you have other versions, please help me to find out the minimum version via the following steps:
  *     1. Compile demo asio_server and test_client;
  *     2. Run asio_server and test_client without any parameters;
@@ -80,21 +80,32 @@
  * 2016.10.8	version 1.3.0
  * Drop original congestion control (because it cannot totally resolve dead loop) and add a semi-automatic congestion control.
  * Demonstrate how to use the new semi-automatic congestion control (asio_server, test_client, pingpong_server and pingpong_client).
- * Drop post_msg_buffer and corresponding functions (like post_msg()) and timer (ascs::socket::TIMER_HANDLE_POST_BUFFER).
+ * Drop post_msg_buffer and corresponding functions (like post_msg()) and timer (st_socket::TIMER_HANDLE_POST_BUFFER).
  * Optimize locks on message sending and dispatching.
  * Add enum shutdown_states.
- * ascs::timer now can be used independently.
- * Add a new type ascs::st_timer::tid to represent timer ID.
+ * st_timer now can be used independently.
+ * Add a new type st_timer::tid to represent timer ID.
  * Add a new packer--fixed_length_packer.
  * Add a new class--message_queue.
+ *
+ * 2016.10.16	version 1.3.1
+ * Support non-lock queue, it's totally not thread safe and lock-free, it can improve IO throughput with particular business.
+ * Demonstrate how and when to use non-lock queue as the input and output message buffer.
+ * Queues (and their internal containers) used as input and output message buffer are now configurable (by macros or template arguments).
+ * New macros--ST_ASIO_INPUT_QUEUE, ST_ASIO_INPUT_CONTAINER, ST_ASIO_OUTPUT_QUEUE and ST_ASIO_OUTPUT_CONTAINER.
+ * In contrast to non_lock_queue, rename message_queue to lock_queue.
+ * Move container related classes and functions from st_asio_wrapper_base.h to st_asio_wrapper_container.h.
+ * Improve efficiency in scenarios of low throughput like pingpong test.
+ * Replaceable packer/unpacker now support replaceable_buffer (an alias of auto_buffer) and shared_buffer to be their message type.
+ * Move class statistic and obj_with_begin_time out of st_socket to reduce template tiers.
  *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10300	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.3.0"
+#define ST_ASIO_WRAPPER_VER		10301	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.3.1"
 
 #ifdef _MSC_VER
 	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");

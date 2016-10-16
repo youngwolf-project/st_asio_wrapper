@@ -99,21 +99,26 @@ public:
 };
 
 //protocol: length + body
-class replaceable_packer : public i_packer<replaceable_buffer>
+//T can be replaceable_buffer (an alias of auto_buffer) or shared_buffer, the latter makes output messages seemingly copyable.
+template<typename T = replaceable_buffer>
+class replaceable_packer : public i_packer<T>
 {
+protected:
+	typedef i_packer<T> super;
+
 public:
-	using i_packer<msg_type>::pack_msg;
-	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
+	using super::pack_msg;
+	virtual typename super::msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		auto raw_msg = new string_buffer();
 		auto str = packer().pack_msg(pstr, len, num, native);
 		raw_msg->swap(str);
-		return msg_type(raw_msg);
+		return typename super::msg_type(raw_msg);
 	}
 
-	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(std::next(msg.data(), ST_ASIO_HEAD_LEN));}
-	virtual const char* raw_data(msg_ctype& msg) const {return std::next(msg.data(), ST_ASIO_HEAD_LEN);}
-	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
+	virtual char* raw_data(typename super::msg_type& msg) const {return const_cast<char*>(std::next(msg.data(), ST_ASIO_HEAD_LEN));}
+	virtual const char* raw_data(typename super::msg_ctype& msg) const {return std::next(msg.data(), ST_ASIO_HEAD_LEN);}
+	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
 };
 
 //protocol: fixed lenght

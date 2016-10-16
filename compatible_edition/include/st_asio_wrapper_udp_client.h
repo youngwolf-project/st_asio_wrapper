@@ -52,4 +52,4 @@ protected:
 
 } //namespace
 
-#endif /* ST_ASIO_WRAPPER_TEST_CLIENT_H_ */
+#endif /* ST_ASIO_WRAPPER_UDP_CLIENT_H_ */

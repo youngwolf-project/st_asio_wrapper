@@ -20,8 +20,8 @@
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER replaceable_packer
-#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
+#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
 #elif 2 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER fixed_length_packer
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
@@ -137,9 +137,9 @@ class echo_server : public st_server_base<echo_socket, st_object_pool<echo_socke
 public:
 	echo_server(st_service_pump& service_pump_) : st_server_base(service_pump_) {}
 
-	echo_socket::statistic get_statistic()
+	statistic get_statistic()
 	{
-		echo_socket::statistic stat;
+		statistic stat;
 		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic();});
 
 		return stat;
@@ -241,17 +241,3 @@ int main(int argc, const char* argv[])
 
 	return 0;
 }
-
-//restore configuration
-#undef ST_ASIO_SERVER_PORT
-#undef ST_ASIO_ASYNC_ACCEPT_NUM
-#undef ST_ASIO_REUSE_OBJECT
-#undef ST_ASIO_FREE_OBJECT_INTERVAL
-#undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-#undef ST_ASIO_ENHANCED_STABILITY
-#undef ST_ASIO_FULL_STATISTIC
-#undef ST_ASIO_USE_STEADY_TIMER
-#undef ST_ASIO_USE_SYSTEM_TIMER
-#undef ST_ASIO_DEFAULT_PACKER
-#undef ST_ASIO_DEFAULT_UNPACKER
-//restore configuration

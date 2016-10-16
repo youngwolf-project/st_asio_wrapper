@@ -20,8 +20,8 @@
 //3-prefix and suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER replaceable_packer
-#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker
+#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
 #elif 2 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER fixed_length_packer
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
@@ -139,9 +139,9 @@ class echo_server : public echo_server_base
 public:
 	echo_server(st_service_pump& service_pump_) : echo_server_base(service_pump_) {}
 
-	echo_socket::statistic get_statistic()
+	statistic get_statistic()
 	{
-		echo_socket::statistic stat;
+		statistic stat;
 		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
 		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
 			stat += (*iter)->get_statistic();
@@ -245,17 +245,3 @@ int main(int argc, const char* argv[])
 
 	return 0;
 }
-
-//restore configuration
-#undef ST_ASIO_SERVER_PORT
-#undef ST_ASIO_ASYNC_ACCEPT_NUM
-#undef ST_ASIO_REUSE_OBJECT
-#undef ST_ASIO_FREE_OBJECT_INTERVAL
-#undef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-#undef ST_ASIO_ENHANCED_STABILITY
-#undef ST_ASIO_FULL_STATISTIC
-#undef ST_ASIO_USE_STEADY_TIMER
-#undef ST_ASIO_USE_SYSTEM_TIMER
-#undef ST_ASIO_DEFAULT_PACKER
-#undef ST_ASIO_DEFAULT_UNPACKER
-//restore configuration

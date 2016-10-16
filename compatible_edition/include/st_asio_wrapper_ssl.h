@@ -28,11 +28,13 @@
 namespace st_asio_wrapper
 {
 
-template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket> >
-class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket>
+template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>
 {
 protected:
-	typedef st_connector_base<Packer, Unpacker, Socket> super;
+	typedef st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	using super::TIMER_BEGIN;
@@ -164,11 +166,14 @@ protected:
 	boost::asio::ssl::context ctx;
 };
 
-template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket> >
-class st_ssl_server_socket_base : public st_server_socket_base<Packer, Unpacker, Server, Socket> //so cumbersome, what should we do to make it as simple as normal edition?
+template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+//so cumbersome, what should we do to make it as simple as normal edition?
+class st_ssl_server_socket_base : public st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer>
 {
 protected:
-	typedef st_server_socket_base<Packer, Unpacker, Server, Socket> super;
+	typedef st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	using super::TIMER_BEGIN;

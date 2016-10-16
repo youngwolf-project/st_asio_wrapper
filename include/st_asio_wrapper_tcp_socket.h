@@ -25,8 +25,10 @@ static_assert(ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION > 0, "graceful shutdown dur
 namespace st_asio_wrapper
 {
 
-template <typename Socket, typename Packer, typename Unpacker>
-class st_tcp_socket_base : public st_socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type>
+template <typename Socket, typename Packer, typename Unpacker,
+	template<typename, typename> class InQueue, template<typename> class InContainer,
+	template<typename, typename> class OutQueue, template<typename> class OutContainer>
+class st_tcp_socket_base : public st_socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -35,7 +37,7 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 protected:
-	typedef st_socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type> super;
+	typedef st_socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 	using super::TIMER_BEGIN;
 	using super::TIMER_END;
 
@@ -124,7 +126,7 @@ protected:
 #endif
 				size_t size = 0;
 				typename super::in_msg msg;
-				auto end_time = super::statistic::local_time();
+				auto end_time = statistic::local_time();
 
 				typename super::in_container_type::lock_guard lock(ST_THIS send_msg_buffer);
 				while (ST_THIS send_msg_buffer.try_dequeue_(msg))
@@ -227,7 +229,7 @@ private:
 	{
 		if (!ec)
 		{
-			ST_THIS stat.send_time_sum += super::statistic::local_time() - last_send_msg.front().begin_time;
+			ST_THIS stat.send_time_sum += statistic::local_time() - last_send_msg.front().begin_time;
 			ST_THIS stat.send_byte_sum += bytes_transferred;
 			ST_THIS stat.send_msg_sum += last_send_msg.size();
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -242,10 +244,13 @@ private:
 			ST_THIS on_send_error(ec);
 		last_send_msg.clear();
 
-		if (ec || !do_send_msg()) //send msg sequentially, which means second sending only after first sending success
+		if (ec)
+			ST_THIS sending = false;
+		else if (!do_send_msg()) //send msg sequentially, which means second sending only after first sending success
 		{
 			ST_THIS sending = false;
-			ST_THIS send_msg(); //just make sure no pending msgs
+			if (!ST_THIS send_msg_buffer.empty())
+				ST_THIS send_msg(); //just make sure no pending msgs
 		}
 	}
 

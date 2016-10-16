@@ -28,11 +28,13 @@
 namespace st_asio_wrapper
 {
 
-template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
-class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket>
+template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>
 {
 protected:
-	typedef st_connector_base<Packer, Unpacker, Socket> super;
+	typedef st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	using super::TIMER_BEGIN;
@@ -163,8 +165,10 @@ protected:
 	boost::asio::ssl::context ctx;
 };
 
-template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
-using st_ssl_server_socket_base = st_server_socket_base<Packer, Unpacker, Server, Socket>;
+template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+using st_ssl_server_socket_base = st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer>;
 
 template<typename Socket, typename Pool = st_ssl_object_pool<Socket>, typename Server = i_server>
 class st_ssl_server_base : public st_server_base<Socket, Pool, Server>

@@ -15,66 +15,22 @@
 namespace st_asio_wrapper
 {
 
-template<typename Socket, typename Packer, typename Unpacker, typename InMsgType = typename Packer::msg_type, typename OutMsgType = typename Unpacker::msg_type>
-class st_socket: public st_timer
+template<typename Socket, typename Packer, typename Unpacker, typename InMsgType, typename OutMsgType,
+	template<typename, typename> class InQueue, template<typename> class InContainer,
+	template<typename, typename> class OutQueue, template<typename> class OutContainer>
+class socket: public timer
 {
-public:
-	效率统计，注意这个功能会轻微的影响性能，默认关闭，可以通过ST_ASIO_FULL_STATISTIC宏来开启。在关闭情况下，所有整数项统计（uint_fast64_t）仍然有效，
-	所有时间统计项将无效（stat_duration）。在打开情况下，时间统计的数据类型其实是boost::posix_time::time_duration。
-	struct statistic
-	{
-#ifdef ST_ASIO_FULL_STATISTIC
-		static bool enabled();
-		typedef boost::posix_time::ptime stat_time;
-		static stat_time local_time();
-		typedef boost::posix_time::time_duration stat_duration;
-#else
-		struct dummy_duration;
-		struct dummy_time;
-
-		static bool enabled();
-		typedef dummy_time stat_time;
-		static stat_time local_time();
-		typedef dummy_duration stat_duration;
-#endif
-
-		statistic();
-		void reset();
-		由于统计涉及多个方面，并且是多线程修改不同的部分，这个函数只是在某些特殊情况下才可以调用，比如在构造函数里面，或者只有一个service线程，
-		所以这个函数基本上还是用在对象重用时。
-
-		statistic& operator +=(const struct statistic& other);
-		std::string to_string() const;
-
-		消息发送相关的统计
-		uint_fast64_t send_msg_sum; 成功发送到asio的消息条数
-		uint_fast64_t send_byte_sum; 成功发送到asio的消息总字节数
-		stat_duration send_delay_sum; 从消息发送（send_(native_)msg, post_(native_)msg，不包括打包时间）到真正发送（asio::async_write）的延迟时间
-		stat_duration send_time_sum; 从真正的消息发送（asio::async_write）到发送完成（发送到SOCKET缓存），这一项体现了你的网络吞吐率，注意吞吐率低
-		不代表是你的问题，也有可能是接收方慢了。
-
-		消息接收相关统计
-		uint_fast64_t recv_msg_sum; 收到的消息条数
-		uint_fast64_t recv_byte_sum; 收到的消息总字节数
-		stat_duration dispatch_dealy_sum; 从消息解包完成之后，到on_msg_handle的时间延迟，如果这项偏大，可能是因为service线程总不够用
-		stat_duration recv_idle_sum; 暂停消息接收的总时间，如果接收缓存满，或者在发送缓存满的情况下调用了post_(native_)msg，将会暂停消息接收，
-		注意，在回调on_msg期间，也算是暂停了消息接收。
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-		stat_duration handle_time_1_sum; 调用on_msg花费的总时间
-#endif
-		stat_duration handle_time_2_sum; 调用on_msg_handle花费的总时间
-	};
-
 protected:
-	struct in_msg : public InMsgType;
-	struct out_msg : public OutMsgType;
-	在InMsgType或OutMsgType的基础上增加了一个stat_time，用于统计时间消耗
+	typedef obj_with_begin_time<InMsgType> in_msg;
+	typedef obj_with_begin_time<OutMsgType> out_msg;
+	typedef InQueue<in_msg, InContainer<in_msg>> in_container_type;
+	typedef OutQueue<out_msg, OutContainer<out_msg>> out_container_type;
 
-	typedef boost::container::list<in_msg> in_container_type;
-	typedef boost::container::list<out_msg> out_container_type;
-
-	static const unsigned char TIMER_BEGIN = st_timer::TIMER_END;
-	static const unsigned char TIMER_END = TIMER_BEGIN+ 10;
+	static const tid TIMER_BEGIN = timer::TIMER_END;
+	static const tid TIMER_HANDLE_MSG = TIMER_BEGIN;
+	static const tid TIMER_DISPATCH_MSG = TIMER_BEGIN + 1;
+	static const tid TIMER_DELAY_CLOSE = TIMER_BEGIN + 2;
+	static const tid TIMER_END = TIMER_BEGIN + 10;
 
 	st_socket(boost::asio::io_service& io_service_);
 
