@@ -152,7 +152,7 @@ public:
 	{
 		unpacker::container_type tmp_can;
 		auto unpack_ok = unpacker_.parse_msg(bytes_transferred, tmp_can);
-		do_something_to_all(tmp_can, [&msg_can](decltype(*std::begin(tmp_can))& item) {
+		do_something_to_all(tmp_can, [&msg_can](unpacker::msg_type& item) {
 			auto raw_msg = new string_buffer();
 			raw_msg->swap(item);
 			msg_can.resize(msg_can.size() + 1);

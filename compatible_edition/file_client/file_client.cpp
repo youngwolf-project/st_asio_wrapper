@@ -4,6 +4,8 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		5051
+#define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
+//#define ST_ASIO_INPUT_QUEUE non_lock_queue
 //we cannot use non_lock_queue, because we also send messages (talking messages) out of ascs::socket::on_msg_send().
 #define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
 //configuration
@@ -74,7 +76,8 @@ int main(int argc, const char* argv[])
 				printf("transfer %s begin.\n", iter->data());
 				if (client.find(0)->get_file(*iter))
 				{
-					client.do_something_to_all(boost::bind(&file_socket::get_file, _1, boost::cref(*iter)));
+					client.do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t (file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
+						boost::lambda::bind(&file_socket::get_file, *boost::lambda::_1, *iter)));
 					client.start();
 
 					while (completed_client_num != (unsigned short) link_num)

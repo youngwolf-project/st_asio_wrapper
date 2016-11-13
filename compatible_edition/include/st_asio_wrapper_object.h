@@ -29,48 +29,44 @@ protected:
 public:
 	bool stopped() const {return io_service_.stopped();}
 
-#ifdef ST_ASIO_ENHANCED_STABILITY
-	void post(const boost::function<void()>& handler) {io_service_.post(boost::bind(&st_object::post_handler, this, async_call_indicator, handler));}
+#if 0 == ST_ASIO_DELAY_CLOSE
+	void post(const boost::function<void()>& handler) {io_service_.post((async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+
+	typedef boost::function<void(const boost::system::error_code&)> handler_with_error;
+	handler_with_error make_handler_error(const handler_with_error& handler) const {return (async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1));}
+
+	typedef boost::function<void(const boost::system::error_code&, size_t)> handler_with_error_size;
+	handler_with_error_size make_handler_error_size(const handler_with_error_size& handler) const
+		{return (async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1, boost::lambda::_2));}
+
 	bool is_async_calling() const {return !async_call_indicator.unique();}
 	bool is_last_async_call() const {return async_call_indicator.use_count() <= 2;} //can only be called in callbacks
-
-	boost::function<void(const boost::system::error_code&)> make_handler_error(const boost::function<void(const boost::system::error_code&)>& handler) const
-		{return boost::bind(&st_object::error_handler, this, async_call_indicator, handler, boost::asio::placeholders::error);}
-
-	boost::function<void(const boost::system::error_code&, size_t)> make_handler_error_size(const boost::function<void(const boost::system::error_code&, size_t)>& handler) const
-		{return boost::bind(&st_object::error_size_handler, this, async_call_indicator, handler, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred);}
+	inline void set_async_calling(bool) {}
 
 protected:
 	void reset() {async_call_indicator = boost::make_shared<char>('\0');}
-	void post_handler(const boost::shared_ptr<char>& unused, const boost::function<void()>& handler) const {handler();}
-	void error_handler(const boost::shared_ptr<char>& unused, const boost::function<void(const boost::system::error_code&)>& handler,
-		const boost::system::error_code& ec) const {handler(ec);}
-	void error_size_handler(const boost::shared_ptr<char>& unused, const boost::function<void(const boost::system::error_code&, size_t)>& handler,
-		const boost::system::error_code& ec, size_t bytes_transferred) const {handler(ec, bytes_transferred);}
 
 protected:
 	boost::shared_ptr<char> async_call_indicator;
 #else
-	template<typename CallbackHandler>
-	void post(const CallbackHandler& handler) {io_service_.post(handler);}
-	bool is_async_calling() const {return false;}
-	bool is_last_async_call() const {return true;}
+	template<typename F> void post(const F& handler) {io_service_.post(handler);}
+	template<typename F> inline const F& make_handler_error(const F& f) const {return f;}
+	template<typename F> inline const F& make_handler_error_size(const F& f) const {return f;}
 
-	template<typename F>
-	inline const F& make_handler_error(const F& f) const {return f;}
-
-	template<typename F>
-	inline const F& make_handler_error_size(const F& f) const {return f;}
+	inline bool is_async_calling() const {return async_calling;}
+	inline bool is_last_async_call() const {return true;}
+	inline void set_async_calling(bool value) {async_calling = value;}
 
 protected:
-	void reset() {}
+	void reset() {set_async_calling(false);}
+
+protected:
+	bool async_calling;
 #endif
 
-protected:
 	boost::asio::io_service& io_service_;
 };
 
 } //namespace
 
 #endif /* ifndef ST_ASIO_WRAPPER_OBJECT_H_ */
-

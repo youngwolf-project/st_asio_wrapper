@@ -3,12 +3,12 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		9528
-#define ST_ASIO_ASYNC_ACCEPT_NUM	5
+#define ST_ASIO_ASYNC_ACCEPT_NUM 5
 #define ST_ASIO_REUSE_OBJECT //use objects pool
-//#define ST_ASIO_FREE_OBJECT_INTERVAL	60 //it's useless if ST_ASIO_REUSE_OBJECT macro been defined
+//#define ST_ASIO_FREE_OBJECT_INTERVAL 60 //it's useless if ST_ASIO_REUSE_OBJECT macro been defined
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_ENHANCED_STABILITY
-#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency.
+#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 //#define ST_ASIO_USE_STEADY_TIMER
 //#define ST_ASIO_USE_SYSTEM_TIMER
 
@@ -142,9 +142,7 @@ public:
 	statistic get_statistic()
 	{
 		statistic stat;
-		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
-		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
-			stat += (*iter)->get_statistic();
+		do_something_to_all(stat += boost::lambda::bind(&echo_socket::get_statistic, *boost::lambda::_1));
 
 		return stat;
 	}
@@ -237,7 +235,7 @@ int main(int argc, const char* argv[])
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
 				server_.do_something_to_all(boost::bind((bool (normal_server_socket::*)(packer::msg_ctype&, bool)) &normal_server_socket::direct_send_msg, _1, boost::cref(msg), false));
 
-			//if asio_client is using stream_unpacker
+			//if asio_client is using stream_unpacker, we don't need to pack message, just send it.
 //			if (!str.empty())
 //				server_.do_something_to_all(boost::bind((bool (normal_server_socket::*)(packer::msg_ctype&, bool)) &normal_server_socket::direct_send_msg, _1, boost::cref(str), false));
 		}

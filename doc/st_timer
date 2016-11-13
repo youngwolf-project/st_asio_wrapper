@@ -1,28 +1,46 @@
-
+﻿
 namespace st_asio_wrapper
 {
 
 定时器类
 class st_timer
 {
-protected:
+public:
+#if defined(ST_ASIO_USE_STEADY_TIMER) || defined(ST_ASIO_USE_SYSTEM_TIMER)
+	#ifdef BOOST_ASIO_HAS_STD_CHRONO
+	typedef std::chrono::milliseconds milliseconds;
+	#else
+	typedef boost::chrono::milliseconds milliseconds;
+	#endif
+
+	#ifdef ST_ASIO_USE_STEADY_TIMER
+	typedef boost::asio::steady_timer timer_type;
+	#else
+	typedef boost::asio::system_timer timer_type;
+	#endif
+#else
+	typedef boost::posix_time::milliseconds milliseconds;
+	typedef boost::asio::deadline_timer timer_type;
+#endif
+
+	typedef unsigned char tid;
+	static const tid TIMER_END = 0;
+继承者的定义器ID必须从父类的TIMER_END开始，然后最好也定义一个自己的TIMER_END，如果你这个类可能会被继承的话。
+
 	struct timer_info
 	{
-		enum timer_status {TIMER_OK, TIMER_CANCELED};
+		enum timer_status {TIMER_FAKE, TIMER_OK, TIMER_CANCELED};
 
-		unsigned char id;
+		tid id;
 		timer_status status;
 		size_t milliseconds;
-		boost::function<bool (unsigned char)> call_back;
+		boost::function<bool (tid)> call_back;
 		在定时器到达后，call_back被回调，并根据返回值决定是否继续这个定时器（true即继续），同一个定时器，call_back的调用是顺序的。
-		boost::shared_ptr<boost::asio::deadline_timer> timer;
+		boost::shared_ptr<timer_type> timer;
 
-		bool operator <(const timer_info& other) const {return id < other.id;}
+		timer_info() : id(0), status(TIMER_FAKE), milliseconds(0) {}
 	};
 定时器数据结构。
-
-	static const unsigned char TIMER_END = 0;
-继承者的定义器ID必须从父类的TIMER_END开始，然后最好也定义一个自己的TIMER_END，如果你这个类可能会被继承的话。
 
 	st_timer(io_service& _io_service_);
 	virtual ~st_timer();
@@ -30,38 +48,34 @@ protected:
 public:
 	typedef timer_info object_type;
 	typedef const object_type object_ctype;
-	typedef boost::container::set<object_type> container_type;
+	typedef std::vector<object_type> container_type;
 
-	void update_timer_info(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>&& call_back, bool start = false);
-	void update_timer_info(unsigned char id, size_t milliseconds, const boost::function<bool(unsigned char)>& call_back, bool start = false)
+	void update_timer_info(tid id, size_t milliseconds, boost::function<bool(tid)>&& call_back, bool start = false);
+	void update_timer_info(tid id, size_t milliseconds, const boost::function<bool(tid)>& call_back, bool start = false)
 更新timer，如果start为true，更新完了之后马上会开启或者重新开启这个timer。
 注意，对同一个st_timer里面的同一个定时器操作并不是线程安全的。
 
-	void set_timer(unsigned char id, size_t milliseconds, boost::function<bool(unsigned char)>&& call_back);
-	void set_timer(unsigned char id, size_t milliseconds, const boost::function<bool(unsigned char)>& call_back);
+	void set_timer(tid id, size_t milliseconds, boost::function<bool(tid)>&& call_back);
+	void set_timer(tid id, size_t milliseconds, const boost::function<bool(tid)>& call_back);
 开启定时器，定时器以id分区，如果定时器已经存在，则重新开始记时。这个函数其实就是以start为true调用update_timer_info而已。
 
-	object_type find_timer(unsigned char id);
+	object_type find_timer(tid id);
 查找定义器。
 
-	bool start_timer(unsigned char id);
+	bool start_timer(tid id);
 开启一个已经存在的定义器。注意stop_timer之后，定义器还是存在的，只是未启动。
 
-	void stop_timer(unsigned char id);
+	void stop_timer(tid id);
 停止定时器，如果定时时间已经到达，且已经被post到io_server的队列中，则on_timer仍然会在未来某个时候被回调，这是asio的设计。
 
-	boost::asio::io_service& get_io_service();
-	const boost::asio::io_service& get_io_service() const;
+	void stop_all_timer();
+停止所有定时器。
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred);
 对所有定时器做一个操作，操作由__pred来定，st_asio_wrapper库只是调用__pred()。
 
 	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred);
-与do_something_to_all类似，只是当__pred()返回真时就不再继续循环处理后面的定时器了（如果你永远返回false，那就等于
-so_something_to_all），跟查找功能类似。
-
-	void stop_all_timer();
-停止所有定时器。
+与do_something_to_all类似，只是当__pred()返回真时就不再继续循环处理后面的定时器了（如果你永远返回false，那就等于so_something_to_all），跟查找功能类似。
 
 protected:
 	void start_timer(const timer_info& ti);
@@ -71,9 +85,11 @@ protected:
 内部使用的helper函数，真正的结束定时器（调用boost::asio::deadline_timer::cancel）。
 
 protected:
-	boost::asio::io_service& io_service_;
 	container_type timer_can;
-	boost::shared_mutex timer_can_mutex;
+
+private:
+	using st_object::io_service_;
+隐藏io_service。
 };
 
 } //namespace

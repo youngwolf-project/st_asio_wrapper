@@ -1,4 +1,4 @@
-
+﻿
 #ifndef ST_ASIO_SERVER_IP
 #define ST_ASIO_SERVER_IP			"127.0.0.1"
 #endif
@@ -81,7 +81,7 @@ virtual int prepare_reconnect(const boost::system::error_code& ec);
 如果允许（io_service仍然在运行且prepare_reconnect返回大于等于0），启动定时器以延时一小段时间之后重新连接服务器。
 
 private:
-	bool async_shutdown_handler(unsigned char id, ssize_t loop_num);
+	bool async_shutdown_handler(st_timer::tid id, ssize_t loop_num);
 异步优雅关闭（shutdown）超时定时器。
 
 	void connect_handler(const error_code& ec);

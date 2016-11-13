@@ -70,10 +70,11 @@ protected:
 		if (!ST_THIS stopped())
 		{
 			if (ST_THIS reconnecting && !ST_THIS is_connected())
-				ST_THIS lowest_layer().async_connect(ST_THIS server_addr, ST_THIS make_handler_error(boost::bind(&st_ssl_connector_base::connect_handler, this, boost::asio::placeholders::error)));
+				ST_THIS lowest_layer().async_connect(ST_THIS server_addr,
+					ST_THIS make_handler_error(boost::bind(&st_ssl_connector_base::connect_handler, this, boost::asio::placeholders::error)));
 			else if (!authorized_)
-				ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client, ST_THIS make_handler_error(boost::bind(&st_ssl_connector_base::handshake_handler, this,
-					boost::asio::placeholders::error)));
+				ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client,
+					ST_THIS make_handler_error(boost::bind(&st_ssl_connector_base::handshake_handler, this, boost::asio::placeholders::error)));
 			else
 				ST_THIS do_recv_msg();
 

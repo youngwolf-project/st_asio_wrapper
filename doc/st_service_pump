@@ -1,4 +1,4 @@
-
+﻿
 #ifndef ST_ASIO_SERVICE_THREAD_NUM
 #define ST_ASIO_SERVICE_THREAD_NUM 8
 同时开启多少个线程执行boost::asio::io_service::run函数。

@@ -93,7 +93,7 @@ public:
 
 	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect();}
 	void force_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_shutdown();}
-	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = true) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown(sync);}
+	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = false) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown(sync);}
 
 protected:
 	virtual bool init()

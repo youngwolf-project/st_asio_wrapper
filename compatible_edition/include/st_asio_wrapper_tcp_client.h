@@ -36,10 +36,7 @@ public:
 	size_t valid_size()
 	{
 		size_t size = 0;
-		boost::shared_lock<boost::shared_mutex> lock(ST_THIS object_can_mutex);
-		for (BOOST_AUTO(iter, ST_THIS object_can.begin()); iter != ST_THIS object_can.end(); ++iter)
-			if ((*iter)->is_connected())
-				++size;
+		ST_THIS do_something_to_all(boost::lambda::if_then(boost::lambda::bind(&Socket::is_connected, *boost::lambda::_1), ++boost::lambda::var(size)));
 		return size;
 	}
 

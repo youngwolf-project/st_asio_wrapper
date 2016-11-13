@@ -1,4 +1,4 @@
-
+﻿
 #ifndef ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION
 #define ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION	5 //seconds, maximum duration while graceful shutdown
 #endif
@@ -123,9 +123,9 @@ protected:
 protected:
 	typename super::in_container_type last_send_msg;
 	boost::shared_ptr<i_unpacker<out_msg_type>> unpacker_;
-	int shutdown_state; //2-the first step of graceful close, 1-force close, 0-normal state
 
-	boost::shared_mutex shutdown_mutex;
+	shutdown_states shutdown_state;
+	st_atomic_size_t shutdown_atomic;
 让shutdown函数线程安全。
 };
 

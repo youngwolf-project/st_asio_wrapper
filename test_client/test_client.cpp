@@ -6,10 +6,11 @@
 //configuration
 #define ST_ASIO_SERVER_PORT		9527
 //#define ST_ASIO_REUSE_OBJECT //use objects pool
+#define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
-//#define ST_ASIO_CLEAR_OBJECT_INTERVAL	1
+//#define ST_ASIO_CLEAR_OBJECT_INTERVAL 1
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
-#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency.
+#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_INPUT_QUEUE non_lock_queue //we will never operate sending buffer concurrently, so need no locks.
 #endif
@@ -216,6 +217,141 @@ public:
 	///////////////////////////////////////////////////
 };
 
+void send_msg_one_by_one(test_client& client, size_t msg_num, size_t msg_len, char msg_fill)
+{
+	check_msg = true;
+	uint64_t total_msg_bytes = msg_num * msg_len * client.size();
+
+	boost::timer::cpu_timer begin_time;
+	client.begin(msg_num, msg_len, msg_fill);
+	unsigned percent = 0;
+	do
+	{
+		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
+
+		auto new_percent = (unsigned) (100 * client.get_recv_bytes() / total_msg_bytes);
+		if (percent != new_percent)
+		{
+			percent = new_percent;
+			printf("\r%u%%", percent);
+			fflush(stdout);
+		}
+	} while (100 != percent);
+	begin_time.stop();
+
+	auto used_time = (double) begin_time.elapsed().wall / 1000000000;
+	printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
+	printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+}
+
+void send_msg_randomly(test_client& client, size_t msg_num, size_t msg_len, char msg_fill)
+{
+	check_msg = false;
+	uint64_t send_bytes = 0;
+	uint64_t total_msg_bytes = msg_num * msg_len;
+	auto buff = new char[msg_len];
+	memset(buff, msg_fill, msg_len);
+
+	boost::timer::cpu_timer begin_time;
+	unsigned percent = 0;
+	for (size_t i = 0; i < msg_num; ++i)
+	{
+		memcpy(buff, &i, sizeof(size_t)); //seq
+
+		//congestion control, method #1, the peer needs its own congestion control too.
+		client.safe_random_send_msg(buff, msg_len); //can_overflow is false, it's important
+		send_bytes += msg_len;
+
+		auto new_percent = (unsigned) (100 * send_bytes / total_msg_bytes);
+		if (percent != new_percent)
+		{
+			percent = new_percent;
+			printf("\r%u%%", percent);
+			fflush(stdout);
+		}
+	}
+
+	while(client.get_recv_bytes() != total_msg_bytes)
+		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
+
+	begin_time.stop();
+	delete[] buff;
+
+	auto used_time = (double) begin_time.elapsed().wall / 1000000000;
+	printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
+	printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+}
+
+//use up to 16 (hard code) worker threads to send messages concurrently
+void send_msg_concurrently(test_client& client, size_t msg_num, size_t msg_len, char msg_fill)
+{
+	check_msg = true;
+	auto link_num = client.size();
+	auto group_num = std::min((size_t) 16, link_num);
+	auto group_link_num = link_num / group_num;
+	auto left_link_num = link_num - group_num * group_link_num;
+	uint64_t total_msg_bytes = msg_num * msg_len * link_num;
+
+	auto group_index = (size_t) -1;
+	size_t this_group_link_num = 0;
+
+	std::vector<std::list<test_client::object_type>> link_groups(group_num);
+	client.do_something_to_all([&](test_client::object_ctype& item) {
+		if (0 == this_group_link_num)
+		{
+			this_group_link_num = group_link_num;
+			if (left_link_num > 0)
+			{
+				++this_group_link_num;
+				--left_link_num;
+			}
+
+			++group_index;
+		}
+
+		--this_group_link_num;
+		link_groups[group_index].push_back(item);
+	});
+
+	boost::timer::cpu_timer begin_time;
+	boost::thread_group threads;
+	do_something_to_all(link_groups, [&threads, msg_num, msg_len, msg_fill](const std::list<test_client::object_type>& item) {
+		threads.create_thread([&item, msg_num, msg_len, msg_fill]() {
+			auto buff = new char[msg_len];
+			memset(buff, msg_fill, msg_len);
+			for (size_t i = 0; i < msg_num; ++i)
+			{
+				memcpy(buff, &i, sizeof(size_t)); //seq
+
+				//congestion control, method #1, the peer needs its own congestion control too.
+				do_something_to_all(item, [buff, msg_len](test_client::object_ctype& item2) {item2->safe_send_msg(buff, msg_len);}); //can_overflow is false, it's important
+			}
+			delete[] buff;
+		});
+	});
+
+	unsigned percent = 0;
+	do
+	{
+		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
+
+		auto new_percent = (unsigned) (100 * client.get_recv_bytes() / total_msg_bytes);
+		if (percent != new_percent)
+		{
+			percent = new_percent;
+			printf("\r%u%%", percent);
+			fflush(stdout);
+		}
+	} while (100 != percent);
+	begin_time.stop();
+
+	auto used_time = (double) begin_time.elapsed().wall / 1000000000;
+	printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
+	printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+
+	threads.join_all();
+}
+
 int main(int argc, const char* argv[])
 {
 	printf("usage: %s [<service thread number=1> [<port=%d> [<ip=%s> [link num=16]]]]\n", argv[0], ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
@@ -334,7 +470,7 @@ int main(int argc, const char* argv[])
 			auto iter = std::begin(tok);
 			if (iter != std::end(tok)) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
 
-#if 1 == PACKER_UNPACKER_TYPE
+#if 0 == PACKER_UNPACKER_TYPE || 1 == PACKER_UNPACKER_TYPE
 			if (iter != std::end(tok)) msg_len = std::min(packer::get_max_msg_size(),
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq
 #elif 2 == PACKER_UNPACKER_TYPE
@@ -342,101 +478,32 @@ int main(int argc, const char* argv[])
 			msg_len = 1024; //we hard code this because we fixedly initialized the length of fixed_length_unpacker to 1024
 #elif 3 == PACKER_UNPACKER_TYPE
 			if (iter != std::end(tok)) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE,
-				std::max((size_t) atoi(iter++->data()), sizeof(size_t)));
+				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq
 #endif
 			if (iter != std::end(tok)) msg_fill = *iter++->data();
 			if (iter != std::end(tok)) model = *iter++->data() - '0';
 
-			unsigned percent = 0;
-			uint64_t total_msg_bytes;
-			switch (model)
+			if (0 != model && 1 != model)
 			{
-			case 0:
-				check_msg = true;
-				total_msg_bytes = msg_num * link_num; break;
-			case 1:
-				check_msg = false;
-				srand(time(nullptr));
-				total_msg_bytes = msg_num; break;
-			default:
-				total_msg_bytes = 0; break;
+				puts("unrecognized model!");
+				continue;
 			}
 
-			if (total_msg_bytes > 0)
-			{
-				printf("test parameters after adjustment: " ST_ASIO_SF " " ST_ASIO_SF " %c %d\n", msg_num, msg_len, msg_fill, model);
-				puts("performance test begin, this application will have no response during the test!");
+			printf("test parameters after adjustment: " ST_ASIO_SF " " ST_ASIO_SF " %c %d\n", msg_num, msg_len, msg_fill, model);
+			puts("performance test begin, this application will have no response during the test!");
 
-				client.clear_status();
-				total_msg_bytes *= msg_len;
-				boost::timer::cpu_timer begin_time;
-
+			client.clear_status();
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-				if (0 == model)
-				{
-					client.begin(msg_num, msg_len, msg_fill);
-
-					unsigned new_percent = 0;
-					do
-					{
-						boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
-
-						new_percent = (unsigned) (100 * client.get_recv_bytes() / total_msg_bytes);
-						if (percent != new_percent)
-						{
-							percent = new_percent;
-							printf("\r%u%%", percent);
-							fflush(stdout);
-						}
-					} while (100 != new_percent);
-
-					auto used_time = (double) begin_time.elapsed().wall / 1000000000;
-					printf("\r100%%\ntime spent statistics: %.1f seconds.\n", used_time);
-					printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
-				}
-				else
-					puts("if ST_ASIO_WANT_MSG_SEND_NOTIFY defined, only support model 0!");
+			if (0 == model)
+				send_msg_one_by_one(client, msg_num, msg_len, msg_fill);
+			else
+				puts("if ST_ASIO_WANT_MSG_SEND_NOTIFY defined, only support model 0!");
 #else
-				auto buff = new char[msg_len];
-				memset(buff, msg_fill, msg_len);
-				uint64_t send_bytes = 0;
-				for (size_t i = 0; i < msg_num; ++i)
-				{
-					memcpy(buff, &i, sizeof(size_t)); //seq
-
-					//congestion control, method #1, the peer needs its own congestion control too.
-					switch (model)
-					{
-					case 0:
-						client.safe_broadcast_msg(buff, msg_len); //can_overflow is false, it's important
-						send_bytes += link_num * msg_len;
-						break;
-					case 1:
-						client.safe_random_send_msg(buff, msg_len); //can_overflow is false, it's important
-						send_bytes += msg_len;
-						break;
-					default:
-						break;
-					}
-
-					auto new_percent = (unsigned) (100 * send_bytes / total_msg_bytes);
-					if (percent != new_percent)
-					{
-						percent = new_percent;
-						printf("\r%u%%", percent);
-						fflush(stdout);
-					}
-				}
-				delete[] buff;
-
-				while(client.get_recv_bytes() != total_msg_bytes)
-					boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
-
-				auto used_time = (double) begin_time.elapsed().wall / 1000000000;
-				printf("\r100%%\ntime spent statistics: %.1f seconds.\n", used_time);
-				printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+			if (0 == model)
+				send_msg_concurrently(client, msg_num, msg_len, msg_fill);
+			else
+				send_msg_randomly(client, msg_num, msg_len, msg_fill);
 #endif
-			} // if (total_data_num > 0)
 		}
 	}
 
