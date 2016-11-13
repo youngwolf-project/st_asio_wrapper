@@ -1,4 +1,4 @@
-
+﻿
 #ifdef ASCS_HUGE_MSG
 #define ASCS_HEAD_TYPE	uint32_t
 #define ASCS_HEAD_N2H	ntohl

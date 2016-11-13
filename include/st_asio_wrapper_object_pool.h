@@ -14,10 +14,6 @@
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
 #define ST_ASIO_WRAPPER_OBJECT_POOL_H_
 
-#include <boost/version.hpp>
-#if BOOST_VERSION >= 105300
-#include <boost/atomic.hpp>
-#endif
 #include <boost/unordered_set.hpp>
 
 #include "st_asio_wrapper_timer.h"
@@ -50,31 +46,6 @@ static_assert(ST_ASIO_MAX_OBJECT_NUM > 0, "object capacity must be bigger than z
 
 namespace st_asio_wrapper
 {
-
-#if BOOST_VERSION >= 105300
-typedef boost::atomic_uint_fast64_t st_atomic_uint_fast64;
-#else
-template <typename T>
-class st_atomic
-{
-public:
-	st_atomic() : data(0) {}
-	st_atomic(const T& _data) : data(_data) {}
-	T operator++() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return ++data;}
-	//deliberately omitted operator++(int)
-	T operator+=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data += value;}
-	T operator--() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return --data;}
-	//deliberately omitted operator--(int)
-	T operator-=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data -= value;}
-	T operator=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data = value;}
-	operator T() const {return data;}
-
-private:
-	T data;
-	boost::shared_mutex data_mutex;
-};
-typedef st_atomic<uint_fast64_t> st_atomic_uint_fast64;
-#endif
 
 template<typename Object>
 class st_object_pool : public st_service_pump::i_service, protected st_timer
@@ -220,7 +191,7 @@ protected:
 	object_type create_object() {return create_object(sp);}
 
 public:
-	//to configure unordered_set(for example, set factor or reserved size), not locked the mutex, so must be called before service_pump starting up.
+	//to configure unordered_set(for example, set factor or reserved size), not thread safe, so must be called before service_pump startup.
 	container_type& container() {return object_can;}
 
 	size_t max_size() const {return max_size_;}
@@ -296,7 +267,7 @@ public:
 
 		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
 		for (auto iter = std::begin(object_can); iter != std::end(object_can);)
-			if ((*iter).unique() && (*iter)->obsoleted())
+			if ((*iter)->obsoleted())
 			{
 				objects.push_back(std::move(*iter));
 				iter = object_can.erase(iter);
@@ -328,7 +299,7 @@ public:
 
 		boost::unique_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
 		for (auto iter = std::begin(invalid_object_can); num > 0 && iter != std::end(invalid_object_can);)
-			if ((*iter).unique() && (*iter)->obsoleted())
+			if ((*iter)->obsoleted())
 			{
 				--num;
 				++num_affected;

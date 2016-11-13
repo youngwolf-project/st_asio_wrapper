@@ -174,9 +174,6 @@ protected:
 		boost::unique_lock<boost::shared_mutex> lock(shutdown_mutex);
 
 		ST_THIS stop_all_timer();
-		ST_THIS close(); //must after stop_all_timer(), it's very important
-		ST_THIS started_ = false;
-//		reset_state();
 
 		if (ST_THIS lowest_layer().is_open())
 		{
@@ -184,6 +181,8 @@ protected:
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
 			ST_THIS lowest_layer().close(ec);
 		}
+
+		ST_THIS close(); //call this at the end of 'shutdown', it's very important
 	}
 
 private:

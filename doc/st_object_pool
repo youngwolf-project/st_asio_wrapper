@@ -1,4 +1,4 @@
-
+﻿
 #ifndef ST_ASIO_MAX_OBJECT_NUM
 #define ST_ASIO_MAX_OBJECT_NUM			4096
 #endif

@@ -168,7 +168,7 @@ protected:
 			int delay = prepare_reconnect(ec);
 			if (delay >= 0)
 			{
-				ST_THIS set_timer(TIMER_CONNECT, delay, boost::bind(&st_connector_base::reconnect_handler, this, _1));
+				ST_THIS set_timer(TIMER_CONNECT, delay, boost::lambda::if_then_else_return(boost::lambda::bind(&st_connector_base::do_start, this), false, false));
 				return true;
 			}
 		}
@@ -177,8 +177,6 @@ protected:
 	}
 
 private:
-	bool reconnect_handler(st_timer::tid id) {assert(TIMER_CONNECT == id); do_start(); return false;}
-
 	bool async_shutdown_handler(st_timer::tid id, size_t loop_num)
 	{
 		assert(TIMER_ASYNC_SHUTDOWN == id);

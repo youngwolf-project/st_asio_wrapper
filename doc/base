@@ -28,7 +28,14 @@ i_udp_unpacker:
 udp解包器必须实现这个接口。
 
 2. 类
-dummy_packer:
+st_atomic：
+boost::atomic的代替品，因为boost::atomic在boost 1.53版本中才引入，而st_asio_wrapper库最低支持boost 1.49，注意它是通过boost::shared_mutex
+来实现线程安全的，效率不如原子操作高。
+
+scope_atomic_lock：
+功能与boost::scope_lock一致，只是它执行atomic的++和--操作，而不是调用mutex的lock和unlock。
+
+dummy_packer：
 仅仅提供发送消息的类型以便通过编译，无法真正的打包，所以只能通过direct_send_msg等发送消息。
 
 auto_buffer：

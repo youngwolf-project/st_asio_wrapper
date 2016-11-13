@@ -62,7 +62,6 @@ public:
 	//lockable, dummy
 	void lock() const {}
 	void unlock() const {}
-	bool idle() const {return true;} //locked or not
 };
 
 class lockable
@@ -73,14 +72,13 @@ public:
 	//lockable
 	void lock() {mutex.lock();}
 	void unlock() {mutex.unlock();}
-	bool idle() {boost::unique_lock<boost::shared_mutex> lock(mutex, boost::try_to_lock); return lock.owns_lock();} //locked or not
 
 private:
 	boost::shared_mutex mutex;
 };
 
 //Container must at least has the following functions:
-// Container() constructor
+// Container() and Container(size_t) constructor
 // size
 // empty
 // clear
@@ -100,10 +98,6 @@ public:
 	queue() {}
 	queue(size_t size) : super(size) {}
 
-	//not thread-safe
-	void clear() {super::clear();}
-	void swap(me& other) {super::swap(other);}
-
 	bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	bool enqueue(T&& item) {typename Lockable::lock_guard lock(*this); return enqueue_(std::move(item));}
 	bool try_dequeue(T& item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
@@ -116,7 +110,7 @@ public:
 template<typename T, typename Container> using non_lock_queue = queue<T, Container, dummy_lockable>; //totally not thread safe
 template<typename T, typename Container> using lock_queue = queue<T, Container, lockable>;
 
-//it's not thread safe for 'other', please note. for this queue, depends on 'Q'
+//it's not thread safe for 'other', please note. for 'dest', depends on 'Q'
 template<typename Q>
 size_t move_items_in(Q& dest, Q& other, size_t max_size = ST_ASIO_MAX_MSG_NUM)
 {
@@ -141,7 +135,7 @@ size_t move_items_in(Q& dest, Q& other, size_t max_size = ST_ASIO_MAX_MSG_NUM)
 	return num;
 }
 
-//it's not thread safe for 'other', please note. for this queue, depends on 'Q'
+//it's not thread safe for 'other', please note. for 'dest', depends on 'Q'
 template<typename Q, typename Q2>
 size_t move_items_in(Q& dest, Q2& other, size_t max_size = ST_ASIO_MAX_MSG_NUM)
 {

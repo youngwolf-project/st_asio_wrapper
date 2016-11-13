@@ -72,7 +72,8 @@ protected:
 			if (ST_THIS reconnecting && !ST_THIS is_connected())
 				ST_THIS lowest_layer().async_connect(ST_THIS server_addr, ST_THIS make_handler_error([this](const boost::system::error_code& ec) {ST_THIS connect_handler(ec);}));
 			else if (!authorized_)
-				ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client, ST_THIS make_handler_error([this](const boost::system::error_code& ec) {ST_THIS handshake_handler(ec);}));
+				ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client,
+					ST_THIS make_handler_error([this](const boost::system::error_code& ec) {ST_THIS handshake_handler(ec);}));
 			else
 				ST_THIS do_recv_msg();
 
@@ -207,16 +208,20 @@ private:
 		if (!ec)
 		{
 			if (ST_THIS on_accept(client_ptr))
-				client_ptr->next_layer().async_handshake(boost::asio::ssl::stream_base::server, [client_ptr, this](const boost::system::error_code& ec) {
-					ST_THIS on_handshake(ec, client_ptr);
-					if (!ec && ST_THIS add_client(client_ptr))
-						client_ptr->start();
-				});
+				client_ptr->next_layer().async_handshake(boost::asio::ssl::stream_base::server,
+					[client_ptr, this](const boost::system::error_code& ec) {ST_THIS handshake_handler(ec, client_ptr);});
 
 			start_next_accept();
 		}
 		else
 			ST_THIS stop_listen();
+	}
+
+	void handshake_handler(const boost::system::error_code& ec, typename st_ssl_server_base::object_ctype& client_ptr)
+	{
+		on_handshake(ec, client_ptr);
+		if (!ec && ST_THIS add_client(client_ptr))
+			client_ptr->start();
 	}
 };
 

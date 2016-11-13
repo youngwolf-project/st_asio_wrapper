@@ -14,10 +14,6 @@
 #ifndef ST_ASIO_WRAPPER_OBJECT_POOL_H_
 #define ST_ASIO_WRAPPER_OBJECT_POOL_H_
 
-#include <boost/version.hpp>
-#if BOOST_VERSION >= 105300
-#include <boost/atomic.hpp>
-#endif
 #include <boost/unordered_set.hpp>
 
 #include "st_asio_wrapper_timer.h"
@@ -51,31 +47,6 @@
 
 namespace st_asio_wrapper
 {
-
-#if BOOST_VERSION >= 105300
-typedef boost::atomic_uint_fast64_t st_atomic_uint_fast64;
-#else
-template <typename T>
-class st_atomic
-{
-public:
-	st_atomic() : data(0) {}
-	st_atomic(const T& _data) : data(_data) {}
-	T operator++() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return ++data;}
-	//deliberately omitted operator++(int)
-	T operator+=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data += value;}
-	T operator--() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return --data;}
-	//deliberately omitted operator--(int)
-	T operator-=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data -= value;}
-	T operator=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data = value;}
-	operator T() const {return data;}
-
-private:
-	T data;
-	boost::shared_mutex data_mutex;
-};
-typedef st_atomic<boost::uint_fast64_t> st_atomic_uint_fast64;
-#endif
 
 template<typename Object>
 class st_object_pool : public st_service_pump::i_service, protected st_timer
@@ -112,10 +83,10 @@ protected:
 	void start()
 	{
 #ifndef ST_ASIO_REUSE_OBJECT
-		set_timer(TIMER_FREE_SOCKET, 1000 * ST_ASIO_FREE_OBJECT_INTERVAL, boost::bind(&st_object_pool::free_object_handler, this, _1));
+		set_timer(TIMER_FREE_SOCKET, 1000 * ST_ASIO_FREE_OBJECT_INTERVAL, boost::lambda::if_then_else_return(boost::lambda::bind(&st_object_pool::free_object, this, -1), true, true));
 #endif
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
-		set_timer(TIMER_CLEAR_SOCKET, 1000 * ST_ASIO_CLEAR_OBJECT_INTERVAL, boost::bind(&st_object_pool::clear_obsoleted_object_handler, this, _1));
+		set_timer(TIMER_CLEAR_SOCKET, 1000 * ST_ASIO_CLEAR_OBJECT_INTERVAL, boost::lambda::if_then_else_return(boost::lambda::bind(&st_object_pool::clear_obsoleted_object, this), true, true));
 #endif
 	}
 
@@ -221,7 +192,7 @@ protected:
 	object_type create_object() {return create_object(boost::ref(sp));}
 
 public:
-	//to configure unordered_set(for example, set factor or reserved size), not locked the mutex, so must be called before service_pump starting up.
+	//to configure unordered_set(for example, set factor or reserved size), not thread safe, so must be called before service_pump startup.
 	container_type& container() {return object_can;}
 
 	size_t max_size() const {return max_size_;}
@@ -297,7 +268,7 @@ public:
 
 		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
-			if ((*iter).unique() && (*iter)->obsoleted())
+			if ((*iter)->obsoleted())
 			{
 				objects.push_back(*iter);
 				iter = object_can.erase(iter);
@@ -329,7 +300,7 @@ public:
 
 		boost::unique_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
 		for (BOOST_AUTO(iter, invalid_object_can.begin()); num > 0 && iter != invalid_object_can.end();)
-			if ((*iter).unique() && (*iter)->obsoleted())
+			if ((*iter)->obsoleted())
 			{
 				--num;
 				++num_affected;
@@ -347,15 +318,6 @@ public:
 
 	DO_SOMETHING_TO_ALL_MUTEX(object_can, object_can_mutex)
 	DO_SOMETHING_TO_ONE_MUTEX(object_can, object_can_mutex)
-
-private:
-#ifndef ST_ASIO_REUSE_OBJECT
-	bool free_object_handler(tid id) {assert(TIMER_FREE_SOCKET == id); free_object(); return true;}
-#endif
-
-#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
-	bool clear_obsoleted_object_handler(tid id) {assert(TIMER_CLEAR_SOCKET == id); clear_obsoleted_object(); return true;}
-#endif
 
 protected:
 	st_atomic_uint_fast64 cur_id;

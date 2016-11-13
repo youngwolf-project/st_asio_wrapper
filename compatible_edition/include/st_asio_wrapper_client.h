@@ -48,8 +48,7 @@ protected:
 
 	virtual bool init()
 	{
-		ST_THIS do_something_to_all(boost::mem_fn(&Socket::reset));
-		ST_THIS do_something_to_all(boost::mem_fn(&Socket::start));
+		ST_THIS do_something_to_all((boost::lambda::bind(&Socket::reset, *boost::lambda::_1), boost::lambda::bind(&Socket::start, *boost::lambda::_1)));
 		ST_THIS start();
 		return true;
 	}

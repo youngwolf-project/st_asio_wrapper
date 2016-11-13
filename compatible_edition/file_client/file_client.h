@@ -3,8 +3,6 @@
 #define FILE_CLIENT_H_
 
 #include <boost/timer/timer.hpp>
-#include <boost/lambda/bind.hpp>
-#include <boost/lambda/lambda.hpp>
 
 #include "../file_server/packer_unpacker.h"
 #include "../include/ext/st_asio_wrapper_client.h"
@@ -42,20 +40,16 @@ public:
 
 		if (TRANS_IDLE != state)
 			return false;
-		else if (NULL == file)
-		{
-			if (0 == id())
-				file = fopen(file_name.data(), "w+b");
-			else
-				file = fopen(file_name.data(), "r+b");
 
-			if (NULL == file)
-			{
-				printf("can't create file %s.\n", file_name.data());
-				return false;
-			}
-			else if (0 == id())
-				return true;
+		if (0 == id())
+			file = fopen(file_name.data(), "w+b");
+		else
+			file = fopen(file_name.data(), "r+b");
+
+		if (NULL == file)
+		{
+			printf("can't create file %s.\n", file_name.data());
+			return false;
 		}
 
 		std::string order("\0", ORDER_LEN);
@@ -197,7 +191,7 @@ public:
 	{
 		fl_type total_rest_size = 0;
 		do_something_to_all(total_rest_size += *boost::lambda::_1);
-//		do_something_to_all(total_rest_size += boost::lambda::bind(&file_socket::get_rest_size, &*boost::lambda::_1));
+//		do_something_to_all(total_rest_size += boost::lambda::bind(&file_socket::get_rest_size, *boost::lambda::_1));
 
 		return total_rest_size;
 	}

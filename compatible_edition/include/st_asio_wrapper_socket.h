@@ -18,19 +18,13 @@
 
 //after this duration, this st_socket can be freed from the heap or reused,
 //you must define this macro as a value, not just define it, the value means the duration, unit is second.
-//if macro ST_ASIO_ENHANCED_STABILITY been defined, this macro will always be zero.
-#ifdef ST_ASIO_ENHANCED_STABILITY
-	#if defined(ST_ASIO_DELAY_CLOSE) && ST_ASIO_DELAY_CLOSE != 0
-		#warning ST_ASIO_DELAY_CLOSE will always be zero if ST_ASIO_ENHANCED_STABILITY macro been defined.
-	#endif
-	#undef ST_ASIO_DELAY_CLOSE
-	#define ST_ASIO_DELAY_CLOSE 0
-#else
-	#ifndef ST_ASIO_DELAY_CLOSE
-	#define ST_ASIO_DELAY_CLOSE	5 //seconds
-	#elif ST_ASIO_DELAY_CLOSE <= 0
-		#error "ST_ASIO_DELAY_CLOSE must be bigger than zero."
-	#endif
+//a value equal to zero will cause st_socket to use a mechanism to guarantee 100% safety when reusing or freeing it,
+//st_object will hook all async calls to avoid this st_socket to be reused or freed before all async calls finish
+//or been interrupted (of course, this mechanism will slightly impact efficiency).
+#ifndef ST_ASIO_DELAY_CLOSE
+#define ST_ASIO_DELAY_CLOSE	0 //seconds, guarantee 100% safety when reusing or freeing this st_socket
+#elif ST_ASIO_DELAY_CLOSE < 0
+	#error "delay close duration must be bigger than or equal to zero."
 #endif
 
 namespace st_asio_wrapper
@@ -53,9 +47,10 @@ protected:
 	static const tid TIMER_DELAY_CLOSE = TIMER_BEGIN + 2;
 	static const tid TIMER_END = TIMER_BEGIN + 10;
 
-	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()), started_(false) {reset_state();}
-	template<typename Arg>
-	st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()), started_(false) {reset_state();}
+	st_socket(boost::asio::io_service& io_service_) : st_timer(io_service_), _id(-1), next_layer_(io_service_), packer_(boost::make_shared<Packer>()),
+		send_atomic(0), dispatch_atomic(0), started_(false), start_atomic(0) {reset_state();}
+	template<typename Arg> st_socket(boost::asio::io_service& io_service_, Arg& arg) : st_timer(io_service_), _id(-1), next_layer_(io_service_, arg), packer_(boost::make_shared<Packer>()),
+		send_atomic(0), dispatch_atomic(0), started_(false), start_atomic(0) {reset_state();}
 
 	void reset()
 	{
@@ -72,10 +67,6 @@ protected:
 
 		sending = paused_sending = false;
 		dispatching = paused_dispatching = congestion_controlling = false;
-#ifndef ST_ASIO_ENHANCED_STABILITY
-		closing = false;
-#endif
-//		started_ = false;
 	}
 
 	void clear_buffer()
@@ -88,9 +79,6 @@ protected:
 	}
 
 public:
-	//please do not change id at runtime via the following function, except this st_socket is not managed by st_object_pool,
-	//it should only be used by st_object_pool when reusing or creating new st_socket.
-	void id(boost::uint_fast64_t id) {assert(!started_); if (started_) unified_out::error_out("id is unchangeable!"); else _id = id;}
 	boost::uint_fast64_t id() const {return _id;}
 	bool is_equal_to(boost::uint_fast64_t id) const {return _id == id;}
 
@@ -99,21 +87,17 @@ public:
 	typename Socket::lowest_layer_type& lowest_layer() {return next_layer().lowest_layer();}
 	const typename Socket::lowest_layer_type& lowest_layer() const {return next_layer().lowest_layer();}
 
-	virtual bool obsoleted()
-	{
-#ifndef ST_ASIO_ENHANCED_STABILITY
-		return started() || closing || ST_THIS is_async_calling() ? false : recv_msg_buffer.empty() && recv_msg_buffer.idle();
-#else
-		return !started() && !ST_THIS is_async_calling();
-#endif
-	}
+	virtual bool obsoleted() {return !dispatching && !started() && !is_async_calling();}
 
 	bool started() const {return started_;}
 	void start()
 	{
-		boost::unique_lock<boost::shared_mutex> lock(start_mutex);
 		if (!started_)
-			started_ = do_start();
+		{
+			scope_atomic_lock<> lock(start_atomic);
+			if (!started_ && lock.locked())
+				started_ = do_start();
+		}
 	}
 
 	//return false if send buffer is empty or sending not allowed or io_service stopped
@@ -121,8 +105,8 @@ public:
 	{
 		if (!sending)
 		{
-			boost::unique_lock<boost::shared_mutex> lock(send_mutex);
-			if (!sending)
+			scope_atomic_lock<> lock(send_atomic);
+			if (!sending && lock.locked())
 			{
 				sending = true;
 				lock.unlock();
@@ -138,7 +122,8 @@ public:
 	void suspend_send_msg(bool suspend) {if (!(paused_sending = suspend)) send_msg();}
 	bool suspend_send_msg() const {return paused_sending;}
 
-	void suspend_dispatch_msg(bool suspend) {if (!(paused_dispatching = suspend)) dispatch_msg();}
+	//for a st_socket that has been shut down, resuming message dispatching will not take effect for left messages.
+	void suspend_dispatch_msg(bool suspend) {if (!(paused_dispatching = suspend) && started()) dispatch_msg();}
 	bool suspend_dispatch_msg() const {return paused_dispatching;}
 
 	void congestion_control(bool enable) {congestion_controlling = enable; unified_out::warning_out("%s congestion control.", enable ? "open" : "close");}
@@ -185,10 +170,10 @@ protected:
 	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
 	//receiving error or peer endpoint quit(false ec means ok)
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
-	//if ST_ASIO_ENHANCED_STABILITY macro been defined, in this callback, st_socket guarantee that there's no any async call associated it,
-	//include user timers(created by set_timer()) and user async calls(started via post()),
-	//this means you can clean up any resource in this st_socket except this st_socket itself, because this st_socket maybe is being maintained by st_object_pool.
-	//if ST_ASIO_ENHANCED_STABILITY macro not defined, st_socket simply call this callback ST_ASIO_DELAY_CLOSE seconds later after link down, no any guarantees.
+	//if ST_ASIO_DELAY_CLOSE is equal to zero, in this callback, st_socket guarantee that there's no any other async call associated it,
+	//include user timers(created by set_timer()) and user async calls(started via post()), this means you can clean up any resource
+	//in this st_socket except this st_socket itself, because this st_socket maybe is being maintained by st_object_pool.
+	//otherwise (bigger than zero), st_socket simply call this callback ST_ASIO_DELAY_CLOSE seconds later after link down, no any guarantees.
 	virtual void on_close() {unified_out::info_out("on_close()");}
 
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
@@ -222,15 +207,18 @@ protected:
 	virtual void on_all_msg_send(InMsgType& msg) {}
 #endif
 
-	//subclass notify st_socket the shutdown event.
+	//subclass notify st_socket the shutdown event, not thread safe
 	void close()
 	{
-		if (is_closable())
+		if (started_)
 		{
-#ifndef ST_ASIO_ENHANCED_STABILITY
-			closing = true;
-#endif
-			set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, boost::bind(&st_socket::timer_handler, this, _1));
+			started_ = false;
+
+			if (is_closable())
+			{
+				set_async_calling(true);
+				set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, boost::bind(&st_socket::timer_handler, this, _1));
+			}
 		}
 	}
 
@@ -272,8 +260,8 @@ protected:
 	{
 		if (!dispatching)
 		{
-			boost::unique_lock<boost::shared_mutex> lock(dispatch_mutex);
-			if (!dispatching)
+			scope_atomic_lock<> lock(dispatch_atomic);
+			if (!dispatching && lock.locked())
 			{
 				dispatching = true;
 				lock.unlock();
@@ -329,6 +317,11 @@ protected:
 	}
 
 private:
+	//please do not change id at runtime via the following function, except this st_socket is not managed by st_object_pool,
+	//it should only be used by st_object_pool when reusing or creating new st_socket.
+	template<typename Object> friend class st_object_pool;
+	void id(boost::uint_fast64_t id) {_id = id;}
+
 	bool timer_handler(tid id)
 	{
 		switch (id)
@@ -349,9 +342,8 @@ private:
 				lowest_layer().close(ec);
 			}
 			on_close();
-#ifndef ST_ASIO_ENHANCED_STABILITY
-			closing = false;
-#endif
+			set_async_calling(false);
+
 			break;
 		default:
 			assert(false);
@@ -397,21 +389,18 @@ protected:
 	in_container_type send_msg_buffer;
 	out_container_type recv_msg_buffer;
 	boost::container::list<out_msg> temp_msg_buffer;
-	//st_socket will invoke handle_msg() when got some msgs. if these msgs can't be pushed into recv_msg_buffer because of:
+	//subclass will invoke handle_msg() when got some msgs. if these msgs can't be pushed into recv_msg_buffer because of:
 	// 1. msg dispatching suspended;
 	// 2. congestion control opened;
 	//st_socket will delay 50 milliseconds(non-blocking) to invoke handle_msg() again, and now, as you known, temp_msg_buffer is used to hold these msgs temporarily.
 
 	bool sending, paused_sending;
-	boost::shared_mutex send_mutex;
+	st_atomic_size_t send_atomic;
 	bool dispatching, paused_dispatching, congestion_controlling;
-	boost::shared_mutex dispatch_mutex;
-#ifndef ST_ASIO_ENHANCED_STABILITY
-	bool closing;
-#endif
+	st_atomic_size_t dispatch_atomic;
 
 	bool started_; //has started or not
-	boost::shared_mutex start_mutex;
+	st_atomic_size_t start_atomic;
 
 	struct statistic stat;
 	typename statistic::stat_time recv_idle_begin_time;

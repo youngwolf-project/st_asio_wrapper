@@ -1,4 +1,4 @@
-
+﻿
 #ifndef ST_ASIO_UDP_DEFAULT_IP_VERSION
 #define ST_ASIO_UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
 #endif
