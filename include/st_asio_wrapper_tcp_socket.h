@@ -13,6 +13,8 @@
 #ifndef ST_ASIO_WRAPPER_TCP_SOCKET_H_
 #define ST_ASIO_WRAPPER_TCP_SOCKET_H_
 
+#include <vector>
+
 #include "st_asio_wrapper_socket.h"
 
 #ifndef ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION
@@ -41,23 +43,22 @@ protected:
 
 	enum shutdown_states {NONE, FORCE, GRACEFUL};
 
-	st_tcp_socket_base(boost::asio::io_service& io_service_) : super(io_service_), unpacker_(boost::make_shared<Unpacker>()),
-		shutdown_state(shutdown_states::NONE), shutdown_atomic(0) {}
-	template<typename Arg> st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()),
-		shutdown_state(shutdown_states::NONE), shutdown_atomic(0) {}
+	st_tcp_socket_base(boost::asio::io_service& io_service_) : super(io_service_), unpacker_(boost::make_shared<Unpacker>()), shutdown_state(NONE), shutdown_atomic(0) {}
+	template<typename Arg>
+	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()), shutdown_state(NONE), shutdown_atomic(0) {}
 
 public:
 	virtual bool obsoleted() {return !is_shutting_down() && super::obsoleted();}
 
 	//reset all, be ensure that there's no any operations performed on this st_tcp_socket_base when invoke it
-	void reset() {reset_state(); shutdown_state = shutdown_states::NONE; super::reset();}
+	void reset() {reset_state(); shutdown_state = NONE; super::reset();}
 	void reset_state()
 	{
 		unpacker_->reset_state();
 		super::reset_state();
 	}
 
-	bool is_shutting_down() const {return shutdown_states::NONE != shutdown_state;}
+	bool is_shutting_down() const {return NONE != shutdown_state;}
 
 	//get or change the unpacker at runtime
 	//changing unpacker at runtime is not thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
@@ -79,13 +80,13 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
-	void force_shutdown() {if (shutdown_states::FORCE != shutdown_state) shutdown();}
+	void force_shutdown() {if (FORCE != shutdown_state) shutdown();}
 	bool graceful_shutdown(bool sync) //will block until shutdown success or time out if sync equal to true
 	{
 		if (is_shutting_down())
 			return false;
 		else
-			shutdown_state = shutdown_states::GRACEFUL;
+			shutdown_state = GRACEFUL;
 
 		boost::system::error_code ec;
 		ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
@@ -181,7 +182,7 @@ protected:
 		if (!lock.locked())
 			return;
 
-		shutdown_state = shutdown_states::FORCE;
+		shutdown_state = FORCE;
 		ST_THIS stop_all_timer();
 
 		if (ST_THIS lowest_layer().is_open())

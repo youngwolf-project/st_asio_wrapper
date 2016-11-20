@@ -20,6 +20,7 @@
 #include "st_asio_wrapper_tcp_client.h"
 #include "st_asio_wrapper_server_socket.h"
 #include "st_asio_wrapper_server.h"
+#include "st_asio_wrapper_container.h"
 
 #ifdef ST_ASIO_REUSE_OBJECT
 	#error boost::asio::ssl::stream not support reuse!
@@ -100,7 +101,7 @@ protected:
 		if (!ST_THIS is_shutting_down() && authorized_)
 		{
 			ST_THIS show_info("ssl client link:", "been shut down.");
-			ST_THIS shutdown_state = super::shutdown_states::GRACEFUL;
+			ST_THIS shutdown_state = super::GRACEFUL;
 			ST_THIS reconnecting = false;
 			authorized_ = false;
 
@@ -169,7 +170,21 @@ protected:
 template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
 	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+#if !defined(_MSC_VER) || _MSC_VER >= 1800
 using st_ssl_server_socket_base = st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer>;
+#else
+class st_ssl_server_socket_base : public st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer>
+{
+protected:
+	typedef st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer> super;
+
+public:
+	using super::TIMER_BEGIN;
+	using super::TIMER_END;
+
+	st_ssl_server_socket_base(Server& server_, boost::asio::ssl::context& ctx) : super(server_, ctx) {}
+};
+#endif
 
 template<typename Socket, typename Pool = st_ssl_object_pool<Socket>, typename Server = i_server>
 class st_ssl_server_base : public st_server_base<Socket, Pool, Server>

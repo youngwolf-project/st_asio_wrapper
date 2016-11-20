@@ -254,7 +254,7 @@ public:
 		return object_type();
 	}
 
-	void list_all_object() {do_something_to_all([](object_ctype& item) {item->show_info("", ""); });}
+	void list_all_object() {do_something_to_all([](object_ctype& item) {item->show_info("", "");});}
 
 	//Kick out obsoleted objects
 	//Consider the following assumptions:

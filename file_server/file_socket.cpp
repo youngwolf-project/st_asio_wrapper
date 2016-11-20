@@ -10,7 +10,11 @@
 //but file_server only receive talking message, not send talking message proactively), the previous message has been
 //sent to file_client, so sending buffer will always be empty, which means we will never operate sending buffer concurrently,
 //so need no locks.
-#define ST_ASIO_DEFAULT_PACKER	replaceable_packer<>
+#if !defined(_MSC_VER) || _MSC_VER > 1800
+#define ST_ASIO_DEFAULT_PACKER	replaceable_packer<> //before C++ 14.0, auto_buffer will lead compilation error, who can tell me why?
+#else
+#define ST_ASIO_DEFAULT_PACKER	replaceable_packer<shared_buffer<i_buffer>>
+#endif
 //configuration
 
 #include "file_socket.h"
@@ -31,7 +35,7 @@ bool file_socket::on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(m
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 void file_socket::on_msg_send(in_msg_type& msg)
 {
-	auto buffer = dynamic_cast<file_buffer*>(msg.raw_buffer());
+	auto buffer = dynamic_cast<file_buffer*>(&*msg.raw_buffer());
 	if (nullptr != buffer)
 	{
 		buffer->read();

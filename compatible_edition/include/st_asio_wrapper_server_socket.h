@@ -14,6 +14,7 @@
 #define ST_ASIO_WRAPPER_SERVER_SOCKET_H_
 
 #include "st_asio_wrapper_tcp_socket.h"
+#include "st_asio_wrapper_container.h"
 
 namespace st_asio_wrapper
 {

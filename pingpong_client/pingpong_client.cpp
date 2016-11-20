@@ -122,7 +122,7 @@ public:
 	statistic get_statistic()
 	{
 		statistic stat;
-		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic(); });
+		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic();});
 
 		return stat;
 	}

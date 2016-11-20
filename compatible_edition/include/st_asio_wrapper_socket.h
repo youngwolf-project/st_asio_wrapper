@@ -13,7 +13,6 @@
 #ifndef ST_ASIO_WRAPPER_SOCKET_H_
 #define ST_ASIO_WRAPPER_SOCKET_H_
 
-#include "st_asio_wrapper_base.h"
 #include "st_asio_wrapper_timer.h"
 
 //after this duration, this st_socket can be freed from the heap or reused,
@@ -243,8 +242,11 @@ protected:
 		temp_buffer.swap(temp_msg_buffer);
 #endif
 
-		if (move_items_in(recv_msg_buffer, temp_buffer, -1) > 0)
+		if (!temp_buffer.empty())
+		{
+			recv_msg_buffer.move_items_in(temp_buffer);
 			dispatch_msg();
+		}
 
 		if (temp_msg_buffer.empty() && recv_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM)
 			do_recv_msg(); //receive msg sequentially, which means second receiving only after first receiving success

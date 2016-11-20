@@ -14,6 +14,7 @@
 #define ST_ASIO_WRAPPER_UDP_SOCKET_H_
 
 #include "st_asio_wrapper_socket.h"
+#include "st_asio_wrapper_container.h"
 
 //in set_local_addr, if the IP is empty, ST_ASIO_UDP_DEFAULT_IP_VERSION will define the IP version,
 //or, the IP version will be deduced by the IP address.

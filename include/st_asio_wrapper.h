@@ -109,13 +109,18 @@
  * Remove all mutex (except mutex in st_object_pool, st_service_pump, lock_queue and st_udp_socket).
  * Sharply simplified st_timer class.
  *
+ * 2016.11.20	version 1.3.3
+ * Simplify header files' dependence.
+ * Yield to Visual C++ 10.0
+ * Add Visual C++ solution and project files (Visuall C++ 11.0 and 9.0).
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10302	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.3.2"
+#define ST_ASIO_WRAPPER_VER		10303	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.3.3"
 
 #ifdef _MSC_VER
 	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");
