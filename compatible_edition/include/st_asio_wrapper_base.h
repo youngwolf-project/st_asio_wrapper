@@ -14,27 +14,30 @@
 #define ST_ASIO_WRAPPER_BASE_H_
 
 #include <time.h>
-#include <string>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <assert.h>
 
+#include <string>
 #include <sstream>
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
+#include <boost/thread.hpp>
 #include <boost/version.hpp>
 #include <boost/date_time.hpp>
 #include <boost/smart_ptr.hpp>
-#include "boost/lambda/lambda.hpp"
-#include "boost/lambda/bind.hpp"
-#include "boost/lambda/if.hpp"
+#include <boost/typeof/typeof.hpp>
+#include <boost/container/list.hpp>
+#include <boost/lambda/lambda.hpp>
+#include <boost/lambda/bind.hpp>
+#include <boost/lambda/if.hpp>
 #if BOOST_VERSION >= 105300
 #include <boost/atomic.hpp>
 #endif
 
-#include "st_asio_wrapper_container.h"
+#include "st_asio_wrapper.h"
 
 //the size of the buffer used when receiving msg, must equal to or larger than the biggest msg size,
 //the bigger this buffer is, the more msgs can be received in one time if there are enough msgs buffered in the SOCKET.
@@ -44,6 +47,13 @@
 #define ST_ASIO_MSG_BUFFER_SIZE	4000
 #elif ST_ASIO_MSG_BUFFER_SIZE <= 0
 	#error message buffer size must be bigger than zero.
+#endif
+
+//msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamically, which means only allocate memory when needed.
+#ifndef ST_ASIO_MAX_MSG_NUM
+#define ST_ASIO_MAX_MSG_NUM		1024
+#elif ST_ASIO_MAX_MSG_NUM <= 0
+	#error message capacity must be bigger than zero.
 #endif
 
 #if defined _MSC_VER
@@ -398,6 +408,33 @@ void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 
 template<typename _Can, typename _Predicate>
 void do_something_to_one(_Can& __can, const _Predicate& __pred) {for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) if (__pred(*iter)) break;}
+
+template<typename _Can>
+bool splice_helper(_Can& dest_can, _Can& src_can, size_t max_size = ST_ASIO_MAX_MSG_NUM)
+{
+	size_t size = dest_can.size();
+	if (size < max_size) //dest_can can hold more items.
+	{
+		size = max_size - size; //maximum items can be handled this time
+		BOOST_AUTO(begin_iter, src_can.begin()); BOOST_AUTO(end_iter, src_can.end());
+		if (src_can.size() > size) //some items left behind
+		{
+			size_t left_num = src_can.size() - size;
+			if (left_num > size) //find the minimum movement
+				std::advance(end_iter = begin_iter, size);
+			else
+				std::advance(end_iter, -(int) left_num);
+		}
+		else
+			size = src_can.size();
+		//use size to avoid std::distance() call, so, size must correct
+		dest_can.splice(dest_can.end(), src_can, begin_iter, end_iter, size);
+
+		return size > 0;
+	}
+
+	return false;
+}
 
 //member functions, used to do something to any member container(except map and multimap) optionally with any member mutex
 #define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)

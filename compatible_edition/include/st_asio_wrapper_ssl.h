@@ -20,6 +20,7 @@
 #include "st_asio_wrapper_tcp_client.h"
 #include "st_asio_wrapper_server_socket.h"
 #include "st_asio_wrapper_server.h"
+#include "st_asio_wrapper_container.h"
 
 #ifdef ST_ASIO_REUSE_OBJECT
 	#error boost::asio::ssl::stream not support reuse!

@@ -14,6 +14,7 @@
 #define ST_ASIO_WRAPPER_CONNECTOR_H_
 
 #include "st_asio_wrapper_tcp_socket.h"
+#include "st_asio_wrapper_container.h"
 
 #ifndef ST_ASIO_SERVER_IP
 #define ST_ASIO_SERVER_IP			"127.0.0.1"

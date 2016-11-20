@@ -13,6 +13,8 @@
 #ifndef ST_ASIO_WRAPPER_TCP_SOCKET_H_
 #define ST_ASIO_WRAPPER_TCP_SOCKET_H_
 
+#include <vector>
+
 #include "st_asio_wrapper_socket.h"
 
 #ifndef ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION

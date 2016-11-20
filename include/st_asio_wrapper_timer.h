@@ -125,7 +125,8 @@ protected:
 
 		ti.timer->expires_from_now(milliseconds(ti.milliseconds));
 		//return true from call_back to continue the timer, or the timer will stop
-		ti.timer->async_wait(make_handler_error([this, &ti](const boost::system::error_code& ec) {if (!ec && ti.call_back(ti.id) && timer_info::TIMER_OK == ti.status) ST_THIS start_timer(ti);}));
+		ti.timer->async_wait(make_handler_error(
+			[this, &ti](const boost::system::error_code& ec) {if (!ec && ti.call_back(ti.id) && st_timer::timer_info::TIMER_OK == ti.status) ST_THIS start_timer(ti);}));
 	}
 
 	void stop_timer(timer_info& ti)

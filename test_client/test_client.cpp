@@ -316,15 +316,21 @@ void send_msg_concurrently(test_client& client, size_t msg_num, size_t msg_len, 
 	boost::timer::cpu_timer begin_time;
 	boost::thread_group threads;
 	do_something_to_all(link_groups, [&threads, msg_num, msg_len, msg_fill](const std::list<test_client::object_type>& item) {
-		threads.create_thread([&item, msg_num, msg_len, msg_fill]() {
-			auto buff = new char[msg_len];
-			memset(buff, msg_fill, msg_len);
-			for (size_t i = 0; i < msg_num; ++i)
+		auto msg_num_ = msg_num;
+		auto msg_len_ = msg_len;
+		auto msg_fill_ = msg_fill;
+		//terrible Visual C++ 10.0, it cannot capture msg_num, msg_len and msg_fill directly at here
+		threads.create_thread([&item, msg_num_, msg_len_, msg_fill_]() {
+			auto buff = new char[msg_len_];
+			memset(buff, msg_fill_, msg_len_);
+			for (size_t i = 0; i < msg_num_; ++i)
 			{
 				memcpy(buff, &i, sizeof(size_t)); //seq
+				auto msg_len__ = msg_len_;
+				//terrible Visual C++ 10.0, it cannot capture msg_len_ directly at here
 
 				//congestion control, method #1, the peer needs its own congestion control too.
-				do_something_to_all(item, [buff, msg_len](test_client::object_ctype& item2) {item2->safe_send_msg(buff, msg_len);}); //can_overflow is false, it's important
+				do_something_to_all(item, [buff, msg_len__](test_client::object_ctype& item2) {item2->safe_send_msg(buff, msg_len__);}); //can_overflow is false, it's important
 			}
 			delete[] buff;
 		});
