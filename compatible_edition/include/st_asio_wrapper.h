@@ -24,7 +24,7 @@
 
 #ifdef _MSC_VER
 	#if _MSC_VER >= 1600
-		#warning Your compiler is Visual C++ 10.0 or higher, you can use the standard edition to gain some performance improvement.
+		#pragma message("Your compiler is Visual C++ 10.0 or higher, you can use the standard edition to gain some performance improvement.")
 	#endif
 #elif defined(__GNUC__)
 	//After a roughly reading from gcc.gnu.org and clang.llvm.org, I believed that the minimum version of GCC and Clang that support c++0x
