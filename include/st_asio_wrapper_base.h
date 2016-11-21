@@ -154,9 +154,6 @@ public:
 protected:
 	buffer_type buffer;
 };
-typedef auto_buffer<i_buffer> replaceable_buffer;
-//replaceable_packer and replaceable_unpacker used replaceable_buffer as their msg type, so they're replaceable,
-//shared_buffer<i_buffer> is available too.
 
 //convert '->' operation to '.' operation
 //user need to allocate object, and shared_buffer will free it
@@ -192,6 +189,13 @@ protected:
 	buffer_type buffer;
 };
 //not like auto_buffer, shared_buffer is copyable, but auto_buffer is a bit more efficient.
+
+#if !defined(_MSC_VER) || _MSC_VER > 1800
+typedef auto_buffer<i_buffer> replaceable_buffer;
+#else
+typedef shared_buffer<i_buffer> replaceable_buffer; //before C++ 14.0, auto_buffer will lead compilation error, who can tell me why?
+#endif
+//packer or/and unpacker used replaceable_buffer as their msg type will be replaceable.
 
 //packer concept
 template<typename MsgType>

@@ -12,11 +12,7 @@
 //but file_server only receive talking message, not send talking message proactively), the previous message has been
 //sent to file_client, so sending buffer will always be empty, which means we will never operate sending buffer concurrently,
 //so need no locks.
-#if !defined(_MSC_VER) || _MSC_VER > 1800
-#define ST_ASIO_DEFAULT_PACKER	replaceable_packer<> //before C++ 14.0, auto_buffer will lead compilation error, who can tell me why?
-#else
-#define ST_ASIO_DEFAULT_PACKER	replaceable_packer<shared_buffer<i_buffer>>
-#endif
+#define ST_ASIO_DEFAULT_PACKER	replaceable_packer<>
 //configuration
 
 #include "../include/st_asio_wrapper_server.h"
