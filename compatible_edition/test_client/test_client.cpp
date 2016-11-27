@@ -312,10 +312,11 @@ void send_msg_concurrently(test_client& client, size_t msg_num, size_t msg_len, 
 	size_t group_index = (size_t) -1;
 	size_t this_group_link_num = 0;
 
-	std::list<test_client::object_type> all_links;
-	client.do_something_to_all(boost::lambda::bind(&std::list<test_client::object_type>::push_back, &all_links, boost::lambda::_1));
+	typedef std::list<test_client::object_type> link_container;
+	link_container all_links;
+	client.do_something_to_all(boost::lambda::bind((void (link_container::*)(const link_container::value_type&)) &link_container::push_back, &all_links, boost::lambda::_1));
 
-	std::vector<std::list<test_client::object_type> > link_groups(group_num);
+	std::vector<link_container> link_groups(group_num);
 	for (BOOST_AUTO(iter, all_links.begin()); iter != all_links.end(); ++iter)
 	{
 		if (0 == this_group_link_num)
