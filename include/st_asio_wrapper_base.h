@@ -193,7 +193,7 @@ protected:
 #if !defined(_MSC_VER) || _MSC_VER > 1800
 typedef auto_buffer<i_buffer> replaceable_buffer;
 #else
-typedef shared_buffer<i_buffer> replaceable_buffer; //before C++ 14.0, auto_buffer will lead compilation error, who can tell me why?
+typedef shared_buffer<i_buffer> replaceable_buffer; //before C++ 14.0, auto_buffer will lead compilation error
 #endif
 //packer or/and unpacker used replaceable_buffer as their msg type will be replaceable.
 
