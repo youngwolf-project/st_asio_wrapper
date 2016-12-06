@@ -112,13 +112,13 @@ private:
 };
 
 class st_service_pump;
-class st_timer;
+class st_object;
 class i_server
 {
 public:
 	virtual st_service_pump& get_service_pump() = 0;
 	virtual const st_service_pump& get_service_pump() const = 0;
-	virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
+	virtual bool del_client(const boost::shared_ptr<st_object>& client_ptr) = 0;
 };
 
 class i_buffer
@@ -255,9 +255,12 @@ public:
 
 	udp_msg() {}
 	udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr) : peer_addr(_peer_addr) {}
+	udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr, const MsgType& msg) : MsgType(msg), peer_addr(_peer_addr) {}
 
+	using MsgType::operator =;
+	using MsgType::swap;
+	void swap(boost::asio::ip::udp::endpoint& addr) {std::swap(peer_addr, addr);}
 	void swap(udp_msg& other) {std::swap(peer_addr, other.peer_addr); MsgType::swap(other);}
-	void set_addr(const boost::asio::ip::udp::endpoint& addr) {peer_addr = addr;}
 };
 
 template<typename MsgType>
@@ -281,7 +284,6 @@ public:
 struct statistic
 {
 #ifdef ST_ASIO_FULL_STATISTIC
-	static bool enabled() {return true;}
 	typedef boost::posix_time::ptime stat_time;
 	static stat_time local_time() {return boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time();}
 	typedef boost::posix_time::time_duration stat_duration;
@@ -289,7 +291,6 @@ struct statistic
 	struct dummy_duration {const dummy_duration& operator +=(const dummy_duration& other) {return *this;}}; //not a real duration, just satisfy compiler(d1 += d2)
 	struct dummy_time {dummy_duration operator -(const dummy_time& other) {return dummy_duration();}}; //not a real time, just satisfy compiler(t1 - t2)
 
-	static bool enabled() {return false;}
 	typedef dummy_time stat_time;
 	static stat_time local_time() {return stat_time();}
 	typedef dummy_duration stat_duration;
@@ -298,7 +299,7 @@ struct statistic
 	void reset()
 	{
 		send_msg_sum = send_byte_sum = 0;
-		send_delay_sum = send_time_sum = stat_duration();
+		send_delay_sum = send_time_sum = pack_time_sum = stat_duration();
 
 		recv_msg_sum = recv_byte_sum = 0;
 		dispatch_dealy_sum = recv_idle_sum = stat_duration();
@@ -306,6 +307,7 @@ struct statistic
 		handle_time_1_sum = stat_duration();
 #endif
 		handle_time_2_sum = stat_duration();
+		unpack_time_sum = stat_duration();
 	}
 
 	statistic& operator +=(const struct statistic& other)
@@ -314,6 +316,7 @@ struct statistic
 		send_byte_sum += other.send_byte_sum;
 		send_delay_sum += other.send_delay_sum;
 		send_time_sum += other.send_time_sum;
+		pack_time_sum += other.pack_time_sum;
 
 		recv_msg_sum += other.recv_msg_sum;
 		recv_byte_sum += other.recv_byte_sum;
@@ -323,6 +326,7 @@ struct statistic
 		handle_time_1_sum += other.handle_time_1_sum;
 #endif
 		handle_time_2_sum += other.handle_time_2_sum;
+		unpack_time_sum += other.unpack_time_sum;
 
 		return *this;
 	}
@@ -337,6 +341,7 @@ struct statistic
 			<< "size in bytes: " << send_byte_sum << std::endl
 			<< "send delay: " << send_delay_sum.total_seconds() << "." << std::setw(tw) << send_delay_sum.fractional_seconds() << std::setw(0) << std::endl
 			<< "send duration: " << send_time_sum.total_seconds() << "." << std::setw(tw) << send_time_sum.fractional_seconds() << std::setw(0) << std::endl
+			<< "pack duration: " << pack_time_sum.total_seconds() << "." << std::setw(tw) << pack_time_sum.fractional_seconds() << std::setw(0) << std::endl
 			<< "\nrecv corresponding statistic:\n"
 			<< "message sum: " << recv_msg_sum << std::endl
 			<< "size in bytes: " << recv_byte_sum << std::endl
@@ -345,7 +350,8 @@ struct statistic
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 			<< "on_msg duration: " << handle_time_1_sum.total_seconds() << "." << std::setw(tw) << handle_time_1_sum.fractional_seconds() << std::setw(0) << std::endl
 #endif
-			<< "on_msg_handle duration: " << handle_time_2_sum.total_seconds() << "." << std::setw(tw) << handle_time_2_sum.fractional_seconds();
+			<< "on_msg_handle duration: " << handle_time_2_sum.total_seconds() << "." << std::setw(tw) << handle_time_2_sum.fractional_seconds() << std::endl
+			<< "unpack duration: " << unpack_time_sum.total_seconds() << "." << std::setw(tw) << unpack_time_sum.fractional_seconds();
 #else
 		s << std::setfill('0') << "send corresponding statistic:\n"
 			<< "message sum: " << send_msg_sum << std::endl
@@ -363,6 +369,7 @@ struct statistic
 	stat_duration send_delay_sum; //from send_(native_)msg (exclude msg packing) to asio::async_write
 	stat_duration send_time_sum; //from asio::async_write to send_handler
 	//above two items indicate your network's speed or load
+	stat_duration pack_time_sum; //st_udp_socket will not gather this item
 
 	//recv corresponding statistic
 	boost::uint_fast64_t recv_msg_sum; //include msgs in receiving buffer
@@ -374,6 +381,21 @@ struct statistic
 	stat_duration handle_time_1_sum; //on_msg consumed time, this indicate the efficiency of msg handling
 #endif
 	stat_duration handle_time_2_sum; //on_msg_handle consumed time, this indicate the efficiency of msg handling
+	stat_duration unpack_time_sum; //st_udp_socket will not gather this item
+};
+
+class auto_duration
+{
+public:
+	auto_duration(statistic::stat_duration& duration_) : started(true), begin_time(statistic::local_time()), duration(duration_) {}
+	~auto_duration() {end();}
+
+	void end() {if (started) duration += statistic::local_time() - begin_time; started = false;}
+
+private:
+	bool started;
+	statistic::stat_time begin_time;
+	statistic::stat_duration& duration;
 };
 
 template<typename T>
@@ -382,6 +404,7 @@ struct obj_with_begin_time : public T
 	obj_with_begin_time() {restart();}
 	void restart() {restart(statistic::local_time());}
 	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
+	using T::operator =;
 	using T::swap;
 	void swap(obj_with_begin_time& other) {T::swap(other); std::swap(begin_time, other.begin_time);}
 
@@ -478,12 +501,13 @@ TYPE FUNNAME(const std::string& str, bool can_overflow = false) {return FUNNAME(
 #define TCP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	if (can_overflow || ST_THIS is_send_buffer_available()) \
-	{ \
-		in_msg_type msg; \
-		return ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE) ? ST_THIS do_direct_send_msg(msg) : false; \
-	} \
-	return false; \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return false; \
+	auto_duration dur(ST_THIS stat.pack_time_sum); \
+	in_msg_type msg; \
+	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	dur.end(); \
+	return ST_THIS do_direct_send_msg(msg); \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
@@ -509,12 +533,11 @@ TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const std::string&
 #define UDP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	if (can_overflow || ST_THIS is_send_buffer_available()) \
-	{ \
-		in_msg_type msg(peer_addr); \
-		return ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE) ? ST_THIS do_direct_send_msg(msg) : false; \
-	} \
-	return false; \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return false; \
+	in_msg_type msg(peer_addr); \
+	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	return ST_THIS do_direct_send_msg(msg); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 

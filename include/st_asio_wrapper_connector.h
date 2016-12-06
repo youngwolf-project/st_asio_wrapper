@@ -46,7 +46,6 @@ public:
 
 	st_connector_base(boost::asio::io_service& io_service_) : super(io_service_), connected(false), reconnecting(true)
 		{set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
-
 	template<typename Arg>
 	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), connected(false), reconnecting(true)
 		{set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}

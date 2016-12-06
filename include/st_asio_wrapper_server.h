@@ -69,7 +69,7 @@ public:
 	//implement i_server's pure virtual functions
 	virtual st_service_pump& get_service_pump() {return Pool::get_service_pump();}
 	virtual const st_service_pump& get_service_pump() const {return Pool::get_service_pump();}
-	virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr)
+	virtual bool del_client(const boost::shared_ptr<st_object>& client_ptr)
 	{
 		auto raw_client_ptr(boost::dynamic_pointer_cast<Socket>(client_ptr));
 		return raw_client_ptr && ST_THIS del_object(raw_client_ptr) ? raw_client_ptr->force_shutdown(), true : false;
