@@ -114,13 +114,18 @@
  * Yield to Visual C++ 10.0
  * Add Visual C++ solution and project files (Visuall C++ 11.0 and 9.0).
  *
+ * 2016.12.6	version 1.3.4
+ * Compatible edition support c++0x (11, 14, 17, ...) features too.
+ * Monitor time consumptions for message packing and unpacking.
+ * Fix bug: pop_first_pending_send_msg and pop_first_pending_recv_msg cannot compile.
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10303	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.3.3"
+#define ST_ASIO_WRAPPER_VER		10304	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.3.4"
 
 #ifdef _MSC_VER
 	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");

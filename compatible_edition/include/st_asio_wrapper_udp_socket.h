@@ -194,7 +194,7 @@ private:
 			++ST_THIS stat.recv_msg_sum;
 			ST_THIS stat.recv_byte_sum += bytes_transferred;
 			ST_THIS temp_msg_buffer.resize(ST_THIS temp_msg_buffer.size() + 1);
-			ST_THIS temp_msg_buffer.back().set_addr(peer_addr);
+			ST_THIS temp_msg_buffer.back().swap(peer_addr);
 			unpacker_->parse_msg(ST_THIS temp_msg_buffer.back(), bytes_transferred);
 			ST_THIS handle_msg();
 		}

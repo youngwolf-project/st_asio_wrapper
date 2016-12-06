@@ -161,7 +161,7 @@ protected:
 		assert(boost::asio::buffer_size(recv_buff) > 0);
 
 		boost::asio::async_read(ST_THIS next_layer(), recv_buff,
-			boost::bind(&i_unpacker<out_msg_type>::completion_condition, unpacker_, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
+			boost::bind(&st_tcp_socket_base::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred),
 			ST_THIS make_handler_error_size(boost::bind(&st_tcp_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
@@ -197,12 +197,20 @@ protected:
 	}
 
 private:
+	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
+	{
+		auto_duration dur(ST_THIS stat.unpack_time_sum);
+		return ST_THIS unpacker_->completion_condition(ec, bytes_transferred);
+	}
+
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec && bytes_transferred > 0)
 		{
 			typename Unpacker::container_type temp_msg_can;
+			auto_duration dur(ST_THIS stat.unpack_time_sum);
 			bool unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
+			dur.end();
 			size_t msg_num = temp_msg_can.size();
 			if (msg_num > 0)
 			{

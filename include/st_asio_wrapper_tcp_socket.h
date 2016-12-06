@@ -159,7 +159,7 @@ protected:
 		assert(boost::asio::buffer_size(recv_buff) > 0);
 
 		boost::asio::async_read(ST_THIS next_layer(), recv_buff,
-			[this](const boost::system::error_code& ec, size_t bytes_transferred)->size_t {return ST_THIS unpacker_->completion_condition(ec, bytes_transferred);},
+			[this](const boost::system::error_code& ec, size_t bytes_transferred)->size_t {return ST_THIS completion_checker(ec, bytes_transferred);},
 			ST_THIS make_handler_error_size([this](const boost::system::error_code& ec, size_t bytes_transferred) {ST_THIS recv_handler(ec, bytes_transferred);}));
 	}
 
@@ -195,12 +195,20 @@ protected:
 	}
 
 private:
+	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
+	{
+		auto_duration dur(ST_THIS stat.unpack_time_sum);
+		return ST_THIS unpacker_->completion_condition(ec, bytes_transferred);
+	}
+
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (!ec && bytes_transferred > 0)
 		{
 			typename Unpacker::container_type temp_msg_can;
+			auto_duration dur(ST_THIS stat.unpack_time_sum);
 			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
+			dur.end();
 			auto msg_num = temp_msg_can.size();
 			if (msg_num > 0)
 			{

@@ -101,7 +101,7 @@ protected:
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 		ST_THIS force_shutdown();
 #else
-		server.del_client(boost::dynamic_pointer_cast<st_timer>(ST_THIS shared_from_this()));
+		server.del_client(ST_THIS shared_from_this());
 #endif
 		ST_THIS shutdown_state = super::NONE;
 	}
