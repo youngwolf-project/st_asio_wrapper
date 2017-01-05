@@ -8,6 +8,7 @@
 								  //any value which is bigger than zero is okay.
 #define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_CUSTOM_LOG
+#define ST_ASIO_HEARTBEAT_INTERVAL	0 //disable heartbeat just because asio_server disabled heartbeat.
 #define ST_ASIO_DEFAULT_UNPACKER non_copy_unpacker
 //#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 

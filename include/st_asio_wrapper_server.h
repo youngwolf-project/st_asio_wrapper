@@ -21,7 +21,7 @@
 static_assert(ST_ASIO_SERVER_PORT > 0, "server port must be bigger than zero.");
 
 #ifndef ST_ASIO_ASYNC_ACCEPT_NUM
-#define ST_ASIO_ASYNC_ACCEPT_NUM	1 //how many async_accept delivery concurrently
+#define ST_ASIO_ASYNC_ACCEPT_NUM	16 //how many async_accept delivery concurrently
 #endif
 static_assert(ST_ASIO_ASYNC_ACCEPT_NUM > 0, "async accept number must be bigger than zero.");
 

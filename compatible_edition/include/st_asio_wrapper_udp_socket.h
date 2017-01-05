@@ -130,7 +130,7 @@ protected:
 	//return false if send buffer is empty or sending not allowed or io_service stopped
 	virtual bool do_send_msg()
 	{
-		if (is_send_allowed() && !ST_THIS stopped() && !ST_THIS send_msg_buffer.empty() && ST_THIS send_msg_buffer.try_dequeue(last_send_msg))
+		if (!ST_THIS send_msg_buffer.empty() && is_send_allowed() && ST_THIS send_msg_buffer.try_dequeue(last_send_msg))
 		{
 			ST_THIS stat.send_delay_sum += statistic::local_time() - last_send_msg.begin_time;
 
@@ -175,6 +175,7 @@ protected:
 		boost::unique_lock<boost::shared_mutex> lock(shutdown_mutex);
 
 		ST_THIS stop_all_timer();
+		ST_THIS close();
 
 		if (ST_THIS lowest_layer().is_open())
 		{
@@ -182,8 +183,6 @@ protected:
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
 			ST_THIS lowest_layer().close(ec);
 		}
-
-		ST_THIS close(); //call this at the end of 'shutdown', it's very important
 	}
 
 private:
@@ -193,7 +192,7 @@ private:
 		{
 			++ST_THIS stat.recv_msg_sum;
 			ST_THIS stat.recv_byte_sum += bytes_transferred;
-			ST_THIS temp_msg_buffer.resize(ST_THIS temp_msg_buffer.size() + 1);
+			ST_THIS temp_msg_buffer.emplace_back();
 			ST_THIS temp_msg_buffer.back().swap(peer_addr);
 			unpacker_->parse_msg(ST_THIS temp_msg_buffer.back(), bytes_transferred);
 			ST_THIS handle_msg();

@@ -207,7 +207,7 @@ private:
 		assert(NULL != i_service_);
 
 		boost::unique_lock<boost::shared_mutex> lock(service_can_mutex);
-		service_can.push_back(i_service_);
+		service_can.emplace_back(i_service_);
 	}
 
 protected:

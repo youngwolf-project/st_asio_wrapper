@@ -12,8 +12,20 @@ else
 	lflag = -s
 	dir = release
 endif
+
+kernel = ${shell uname -s}
+ifeq (${kernel}, SunOS)
+cflag += -pthreads ${ext_cflag} ${boost_include_dir}
+lflag += -pthreads -lsocket -lnsl ${boost_lib_dir} -lboost_system -lboost_thread ${ext_libs}
+else
+ifeq (${kernel}, FreeBSD)
+cflag += -pthread ${ext_cflag} ${boost_include_dir}
+lflag += -pthread ${boost_lib_dir} -lboost_system -lboost_thread -lboost_atomic ${ext_libs}
+else # here maybe still have other kernels need to be separated out
 cflag += -pthread ${ext_cflag} ${boost_include_dir}
 lflag += -pthread ${boost_lib_dir} -lboost_system -lboost_thread ${ext_libs}
+endif
+endif
 
 target = ${dir}/${module}
 sources = ${shell ls *.cpp}

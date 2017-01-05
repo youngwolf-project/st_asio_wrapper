@@ -31,6 +31,7 @@ protected:
 public:
 	static const st_timer::tid TIMER_BEGIN = super::TIMER_END;
 	static const st_timer::tid TIMER_ASYNC_SHUTDOWN = TIMER_BEGIN;
+	static const st_timer::tid TIMER_HEARTBEAT_CHECK = TIMER_BEGIN + 1;
 	static const st_timer::tid TIMER_END = TIMER_BEGIN + 10;
 
 	st_server_socket_base(Server& server_) : super(server_.get_service_pump()), server(server_) {}
@@ -85,6 +86,9 @@ protected:
 	{
 		if (!ST_THIS stopped())
 		{
+			ST_THIS last_interact_time = time(nullptr);
+			if (ST_ASIO_HEARTBEAT_INTERVAL > 0)
+				ST_THIS set_timer(TIMER_HEARTBEAT_CHECK, ST_ASIO_HEARTBEAT_INTERVAL * 1000, [this](st_timer::tid id)->bool {return ST_THIS check_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);});
 			ST_THIS do_recv_msg();
 			return true;
 		}
@@ -104,6 +108,30 @@ protected:
 		server.del_client(ST_THIS shared_from_this());
 #endif
 		ST_THIS shutdown_state = super::NONE;
+	}
+
+	//unit is second
+	//if macro ST_ASIO_HEARTBEAT_INTERVAL is bigger than zero, st_server_socket_base will start a timer to call this automatically with interval equal to ST_ASIO_HEARTBEAT_INTERVAL.
+	//otherwise, you can call check_heartbeat with you own logic, but you still need to define a valid ST_ASIO_HEARTBEAT_MAX_ABSENCE macro, please note.
+	bool check_heartbeat(int interval)
+	{
+		assert(interval > 0);
+
+		auto now = time(nullptr);
+		if (ST_THIS clean_heartbeat() > 0)
+		{
+			if (now - ST_THIS last_interact_time >= interval) //server never send heartbeat on its own initiative
+				ST_THIS send_heartbeat('s');
+
+			ST_THIS last_interact_time = now;
+		}
+		else if (now - ST_THIS last_interact_time >= interval * ST_ASIO_HEARTBEAT_MAX_ABSENCE)
+		{
+			show_info("server link:", "broke unexpectedly.");
+			force_shutdown();
+		}
+
+		return ST_THIS started(); //always keep this timer
 	}
 
 private:

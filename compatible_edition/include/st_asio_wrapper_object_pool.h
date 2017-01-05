@@ -97,7 +97,7 @@ protected:
 		assert(object_ptr && !object_ptr->is_equal_to(-1));
 
 		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
-		return object_can.size() < max_size_ ? object_can.insert(object_ptr).second : false;
+		return object_can.size() < max_size_ ? object_can.emplace(object_ptr).second : false;
 	}
 
 	//only add object_ptr to invalid_object_can when it's in object_can, this can avoid duplicated items in invalid_object_can, because invalid_object_can is a list,
@@ -113,7 +113,7 @@ protected:
 		if (exist)
 		{
 			boost::unique_lock<boost::shared_mutex> lock(invalid_object_can_mutex);
-			invalid_object_can.push_back(object_ptr);
+			invalid_object_can.emplace_back(object_ptr);
 		}
 
 		return exist;
@@ -125,7 +125,7 @@ protected:
 	{
 		if (object_ptr)
 		{
-			object_ptr->id(++cur_id);
+			object_ptr->id(1 + cur_id.fetch_add(1, boost::memory_order_relaxed));
 			on_create(object_ptr);
 		}
 		else
@@ -270,7 +270,7 @@ public:
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
 			if ((*iter)->obsoleted())
 			{
-				objects.push_back(*iter);
+				objects.emplace_back(*iter);
 				iter = object_can.erase(iter);
 			}
 			else
