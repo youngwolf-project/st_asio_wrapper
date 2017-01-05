@@ -102,7 +102,7 @@ public:
 		}
 
 		if (0 == _data_len)
-			msg_can.resize(msg_can.size() + 1);
+			msg_can.emplace_back();
 
 		return true;
 	}

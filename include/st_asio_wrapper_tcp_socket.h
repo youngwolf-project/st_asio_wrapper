@@ -13,14 +13,25 @@
 #ifndef ST_ASIO_WRAPPER_TCP_SOCKET_H_
 #define ST_ASIO_WRAPPER_TCP_SOCKET_H_
 
-#include <vector>
-
 #include "st_asio_wrapper_socket.h"
 
 #ifndef ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION
 #define ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION	5 //seconds, maximum duration while graceful shutdown
 #endif
 static_assert(ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION > 0, "graceful shutdown duration must be bigger than zero.");
+
+#ifndef ST_ASIO_HEARTBEAT_INTERVAL
+#define ST_ASIO_HEARTBEAT_INTERVAL	5 //second(s)
+#endif
+//at every ST_ASIO_HEARTBEAT_INTERVAL second(s), send an OOB data (heartbeat) if no normal messages been sent,
+//less than or equal to zero means disable heartbeat, then you can send and check heartbeat with you own logic by calling st_connector_base::check_heartbeat
+// or st_server_socket_base::check_heartbeat, and you still need to define a valid ST_ASIO_HEARTBEAT_MAX_ABSENCE macro, please note.
+
+#ifndef ST_ASIO_HEARTBEAT_MAX_ABSENCE
+#define ST_ASIO_HEARTBEAT_MAX_ABSENCE	3 //times of ST_ASIO_HEARTBEAT_INTERVAL
+#endif
+static_assert(ST_ASIO_HEARTBEAT_MAX_ABSENCE > 0, "heartbeat absence must be bigger than zero.");
+//if no any data (include heartbeats) been received within ST_ASIO_HEARTBEAT_INTERVAL * ST_ASIO_HEARTBEAT_MAX_ABSENCE second(s), shut down the link.
 
 namespace st_asio_wrapper
 {
@@ -43,9 +54,16 @@ protected:
 
 	enum shutdown_states {NONE, FORCE, GRACEFUL};
 
-	st_tcp_socket_base(boost::asio::io_service& io_service_) : super(io_service_), unpacker_(boost::make_shared<Unpacker>()), shutdown_state(NONE), shutdown_atomic(0) {}
-	template<typename Arg>
-	st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), unpacker_(boost::make_shared<Unpacker>()), shutdown_state(NONE), shutdown_atomic(0) {}
+	st_tcp_socket_base(boost::asio::io_service& io_service_) : super(io_service_) {first_init();}
+	template<typename Arg> st_tcp_socket_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg) {first_init();}
+
+	//helper function, just call it in constructor
+	void first_init()
+	{
+		unpacker_ = boost::make_shared<Unpacker>();
+		shutdown_state = NONE;
+		shutdown_atomic.store(0, boost::memory_order_relaxed);
+	}
 
 public:
 	virtual bool obsoleted() {return !is_shutting_down() && super::obsoleted();}
@@ -112,12 +130,12 @@ protected:
 	}
 
 	//ascs::socket will guarantee not call this function in more than one thread concurrently.
-	//return false if send buffer is empty or sending not allowed or io_service stopped
+	//return false if send buffer is empty or sending not allowed
 	virtual bool do_send_msg()
 	{
-		if (is_send_allowed() && !ST_THIS stopped() && !ST_THIS send_msg_buffer.empty())
+		if (is_send_allowed())
 		{
-			std::vector<boost::asio::const_buffer> bufs;
+			std::list<boost::asio::const_buffer> bufs;
 			{
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 				const size_t max_send_size = 0;
@@ -133,8 +151,8 @@ protected:
 				{
 					ST_THIS stat.send_delay_sum += end_time - msg.begin_time;
 					size += msg.size();
-					last_send_msg.push_back(std::move(msg));
-					bufs.push_back(boost::asio::buffer(last_send_msg.back().data(), last_send_msg.back().size()));
+					last_send_msg.emplace_back(std::move(msg));
+					bufs.emplace_back(last_send_msg.back().data(), last_send_msg.back().size());
 					if (size >= max_send_size)
 						break;
 				}
@@ -184,15 +202,47 @@ protected:
 
 		shutdown_state = FORCE;
 		ST_THIS stop_all_timer();
+		ST_THIS close();
 
 		if (ST_THIS lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
 			ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
 		}
-
-		ST_THIS close(); //call this at the end of 'shutdown', it's very important
 	}
+
+	int clean_heartbeat()
+	{
+		auto heartbeat_len = 0;
+		auto s = ST_THIS lowest_layer().native_handle();
+
+		while (true)
+		{
+#ifdef _WIN32
+			char oob_data;
+			unsigned long no_oob_data = 1;
+			ioctlsocket(s, SIOCATMARK, &no_oob_data);
+			if (0 == no_oob_data && recv(s, &oob_data, 1, MSG_OOB) > 0)
+				++heartbeat_len;
+#else
+			char oob_data[1024];
+			auto has_oob_data = 0;
+			int recv_len;
+			ioctl(s, SIOCATMARK, &has_oob_data);
+			if (1 == has_oob_data && (recv_len = recv(s, oob_data, sizeof(oob_data), MSG_OOB)) > 0)
+			{
+				heartbeat_len += recv_len;
+				if (recv_len < (int) sizeof(oob_data))
+					break;
+			}
+#endif
+			else
+				break;
+		}
+
+		return heartbeat_len;
+	}
+	void send_heartbeat(const char c) {send(ST_THIS lowest_layer().native_handle(), &c, 1, MSG_OOB);}
 
 private:
 	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
@@ -205,6 +255,8 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
+			last_interact_time = time(nullptr);
+
 			typename Unpacker::container_type temp_msg_can;
 			auto_duration dur(ST_THIS stat.unpack_time_sum);
 			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
@@ -215,10 +267,10 @@ private:
 				ST_THIS stat.recv_msg_sum += msg_num;
 				ST_THIS temp_msg_buffer.resize(ST_THIS temp_msg_buffer.size() + msg_num);
 				auto op_iter = ST_THIS temp_msg_buffer.rbegin();
-				for (auto iter = temp_msg_can.rbegin(); iter != temp_msg_can.rend();)
+				for (auto iter = temp_msg_can.rbegin(); iter != temp_msg_can.rend(); ++op_iter, ++iter)
 				{
-					ST_THIS stat.recv_byte_sum += (++iter).base()->size();
-					(++op_iter).base()->swap(*iter.base());
+					ST_THIS stat.recv_byte_sum += iter->size();
+					op_iter->swap(*iter);
 				}
 			}
 			ST_THIS handle_msg();
@@ -238,6 +290,8 @@ private:
 	{
 		if (!ec)
 		{
+			last_interact_time = time(nullptr);
+
 			ST_THIS stat.send_time_sum += statistic::local_time() - last_send_msg.front().begin_time;
 			ST_THIS stat.send_byte_sum += bytes_transferred;
 			ST_THIS stat.send_msg_sum += last_send_msg.size();
@@ -267,8 +321,11 @@ protected:
 	boost::container::list<typename super::in_msg> last_send_msg;
 	boost::shared_ptr<i_unpacker<out_msg_type>> unpacker_;
 
-	shutdown_states shutdown_state;
+	volatile shutdown_states shutdown_state;
 	st_atomic_size_t shutdown_atomic;
+
+	//heartbeat
+	time_t last_interact_time;
 };
 
 } //namespace

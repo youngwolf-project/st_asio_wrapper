@@ -22,7 +22,7 @@
 #endif
 
 #ifndef ST_ASIO_ASYNC_ACCEPT_NUM
-#define ST_ASIO_ASYNC_ACCEPT_NUM	1 //how many async_accept delivery concurrently
+#define ST_ASIO_ASYNC_ACCEPT_NUM	16 //how many async_accept delivery concurrently
 #elif ST_ASIO_SERVER_PORT <= 0
 	#error async accept number must be bigger than zero.
 #endif

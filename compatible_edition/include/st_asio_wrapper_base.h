@@ -13,12 +13,10 @@
 #ifndef ST_ASIO_WRAPPER_BASE_H_
 #define ST_ASIO_WRAPPER_BASE_H_
 
-#include <time.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdarg.h>
-#include <assert.h>
 
+#include <vector>
 #include <string>
 #include <sstream>
 
@@ -76,14 +74,20 @@ class st_atomic
 {
 public:
 	st_atomic() : data(0) {}
-	st_atomic(const T& _data) : data(_data) {}
+	st_atomic(T _data) : data(_data) {}
+
 	T operator++() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return ++data;}
 	//deliberately omitted operator++(int)
-	T operator+=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data += value;}
+	T operator+=(T value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data += value;}
 	T operator--() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return --data;}
 	//deliberately omitted operator--(int)
-	T operator-=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data -= value;}
-	T operator=(const T& value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data = value;}
+	T operator-=(T value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data -= value;}
+	T operator=(T value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data = value;}
+	T exchange(T value, boost::memory_order) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); T pre_data = data; data = value; return pre_data;}
+	T fetch_add(T value, boost::memory_order) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); T pre_data = data; data += value; return pre_data;}
+	void store(T value, boost::memory_order) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); data = value;}
+
+	bool is_lock_free() const {return false;}
 	operator T() const {return data;}
 
 private:
@@ -98,15 +102,14 @@ template<typename atomic_type = st_atomic_size_t>
 class scope_atomic_lock : public boost::noncopyable
 {
 public:
-	scope_atomic_lock(atomic_type& atomic_) : added(false), atomic(atomic_) {lock();} //atomic_ must has been initialized to zero
+	scope_atomic_lock(atomic_type& atomic_) : _locked(false), atomic(atomic_) {lock();} //atomic_ must has been initialized with zero
 	~scope_atomic_lock() {unlock();}
 
-	void lock() {if (!added) _locked = 1 == ++atomic; added = true;}
-	void unlock() {if (added) --atomic; _locked = false, added = false;}
+	void lock() {if (!_locked) _locked = 0 == atomic.exchange(1, boost::memory_order_acq_rel);}
+	void unlock() {if (_locked) atomic.store(0, boost::memory_order_release); _locked = false;}
 	bool locked() const {return _locked;}
 
 private:
-	bool added;
 	bool _locked;
 	atomic_type& atomic;
 };
@@ -235,6 +238,11 @@ class i_unpacker
 public:
 	typedef MsgType msg_type;
 	typedef const msg_type msg_ctype;
+#ifdef ST_ASIO_SCATTERED_RECV_BUFFER
+	typedef std::vector<boost::asio::mutable_buffers_1> buffer_type;
+#else
+	typedef boost::asio::mutable_buffers_1 buffer_type;
+#endif
 	typedef boost::container::list<msg_type> container_type;
 
 protected:
@@ -244,7 +252,7 @@ public:
 	virtual void reset_state() = 0;
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) = 0;
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
+	virtual buffer_type prepare_next_recv() = 0;
 };
 
 template<typename MsgType>
@@ -269,6 +277,7 @@ class i_udp_unpacker
 public:
 	typedef MsgType msg_type;
 	typedef const msg_type msg_ctype;
+	typedef boost::asio::mutable_buffers_1 buffer_type;
 	typedef boost::container::list<udp_msg<msg_type> > container_type;
 
 protected:
@@ -277,7 +286,7 @@ protected:
 public:
 	virtual void reset_state() {}
 	virtual void parse_msg(msg_type& msg, size_t bytes_transferred) = 0;
-	virtual boost::asio::mutable_buffers_1 prepare_next_recv() = 0;
+	virtual buffer_type prepare_next_recv() = 0;
 };
 //unpacker concept
 
@@ -484,7 +493,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 //used by both TCP and UDP
 #define SAFE_SEND_MSG_CHECK \
 { \
-	if (!ST_THIS is_send_allowed() || ST_THIS stopped()) return false; \
+	if (!ST_THIS is_send_allowed()) return false; \
 	boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50)); \
 }
 

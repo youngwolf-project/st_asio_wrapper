@@ -42,13 +42,12 @@ public:
 	static const st_timer::tid TIMER_BEGIN = super::TIMER_END;
 	static const st_timer::tid TIMER_CONNECT = TIMER_BEGIN;
 	static const st_timer::tid TIMER_ASYNC_SHUTDOWN = TIMER_BEGIN + 1;
+	static const st_timer::tid TIMER_HEARTBEAT_CHECK = TIMER_BEGIN + 2;
 	static const st_timer::tid TIMER_END = TIMER_BEGIN + 10;
 
-	st_connector_base(boost::asio::io_service& io_service_) : super(io_service_), connected(false), reconnecting(true)
-		{set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
+	st_connector_base(boost::asio::io_service& io_service_) : super(io_service_), connected(false), reconnecting(true) {set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 	template<typename Arg>
-	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), connected(false), reconnecting(true)
-		{set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
+	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), connected(false), reconnecting(true) {set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 
 	//reset all, be ensure that there's no any operations performed on this st_connector_base when invoke it
 	//notice, when reusing this st_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
@@ -175,6 +174,28 @@ protected:
 		return false;
 	}
 
+	//unit is second
+	//if macro ST_ASIO_HEARTBEAT_INTERVAL is bigger than zero, st_connector_base will start a timer to call this automatically with interval equal to ST_ASIO_HEARTBEAT_INTERVAL.
+	//otherwise, you can call check_heartbeat with you own logic, but you still need to define a valid ST_ASIO_HEARTBEAT_MAX_ABSENCE macro, please note.
+	bool check_heartbeat(int interval)
+	{
+		assert(interval > 0);
+
+		auto now = time(nullptr);
+		if (now - ST_THIS last_interact_time >= interval) //client send heartbeat on its own initiative
+			ST_THIS send_heartbeat('c');
+
+		if (ST_THIS clean_heartbeat() > 0)
+			ST_THIS last_interact_time = now;
+		else if (now - ST_THIS last_interact_time >= interval * ST_ASIO_HEARTBEAT_MAX_ABSENCE)
+		{
+			show_info("client link:", "broke unexpectedly.");
+			force_shutdown(ST_THIS is_shutting_down() ? reconnecting : prepare_reconnect(boost::system::error_code(boost::asio::error::network_down)) >= 0);
+		}
+
+		return ST_THIS started(); //always keep this timer
+	}
+
 private:
 	bool async_shutdown_handler(st_timer::tid id, size_t loop_num)
 	{
@@ -205,6 +226,9 @@ private:
 			connected = reconnecting = true;
 			ST_THIS reset_state();
 			on_connect();
+			ST_THIS last_interact_time = time(nullptr);
+			if (ST_ASIO_HEARTBEAT_INTERVAL > 0)
+				ST_THIS set_timer(TIMER_HEARTBEAT_CHECK, ST_ASIO_HEARTBEAT_INTERVAL * 1000, [this](st_timer::tid id)->bool {return ST_THIS check_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);});
 			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}

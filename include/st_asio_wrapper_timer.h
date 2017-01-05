@@ -13,8 +13,6 @@
 #ifndef ST_ASIO_WRAPPER_TIMER_H_
 #define ST_ASIO_WRAPPER_TIMER_H_
 
-#include <vector>
-
 #ifdef ST_ASIO_USE_STEADY_TIMER
 #include <boost/asio/steady_timer.hpp>
 #elif defined(ST_ASIO_USE_SYSTEM_TIMER)
@@ -64,11 +62,11 @@ public:
 
 		tid id;
 		timer_status status;
-		size_t milliseconds;
+		size_t interval_ms;
 		std::function<bool(tid)> call_back;
 		boost::shared_ptr<timer_type> timer;
 
-		timer_info() : id(0), status(TIMER_FAKE), milliseconds(0) {}
+		timer_info() : id(0), status(TIMER_FAKE), interval_ms(0) {}
 	};
 
 	typedef const timer_info timer_cinfo;
@@ -76,26 +74,35 @@ public:
 
 	st_timer(boost::asio::io_service& _io_service_) : st_object(_io_service_), timer_can(256) {tid id = -1; do_something_to_all([&id](timer_info& item) {item.id = ++id;});}
 
-	void update_timer_info(tid id, size_t milliseconds, std::function<bool(tid)>&& call_back, bool start = false)
+	void update_timer_info(tid id, size_t interval, std::function<bool(tid)>&& call_back, bool start = false)
 	{
 		timer_info& ti = timer_can[id];
 
 		if (timer_info::TIMER_FAKE == ti.status)
 			ti.timer = boost::make_shared<timer_type>(io_service_);
 		ti.status = timer_info::TIMER_OK;
-		ti.milliseconds = milliseconds;
+		ti.interval_ms = interval;
 		ti.call_back.swap(call_back);
 
 		if (start)
 			start_timer(ti);
 	}
-	void update_timer_info(tid id, size_t milliseconds, const std::function<bool(tid)>& call_back, bool start = false)
-		{update_timer_info(id, milliseconds, std::function<bool(tid)>(call_back), start);}
+	void update_timer_info(tid id, size_t interval, const std::function<bool(tid)>& call_back, bool start = false)
+		{update_timer_info(id, interval, std::function<bool(tid)>(call_back), start);}
 
-	void set_timer(tid id, size_t milliseconds, std::function<bool(tid)>&& call_back) {update_timer_info(id, milliseconds, std::move(call_back), true);}
-	void set_timer(tid id, size_t milliseconds, const std::function<bool(tid)>& call_back) {update_timer_info(id, milliseconds, call_back, true);}
+	void change_timer_interval(tid id, size_t interval) {timer_can[id].interval_ms = interval;}
 
-	timer_info find_timer(tid id) const {return timer_can[id];}
+	bool revive_timer(tid id)
+	{
+		if (timer_info::TIMER_FAKE == timer_can[id].status)
+			return false;
+
+		timer_can[id].status = timer_info::TIMER_OK;
+		return true;
+	}
+
+	void set_timer(tid id, size_t interval, std::function<bool(tid)>&& call_back) {update_timer_info(id, interval, std::move(call_back), true);}
+	void set_timer(tid id, size_t interval, const std::function<bool(tid)>& call_back) {update_timer_info(id, interval, call_back, true);}
 
 	bool start_timer(tid id)
 	{
@@ -110,6 +117,7 @@ public:
 		return true;
 	}
 
+	timer_info find_timer(tid id) const {return timer_can[id];}
 	void stop_timer(tid id) {stop_timer(timer_can[id]);}
 	void stop_all_timer() {do_something_to_all([this](timer_info& item) {ST_THIS stop_timer(item);});}
 
@@ -123,7 +131,7 @@ protected:
 	{
 		assert(timer_info::TIMER_OK == ti.status);
 
-		ti.timer->expires_from_now(milliseconds(ti.milliseconds));
+		ti.timer->expires_from_now(milliseconds(ti.interval_ms));
 		//return true from call_back to continue the timer, or the timer will stop
 		ti.timer->async_wait(make_handler_error(
 			[this, &ti](const boost::system::error_code& ec) {if (!ec && ti.call_back(ti.id) && st_timer::timer_info::TIMER_OK == ti.status) ST_THIS start_timer(ti);}));

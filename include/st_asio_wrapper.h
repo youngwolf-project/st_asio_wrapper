@@ -112,20 +112,34 @@
  * 2016.11.20	version 1.3.3
  * Simplify header files' dependence.
  * Yield to Visual C++ 10.0
- * Add Visual C++ solution and project files (Visuall C++ 11.0 and 9.0).
+ * Add Visual C++ solution and project files (Visual C++ 11.0 and 9.0).
  *
  * 2016.12.6	version 1.3.4
  * Compatible edition support c++0x (11, 14, 17, ...) features too.
  * Monitor time consumptions for message packing and unpacking.
  * Fix bug: pop_first_pending_send_msg and pop_first_pending_recv_msg cannot compile.
  *
+ * 2017.1.1		version 1.3.5
+ * Support heartbeat (via OOB data), see ST_ASIO_HEARTBEAT_INTERVAL macro for more details.
+ * Support scatter-gather buffers when receiving messages, this feature needs modification of i_unpacker, you must explicitly define
+ *  ST_ASIO_SCATTERED_RECV_BUFFER macro to open it, this is just for compatibility.
+ * Simplify lock-free mechanism.
+ * Optimize container insertion (use series of emplace functions instead).
+ * Demo test_client support alterable number of sending thread (before, it's a hard code 16).
+ * Fix bug: In extreme cases, messages may get starved in receive buffer and will not be dispatched until arrival of next message.
+ * Fix bug: In extreme cases, messages may get starved in send buffer and will not be sent until arrival of next message.
+ * Fix bug: Sometimes, st_connector_base cannot reconnect to the server after link broken.
+ *
+ * known issues:
+ * 1. heartbeat mechanism cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10304	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.3.4"
+#define ST_ASIO_WRAPPER_VER		10305	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.3.5"
 
 #ifdef _MSC_VER
 	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");

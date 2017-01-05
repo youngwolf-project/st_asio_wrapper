@@ -11,6 +11,7 @@
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_MSG_BUFFER_SIZE	65536
 #define ST_ASIO_INPUT_QUEUE non_lock_queue //we will never operate sending buffer concurrently, so need no locks.
+#define ST_ASIO_HEARTBEAT_INTERVAL	0 //disable heartbeat when doing performance test
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 //configuration
 
@@ -39,8 +40,8 @@ st_atomic<unsigned short> completed_session_num;
 //   for sender, send msgs in on_msg_send() or use sending buffer limitation (like safe_send_msg(..., false)),
 //    but must not in service threads, please note.
 //
-//2. for sender, if responses are available (like pingpong test), send msgs in on_msg()/on_msg_handle().
-//    this will reduce IO throughput because, SOCKET's sliding window is not fully used, pleae note.
+//2. for sender, if responses are available (like pingpong test), send msgs in on_msg()/on_msg_handle(),
+//    but this will reduce IO throughput because SOCKET's sliding window is not fully used, pleae note.
 //
 //pingpong_client will choose method #1 if defined ST_ASIO_WANT_MSG_SEND_NOTIFY, otherwise #2
 //BTW, if pingpong_client chose method #2, then pingpong_server can work properly without any congestion control,

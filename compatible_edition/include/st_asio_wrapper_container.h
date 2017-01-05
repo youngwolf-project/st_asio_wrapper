@@ -68,13 +68,13 @@ private:
 
 //Container must at least has the following functions:
 // Container() and Container(size_t) constructor
-// size
-// resize
-// empty
+// size (must be thread safe, but doesn't have to be coherent, std::list before gcc 5 doesn't meet this requirement, boost::container::list always does)
+// empty (must be thread safe, but doesn't have to be coherent)
 // clear
 // swap
-// push_back(const T& item)
-// splice(Container::const_iterator, std::list<T>&), after this, std::list<T> must be empty
+// emplace_back(const T& item)
+// emplace_back()
+// splice(Container::const_iterator, boost::container::list<T>&), after this, boost::container::list<T> must be empty
 // front
 // back
 // pop_front
@@ -89,13 +89,19 @@ public:
 	queue() {}
 	queue(size_t size) : super(size) {}
 
+	using Container::size;
+	using Container::clear;
+	using Container::swap;
+
+	//thread safe
 	bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	void move_items_in(boost::container::list<T>& can) {typename Lockable::lock_guard lock(*this); move_items_in_(can);}
 	bool try_dequeue(T& item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
 
-	bool enqueue_(const T& item) {this->push_back(item); return true;}
-	bool enqueue_(T& item) {this->resize(this->size() + 1); this->back().swap(item); return true;} //after this, item will becomes empty, please note.
+	//not thread safe
+	bool enqueue_(const T& item) {this->emplace_back(item); return true;}
+	bool enqueue_(T& item) {this->emplace_back(); this->back().swap(item); return true;} //after this, item will becomes empty, please note.
 	void move_items_in_(boost::container::list<T>& can) {this->splice(this->end(), can);}
 	bool try_dequeue_(T& item) {if (this->empty()) return false; item.swap(this->front()); this->pop_front(); return true;}
 };
