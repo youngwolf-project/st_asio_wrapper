@@ -22,18 +22,22 @@
 #endif
 
 #ifndef ST_ASIO_HEARTBEAT_INTERVAL
-#define ST_ASIO_HEARTBEAT_INTERVAL	5 //second(s)
+#define ST_ASIO_HEARTBEAT_INTERVAL	0 //second(s), disable heartbeat by default, just for compatibility
 #endif
-//at every ST_ASIO_HEARTBEAT_INTERVAL second(s), send an OOB data (heartbeat) if no normal messages been sent,
-//less than or equal to zero means disable heartbeat, then you can send and check heartbeat with you own logic by calling st_connector_base::check_heartbeat
-// or st_server_socket_base::check_heartbeat, and you still need to define a valid ST_ASIO_HEARTBEAT_MAX_ABSENCE macro, please note.
+//at every ST_ASIO_HEARTBEAT_INTERVAL second(s):
+// 1. st_connector_base will send an OOB data (heartbeat) if no normal messages been sent not received within this interval,
+// 2. st_server_socket_base will try to recieve all OOB data (heartbeat) which has been recieved by system.
+// 3. both endpoints will check the link's connectedness, see ST_ASIO_HEARTBEAT_MAX_ABSENCE macro for more details.
+//less than or equal to zero means disable heartbeat, then you can send and check heartbeat with you own logic by calling
+//st_connector_base::check_heartbeat or st_server_socket_base::check_heartbeat, and you still need a valid ST_ASIO_HEARTBEAT_MAX_ABSENCE, please note.
 
 #ifndef ST_ASIO_HEARTBEAT_MAX_ABSENCE
 #define ST_ASIO_HEARTBEAT_MAX_ABSENCE	3 //times of ST_ASIO_HEARTBEAT_INTERVAL
 #elif ST_ASIO_HEARTBEAT_MAX_ABSENCE <= 0
 	#error heartbeat absence must be bigger than zero.
 #endif
-//if no any data (include heartbeats) been received within ST_ASIO_HEARTBEAT_INTERVAL * ST_ASIO_HEARTBEAT_MAX_ABSENCE second(s), shut down the link.
+//if no any messages been sent or received, nor any heartbeats been received within
+//ST_ASIO_HEARTBEAT_INTERVAL * ST_ASIO_HEARTBEAT_MAX_ABSENCE second(s), shut down the link.
 
 namespace st_asio_wrapper
 {

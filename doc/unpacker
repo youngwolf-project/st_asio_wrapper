@@ -34,10 +34,10 @@ class non_copy_unpacker : public i_unpacker<basic_buffer>;
 
 这两个消息不解释，注意没有返回replaceable_buffer的fixed_length_unpacker和prefix_suffix_unpacker，可参考
 replaceable_unpacker自行实现。
-class fixed_length_unpacker : public i_unpacker<std::string>;
+class fixed_length_unpacker : public i_unpacker<basic_buffer>;
 class prefix_suffix_unpacker : public i_unpacker<std::string>;
 
-class stream_unpacker : public tcp::i_unpacker<std::string>
+class stream_unpacker : public tcp::i_unpacker<std::string>;
 无协议解包器，收到什么就是什么，类似于调试助手。
 
 }} //namespace

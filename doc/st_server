@@ -5,7 +5,7 @@
 #endif
 
 #ifndef ST_ASIO_ASYNC_ACCEPT_NUM
-#define ST_ASIO_ASYNC_ACCEPT_NUM			1
+#define ST_ASIO_ASYNC_ACCEPT_NUM			16
 同时投递多少个async_accept。
 #endif
 

@@ -80,6 +80,10 @@ virtual int prepare_reconnect(const boost::system::error_code& ec);
 	bool prepare_next_reconnect(const boost::system::error_code& ec);
 如果允许（io_service仍然在运行且prepare_reconnect返回大于等于0），启动定时器以延时一小段时间之后重新连接服务器。
 
+	bool check_heartbeat(int interval);
+发送和读取心跳包，将做断线检测。
+如果定义了ASCS_HEARTBEAT_INTERVAL，将自动调用这个函数，否则你也可以以自己的逻辑来调用它。
+
 private:
 	bool async_shutdown_handler(st_timer::tid id, ssize_t loop_num);
 异步优雅关闭（shutdown）超时定时器。

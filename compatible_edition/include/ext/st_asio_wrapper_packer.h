@@ -128,7 +128,7 @@ public:
 	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
 };
 
-//protocol: fixed lenght
+//protocol: fixed length
 class fixed_length_packer : public packer
 {
 public:
