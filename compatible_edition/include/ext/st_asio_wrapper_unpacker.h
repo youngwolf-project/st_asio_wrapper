@@ -275,7 +275,7 @@ private:
 	int step; //-1-error format, 0-want the head, 1-want the body
 };
 
-//protocol: fixed lenght
+//protocol: fixed length
 //non-copy
 class fixed_length_unpacker : public i_unpacker<basic_buffer>
 {

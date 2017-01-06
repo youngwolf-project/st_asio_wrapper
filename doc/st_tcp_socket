@@ -2,6 +2,22 @@
 #ifndef ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION
 #define ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION	5 //seconds, maximum duration while graceful shutdown
 #endif
+static_assert(ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION > 0, "graceful shutdown duration must be bigger than zero.");
+
+#ifndef ASCS_HEARTBEAT_INTERVAL
+#define ASCS_HEARTBEAT_INTERVAL	5 //second(s)
+#endif
+发送心跳包间隔，在此间隔中，如果有消息被接收或者被成功发送，将不会发送心跳包，直到下一个间隔再发。
+心跳包通过OOB通道实现。注意，从linux发送心跳包到windows，接收方会把心跳包当成普通的数据而造成解包失败，原因未知。
+如果想关闭心跳包，定义这个宏为0即可，此时你仍然可以以自己的逻辑来发送接收心跳包，并判断连接的有效性，只需要你调用connector_base::check_heartbeat或者
+server_socket_base::check_heartbeat即可，非常简单。
+
+#ifndef ASCS_HEARTBEAT_MAX_ABSENCE
+#define ASCS_HEARTBEAT_MAX_ABSENCE	3 //times of ASCS_HEARTBEAT_INTERVAL
+#endif
+static_assert(ASCS_HEARTBEAT_MAX_ABSENCE > 0, "heartbeat absence must be bigger than zero.");
+在ASCS_HEARTBEAT_INTERVAL * ASCS_HEARTBEAT_MAX_ABSENCE秒之内，如果没有任何数据收发，也没有收到心跳包，连接被认为是意外中断。注意，即便你自己调用
+connector_base::check_heartbeat或者server_socket_base::check_heartbeat，这个宏仍然需要，所以它必须大于0。
 
 namespace st_asio_wrapper
 {
@@ -22,10 +38,12 @@ protected:
 	enum shutdown_states {NONE, FORCE, GRACEFUL};
 
 	st_tcp_socket(boost::asio::io_service& io_service_);
-
 	template<typename Arg>
 	st_tcp_socket(boost::asio::io_service& io_service_, Arg& arg);
 ssl使用。
+
+	void first_init();
+构造时调用，仅仅是为了节省代码量而已，因为我们有两个构造函数都将调用它。
 
 public:
 	virtual bool obsoleted();
@@ -37,8 +55,8 @@ public:
 	void reset_state();
 重载父类同名函数，重置自己的状态之后，调用父类同名函数。
 
-	bool is_closing() const;
-是否正在优雅关闭套接字，此时不再发送消息（如果发送会出错，因为已经关闭了自己的数据发送），但继续接收消息。
+	bool is_shutting_down() const {return shutdown_states::NONE != shutdown_state;}
+是否正在优雅关闭套接字，此时不再发送消息（如果发送则会出错，因为已经关闭了自己的数据发送），但继续接收消息。
 
 	boost::shared_ptr<i_unpacker<out_msg_type>> inner_unpacker();
 	boost::shared_ptr<const i_unpacker<out_msg_type>> inner_unpacker() const;
@@ -68,19 +86,6 @@ safe系列函数，在on_msg和om_msg_handle里面调用时需要特别谨慎，
 	bool safe_send_native_msg(const char* pstr, size_t len, bool can_overflow = false);
 	bool safe_send_native_msg(const std::string& str, bool can_overflow = false);
 	bool safe_send_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-同上，只是以native为true调用i_packer::pack_msg接口。
-
-	bool post_msg(const char* pstr, size_t len, bool can_overflow = false);
-	bool post_msg(const std::string& str, bool can_overflow = false);
-	bool post_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-同send_msg，只是它永远能马上成功。
-注意：如果消息发送缓存溢出了（当然can_overflow得为false，否则不检测缓存是否溢出），则暂停消息派发（进而也会停止消息接收，
-因为不派发只接收消息，迟早会让消息接收缓存满而暂停消息接收，如果不使用消息接收缓存，则马上暂停消息接收）。
-post_msg和send_msg的区别请看st_socket里面的post_msg_buffer和send_msg_buffer。
-
-	bool post_native_msg(const char* pstr, size_t len, bool can_overflow = false);
-	bool post_native_msg(const std::string& str, bool can_overflow = false);
-	bool post_native_msg(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
 同上，只是以native为true调用i_packer::pack_msg接口。
 
 protected:
@@ -114,6 +119,10 @@ protected:
 关闭套接字，停止所有定时器，直接派发所有剩余消息，最后启动一个定时器，如果定义了ST_ASIO_ENHANCED_STABILITY宏，则这个将周期性的检测
 当前套接字是否可以安全地被重用或释放，如果未定义，则简单的在ST_ASIO_DELAY_CLOSE秒后认为当前大量接字可被安全地重用或释放。
 
+	int clean_heartbeat();
+读取所有OOB数据，返回读到的OOB数据长度。
+
+private:
 	void recv_handler(const error_code& ec, size_t bytes_transferred);
 收到数据时后asio回调。
 
@@ -121,12 +130,15 @@ protected:
 成功发送消息（写入底层套接字）后由asio回调。
 
 protected:
-	typename super::in_container_type last_send_msg;
+	boost::container::list<typename super::in_msg> last_send_msg;
 	boost::shared_ptr<i_unpacker<out_msg_type>> unpacker_;
 
-	shutdown_states shutdown_state;
+	volatile shutdown_states shutdown_state;
 	st_atomic_size_t shutdown_atomic;
 让shutdown函数线程安全。
+
+	time_t last_interact_time;
+上次交互时间，包括成功发送数据，成功接收数据和OOB数据，用于断线检测。
 };
 
 } //namespace st_asio_wrapper

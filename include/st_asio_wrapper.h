@@ -132,6 +132,8 @@
  *
  * known issues:
  * 1. heartbeat mechanism cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
+ * 2. UDP doesn't support heartbeat because UDP doesn't support OOB data.
+ * 3. SSL doesn't support heartbeat (maybe I missed an option, I'm not familiar with SSL).
  *
  */
 

@@ -108,7 +108,7 @@ protected:
 
         object_type create_object();
 如果定义了ST_ASIO_REUSE_OBJECT宏，则先调用reuse_object尝试重用对象，如果没有对象可被重用，或者未定义该宏，
-则创建一个新的，最后都是调用post_create。
+则创建一个新的，最后都是调用init_object。
 
 public:
 	container_type& container();

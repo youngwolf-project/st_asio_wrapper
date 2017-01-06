@@ -23,19 +23,20 @@ tcp解包器必须实现这个接口。每次开始接收消息之后，会调�
 asio会调用completion_condition，如果返回0，说明已经成功的接收到了至少一个消息，于是ascs会接着调用parse_msg
 来解析消息，解析完了之后再次调用prepare_next_recv进入一个新的循环。注意，解析完消息之后，缓存里面可能还剩余部分数据（消息被分包），
 第二次prepare_next_recv返回的缓存，不能覆盖未解析完的数据（如果采用固定缓存的解包器，通常的做法是把未解析完的数据移动到缓存最前面），否则数据会被覆盖。
+如果定义了ST_ASIO_SCATTERED_RECV_BUFFER宏，则解包器支持scatter-gather缓存，即一次提供多个不连续的缓存用于接收消息，如果你使用了ring buffer，相信你知道我在说什么。
 
 i_udp_unpacker:
 udp解包器必须实现这个接口。
 
 2. 类
-st_atomic：
+st_atomic:
 boost::atomic的代替品，因为boost::atomic在boost 1.53版本中才引入，而st_asio_wrapper库最低支持boost 1.49，注意它是通过boost::shared_mutex
 来实现线程安全的，效率不如原子操作高。
 
 scope_atomic_lock：
-功能与boost::scope_lock一致，只是它执行atomic的++和--操作，而不是调用mutex的lock和unlock。
+功能与boost::scope_lock一致，只是它是lock-free的，用原子操作代替了mutex操作（如果用st_aotmic则除外）。
 
-dummy_packer：
+dummy_packer:
 仅仅提供发送消息的类型以便通过编译，无法真正的打包，所以只能通过direct_send_msg等发送消息。
 
 auto_buffer：

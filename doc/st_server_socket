@@ -2,21 +2,6 @@
 namespace st_asio_wrapper
 {
 
-用于在st_server_socket_base中操作st_server_base的接口，st_server_socket_base使用，st_server_base实现
-class i_server
-{
-public:
-	virtual st_service_pump& get_service_pump() = 0;
-	virtual const st_service_pump& get_service_pump() const = 0;
-获取st_service_pump。
-	virtual bool del_client(const boost::shared_ptr<st_timer>& client_ptr) = 0;
-关闭一个连接时，st_server_socket调用这个方法，i_server的实现者（st_server就是一个i_server的实现者）一般来说应该把这个连接从自己的
-客户端对象池里面删除，调用这个方法的最佳时期是在on_recv_error里面。
-注意，client_ptr看起来是一个st_timer，其实它的类型是st_server_base中的Socket模板参数，用st_timer完全是为了不让i_server带一个类似于
-Socket的模板参数，带上之后会有模板参数的循环依赖的问题，如果哪位同仁可以解决此问题，麻烦告诉我一声。
-i_server的实现者在使用client_ptr参数之前，会转换成Socket类型，请看st_server的实现。
-};
-
 服务端套接字类
 template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket,
 	template<typename, typename> class InQueue = ASCS_INPUT_QUEUE, template<typename> class InContainer = ASCS_INPUT_CONTAINER,
@@ -60,9 +45,17 @@ protected:
 	virtual void on_recv_error(const error_code& ec);
 连接断开，默认的行为是调用i_server::del_client，可以重写以自定义行为。
 
+	bool check_heartbeat(int interval);
+发送和读取心跳包，将做断线检测。
+如果定义了ASCS_HEARTBEAT_INTERVAL，将自动调用这个函数，否则你也可以以自己的逻辑来调用它。
+
+private:
+	bool async_shutdown_handler(st_timer::tid id, size_t loop_num);
+异步优雅关闭（shutdown）超时定时器。
+
 protected:
 	Server& server;
-用于操控st_server，st_server在创建（其实是st_object_pool创建，st_server是其子类）st_server_socket的时候，会把自己的引用通过构造函数传入。
+用于操控st_server，st_server（其实是st_object_pool，st_server是其子类）在创建st_server_socket的时候，会把自己的引用通过构造函数传入。
 };
 
 } //namespace

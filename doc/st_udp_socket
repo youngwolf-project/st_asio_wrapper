@@ -66,19 +66,6 @@ safe系列函数，在on_msg和om_msg_handle里面调用时需要特别谨慎，
 	bool safe_send_native_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
 同上，只是以native为true调用i_packer::pack_msg接口。
 
-	bool post_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
-	bool post_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
-	bool post_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-同send_msg，只是它永远能马上成功。
-注意：如果消息发送缓存溢出了（当然can_overflow得为false，否则不检测缓存是否溢出），则暂停消息派发（进而也会停止消息接收，
-因为不派发只接收消息，迟早会让消息接收缓存满而暂停消息接收，如果不使用消息接收缓存，则马上暂停消息接收）。
-post_msg和send_msg的区别请看st_socket里面的post_msg_buffer和send_msg_buffer。
-
-	bool post_native_msg(const udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false);
-	bool post_native_msg(const udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false);
-	bool post_native_msg(const udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false);
-同上，只是以native为true调用i_packer::pack_msg接口。
-
 	void show_info(const char* head, const char* tail);
 打印日志，在head和tail中间加上本端ip和端口。
 

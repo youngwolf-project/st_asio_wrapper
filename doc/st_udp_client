@@ -2,7 +2,7 @@
 namespace st_asio_wrapper
 {
 
-支持多个套接字的udp客户端
+支持多个套接字的udp服务
 template<typename Socket, typename Pool = st_object_pool<Socket>>
 class st_udp_client_base : public st_client<Socke, Pool>
 {
@@ -10,9 +10,8 @@ public:
 	st_udp_client_base(st_service_pump& service_pump_);
 
 	using st_client<Socket, Pool>::add_client;
-
 	typename Pool::object_type add_client(unsigned short port, const std::string& ip = std::string());
-创建或者重用一个对象，然后以reset为true调用父类的add_client。
+创建或者重用一个对象，然后以reset为true调用父类的同名函数。
 
 	void disconnect(typename Pool::object_ctype& client_ptr);
 	void disconnect();

@@ -10,7 +10,6 @@
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 //#define ST_ASIO_USE_STEADY_TIMER
 //#define ST_ASIO_USE_SYSTEM_TIMER
-#define ST_ASIO_HEARTBEAT_INTERVAL	0 //disable heartbeat when doing performance test
 //#define ST_ASIO_MAX_MSG_NUM		16
 //if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_MSG_NUM macro.
 //please think about if we have 512 links, how much memory we can accupy at most with default ST_ASIO_MAX_MSG_NUM?
@@ -19,9 +18,9 @@
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	0
 //0-default packer and unpacker, head(length) + body
-//1-default replaceable_packer and replaceable_unpacker, head(length) + body
-//2-fixed length unpacker
-//3-prefix and suffix packer and unpacker
+//1-replaceable packer and unpacker, head(length) + body
+//2-fixed length packer and unpacker
+//3-prefix and/or suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
