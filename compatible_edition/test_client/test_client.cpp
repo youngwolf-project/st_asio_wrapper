@@ -243,12 +243,12 @@ void send_msg_one_by_one(test_client& client, size_t msg_num, size_t msg_len, ch
 			printf("\r%u%%", percent);
 			fflush(stdout);
 		}
-	} while (100 != percent);
+	} while (percent < 100);
 	begin_time.stop();
 
 	double used_time = (double) begin_time.elapsed().wall / 1000000000;
-	printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
-	printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+	printf("\ntime spent statistics: %f seconds.\n", used_time);
+	printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 }
 
 void send_msg_randomly(test_client& client, size_t msg_num, size_t msg_len, char msg_fill)
@@ -278,15 +278,15 @@ void send_msg_randomly(test_client& client, size_t msg_num, size_t msg_len, char
 		}
 	}
 
-	while(client.get_recv_bytes() != total_msg_bytes)
+	while(client.get_recv_bytes() < total_msg_bytes)
 		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
 	begin_time.stop();
 	delete[] buff;
 
 	double used_time = (double) begin_time.elapsed().wall / 1000000000;
-	printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
-	printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+	printf("\ntime spent statistics: %f seconds.\n", used_time);
+	printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 }
 
 void thread_runtine(boost::container::list<test_client::object_type>& link_group, size_t msg_num, size_t msg_len, char msg_fill)
@@ -358,13 +358,13 @@ void send_msg_concurrently(test_client& client, size_t send_thread_num, size_t m
 			printf("\r%u%%", percent);
 			fflush(stdout);
 		}
-	} while (100 != percent);
+	} while (percent < 100);
 	threads.join_all();
 	begin_time.stop();
 
 	double used_time = (double) begin_time.elapsed().wall / 1000000000;
-	printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
-	printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+	printf("\ntime spent statistics: %f seconds.\n", used_time);
+	printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 }
 
 int main(int argc, const char* argv[])
@@ -416,13 +416,9 @@ int main(int argc, const char* argv[])
 	int thread_num = 1;
 	if (argc > 1)
 		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
-#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
-	if (1 == thread_num)
-		++thread_num;
 	//add one thread will seriously impact IO throughput when doing performance benchmark, this is because the business logic is very simple (send original messages back,
 	//or just add up total message size), under this scenario, just one service thread without receiving buffer will obtain the best IO throughput.
 	//the server has such behavior too.
-#endif
 
 	sp.start_service(thread_num);
 	while(sp.is_running())
@@ -514,7 +510,7 @@ int main(int argc, const char* argv[])
 			puts("performance test begin, this application will have no response during the test!");
 			for (int i = 0; i < repeat_times; ++i)
 			{
-				printf("thie is the %d / %d test.\n", i + 1, repeat_times);
+				printf("this is the %d / %d test.\n", i + 1, repeat_times);
 				client.clear_status();
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 				if (0 == model)

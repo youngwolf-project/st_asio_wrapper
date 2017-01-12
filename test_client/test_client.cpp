@@ -240,12 +240,12 @@ void send_msg_one_by_one(test_client& client, size_t msg_num, size_t msg_len, ch
 			printf("\r%u%%", percent);
 			fflush(stdout);
 		}
-	} while (100 != percent);
+	} while (percent < 100);
 	begin_time.stop();
 
 	auto used_time = (double) begin_time.elapsed().wall / 1000000000;
-	printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
-	printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+	printf("\ntime spent statistics: %f seconds.\n", used_time);
+	printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 }
 
 void send_msg_randomly(test_client& client, size_t msg_num, size_t msg_len, char msg_fill)
@@ -275,15 +275,15 @@ void send_msg_randomly(test_client& client, size_t msg_num, size_t msg_len, char
 		}
 	}
 
-	while(client.get_recv_bytes() != total_msg_bytes)
+	while(client.get_recv_bytes() < total_msg_bytes)
 		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
 	begin_time.stop();
 	delete[] buff;
 
 	auto used_time = (double) begin_time.elapsed().wall / 1000000000;
-	printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
-	printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+	printf("\ntime spent statistics: %f seconds.\n", used_time);
+	printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 }
 
 //use up to a specific worker threads to send messages concurrently
@@ -321,21 +321,15 @@ void send_msg_concurrently(test_client& client, size_t send_thread_num, size_t m
 	boost::timer::cpu_timer begin_time;
 	boost::thread_group threads;
 	do_something_to_all(link_groups, [&threads, msg_num, msg_len, msg_fill](const std::list<test_client::object_type>& item) {
-		auto msg_num_ = msg_num;
-		auto msg_len_ = msg_len;
-		auto msg_fill_ = msg_fill;
-		//terrible Visual C++ 10.0, it cannot capture msg_num, msg_len and msg_fill directly at here
-		threads.create_thread([&item, msg_num_, msg_len_, msg_fill_]() {
-			auto buff = new char[msg_len_];
-			memset(buff, msg_fill_, msg_len_);
-			for (size_t i = 0; i < msg_num_; ++i)
+		threads.create_thread([&item, msg_num, msg_len, msg_fill]() {
+			auto buff = new char[msg_len];
+			memset(buff, msg_fill, msg_len);
+			for (size_t i = 0; i < msg_num; ++i)
 			{
 				memcpy(buff, &i, sizeof(size_t)); //seq
-				auto msg_len__ = msg_len_;
-				//terrible Visual C++ 10.0, it cannot capture msg_len_ directly at here
 
 				//congestion control, method #1, the peer needs its own congestion control too.
-				do_something_to_all(item, [buff, msg_len__](test_client::object_ctype& item2) {item2->safe_send_msg(buff, msg_len__);}); //can_overflow is false, it's important
+				do_something_to_all(item, [buff, msg_len](test_client::object_ctype& item2) {item2->safe_send_msg(buff, msg_len);}); //can_overflow is false, it's important
 			}
 			delete[] buff;
 		});
@@ -353,13 +347,13 @@ void send_msg_concurrently(test_client& client, size_t send_thread_num, size_t m
 			printf("\r%u%%", percent);
 			fflush(stdout);
 		}
-	} while (100 != percent);
+	} while (percent < 100);
 	threads.join_all();
 	begin_time.stop();
 
 	auto used_time = (double) begin_time.elapsed().wall / 1000000000;
-	printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
-	printf("speed: %.0f(*2)kB/s.\n", total_msg_bytes / used_time / 1024);
+	printf("\ntime spent statistics: %f seconds.\n", used_time);
+	printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 }
 
 int main(int argc, const char* argv[])
@@ -411,13 +405,9 @@ int main(int argc, const char* argv[])
 	auto thread_num = 1;
 	if (argc > 1)
 		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
-#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
-	if (1 == thread_num)
-		++thread_num;
 	//add one thread will seriously impact IO throughput when doing performance benchmark, this is because the business logic is very simple (send original messages back,
 	//or just add up total message size), under this scenario, just one service thread without receiving buffer will obtain the best IO throughput.
 	//the server has such behavior too.
-#endif
 
 	sp.start_service(thread_num);
 	while(sp.is_running())
@@ -509,7 +499,7 @@ int main(int argc, const char* argv[])
 			puts("performance test begin, this application will have no response during the test!");
 			for (int i = 0; i < repeat_times; ++i)
 			{
-				printf("thie is the %d / %d test.\n", i + 1, repeat_times);
+				printf("this is the %d / %d test.\n", i + 1, repeat_times);
 				client.clear_status();
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 				if (0 == model)

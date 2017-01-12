@@ -144,7 +144,7 @@
 #define ST_ASIO_WRAPPER_VERSION	"1.3.5"
 
 #ifdef _MSC_VER
-	static_assert(_MSC_VER >= 1600, "st_asio_wrapper must be compiled with Visual C++ 10.0 or higher.");
+	static_assert(_MSC_VER >= 1700, "st_asio_wrapper must be compiled with Visual C++ 11.0 or higher.");
 #elif defined(__GNUC__)
 	//After a roughly reading from gcc.gnu.org and clang.llvm.org, I believed that the minimum version of GCC and Clang that support c++0x
 	//are 4.6 and 3.1, so, I supply the following compiler verification. If there's something wrong, you can freely modify them,
