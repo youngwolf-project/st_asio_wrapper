@@ -23,8 +23,8 @@
 #define ST_ASIO_WRAPPER_VERSION	"1.3.5"
 
 #ifdef _MSC_VER
-	#if _MSC_VER >= 1600
-		#pragma message("Your compiler is Visual C++ 10.0 or higher, you can use the standard edition to gain some performance improvement.")
+	#if _MSC_VER >= 1700
+		#pragma message("Your compiler is Visual C++ 11.0 or higher, you can use the standard edition to gain some performance improvement.")
 	#endif
 #elif defined(__GNUC__)
 	//After a roughly reading from gcc.gnu.org and clang.llvm.org, I believed that the minimum version of GCC and Clang that support c++0x

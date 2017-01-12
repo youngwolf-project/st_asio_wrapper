@@ -184,7 +184,7 @@ public:
 		stop_timer(UPDATE_PROGRESS);
 
 		double used_time = (double) begin_time.elapsed().wall / 1000000000;
-		printf("\r100%%\ntransfer %s end, speed: %.0f kB/s.\n", file_name.data(), file_size / used_time / 1024);
+		printf("\ntransfer %s end, speed: %f MBps.\n", file_name.data(), file_size / used_time / 1024 / 1024);
 	}
 
 	fl_type get_total_rest_size()

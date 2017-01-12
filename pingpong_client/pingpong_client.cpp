@@ -157,13 +157,9 @@ int main(int argc, const char* argv[])
 	auto thread_num = 1;
 	if (argc > 1)
 		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
-#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
-	if (1 == thread_num)
-		++thread_num;
 	//add one thread will seriously impact IO throughput when doing performance benchmark, this is because the business logic is very simple (send original messages back,
 	//or just add up total message size), under this scenario, just one service thread without receiving buffer will obtain the best IO throughput.
 	//the server has such behavior too.
-#endif
 
 	for (size_t i = 0; i < link_num; ++i)
 		client.add_client(port, ip);
@@ -208,7 +204,7 @@ int main(int argc, const char* argv[])
 
 			uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
 			auto used_time = (double) begin_time.elapsed().wall / 1000000000;
-			printf("\r100%%\ntime spent statistics: %f seconds.\n", used_time);
+			printf("time spent statistics: %f seconds.\n", used_time);
 			printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 
 			delete[] init_msg;
