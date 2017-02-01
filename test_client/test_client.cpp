@@ -356,6 +356,29 @@ void send_msg_concurrently(test_client& client, size_t send_thread_num, size_t m
 	printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
 }
 
+static bool is_testing;
+void start_test(int repeat_times, char model, test_client& client, size_t send_thread_num, size_t msg_num, size_t msg_len, char msg_fill)
+{
+	for (int i = 0; i < repeat_times; ++i)
+	{
+		printf("this is the %d / %d test.\n", i + 1, repeat_times);
+		client.clear_status();
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+		if (0 == model)
+			send_msg_one_by_one(client, msg_num, msg_len, msg_fill);
+		else
+			puts("if ST_ASIO_WANT_MSG_SEND_NOTIFY defined, only support model 0!");
+#else
+		if (0 == model)
+			send_msg_concurrently(client, send_thread_num, msg_num, msg_len, msg_fill);
+		else
+			send_msg_randomly(client, msg_num, msg_len, msg_fill);
+#endif
+	}
+
+	is_testing = false;
+}
+
 int main(int argc, const char* argv[])
 {
 	printf("usage: %s [<service thread number=1> [<send thread number=8> [<port=%d> [<ip=%s> [link num=16]]]]]\n", argv[0], ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
@@ -414,7 +437,14 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::getline(std::cin, str);
-		if (QUIT_COMMAND == str)
+		if (str.empty())
+			continue;
+		else if (is_testing)
+		{
+			puts("testing has not finished yet!");
+			continue;
+		}
+		else if (QUIT_COMMAND == str)
 			sp.stop_service();
 		else if (RESTART_COMMAND == str)
 		{
@@ -434,7 +464,7 @@ int main(int argc, const char* argv[])
 			client.do_something_to_all([](test_client::object_ctype& item) {item->suspend_dispatch_msg(false);});
 		else if (LIST_ALL_CLIENT == str)
 			client.list_all_object();
-		else if (!str.empty())
+		else
 		{
 			if ('+' == str[0] || '-' == str[0])
 			{
@@ -490,28 +520,14 @@ int main(int argc, const char* argv[])
 			if (iter != std::end(parameters)) repeat_times = std::max(atoi(iter++->data()), 1);
 
 			if (0 != model && 1 != model)
-			{
 				puts("unrecognized model!");
-				continue;
-			}
-
-			printf("test parameters after adjustment: " ST_ASIO_SF " " ST_ASIO_SF " %c %d\n", msg_num, msg_len, msg_fill, model);
-			puts("performance test begin, this application will have no response during the test!");
-			for (int i = 0; i < repeat_times; ++i)
+			else
 			{
-				printf("this is the %d / %d test.\n", i + 1, repeat_times);
-				client.clear_status();
-#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-				if (0 == model)
-					send_msg_one_by_one(client, msg_num, msg_len, msg_fill);
-				else
-					puts("if ST_ASIO_WANT_MSG_SEND_NOTIFY defined, only support model 0!");
-#else
-				if (0 == model)
-					send_msg_concurrently(client, send_thread_num, msg_num, msg_len, msg_fill);
-				else
-					send_msg_randomly(client, msg_num, msg_len, msg_fill);
-#endif
+				printf("test parameters after adjustment: " ST_ASIO_SF " " ST_ASIO_SF " %c %d\n", msg_num, msg_len, msg_fill, model);
+				puts("performance test begin, this application will have no response during the test!");
+
+				is_testing = true;
+				boost::thread(boost::bind(&start_test, repeat_times, model, boost::ref(client), send_thread_num, msg_num, msg_len, msg_fill)).detach();
 			}
 		}
 	}

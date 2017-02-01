@@ -185,14 +185,14 @@ protected:
 	virtual bool on_exception(const std::exception& e)
 	{
 		unified_out::error_out("service pump exception: %s.", e.what());
-		return true; //continue this io_service::run, if needed, rewrite this to decide whether to continue or not
+		return true; //continue this boost::asio::io_service::run, if needed, rewrite this to decide whether to continue or not
 	}
 
 	size_t run(boost::system::error_code& ec)
 	{
 		while (true)
 		{
-			try {return io_service::run(ec);}
+			try {return boost::asio::io_service::run(ec);}
 			catch (const std::exception& e) {if (!on_exception(e)) return 0;}
 		}
 	}
