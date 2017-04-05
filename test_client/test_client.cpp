@@ -81,7 +81,11 @@ public:
 		memset(buff, msg_fill, msg_len);
 		memcpy(buff, &recv_index, sizeof(size_t)); //seq
 
+#if 2 == PACKER_UNPACKER_TYPE //there's no fixed_length_packer
+		send_native_msg(buff, msg_len);
+#else
 		send_msg(buff, msg_len);
+#endif
 		delete[] buff;
 	}
 
@@ -101,15 +105,24 @@ protected:
 		if (0 == --msg_num)
 			return;
 
+#if 2 == PACKER_UNPACKER_TYPE //there's no fixed_length_packer
+		auto pstr = const_cast<char*>(msg.data());
+		auto msg_len = msg.size();
+#else
 		auto pstr = inner_packer()->raw_data(msg);
 		auto msg_len = inner_packer()->raw_data_len(msg);
+#endif
 
 		size_t send_index;
 		memcpy(&send_index, pstr, sizeof(size_t));
 		++send_index;
 		memcpy(pstr, &send_index, sizeof(size_t));
 
+#if 2 == PACKER_UNPACKER_TYPE //there's no fixed_length_packer
+		send_native_msg(pstr, msg_len);
+#else
 		send_msg(pstr, msg_len);
+#endif
 	}
 #endif
 

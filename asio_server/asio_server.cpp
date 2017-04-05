@@ -62,7 +62,6 @@ public:
 #if 2 == PACKER_UNPACKER_TYPE
 		dynamic_cast<fixed_length_unpacker*>(&*inner_unpacker())->fixed_length(1024);
 #elif 3 == PACKER_UNPACKER_TYPE
-		dynamic_cast<prefix_suffix_packer*>(&*inner_packer())->prefix_suffix("begin", "end");
 		dynamic_cast<prefix_suffix_unpacker*>(&*inner_unpacker())->prefix_suffix("begin", "end");
 #endif
 	}
@@ -162,6 +161,10 @@ int main(int argc, const char* argv[])
 	}
 	else
 		server_.set_server_addr(ST_ASIO_SERVER_PORT + 100);
+
+#if 3 == PACKER_UNPACKER_TYPE
+	global_packer->prefix_suffix("begin", "end");
+#endif
 
 	service_pump.start_service(1);
 	while(service_pump.is_running())
