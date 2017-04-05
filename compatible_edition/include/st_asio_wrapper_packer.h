@@ -176,9 +176,9 @@ public:
 		return true;
 	}
 
-	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(msg.data());}
-	virtual const char* raw_data(msg_ctype& msg) const {return msg.data();}
-	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size();}
+	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), _prefix.size()));}
+	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), _prefix.size());}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - _prefix.size() - _suffix.size();}
 
 private:
 	std::string _prefix, _suffix;
