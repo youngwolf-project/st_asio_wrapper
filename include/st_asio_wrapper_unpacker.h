@@ -377,13 +377,18 @@ public:
 	{
 		assert(nullptr != buff);
 
-		if ((size_t) -1 == first_msg_len && data_len >= _prefix.size())
+		if ((size_t) -1 == first_msg_len)
 		{
-			if (0 != memcmp(_prefix.data(), buff, _prefix.size()))
-				return 0; //invalid msg, stop reading
-			else
-				first_msg_len = 0; //prefix been checked.
+			if (data_len >= _prefix.size())
+			{
+				if (0 != memcmp(_prefix.data(), buff, _prefix.size()))
+					return 0; //invalid msg, stop reading
+				else
+					first_msg_len = 0; //prefix been checked.
+			}
 		}
+		else if (0 != first_msg_len)
+			return 0;
 
 		auto min_len = _prefix.size() + _suffix.size();
 		if (data_len > min_len)
@@ -423,10 +428,9 @@ public:
 		remain_len += bytes_transferred;
 		assert(remain_len <= ST_ASIO_MSG_BUFFER_SIZE);
 
-		auto min_len = _prefix.size() + _suffix.size();
-		auto unpack_ok = true;
 		auto pnext = std::begin(raw_buff);
-		while ((size_t) -1 != first_msg_len && 0 != first_msg_len)
+		auto min_len = _prefix.size() + _suffix.size();
+		while (0 == peek_msg(remain_len, pnext) && (size_t) -1 != first_msg_len && 0 != first_msg_len)
 		{
 			assert(first_msg_len > min_len);
 			auto msg_len = first_msg_len - min_len;
@@ -436,20 +440,15 @@ public:
 			remain_len -= first_msg_len;
 			std::advance(pnext, first_msg_len);
 			first_msg_len = -1;
-
-			if (boost::asio::detail::default_max_transfer_size == peek_msg(remain_len, pnext))
-				break;
-			else if ((size_t) -1 == first_msg_len)
-				unpack_ok = false;
 		}
 
 		if (pnext == std::begin(raw_buff)) //we should have at least got one msg.
 			return false;
-		else if (unpack_ok && remain_len > 0)
+		else if (remain_len > 0)
 			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
 
 		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
-		return unpack_ok;
+		return true;
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
