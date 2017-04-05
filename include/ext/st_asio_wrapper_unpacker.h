@@ -197,7 +197,7 @@ public:
 	{
 		if (0 == step) //the head been received
 		{
-			assert(raw_buff.empty() && ASCS_HEAD_LEN == bytes_transferred);
+			assert(raw_buff.empty() && ST_ASIO_HEAD_LEN == bytes_transferred);
 
 			auto cur_msg_len = ST_ASIO_HEAD_N2H(head) - ST_ASIO_HEAD_LEN;
 			if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE - ST_ASIO_HEAD_LEN) //invalid size
