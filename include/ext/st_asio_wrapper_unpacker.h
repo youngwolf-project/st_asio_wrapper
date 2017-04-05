@@ -394,8 +394,7 @@ public:
 		else if (remain_len > 0)
 			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
 
-		//if unpacking failed, successfully parsed msgs will still returned via msg_can(sticky package), please note.
-		return unpack_ok;
+		return true;
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
