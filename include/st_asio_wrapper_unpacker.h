@@ -447,7 +447,6 @@ public:
 		else if (remain_len > 0)
 			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
 
-		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
 		return true;
 	}
 
