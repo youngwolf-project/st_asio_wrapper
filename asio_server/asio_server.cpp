@@ -163,7 +163,7 @@ int main(int argc, const char* argv[])
 		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
 
 #if 3 == PACKER_UNPACKER_TYPE
-		global_packer->prefix_suffix("begin", "end");
+	global_packer->prefix_suffix("begin", "end");
 #endif
 
 	service_pump.start_service(thread_num);
