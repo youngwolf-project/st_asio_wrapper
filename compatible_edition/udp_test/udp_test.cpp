@@ -7,6 +7,8 @@
 								  //any value which is bigger than zero is okay.
 //#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
 //#define ST_ASIO_DEFAULT_UDP_UNPACKER replaceable_udp_unpacker<>
+#define ST_ASIO_HEARTBEAT_INTERVAL 5 //neither udp_unpacker nor replaceable_udp_unpacker support heartbeat message,
+									 //so heartbeat will be treated as normal message.
 //configuration
 
 #include "../include/ext/st_asio_wrapper_udp.h"
@@ -26,19 +28,22 @@ int main(int argc, const char* argv[])
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
-	BOOST_AUTO(local_port, (unsigned short) atoi(argv[1]));
-	boost::system::error_code ec;
-	BOOST_AUTO(peer_addr, boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(argc >= 4 ? argv[3] : "127.0.0.1", ec), (unsigned short) atoi(argv[2])));
-	assert(!ec);
-
-	std::string str;
 	st_service_pump sp;
 	st_udp_sclient client(sp);
-	client.set_local_addr(local_port);
+	client.set_local_addr((unsigned short) atoi(argv[1])); //for multicast, do not bind to a specific IP, just port is enough
+	client.set_peer_addr((unsigned short) atoi(argv[2]), argc >= 4 ? argv[3] : "127.0.0.1");
 
 	sp.start_service();
+	//for multicast, join it after start_service():
+//	client.lowest_layer().set_option(boost::asio::ip::multicast::join_group(boost::asio::ip::address::from_string("x.x.x.x")));
+
+	//if you must join it before start_service():
+//	client.lowest_layer().open(ST_ASIO_UDP_DEFAULT_IP_VERSION);
+//	client.lowest_layer().set_option(boost::asio::ip::multicast::join_group(boost::asio::ip::address::from_string("x.x.x.x")));
+//	sp.start_service();
 	while(sp.is_running())
 	{
+		std::string str;
 		std::cin >> str;
 		if (QUIT_COMMAND == str)
 			sp.stop_service();
@@ -48,7 +53,9 @@ int main(int argc, const char* argv[])
 			sp.start_service();
 		}
 		else
-			client.safe_send_native_msg(peer_addr, str);
+			client.direct_sync_send_msg(str); //to send to different endpoints, use overloads that take a const boost::asio::ip::udp::endpoint& parameter
+//			client.sync_send_native_msg(str); //to send to different endpoints, use overloads that take a const boost::asio::ip::udp::endpoint& parameter
+//			client.safe_send_native_msg(str); //to send to different endpoints, use overloads that take a const boost::asio::ip::udp::endpoint& parameter
 	}
 
 	return 0;

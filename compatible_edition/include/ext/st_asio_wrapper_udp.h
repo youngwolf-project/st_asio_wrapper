@@ -29,7 +29,7 @@
 namespace st_asio_wrapper { namespace ext {
 
 typedef st_udp_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UDP_UNPACKER> st_udp_socket;
-typedef st_sclient<st_udp_socket> st_udp_sclient;
+typedef st_udp_sclient_base<st_udp_socket> st_udp_sclient;
 typedef st_udp_client_base<st_udp_socket> st_udp_client;
 
 }} //namespace

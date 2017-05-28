@@ -18,36 +18,43 @@
 namespace st_asio_wrapper
 {
 
+#ifdef ST_ASIO_HAS_TEMPLATE_USING
+template<typename Socket> using st_udp_sclient_base = st_sclient<Socket>;
+#else
+template<typename Socket> class st_udp_sclient_base : public st_sclient<Socket>
+{
+public:
+	st_udp_sclient_base(st_service_pump& service_pump_) : st_sclient<Socket>(service_pump_) {}
+};
+#endif
+
 template<typename Socket, typename Pool = st_object_pool<Socket>>
 class st_udp_client_base : public st_client<Socket, Pool>
 {
-protected:
+private:
 	typedef st_client<Socket, Pool> super;
 
 public:
-	using super::TIMER_BEGIN;
-	using super::TIMER_END;
-
 	st_udp_client_base(st_service_pump& service_pump_) : super(service_pump_) {}
 
-	using super::add_client;
-	typename Pool::object_type add_client(unsigned short port, const std::string& ip = std::string())
+	using super::add_socket;
+	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = std::string())
 	{
-		auto client_ptr(ST_THIS create_object());
-		client_ptr->set_local_addr(port, ip);
-		return ST_THIS add_client(client_ptr) ? client_ptr : typename Pool::object_type();
+		auto socket_ptr(this->create_object());
+		socket_ptr->set_local_addr(port, ip);
+		return this->add_socket(socket_ptr) ? socket_ptr : typename Pool::object_type();
 	}
 
-	//functions with a client_ptr parameter will remove the link from object pool first, then call corresponding function
-	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect();}
-	void disconnect() {ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->disconnect();});}
-	void force_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_shutdown();}
-	void force_shutdown() {ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->force_shutdown();});}
-	void graceful_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown();}
-	void graceful_shutdown() {ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->graceful_shutdown();});}
+	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function
+	void disconnect(typename Pool::object_ctype& socket_ptr) {this->del_object(socket_ptr); socket_ptr->disconnect();}
+	void disconnect() {this->do_something_to_all([](typename Pool::object_ctype& item) {item->disconnect();});}
+	void force_shutdown(typename Pool::object_ctype& socket_ptr) {this->del_object(socket_ptr); socket_ptr->force_shutdown();}
+	void force_shutdown() {this->do_something_to_all([](typename Pool::object_ctype& item) {item->force_shutdown();});}
+	void graceful_shutdown(typename Pool::object_ctype& socket_ptr) {this->del_object(socket_ptr); socket_ptr->graceful_shutdown();}
+	void graceful_shutdown() {this->do_something_to_all([](typename Pool::object_ctype& item) {item->graceful_shutdown();});}
 
 protected:
-	virtual void uninit() {ST_THIS stop(); graceful_shutdown();}
+	virtual void uninit() {this->stop(); graceful_shutdown();}
 };
 
 } //namespace

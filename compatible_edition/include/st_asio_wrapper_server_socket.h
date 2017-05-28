@@ -25,28 +25,24 @@ template<typename Packer, typename Unpacker, typename Server = i_server, typenam
 class st_server_socket_base : public st_tcp_socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>,
 	public boost::enable_shared_from_this<st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer> >
 {
-protected:
+private:
 	typedef st_tcp_socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	static const st_timer::tid TIMER_BEGIN = super::TIMER_END;
-	static const st_timer::tid TIMER_ASYNC_SHUTDOWN = TIMER_BEGIN;
-	static const st_timer::tid TIMER_HEARTBEAT_CHECK = TIMER_BEGIN + 1;
-	static const st_timer::tid TIMER_END = TIMER_BEGIN + 10;
-
 	st_server_socket_base(Server& server_) : super(server_.get_service_pump()), server(server_) {}
 	template<typename Arg>
 	st_server_socket_base(Server& server_, Arg& arg) : super(server_.get_service_pump(), arg), server(server_) {}
 
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
-	//please note, when reuse this socket, st_object_pool will invoke reset(), child must re-write it to initialize all member variables,
-	//and then do not forget to invoke st_server_socket_base::reset() to initialize father's member variables
+	//subclass must re-write this function to initialize itself, and then do not forget to invoke superclass' reset function too
+	//notice, when reusing this socket, object_pool will invoke this function
 	virtual void reset() {super::reset();}
+	virtual void take_over(boost::shared_ptr<st_server_socket_base> socket_ptr) {} //restore this socket from socket_ptr
 
 	void disconnect() {force_shutdown();}
 	void force_shutdown()
 	{
-		if (super::FORCE != ST_THIS shutdown_state)
+		if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
 			show_info("server link:", "been shut down.");
 
 		super::force_shutdown();
@@ -58,11 +54,12 @@ public:
 	//this function is not thread safe, please note.
 	void graceful_shutdown(bool sync = false)
 	{
-		if (!ST_THIS is_shutting_down())
+		if (ST_THIS is_broken())
+			return force_shutdown();
+		else if (!ST_THIS is_shutting_down())
 			show_info("server link:", "being shut down gracefully.");
 
-		if (super::graceful_shutdown(sync))
-			ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::bind(&st_server_socket_base::async_shutdown_handler, this, _1, ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100));
+		super::graceful_shutdown(sync);
 	}
 
 	void show_info(const char* head, const char* tail) const
@@ -84,79 +81,33 @@ public:
 protected:
 	virtual bool do_start()
 	{
-		if (!ST_THIS stopped())
-		{
-			ST_THIS last_interact_time = time(NULL);
-			if (ST_ASIO_HEARTBEAT_INTERVAL > 0)
-				ST_THIS set_timer(TIMER_HEARTBEAT_CHECK, ST_ASIO_HEARTBEAT_INTERVAL * 1000,
-					boost::lambda::if_then_else_return(boost::lambda::bind(&st_server_socket_base::check_heartbeat, this, ST_ASIO_HEARTBEAT_INTERVAL), true, false));
-			ST_THIS do_recv_msg();
-			return true;
-		}
+		ST_THIS status = super::CONNECTED;
+		ST_THIS last_recv_time = time(NULL);
+#if ST_ASIO_HEARTBEAT_INTERVAL > 0
+		ST_THIS start_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);
+#endif
+		ST_THIS send_msg(); //send buffer may have msgs, send them
+		ST_THIS do_recv_msg();
 
-		return false;
+		return true;
 	}
 
 	virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); ST_THIS force_shutdown();}
-	//do not forget to force_shutdown this socket(in del_client(), there's a force_shutdown() invocation)
+	//do not forget to force_shutdown this socket(in del_socket(), there's a force_shutdown() invocation)
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
-		ST_THIS show_info("server link:", "broken/been shut down", ec);
+		show_info("server link:", "broken/been shut down", ec);
 
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
-		ST_THIS force_shutdown();
+		force_shutdown();
 #else
-		server.del_client(ST_THIS shared_from_this());
+		ST_THIS status = super::BROKEN;
+		server.del_socket(ST_THIS shared_from_this());
 #endif
-		ST_THIS shutdown_state = super::NONE;
 	}
 
-	//unit is second
-	//if macro ST_ASIO_HEARTBEAT_INTERVAL is bigger than zero, st_server_socket_base will start a timer to call this automatically with interval equal to ST_ASIO_HEARTBEAT_INTERVAL.
-	//otherwise, you can call check_heartbeat with you own logic, but you still need to define a valid ST_ASIO_HEARTBEAT_MAX_ABSENCE macro, please note.
-	bool check_heartbeat(int interval)
-	{
-		assert(interval > 0);
-
-		time_t now = time(NULL);
-		if (ST_THIS clean_heartbeat() > 0)
-		{
-			if (now - ST_THIS last_interact_time >= interval) //server never send heartbeat on its own initiative
-				ST_THIS send_heartbeat('s');
-
-			ST_THIS last_interact_time = now;
-		}
-		else if (now - ST_THIS last_interact_time >= interval * ST_ASIO_HEARTBEAT_MAX_ABSENCE)
-		{
-			show_info("server link:", "broke unexpectedly.");
-			force_shutdown();
-		}
-
-		return ST_THIS started(); //always keep this timer
-	}
-
-private:
-	bool async_shutdown_handler(st_timer::tid id, size_t loop_num)
-	{
-		assert(TIMER_ASYNC_SHUTDOWN == id);
-
-		if (super::GRACEFUL == ST_THIS shutdown_state)
-		{
-			--loop_num;
-			if (loop_num > 0)
-			{
-				ST_THIS update_timer_info(id, 10, boost::bind(&st_server_socket_base::async_shutdown_handler, this, _1, loop_num));
-				return true;
-			}
-			else
-			{
-				unified_out::info_out("failed to graceful shutdown within %d seconds", ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
-				force_shutdown();
-			}
-		}
-
-		return false;
-	}
+	virtual void on_async_shutdown_error() {force_shutdown();}
+	virtual bool on_heartbeat_error() {show_info("server link:", "broke unexpectedly."); force_shutdown(); return false;}
 
 protected:
 	Server& server;

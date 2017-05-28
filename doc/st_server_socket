@@ -19,6 +19,9 @@ ssl使用。
 	virtual void reset();
 重置所有，st_object_pool在重用时会调用。st_server_socket的子类可重写它以重置自己的状态，记得最后需要调用本类的reset。
 
+	virtual void take_over(boost::shared_ptr<st_server_socket_base> socket_ptr);
+恢复对象socket_ptr到这个st_server_socket，所以你的用户数据最好是指针（智能指针），这样就不需要拷贝了，否则必须执行深拷贝。
+
 	void disconnect();
 直接调用force_shutdown。
 
@@ -45,17 +48,15 @@ protected:
 	virtual void on_recv_error(const error_code& ec);
 连接断开，默认的行为是调用i_server::del_client，可以重写以自定义行为。
 
-	bool check_heartbeat(int interval);
-发送和读取心跳包，将做断线检测。
-如果定义了ASCS_HEARTBEAT_INTERVAL，将自动调用这个函数，否则你也可以以自己的逻辑来调用它。
+	virtual void on_async_shutdown_error();
+异步关闭出错时回调。
 
-private:
-	bool async_shutdown_handler(st_timer::tid id, size_t loop_num);
-异步优雅关闭（shutdown）超时定时器。
+	virtual bool on_heartbeat_error();
+心跳超时时回调。
 
 protected:
 	Server& server;
-用于操控st_server，st_server（其实是st_object_pool，st_server是其子类）在创建st_server_socket的时候，会把自己的引用通过构造函数传入。
+用于操控st_server，st_server在创建st_server_socket的时候，会把自己的引用通过构造函数传入。
 };
 
 } //namespace

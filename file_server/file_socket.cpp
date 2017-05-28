@@ -1,7 +1,7 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		5050
-#define ST_ASIO_CLEAR_OBJECT_INTERVAL 60
+#define ST_ASIO_RESTORE_OBJECT
 #define ST_ASIO_ENHANCED_STABILITY
 #define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_INPUT_QUEUE non_lock_queue
@@ -9,8 +9,9 @@
 //but file_server only receive talking message, not send talking message proactively), the previous message has been
 //sent to file_client, so sending buffer will always be empty, which means we will never operate sending buffer concurrently,
 //so need no locks.
-#define ST_ASIO_HEARTBEAT_INTERVAL	5
 #define ST_ASIO_DEFAULT_PACKER	replaceable_packer<>
+#define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
+#define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
 //configuration
 
 #include "file_socket.h"
@@ -19,13 +20,20 @@ file_socket::file_socket(i_server& server_) : st_server_socket(server_) {}
 file_socket::~file_socket() {trans_end();}
 
 void file_socket::reset() {trans_end(); st_server_socket::reset();}
+void file_socket::take_over(boost::shared_ptr<st_server_socket> socket_ptr)
+{
+	auto raw_socket_ptr(boost::dynamic_pointer_cast<file_socket>(socket_ptr)); //socket_ptr actually is a pointer of file_socket
+	printf("restore user data from invalid object (" ST_ASIO_LLF ").\n", raw_socket_ptr->id());
+}
+//this works too, but brings warnings with -Woverloaded-virtual option.
+//void file_socket::take_over(boost::shared_ptr<file_socket> socket_ptr) {printf("restore user data from invalid object (" ST_ASIO_LLF ").\n", socket_ptr->id());}
 
 //msg handling
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 //we can handle msg very fast, so we don't use recv buffer
 bool file_socket::on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
-bool file_socket::on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
+bool file_socket::on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}
 //msg handling end
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -106,6 +114,13 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 	case 2:
 		printf("client says: %s\n", std::next(msg.data(), ORDER_LEN));
 		break;
+	case 3:
+		if (ORDER_LEN + sizeof(uint_fast64_t) == msg.size())
+		{
+			uint_fast64_t id;
+			memcpy(&id, std::next(msg.data(), ORDER_LEN), sizeof(uint_fast64_t));
+			server.restore_socket(this->shared_from_this(), id);
+		}
 	default:
 		break;
 	}

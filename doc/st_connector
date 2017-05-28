@@ -34,10 +34,8 @@ public:
 在调用父类同名函数的基础上，增加了对是否重连接的判断，如果需要重连接则返回假。
 
 	void set_server_addr(unsigned short port, const std::string& ip);
+	const boost::asio::ip::tcp::endpoint& get_server_addr() const;
 设置服务端地址用于连接之用，需要在do_start之前被调用。
-
-	bool is_connected() const;
-是否已经连接成功。
 
 	void disconnect(bool reconnect = false);
 直接调用force_shutdown。
@@ -68,14 +66,17 @@ virtual int prepare_reconnect(const boost::system::error_code& ec);
 	virtual bool is_closable();
 如果正在重连接，则不允许close这个st_connector。
 
-	virtual bool is_send_allowed() const;
-是否可发送数据，is_connected加上父类的is_send_allowed为最终的判定结果。
-
 	virtual void on_unpack_error();
 解包错误，默认的行为是关闭连接，可以重写以自定义行为。
 
 	virtual void on_recv_error(const error_code& ec);
 接收错误，默认的行为是关闭连接，可以重写以自定义行为。
+
+	virtual void on_async_shutdown_error();
+异步关闭连接失败时回调。
+
+	virtual bool on_heartbeat_error();
+心跳检测超时时回调。
 
 	bool prepare_next_reconnect(const boost::system::error_code& ec);
 如果允许（io_service仍然在运行且prepare_reconnect返回大于等于0），启动定时器以延时一小段时间之后重新连接服务器。
@@ -94,10 +95,8 @@ private:
 protected:
 	boost::asio::ip::tcp::endpoint server_addr;
 服务器地址。
-	bool connected;
-是否已经连接成功。
-	bool reconnecting;
-是否正在重新连接。
+	bool need_reconnect;
+是否重新连接（当连接断开后）。
 };
 
 } //namespace

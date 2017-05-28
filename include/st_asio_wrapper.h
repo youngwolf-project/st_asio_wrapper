@@ -11,6 +11,21 @@
 
  * license: www.boost.org/LICENSE_1_0.txt
  *
+ * Known issues:
+ * 1. since 1.2.0, with boost-1.49, compatible edition's st_object::is_last_async_call() cannot work properly, it is because before asio calling any callbacks, it copied
+ *    the callback(not a good behaviour), this cause st_object::is_last_async_call() never return true, so objects in st_object_pool can never be reused or freed.
+ *    To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro.
+ *    BTW, boost-1.61 and standard edition even with boost-1.49 don't have such issue, I'm not sure in which edition, asio fixed this defect,
+ *    if you have other versions, please help me to find out the minimum version via the following steps:
+ *     1. Compile demo asio_server and test_client;
+ *     2. Run asio_server and test_client without any parameters;
+ *     3. Stop test_client (input 'quit');
+ *     4. Stop asio_server (input 'quit');
+ *     5. If asio_server successfully quitted, means this edition doesn't have above defect.
+ * 2. since 1.3.5 until 1.4, heartbeat function cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
+ * 3. since 1.3.5 until 1.4, UDP doesn't support heartbeat because UDP doesn't support OOB data.
+ * 4. since 1.3.5 until 1.4, SSL doesn't support heartbeat because SSL doesn't support OOB data.
+ *
  * change log:
  * 2012.7.7
  * Created
@@ -65,18 +80,6 @@
  * Drop const qualifier for is_send_allowed() function.
  * Strip boost::bind and boost::ref for standard edition.
  *
- * known issues:
- * 1. On boost-1.49, compatible edition's st_object::is_last_async_call() cannot work properly, it is because before asio calling any callbacks, it copied
- *    the callback(not a good behaviour), this cause st_object::is_last_async_call() never return true, so objects in st_object_pool can never be reused or freed.
- *    To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro.
- *    BTW, boost-1.61 and standard edition even with boost-1.49 don't have such issue, I'm not sure in which edition, asio fixed this defect,
- *    if you have other versions, please help me to find out the minimum version via the following steps:
- *     1. Compile demo asio_server and test_client;
- *     2. Run asio_server and test_client without any parameters;
- *     3. Stop test_client (input 'quit');
- *     4. Stop asio_server (input 'quit');
- *     5. If asio_server successfully quitted, means this edition doesn't have above defect.
- *
  * 2016.10.8	version 1.3.0
  * Drop original congestion control (because it cannot totally resolve dead loop) and add a semi-automatic congestion control.
  * Demonstrate how to use the new semi-automatic congestion control (asio_server, test_client, pingpong_server and pingpong_client).
@@ -130,38 +133,94 @@
  * Fix bug: In extreme cases, messages may get starved in send buffer and will not be sent until arrival of next message.
  * Fix bug: Sometimes, st_connector_base cannot reconnect to the server after link broken.
  *
- * known issues:
- * 1. heartbeat mechanism cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
- * 2. UDP doesn't support heartbeat because UDP doesn't support OOB data.
- * 3. SSL doesn't support heartbeat (maybe I missed an option, I'm not familiar with SSL).
+ * ===============================================================
+ * 2017.5.30	version 1.4.0
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * Virtual function reset_state in i_packer, i_unpacker and i_udp_unpacker have been renamed to reset.
+ * Virtual function is_send_allowed has been renamed to is_ready, it also means ready to receive messages
+ *  since message sending is not suspendable any more.
+ * Virtual function on_msg_handle has been changed, the link_down variable will not be presented any more.
+ * Interface i_server::del_client has been renamed to i_server::del_socket.
+ * Function inner_packer and inner_unpacker have been renamed to packer and unpacker.
+ * All add_client functions have been renamed to add_socket.
+ *
+ * HIGHLIGHT:
+ * Support object restoration (on server side), see macro ST_ASIO_RESTORE_OBJECT for more details.
+ * Re-implement heartbeat function, use user data (so need packer and unpacker's support) instead of OOB, now there will be no any
+ *  limitations for using heartbeat.
+ * Refactor and optimize ssl objects, now st_ssl_connector_base and st_ssl_server_socket_base are reusable,
+ *  just need you to define macro ST_ASIO_REUSE_SSL_STREAM.
+ *
+ * FIX:
+ * Before on_close() to be called, st_socket::start becomes available (so user can call it falsely).
+ * If a timer failed or stopped by callback, its status not set properly (should be set to TIMER_CANCELED).
+ * Make ssl shutting down thread safe.
+ *
+ * ENHANCEMENTS:
+ * Virtual function i_packer::pack_heartbeat been introduced to support heartbeat function.
+ * Interface i_server::restore_socket been added, see macro ST_ASIO_RESTORE_OBJECT for more details.
+ * Be able to manually start heartbeat function without defining macro ST_ASIO_HEARTBEAT_INTERVAL, see demo asio_server for more details.
+ * Support sync mode when sending messages, it's also a type of congestion control like safe_send_msg.
+ * Expand enum st_tcp_socket::shutdown_states, now it's able to represent all SOCKET status (connected, shutting down and broken),
+ *  so rename it to link_status.
+ * Enhance class timer (function is_timer and another stop_all_timer been added).
+ * Support all buffer types that boost::asio supported when receiving messages, use macro ST_ASIO_RECV_BUFFER_TYPE (it's the only way) to define the buffer type,
+ *  it's effective for both TCP and UDP.
+ *
+ * DELETION:
+ * Drop st_server_base::shutdown_all_client, use st_server_base::force_shutdown instead.
+ * Drop ST_ASIO_DISCARD_MSG_WHEN_LINK_DOWN macro and related logic, because it brings complexity and race condition,
+ *  and are not very useful.
+ * Not support pausing message sending and dispatching any more, because they bring complexity and race condition,
+ *  and are not very useful.
+ *
+ * REFACTORING:
+ * Move heartbeat function from st_connector_base and st_server_socket_base to st_socket, so introduce new virtual function
+ *  virtual void on_heartbeat_error() to st_socket, subclass need to implement it.
+ * Move async shutdown function from st_connector_base and st_server_socket_base to st_socket, so introduce new virtual function
+ *  virtual void on_async_shutdown_error() to st_socket, subclass need to implement it.
+ * Move handshake from st_ssl_server_base to st_ssl_server_socket_base.
+ *
+ * REPLACEMENTS:
+ * Use boost::mutex instead of boost::shared_mutex, the former is more efficient in st_asio_wrapper's usage scenario.
+ * Move macro ST_ASIO_SCATTERED_RECV_BUFFER from st_asio_wrapper to st_asio_wrapper::ext, because it doesn't belong to st_asio_wrapper any more after introduced
+ *  macro ST_ASIO_RECV_BUFFER_TYPE.
+ * Move macro ST_ASIO_MSG_BUFFER_SIZE from st_asio_wrapper to st_asio_wrapper::ext, because it doesn't belong to st_asio_wrapper.
+ * Use boost::unordered::unordered_map instead of unordered_set, because we used one of the overloaded function find, which is marked as 'not encouraged to use'.
  *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10305	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.3.5"
+#define ST_ASIO_WRAPPER_VER		10400	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.4.0"
 
+//boost and compiler check
 #ifdef _MSC_VER
-	static_assert(_MSC_VER >= 1700, "st_asio_wrapper must be compiled with Visual C++ 11.0 or higher.");
+	static_assert(_MSC_VER >= 1700, "st_asio_wrapper needs Visual C++ 11.0 or higher.");
+
+	#if _MSC_VER >= 1800
+		#define ST_ASIO_HAS_TEMPLATE_USING
+	#endif
 #elif defined(__GNUC__)
-	//After a roughly reading from gcc.gnu.org and clang.llvm.org, I believed that the minimum version of GCC and Clang that support c++0x
-	//are 4.6 and 3.1, so, I supply the following compiler verification. If there's something wrong, you can freely modify them,
-	//and if you let me know, I'll be very appreciated.
 	#ifdef __clang__
-		static_assert(__clang_major__ > 3 || __clang_major__ == 3 && __clang_minor__ >= 1, "st_asio_wrapper must be compiled with Clang 3.1 or higher.");
-	#elif __GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 6
-		#error st_asio_wrapper must be compiled with GCC 4.6 or higher.
+		static_assert(__clang_major__ > 3 || (__clang_major__ == 3 && __clang_minor__ >= 1), "st_asio_wrapper needs Clang 3.1 or higher.");
+	#else
+		static_assert(__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6), "st_asio_wrapper needs GCC 4.6 or higher.");
 	#endif
 
 	#if !defined(__GXX_EXPERIMENTAL_CXX0X__) && (!defined(__cplusplus) || __cplusplus < 201103L)
-		#error st_asio_wrapper(standard edition) need c++0x support, please open these features.
+		#error st_asio_wrapper(standard edition) needs c++11 or higher.
 	#endif
+
+	#define ST_ASIO_HAS_TEMPLATE_USING
 #else
 	#error st_asio_wrapper only support Visual C++, GCC and Clang.
 #endif
 
-static_assert(BOOST_VERSION >= 104900, "st_asio_wrapper only support boost 1.49 or higher.");
+static_assert(BOOST_VERSION >= 104900, "st_asio_wrapper needs boost 1.49 or higher.");
+//boost and compiler check
 
 #endif /* ST_ASIO_WRAPPER_H_ */

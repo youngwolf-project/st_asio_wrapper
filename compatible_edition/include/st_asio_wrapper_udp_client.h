@@ -18,32 +18,35 @@
 namespace st_asio_wrapper
 {
 
+template<typename Socket> class st_udp_sclient_base : public st_sclient<Socket>
+{
+public:
+	st_udp_sclient_base(st_service_pump& service_pump_) : st_sclient<Socket>(service_pump_) {}
+};
+
 template<typename Socket, typename Pool = st_object_pool<Socket> >
 class st_udp_client_base : public st_client<Socket, Pool>
 {
-protected:
+private:
 	typedef st_client<Socket, Pool> super;
 
 public:
-	using super::TIMER_BEGIN;
-	using super::TIMER_END;
-
 	st_udp_client_base(st_service_pump& service_pump_) : super(service_pump_) {}
 
-	using super::add_client;
-	typename Pool::object_type add_client(unsigned short port, const std::string& ip = std::string())
+	using super::add_socket;
+	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = std::string())
 	{
-		BOOST_AUTO(client_ptr, ST_THIS create_object());
-		client_ptr->set_local_addr(port, ip);
-		return ST_THIS add_client(client_ptr) ? client_ptr : typename Pool::object_type();
+		BOOST_AUTO(socket_ptr, ST_THIS create_object());
+		socket_ptr->set_local_addr(port, ip);
+		return ST_THIS add_socket(socket_ptr) ? socket_ptr : typename Pool::object_type();
 	}
 
-	//functions with a client_ptr parameter will remove the link from object pool first, then call corresponding function
-	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect();}
+	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function
+	void disconnect(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->disconnect();}
 	void disconnect() {ST_THIS do_something_to_all(boost::mem_fn(&Socket::disconnect));}
-	void force_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_shutdown();}
+	void force_shutdown(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->force_shutdown();}
 	void force_shutdown() {ST_THIS do_something_to_all(boost::mem_fn(&Socket::force_shutdown));}
-	void graceful_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown();}
+	void graceful_shutdown(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->graceful_shutdown();}
 	void graceful_shutdown() {ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_shutdown));}
 
 protected:

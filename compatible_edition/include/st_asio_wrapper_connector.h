@@ -36,25 +36,23 @@ template <typename Packer, typename Unpacker, typename Socket = boost::asio::ip:
 	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
 class st_connector_base : public st_tcp_socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>
 {
-protected:
+private:
 	typedef st_tcp_socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	static const st_timer::tid TIMER_BEGIN = super::TIMER_END;
 	static const st_timer::tid TIMER_CONNECT = TIMER_BEGIN;
-	static const st_timer::tid TIMER_ASYNC_SHUTDOWN = TIMER_BEGIN + 1;
-	static const st_timer::tid TIMER_HEARTBEAT_CHECK = TIMER_BEGIN + 2;
 	static const st_timer::tid TIMER_END = TIMER_BEGIN + 10;
 
-	st_connector_base(boost::asio::io_service& io_service_) : super(io_service_), connected(false), reconnecting(true) {set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
+	st_connector_base(boost::asio::io_service& io_service_) : super(io_service_), need_reconnect(true) {set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 	template<typename Arg>
-	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), connected(false), reconnecting(true) {set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
+	st_connector_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg), need_reconnect(true) {set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 
-	//reset all, be ensure that there's no any operations performed on this st_connector_base when invoke it
-	//notice, when reusing this st_connector_base, st_object_pool will invoke reset(), child must re-write this to initialize
-	//all member variables, and then do not forget to invoke st_connector_base::reset() to initialize father's member variables
-	virtual void reset() {connected = false; reconnecting = true; super::reset();}
-	virtual bool obsoleted() {return !reconnecting && super::obsoleted();}
+	//reset all, be ensure that there's no any operations performed on this socket when invoke it
+	//subclass must re-write this function to initialize itself, and then do not forget to invoke superclass' reset function too
+	//notice, when reusing this socket, st_object_pool will invoke this function
+	virtual void reset() {need_reconnect = true; super::reset();}
+	virtual bool obsoleted() {return !need_reconnect && super::obsoleted();}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
 	{
@@ -68,19 +66,14 @@ public:
 	}
 	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
 
-	bool is_connected() const {return connected;}
-
-	//if the connection is broken unexpectedly, st_connector will try to reconnect to the server automatically.
+	//if the connection is broken unexpectedly, st_connector_base will try to reconnect to the server automatically.
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false)
 	{
-		if (super::FORCE != ST_THIS shutdown_state)
-		{
+		if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
 			show_info("client link:", "been shut down.");
-			reconnecting = reconnect;
-			connected = false;
-		}
 
+		need_reconnect = reconnect;
 		super::force_shutdown();
 	}
 
@@ -90,17 +83,13 @@ public:
 	//this function is not thread safe, please note.
 	void graceful_shutdown(bool reconnect = false, bool sync = true)
 	{
-		if (ST_THIS is_shutting_down())
-			return;
-		else if (!is_connected())
+		if (ST_THIS is_broken())
 			return force_shutdown(reconnect);
+		else if (!ST_THIS is_shutting_down())
+			show_info("client link:", "being shut down gracefully.");
 
-		show_info("client link:", "being shut down gracefully.");
-		reconnecting = reconnect;
-		connected = false;
-
-		if (super::graceful_shutdown(sync))
-			ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::bind(&st_connector_base::async_shutdown_handler, this, _1, ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100));
+		need_reconnect = reconnect;
+		super::graceful_shutdown(sync);
 	}
 
 	void show_info(const char* head, const char* tail) const
@@ -122,39 +111,48 @@ public:
 protected:
 	virtual bool do_start() //connect or receive
 	{
-		if (!ST_THIS stopped())
+		if (!ST_THIS is_connected())
+			ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error)));
+		else
 		{
-			if (reconnecting && !is_connected())
-				ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&st_connector_base::connect_handler, this, boost::asio::placeholders::error)));
-			else
-				ST_THIS do_recv_msg();
-
-			return true;
+			ST_THIS last_recv_time = time(NULL);
+#if ST_ASIO_HEARTBEAT_INTERVAL > 0
+			ST_THIS start_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);
+#endif
+			ST_THIS send_msg(); //send buffer may have msgs, send them
+			ST_THIS do_recv_msg();
 		}
 
-		return false;
+		return true;
 	}
 
-	//after how much time(ms), st_connector will try to reconnect to the server, negative means give up.
+	//after how much time(ms), st_connector_base will try to reconnect to the server, negative means give up.
 	virtual int prepare_reconnect(const boost::system::error_code& ec) {return ST_ASIO_RECONNECT_INTERVAL;}
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
-	virtual bool is_closable() {return !reconnecting;}
-	virtual bool is_send_allowed() {return is_connected() && super::is_send_allowed();}
+	virtual bool is_closable() {return !need_reconnect;}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_shutdown();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 		show_info("client link:", "broken/been shut down", ec);
 
-		force_shutdown(ST_THIS is_shutting_down() ? reconnecting : prepare_reconnect(ec) >= 0);
-		ST_THIS shutdown_state = super::NONE;
+		force_shutdown(ST_THIS is_shutting_down() ? need_reconnect : prepare_reconnect(ec) >= 0);
+		ST_THIS status = super::BROKEN;
 
-		if (reconnecting)
+		if (need_reconnect)
 			ST_THIS start();
+	}
+
+	virtual void on_async_shutdown_error() {force_shutdown(need_reconnect);}
+	virtual bool on_heartbeat_error()
+	{
+		show_info("client link:", "broke unexpectedly.");
+		force_shutdown(ST_THIS is_shutting_down() ? need_reconnect : prepare_reconnect(boost::system::error_code(boost::asio::error::network_down)) >= 0);
+		return false;
 	}
 
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
 	{
-		if ((boost::asio::error::operation_aborted != ec || reconnecting) && !ST_THIS stopped())
+		if ((boost::asio::error::operation_aborted != ec || need_reconnect) && !ST_THIS stopped())
 		{
 #ifdef _WIN32
 			if (boost::asio::error::connection_refused != ec && boost::asio::error::network_unreachable != ec && boost::asio::error::timed_out != ec)
@@ -175,63 +173,13 @@ protected:
 		return false;
 	}
 
-	//unit is second
-	//if macro ST_ASIO_HEARTBEAT_INTERVAL is bigger than zero, st_connector_base will start a timer to call this automatically with interval equal to ST_ASIO_HEARTBEAT_INTERVAL.
-	//otherwise, you can call check_heartbeat with you own logic, but you still need to define a valid ST_ASIO_HEARTBEAT_MAX_ABSENCE macro, please note.
-	bool check_heartbeat(int interval)
-	{
-		assert(interval > 0);
-
-		time_t now = time(NULL);
-		if (now - ST_THIS last_interact_time >= interval) //client send heartbeat on its own initiative
-			ST_THIS send_heartbeat('c');
-
-		if (ST_THIS clean_heartbeat() > 0)
-			ST_THIS last_interact_time = now;
-		else if (now - ST_THIS last_interact_time >= interval * ST_ASIO_HEARTBEAT_MAX_ABSENCE)
-		{
-			show_info("client link:", "broke unexpectedly.");
-			force_shutdown(ST_THIS is_shutting_down() ? reconnecting : prepare_reconnect(boost::system::error_code(boost::asio::error::network_down)) >= 0);
-		}
-
-		return ST_THIS started(); //always keep this timer
-	}
-
 private:
-	bool async_shutdown_handler(st_timer::tid id, size_t loop_num)
-	{
-		assert(TIMER_ASYNC_SHUTDOWN == id);
-
-		if (super::GRACEFUL == ST_THIS shutdown_state)
-		{
-			--loop_num;
-			if (loop_num > 0)
-			{
-				ST_THIS update_timer_info(id, 10, boost::bind(&st_connector_base::async_shutdown_handler, this, _1, loop_num));
-				return true;
-			}
-			else
-			{
-				unified_out::info_out("failed to graceful shutdown within %d seconds", ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
-				force_shutdown(reconnecting);
-			}
-		}
-
-		return false;
-	}
-
 	void connect_handler(const boost::system::error_code& ec)
 	{
 		if (!ec)
 		{
-			connected = reconnecting = true;
-			ST_THIS reset_state();
+			ST_THIS status = super::CONNECTED;
 			on_connect();
-			ST_THIS last_interact_time = time(NULL);
-			if (ST_ASIO_HEARTBEAT_INTERVAL > 0)
-				ST_THIS set_timer(TIMER_HEARTBEAT_CHECK, ST_ASIO_HEARTBEAT_INTERVAL * 1000,
-					boost::lambda::if_then_else_return(boost::lambda::bind(&st_connector_base::check_heartbeat, this, ST_ASIO_HEARTBEAT_INTERVAL), true, false));
-			ST_THIS send_msg(); //send buffer may have msgs, send them
 			do_start();
 		}
 		else
@@ -240,8 +188,7 @@ private:
 
 protected:
 	boost::asio::ip::tcp::endpoint server_addr;
-	bool connected;
-	bool reconnecting;
+	bool need_reconnect;
 };
 
 } //namespace

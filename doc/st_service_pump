@@ -44,7 +44,7 @@ public:
 继承者实现，在启动／停止service的时候，st_service_pump会调用。
 
 	protected:
-		st_service_pump& service_pump;
+		st_service_pump& sp;
 
 	private:
 		bool started;
@@ -115,7 +115,7 @@ protected:
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred);
 	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred);
-与st_timer的同名函数类似。
+对所有service对象执行__pred。
 
 private:
 	void add(object_type i_service_);

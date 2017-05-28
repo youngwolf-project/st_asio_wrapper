@@ -1,4 +1,7 @@
 ﻿
+st_client主要是实现st_service_pump::i_service接口，以便st_service_pump能启动它，用在tcp客户端和udp两端。
+st_sclient只包括一个套接字，如果你需要一系列套接字，则使用st_client。
+
 namespace st_asio_wrapper
 {
 
@@ -31,8 +34,8 @@ protected:
 实现i_service的纯虚接口，供st_service_pump在start_service时调用，跟st_sclient::init功能一样，只是对所有客户端都做一个“开始”操作。
 
 public:
-	bool add_client(typename st_client::object_ctype& client_ptr, bool reset = true);
-添加一个连接到对象池，并调用client_ptr->start()，如果reset为true，那么在这之前还会先调用client_ptr->reset()。
+	bool add_socket(typename Pool::object_ctype& socket_ptr, bool reset = true);
+添加一个连接到对象池，并调用socket_ptr->start()，如果reset为true，那么在这之前还会先调用socket_ptr->reset()。
 
 	using Pool::create_object;
 对客户端开放对象创建功能。

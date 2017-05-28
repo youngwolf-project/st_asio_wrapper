@@ -7,7 +7,7 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * make st_asio_wrapper support asio::ssl
+ * make st_asio_wrapper support boost::asio::ssl
  */
 
 #ifndef ST_ASIO_WRAPPER_SSL_H_
@@ -20,72 +20,45 @@
 #include "st_asio_wrapper_tcp_client.h"
 #include "st_asio_wrapper_server_socket.h"
 #include "st_asio_wrapper_server.h"
-#include "st_asio_wrapper_container.h"
-
-#ifdef ST_ASIO_REUSE_OBJECT
-	#error boost::asio::ssl::stream not support reuse!
-#endif
 
 namespace st_asio_wrapper
 {
 
-template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
-	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
-	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class st_ssl_connector_base : public st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>
+template <typename Socket>
+class socket : public Socket
 {
-protected:
-	typedef st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer> super;
+#if defined(ST_ASIO_REUSE_OBJECT) && !defined(ST_ASIO_REUSE_SSL_STREAM)
+	#error please define ST_ASIO_REUSE_SSL_STREAM macro explicitly if you need boost::asio::ssl::stream to be reusable!
+#endif
 
 public:
-	using super::TIMER_BEGIN;
-	using super::TIMER_END;
+	template<typename Arg>
+	socket(Arg& arg, boost::asio::ssl::context& ctx) : Socket(arg, ctx), authorized_(false) {}
 
-	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : super(io_service_, ctx), authorized_(false) {}
-
-	virtual void reset() {authorized_ = false; super::reset();}
+	virtual bool is_ready() {return authorized_ && Socket::is_ready();}
+	virtual void reset() {authorized_ = false;}
 	bool authorized() const {return authorized_;}
 
-	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
-	void force_shutdown(bool reconnect = false)
-	{
-		if (reconnect)
-			unified_out::error_out("boost::asio::ssl::stream not support reuse!");
-
-		if (!shutdown_ssl())
-			super::force_shutdown(false);
-	}
-
-	void graceful_shutdown(bool reconnect = false, bool sync = true)
-	{
-		if (reconnect)
-			unified_out::error_out("boost::asio::ssl::stream not support reuse!");
-
-		if (!shutdown_ssl())
-			super::graceful_shutdown(false, sync);
-	}
-
 protected:
-	virtual bool do_start() //connect or receive
+	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
-		if (!ST_THIS stopped())
+		if (is_ready())
 		{
-			if (ST_THIS reconnecting && !ST_THIS is_connected())
-				ST_THIS lowest_layer().async_connect(ST_THIS server_addr, ST_THIS make_handler_error([this](const boost::system::error_code& ec) {ST_THIS connect_handler(ec);}));
-			else if (!authorized_)
-				ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client,
-					ST_THIS make_handler_error([this](const boost::system::error_code& ec) {ST_THIS handshake_handler(ec);}));
-			else
-				ST_THIS do_recv_msg();
+			authorized_ = false;
+#ifndef ST_ASIO_REUSE_SSL_STREAM
+			this->status = Socket::link_status::GRACEFUL_SHUTTING_DOWN;
+			this->show_info("ssl link:", "been shut down.");
+			boost::system::error_code ec;
+			this->next_layer().shutdown(ec);
 
-			return true;
+			if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown will get error eof.
+				unified_out::info_out("shutdown ssl link failed (maybe intentionally because of reusing)");
+#endif
 		}
 
-		return false;
+		Socket::on_recv_error(ec);
 	}
 
-	virtual void on_unpack_error() {authorized_ = false; super::on_unpack_error();}
-	virtual void on_recv_error(const boost::system::error_code& ec) {authorized_ = false; super::on_recv_error(ec);}
 	virtual void on_handshake(const boost::system::error_code& ec)
 	{
 		if (!ec)
@@ -93,73 +66,112 @@ protected:
 		else
 			unified_out::error_out("handshake failed: %s", ec.message().data());
 	}
-	virtual bool is_send_allowed() {return authorized() && super::is_send_allowed();}
 
-	bool shutdown_ssl()
+	void handle_handshake(const boost::system::error_code& ec) {on_handshake(ec); if (!ec) {authorized_ = true; Socket::do_start();}}
+
+	void shutdown_ssl(bool sync = true)
 	{
-		bool re = false;
-		if (!ST_THIS is_shutting_down() && authorized_)
+		if (!is_ready())
 		{
-			ST_THIS show_info("ssl client link:", "been shut down.");
-			ST_THIS shutdown_state = super::GRACEFUL;
-			ST_THIS reconnecting = false;
-			authorized_ = false;
+			Socket::force_shutdown();
+			return;
+		}
 
+		authorized_ = false;
+		this->status = Socket::link_status::GRACEFUL_SHUTTING_DOWN;
+
+		if (!sync)
+		{
+			this->show_info("ssl link:", "been shutting down.");
+			this->next_layer().async_shutdown(this->make_handler_error([this](const boost::system::error_code& ec) {
+				if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown will get error eof.
+					unified_out::info_out("async shutdown ssl link failed (maybe intentionally because of reusing)");
+			}));
+		}
+		else
+		{
+			this->show_info("ssl link:", "been shut down.");
 			boost::system::error_code ec;
-			ST_THIS next_layer().shutdown(ec);
+			this->next_layer().shutdown(ec);
 
-			re = !ec;
+			if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown will get error eof.
+				unified_out::info_out("shutdown ssl link failed (maybe intentionally because of reusing)");
 		}
-
-		return re;
-	}
-
-private:
-	void connect_handler(const boost::system::error_code& ec)
-	{
-		if (!ec)
-		{
-			ST_THIS connected = ST_THIS reconnecting = false;
-			ST_THIS reset_state();
-			ST_THIS on_connect();
-			do_start();
-		}
-		else
-			ST_THIS prepare_next_reconnect(ec);
-	}
-
-	void handshake_handler(const boost::system::error_code& ec)
-	{
-		on_handshake(ec);
-		if (!ec)
-		{
-			authorized_ = true;
-			ST_THIS send_msg(); //send buffer may have msgs, send them
-			do_start();
-		}
-		else
-			force_shutdown(false);
 	}
 
 protected:
-	bool authorized_;
+	volatile bool authorized_;
+};
+
+template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class st_ssl_connector_base : public socket<st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>>
+{
+private:
+	typedef socket<st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>> super;
+
+public:
+	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : super(io_service_, ctx) {}
+
+	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
+	void force_shutdown(bool reconnect = false)
+	{
+		if (reconnect)
+		{
+			this->authorized_ = false;
+			super::force_shutdown(true);
+		}
+		else
+			graceful_shutdown();
+	}
+	void graceful_shutdown(bool reconnect = false, bool sync = true)
+	{
+		if (reconnect)
+		{
+			this->authorized_ = false;
+			super::graceful_shutdown(true, sync);
+		}
+		else
+		{
+			this->need_reconnect = false;
+			this->shutdown_ssl(sync);
+		}
+	}
+
+protected:
+	virtual bool do_start() //add handshake
+	{
+		if (!this->is_connected())
+			super::do_start();
+		else if (!this->authorized())
+			this->next_layer().async_handshake(boost::asio::ssl::stream_base::client, this->make_handler_error([this](const boost::system::error_code& ec) {this->handle_handshake(ec);}));
+
+		return true;
+	}
+
+#ifndef ST_ASIO_REUSE_SSL_STREAM
+	virtual int prepare_reconnect(const boost::system::error_code& ec) {return -1;}
+	virtual void on_recv_error(const boost::system::error_code& ec) {this->need_reconnect = false; super::on_recv_error(ec);}
+#endif
+	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_shutdown();}
+
+private:
+	void handle_handshake(const boost::system::error_code& ec) {super::handle_handshake(ec); if (ec) force_shutdown();}
 };
 
 template<typename Object>
 class st_ssl_object_pool : public st_object_pool<Object>
 {
-protected:
+private:
 	typedef st_object_pool<Object> super;
 
 public:
-	using super::TIMER_BEGIN;
-	using super::TIMER_END;
-
 	st_ssl_object_pool(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : super(service_pump_), ctx(m) {}
-	boost::asio::ssl::context& ssl_context() {return ctx;}
+	boost::asio::ssl::context& context() {return ctx;}
 
 	using super::create_object;
-	typename st_ssl_object_pool::object_type create_object() {return create_object(ST_THIS sp, ctx);}
+	typename st_ssl_object_pool::object_type create_object() {return create_object(this->sp, ctx);}
 	template<typename Arg>
 	typename st_ssl_object_pool::object_type create_object(Arg& arg) {return create_object(arg, ctx);}
 
@@ -170,75 +182,62 @@ protected:
 template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
 	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-#if !defined(_MSC_VER) || _MSC_VER >= 1800
-using st_ssl_server_socket_base = st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer>;
-#else
-class st_ssl_server_socket_base : public st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer>
+class st_ssl_server_socket_base : public socket<st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer>>
 {
-protected:
-	typedef st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer> super;
+private:
+	typedef socket<st_server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer>> super;
 
 public:
-	using super::TIMER_BEGIN;
-	using super::TIMER_END;
-
 	st_ssl_server_socket_base(Server& server_, boost::asio::ssl::context& ctx) : super(server_, ctx) {}
-};
+
+#ifdef ST_ASIO_REUSE_SSL_STREAM
+	void disconnect() {force_shutdown();}
+	void force_shutdown() {this->authorized_ = false; super::force_shutdown();}
+	void graceful_shutdown(bool sync = false) {this->authorized_ = false; super::graceful_shutdown(sync);}
+#else
+	void disconnect() {force_shutdown();}
+	void force_shutdown() {graceful_shutdown();} //must with async mode (the default value), because server_base::uninit will call this function
+	void graceful_shutdown(bool sync = false) {this->shutdown_ssl(sync);}
 #endif
 
+protected:
+	virtual bool do_start() //add handshake
+	{
+		if (!this->authorized())
+			this->next_layer().async_handshake(boost::asio::ssl::stream_base::server, this->make_handler_error([this](const boost::system::error_code& ec) {this->handle_handshake(ec);}));
+
+		return true;
+	}
+
+	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_shutdown();}
+
+private:
+	void handle_handshake(const boost::system::error_code& ec) {super::handle_handshake(ec); if (ec) this->server.del_socket(this->shared_from_this());}
+};
+
+#ifdef ST_ASIO_HAS_TEMPLATE_USING
+template<typename Socket, typename Pool = st_ssl_object_pool<Socket>, typename Server = i_server>
+using st_ssl_server_base = st_server_base<Socket, Pool, Server>;
+template<typename Socket> using st_ssl_tcp_sclient_base = st_tcp_sclient_base<Socket>;
+template<typename Socket, typename Pool = st_ssl_object_pool<Socket>> using st_ssl_tcp_client_base = st_tcp_client_base<Socket, Pool>;
+#else
 template<typename Socket, typename Pool = st_ssl_object_pool<Socket>, typename Server = i_server>
 class st_ssl_server_base : public st_server_base<Socket, Pool, Server>
 {
-protected:
-	typedef st_server_base<Socket, Pool, Server> super;
-
 public:
-	using super::TIMER_BEGIN;
-	using super::TIMER_END;
-
-	st_ssl_server_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : super(service_pump_, m) {}
-
-protected:
-	virtual void on_handshake(const boost::system::error_code& ec, typename st_ssl_server_base::object_ctype& client_ptr)
-	{
-		if (!ec)
-			client_ptr->show_info("handshake with", "success.");
-		else
-		{
-			std::string error_info = "failed: ";
-			error_info += ec.message().data();
-			client_ptr->show_info("handshake with", error_info.data());
-		}
-	}
-
-	virtual void start_next_accept()
-	{
-		auto client_ptr = ST_THIS create_object(*this);
-		ST_THIS acceptor.async_accept(client_ptr->lowest_layer(), [client_ptr, this](const boost::system::error_code& ec) {ST_THIS accept_handler(ec, client_ptr);});
-	}
-
-private:
-	void accept_handler(const boost::system::error_code& ec, typename st_ssl_server_base::object_ctype& client_ptr)
-	{
-		if (!ec)
-		{
-			if (ST_THIS on_accept(client_ptr))
-				client_ptr->next_layer().async_handshake(boost::asio::ssl::stream_base::server,
-					[client_ptr, this](const boost::system::error_code& ec) {ST_THIS handshake_handler(ec, client_ptr);});
-
-			start_next_accept();
-		}
-		else
-			ST_THIS stop_listen();
-	}
-
-	void handshake_handler(const boost::system::error_code& ec, typename st_ssl_server_base::object_ctype& client_ptr)
-	{
-		on_handshake(ec, client_ptr);
-		if (!ec && ST_THIS add_client(client_ptr))
-			client_ptr->start();
-	}
+	st_ssl_server_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_server_base<Socket, Pool, Server>(service_pump_, m) {}
 };
+template<typename Socket> class st_ssl_tcp_sclient_base : public st_tcp_sclient_base<Socket>
+{
+public:
+	st_ssl_tcp_sclient_base(st_service_pump& service_pump_, boost::asio::ssl::context& ctx) : st_tcp_sclient_base<Socket>(service_pump_, ctx) {}
+};
+template<typename Socket, typename Pool = st_ssl_object_pool<Socket>> class st_ssl_tcp_client_base : public st_tcp_client_base<Socket, Pool>
+{
+public:
+	st_ssl_tcp_client_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_tcp_client_base<Socket, Pool>(service_pump_, m) {}
+};
+#endif
 
 } //namespace
 

@@ -334,6 +334,10 @@
 				RelativePath=".\file_client.h"
 				>
 			</File>
+			<File
+				RelativePath=".\unpacker.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="资源文件"

@@ -33,27 +33,28 @@
 
 #include "st_asio_wrapper.h"
 
-//the size of the buffer used when receiving msg, must equal to or larger than the biggest msg size,
-//the bigger this buffer is, the more msgs can be received in one time if there are enough msgs buffered in the SOCKET.
-//every unpackers have a fixed buffer with this size, every st_tcp_sockets have an unpacker, so, this size is not the bigger the better.
-//if you customized the packer and unpacker, the above principle maybe not right anymore, it should depends on your implementations.
-#ifndef ST_ASIO_MSG_BUFFER_SIZE
-#define ST_ASIO_MSG_BUFFER_SIZE	4000
-#endif
-static_assert(ST_ASIO_MSG_BUFFER_SIZE > 0, "message buffer size must be bigger than zero.");
-
 //msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamically, which means only allocate memory when needed.
 #ifndef ST_ASIO_MAX_MSG_NUM
 #define ST_ASIO_MAX_MSG_NUM		1024
 #endif
 static_assert(ST_ASIO_MAX_MSG_NUM > 0, "message capacity must be bigger than zero.");
 
+//buffer type used when receiving messages (unpacker's prepare_next_recv() need to return this type)
+#ifndef ST_ASIO_RECV_BUFFER_TYPE
+#define ST_ASIO_RECV_BUFFER_TYPE boost::asio::mutable_buffers_1
+#endif
+
 #if defined _MSC_VER
 #define ST_ASIO_SF "%Iu"
-#define ST_THIS //workaround to make up the BOOST_AUTO's defect under vc2008 and compiler bugs before vc2012
 #else // defined __GNUC__
 #define ST_ASIO_SF "%zu"
-#define ST_THIS this->
+#ifdef __x86_64__
+#define ST_ASIO_LLF "%lu" //format used to print 'uint_fast64_t'
+#endif
+#endif
+
+#ifndef ST_ASIO_LLF
+#define ST_ASIO_LLF "%llu" //format used to print 'uint_fast64_t'
 #endif
 
 namespace st_asio_wrapper
@@ -70,23 +71,23 @@ public:
 	st_atomic() : data(0) {}
 	st_atomic(T _data) : data(_data) {}
 
-	T operator++() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return ++data;}
+	T operator++() {boost::lock_guard<boost::mutex> lock(data_mutex); return ++data;}
 	//deliberately omitted operator++(int)
-	T operator+=(T value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data += value;}
-	T operator--() {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return --data;}
+	T operator+=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data += value;}
+	T operator--() {boost::lock_guard<boost::mutex> lock(data_mutex); return --data;}
 	//deliberately omitted operator--(int)
-	T operator-=(T value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data -= value;}
-	T operator=(T value) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); return data = value;}
-	T exchange(T value, boost::memory_order) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); T pre_data = data; data = value; return pre_data;}
-	T fetch_add(T value, boost::memory_order) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); T pre_data = data; data += value; return pre_data;}
-	void store(T value, boost::memory_order) {boost::unique_lock<boost::shared_mutex> lock(data_mutex); data = value;}
+	T operator-=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data -= value;}
+	T operator=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data = value;}
+	T exchange(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data = value; return pre_data;}
+	T fetch_add(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data += value; return pre_data;}
+	void store(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); data = value;}
 
 	bool is_lock_free() const {return false;}
 	operator T() const {return data;}
 
 private:
 	T data;
-	boost::shared_mutex data_mutex;
+	boost::mutex data_mutex;
 };
 typedef st_atomic<uint_fast64_t> st_atomic_uint_fast64;
 typedef st_atomic<size_t> st_atomic_size_t;
@@ -115,7 +116,8 @@ class i_server
 public:
 	virtual st_service_pump& get_service_pump() = 0;
 	virtual const st_service_pump& get_service_pump() const = 0;
-	virtual bool del_client(const boost::shared_ptr<st_object>& client_ptr) = 0;
+	virtual bool del_socket(const boost::shared_ptr<st_object>& socket_ptr) = 0;
+	virtual bool restore_socket(const boost::shared_ptr<st_object>& socket_ptr, uint_fast64_t id) = 0;
 };
 
 class i_buffer
@@ -193,10 +195,10 @@ protected:
 };
 //not like auto_buffer, shared_buffer is copyable, but auto_buffer is a bit more efficient.
 
-#if !defined(_MSC_VER) || _MSC_VER > 1800
+#if !defined(_MSC_VER) || _MSC_VER >= 1900 //for naughty VC++, it violate the standard and even itself usually.
 typedef auto_buffer<i_buffer> replaceable_buffer;
 #else
-typedef shared_buffer<i_buffer> replaceable_buffer; //before C++ 14.0, auto_buffer will lead compilation error
+typedef shared_buffer<i_buffer> replaceable_buffer; //before VC++ 14.0, auto_buffer will lead compilation error
 #endif
 //packer or/and unpacker used replaceable_buffer as their msg type will be replaceable.
 
@@ -212,8 +214,9 @@ protected:
 	virtual ~i_packer() {}
 
 public:
-	virtual void reset_state() {}
+	virtual void reset() {}
 	virtual msg_type pack_msg(const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+	virtual msg_type pack_heartbeat() {return msg_type();}
 	virtual char* raw_data(msg_type& msg) const {return nullptr;}
 	virtual const char* raw_data(msg_ctype& msg) const {return nullptr;}
 	virtual size_t raw_data_len(msg_ctype& msg) const {return 0;}
@@ -241,18 +244,15 @@ class i_unpacker
 public:
 	typedef MsgType msg_type;
 	typedef const msg_type msg_ctype;
-#ifdef ST_ASIO_SCATTERED_RECV_BUFFER
-	typedef std::vector<boost::asio::mutable_buffers_1> buffer_type;
-#else
-	typedef boost::asio::mutable_buffers_1 buffer_type;
-#endif
 	typedef boost::container::list<msg_type> container_type;
+	typedef ST_ASIO_RECV_BUFFER_TYPE buffer_type;
 
 protected:
 	virtual ~i_unpacker() {}
 
 public:
-	virtual void reset_state() = 0;
+	virtual void reset() = 0;
+	//heartbeat must not be included in msg_can, otherwise you must handle heartbeat at where you handle normal messges.
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) = 0;
 	virtual buffer_type prepare_next_recv() = 0;
@@ -281,14 +281,15 @@ class i_udp_unpacker
 public:
 	typedef MsgType msg_type;
 	typedef const msg_type msg_ctype;
-	typedef boost::asio::mutable_buffers_1 buffer_type;
 	typedef boost::container::list<udp_msg<msg_type>> container_type;
+	typedef ST_ASIO_RECV_BUFFER_TYPE buffer_type;
 
 protected:
 	virtual ~i_udp_unpacker() {}
 
 public:
-	virtual void reset_state() {}
+	virtual void reset() {}
+	//heartbeat must not be returned (use empty message instead), otherwise you must handle heartbeat at where you handle normal messges.
 	virtual msg_type parse_msg(size_t bytes_transferred) = 0;
 	virtual buffer_type prepare_next_recv() = 0;
 };
@@ -378,15 +379,15 @@ struct statistic
 
 	//send corresponding statistic
 	uint_fast64_t send_msg_sum; //not counted msgs in sending buffer
-	uint_fast64_t send_byte_sum; //not counted msgs in sending buffer
-	stat_duration send_delay_sum; //from send_(native_)msg (exclude msg packing) to asio::async_write
-	stat_duration send_time_sum; //from asio::async_write to send_handler
+	uint_fast64_t send_byte_sum; //include data added by packer, not counted msgs in sending buffer
+	stat_duration send_delay_sum; //from send_(native_)msg (exclude msg packing) to boost::asio::async_write
+	stat_duration send_time_sum; //from boost::asio::async_write to send_handler
 	//above two items indicate your network's speed or load
 	stat_duration pack_time_sum; //st_udp_socket will not gather this item
 
 	//recv corresponding statistic
-	uint_fast64_t recv_msg_sum; //include msgs in receiving buffer
-	uint_fast64_t recv_byte_sum; //include msgs in receiving buffer
+	uint_fast64_t recv_msg_sum; //msgs returned by i_unpacker::parse_msg
+	uint_fast64_t recv_byte_sum; //msgs (in bytes) returned by i_unpacker::parse_msg
 	stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
 	stat_duration recv_idle_sum;
 	//during this duration, st_socket suspended msg reception (receiving buffer overflow, msg dispatching suspended or doing congestion control)
@@ -426,24 +427,16 @@ struct obj_with_begin_time : public T
 };
 
 //free functions, used to do something to any container(except map and multimap) optionally with any mutex
-#if !defined _MSC_VER || _MSC_VER >= 1700
-	template<typename _Can, typename _Mutex, typename _Predicate>
-	void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred) {boost::shared_lock<boost::shared_mutex> lock(__mutex); for (auto& item : __can) __pred(item);}
+template<typename _Can, typename _Mutex, typename _Predicate>
+void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred) {boost::lock_guard<boost::mutex> lock(__mutex); for (auto& item : __can) __pred(item);}
 
-	template<typename _Can, typename _Predicate>
-	void do_something_to_all(_Can& __can, const _Predicate& __pred) {for (auto& item : __can) __pred(item);}
-#else
-	template<typename _Can, typename _Mutex, typename _Predicate>
-	void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred) {boost::shared_lock<boost::shared_mutex> lock(__mutex); std::for_each(std::begin(__can), std::end(__can), __pred);}
-
-	template<typename _Can, typename _Predicate>
-	void do_something_to_all(_Can& __can, const _Predicate& __pred) {std::for_each(std::begin(__can), std::end(__can), __pred);}
-#endif
+template<typename _Can, typename _Predicate>
+void do_something_to_all(_Can& __can, const _Predicate& __pred) {for (auto& item : __can) __pred(item);}
 
 template<typename _Can, typename _Mutex, typename _Predicate>
 void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 {
-	boost::shared_lock<boost::shared_mutex> lock(__mutex);
+	boost::lock_guard<boost::mutex> lock(__mutex);
 	for (auto iter = std::begin(__can); iter != std::end(__can); ++iter) if (__pred(*iter)) break;
 }
 
@@ -478,28 +471,19 @@ bool splice_helper(_Can& dest_can, _Can& src_can, size_t max_size = ST_ASIO_MAX_
 #define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)
 #define DO_SOMETHING_TO_ALL(CAN) DO_SOMETHING_TO_ALL_NAME(do_something_to_all, CAN)
 
-#if !defined _MSC_VER || _MSC_VER >= 1700
-	#define DO_SOMETHING_TO_ALL_MUTEX_NAME(NAME, CAN, MUTEX) \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::shared_lock<boost::shared_mutex> lock(MUTEX); for (auto& item : CAN) __pred(item);}
+#define DO_SOMETHING_TO_ALL_MUTEX_NAME(NAME, CAN, MUTEX) \
+template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::lock_guard<boost::mutex> lock(MUTEX); for (auto& item : CAN) __pred(item);}
 
-	#define DO_SOMETHING_TO_ALL_NAME(NAME, CAN) \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) {for (auto& item : CAN) __pred(item);} \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (auto& item : CAN) __pred(item);}
-#else
-	#define DO_SOMETHING_TO_ALL_MUTEX_NAME(NAME, CAN, MUTEX) \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::shared_lock<boost::shared_mutex> lock(MUTEX); std::for_each(std::begin(CAN), std::end(CAN), __pred);}
-
-	#define DO_SOMETHING_TO_ALL_NAME(NAME, CAN) \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) {std::for_each(std::begin(CAN), std::end(CAN), __pred);} \
-	template<typename _Predicate> void NAME(const _Predicate& __pred) const {std::for_each(std::begin(CAN), std::end(CAN), __pred);}
-#endif
+#define DO_SOMETHING_TO_ALL_NAME(NAME, CAN) \
+template<typename _Predicate> void NAME(const _Predicate& __pred) {for (auto& item : CAN) __pred(item);} \
+template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (auto& item : CAN) __pred(item);}
 
 #define DO_SOMETHING_TO_ONE_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ONE_MUTEX_NAME(do_something_to_one, CAN, MUTEX)
 #define DO_SOMETHING_TO_ONE(CAN) DO_SOMETHING_TO_ONE_NAME(do_something_to_one, CAN)
 
 #define DO_SOMETHING_TO_ONE_MUTEX_NAME(NAME, CAN, MUTEX) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) \
-	{boost::shared_lock<boost::shared_mutex> lock(MUTEX); for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;}
+	{boost::lock_guard<boost::mutex> lock(MUTEX); for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;}
 
 #define DO_SOMETHING_TO_ONE_NAME(NAME, CAN) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) {for (auto iter = std::begin(CAN); iter != std::end(CAN); ++iter) if (__pred(*iter)) break;} \
@@ -508,7 +492,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (au
 //used by both TCP and UDP
 #define SAFE_SEND_MSG_CHECK \
 { \
-	if (!ST_THIS is_send_allowed()) return false; \
+	if (this->stopped() || !this->is_ready()) return false; \
 	boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50)); \
 }
 
@@ -525,14 +509,36 @@ TYPE FUNNAME(const std::string& str, bool can_overflow = false) {return FUNNAME(
 #define TCP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+	if (!can_overflow && !this->is_send_buffer_available()) \
 		return false; \
-	auto_duration dur(ST_THIS stat.pack_time_sum); \
-	auto msg = ST_THIS packer_->pack_msg(pstr, len, num, NATIVE); \
+	auto_duration dur(this->stat.pack_time_sum); \
+	auto msg = this->packer_->pack_msg(pstr, len, num, NATIVE); \
 	dur.end(); \
-	return ST_THIS do_direct_send_msg(std::move(msg)); \
+	return this->do_direct_send_msg(std::move(msg)); \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+
+#define TCP_SYNC_SEND_MSG(FUNNAME, NATIVE) \
+size_t FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+{ \
+	if (!this->sending && !this->stopped() && this->is_ready()) \
+	{ \
+		scope_atomic_lock<> lock(this->send_atomic); \
+		if (!this->sending && lock.locked()) \
+		{ \
+			this->sending = true; \
+			lock.unlock(); \
+			auto_duration dur(this->stat.pack_time_sum); \
+			auto msg = this->packer_->pack_msg(pstr, len, num, NATIVE); \
+			dur.end(); \
+			if (msg.empty()) \
+				unified_out::error_out("found an empty message, please check your packer."); \
+			return do_sync_send_msg(msg); /*always send message even it's empty, this is very important*/ \
+		} \
+	} \
+	return 0; \
+} \
+TCP_SEND_MSG_CALL_SWITCH(FUNNAME, size_t)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into st_tcp_socket's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
@@ -542,7 +548,7 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
 #define TCP_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-	{ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->SEND_FUNNAME(pstr, len, num, can_overflow);});} \
+	{this->do_something_to_all([=](typename Pool::object_ctype& item) {item->SEND_FUNNAME(pstr, len, num, can_overflow);});} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //TCP msg sending interface
 ///////////////////////////////////////////////////
@@ -550,22 +556,47 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 ///////////////////////////////////////////////////
 //UDP msg sending interface
 #define UDP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
+TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow = false) {return FUNNAME(peer_addr, pstr, len, can_overflow);} \
 TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false) {return FUNNAME(peer_addr, &pstr, &len, 1, can_overflow);} \
+TYPE FUNNAME(const std::string& str, bool can_overflow = false) {return FUNNAME(peer_addr, str, can_overflow);} \
 TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const std::string& str, bool can_overflow = false) {return FUNNAME(peer_addr, str.data(), str.size(), can_overflow);}
 
 #define UDP_SEND_MSG(FUNNAME, NATIVE) \
+bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) {return FUNNAME(peer_addr, pstr, len, num, can_overflow);} \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
-	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+	if (!can_overflow && !this->is_send_buffer_available()) \
 		return false; \
-	in_msg_type msg(peer_addr, ST_THIS packer_->pack_msg(pstr, len, num, NATIVE)); \
-	return ST_THIS do_direct_send_msg(std::move(msg)); \
+	in_msg_type msg(peer_addr, this->packer_->pack_msg(pstr, len, num, NATIVE)); \
+	return this->do_direct_send_msg(std::move(msg)); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+
+#define UDP_SYNC_SEND_MSG(FUNNAME, NATIVE) \
+size_t FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) {return FUNNAME(peer_addr, pstr, len, num, can_overflow);} \
+size_t FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+{ \
+	if (!this->sending && !this->stopped() && this->is_ready()) \
+	{ \
+		scope_atomic_lock<> lock(this->send_atomic); \
+		if (!this->sending && lock.locked()) \
+		{ \
+			this->sending = true; \
+			lock.unlock(); \
+			auto msg = this->packer_->pack_msg(pstr, len, num, NATIVE); \
+			if (msg.empty()) \
+				unified_out::error_out("found an empty message, please check your packer."); \
+			return do_sync_send_msg(peer_addr, msg); /*always send message even it's empty, this is very important*/ \
+		} \
+	} \
+	return 0; \
+} \
+UDP_SEND_MSG_CALL_SWITCH(FUNNAME, size_t)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into st_udp_socket's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define UDP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
+bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false)  {return FUNNAME(peer_addr, pstr, len, num, can_overflow);} \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 	{while (!SEND_FUNNAME(peer_addr, pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK return true;} \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
