@@ -3,6 +3,21 @@
 #define ST_ASIO_MAX_OBJECT_NUM			4096
 #endif
 
+//#define ST_ASIO_RESTORE_OBJECT
+//ST_ASIO_RESTORE_OBJECT has the same effects as macro ST_ASIO_REUSE_OBJECT (it will overwrite the latter), except:
+//reuse will not happen when create new connections, but just happen when invoke i_server::restore_socket.
+//you may ask, for what purpose we introduced this feature?
+//consider following situation:
+//if a specific link is down, and the client has reconnected to the server, on the server side, how does the new st_server_socket_base
+//restore all user data (because you don't want to nor need to reestablish them) and keep its id?
+//before this feature been introduced, it's almost impossible.
+//according to above explanation, we know that:
+//1. like object pool, only objects in invalid_object_can can be restored;
+//2. client need to inform st_server_socket_base the former id (or something else which can be used to calculate the former id
+//   on the server side) after reconnected to the server;
+//3. this feature needs user's support (send former id to server side on client side, invoke i_server::restore_socket in st_server_socket_base);
+//4. do not define this macro on client side nor for UDP.
+
 #ifndef ST_ASIO_REUSE_OBJECT
 	#ifndef ST_ASIO_FREE_OBJECT_INTERVAL
 	#define ST_ASIO_FREE_OBJECT_INTERVAL	10
@@ -20,11 +35,6 @@
 然后移出对象池，这样一次遍历可以操作多条连接，对于短连接效率可能会更高，对于长连接，建议每次连接断开时，调用
 st_server::del_client(）马上清除这条连接。用这个宏指定定时器间隔，单位为秒。
 
-#ifndef ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME
-#define ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME	5
-失效对象（并且已经移动到临时链表中的对象），多久时间之后，可以重用或者释放/关闭，单位为秒。
-#endif
-
 namespace st_asio_wrapper
 {
 
@@ -37,7 +47,6 @@ public:
 	typedef boost::shared_ptr<Object> object_type;
 	typedef const object_type object_ctype;
 
-protected:
 hash表需要的对象比较类。
 	struct st_object_hasher
 	{
@@ -53,22 +62,7 @@ hash表需要的对象比较类。
 		bool operator()(uint_fast64_t id, object_ctype& right) const;
 	};
 
-public:
 	typedef boost::unordered::unordered_set<object_type, st_object_hasher, st_object_equal> container_type;
-
-protected:
-已经关闭的连接，从对象池移出到临时链表时，将按这个结构保存，主要目的是为了记录关闭的时间（以判断是否可以释放或者重用）。
-	struct invalid_object
-	{
-		object_type object_ptr;
-#ifdef ST_ASIO_ENHANCED_STABILITY
-		const time_t kick_out_time;
-#endif
-		invalid_object(object_ctype& object_ptr_);
-		bool is_timeout() const;
-		bool is_timeout(time_t now) const;
-是否超时（超时之后就可以释放或者重用object_ptr对象了）。
-	};
 
 protected:
 	st_object_pool(st_service_pump& service_pump_);
@@ -91,24 +85,26 @@ protected:
 	void init_object(object_ctype& object_ptr);
 内部使用，目前只是给对象赋一个唯一的ID。
 
-#ifdef ST_ASIO_REUSE_OBJECT
+	object_type change_object_id(object_ctype& object_ptr, uint_fast64_t id)
+将无效对象（其id等于id）恢复到object_ptr，如果成功，object_ptr的take_over函数将被回调，同时object_ptr的id已经被修改为id。
+
+#if defined(ST_ASIO_REUSE_OBJECT) && !defined(ST_ASIO_RESTORE_OBJECT)
 	object_type reuse_object();
 查找可重用的对象，如果没有，返回空的智能指针。能被重用的对象必需是：
  1. 已经从对象池移到了临时链表里面；
- 2. 已经超时（参看ST_ASIO_OBSOLETED_OBJECT_LIFE_TIME宏）；
- 3. 对象的引用记数（对象是一个shared_ptr）必须是1；
- 4. 对象的obsoleted函数必须返回true。
+ 2. 对象的引用记数（对象是一个shared_ptr）必须是1；
+ 3. 对象的obsoleted函数必须返回true。
 #endif
 
 	template<typename Arg>
 	object_type create_object(Arg& arg);
-
 	template<typename Arg1, typename Arg2>
 	object_type create_object(Arg1& arg1, Arg2& arg2);
-
-        object_type create_object();
-如果定义了ST_ASIO_REUSE_OBJECT宏，则先调用reuse_object尝试重用对象，如果没有对象可被重用，或者未定义该宏，
+如果定义了ST_ASIO_REUSE_OBJECT且未定义T_ASIO_RESTORE_OBJECT宏，则先调用reuse_object尝试重用对象，如果没有对象可被重用，
 则创建一个新的，最后都是调用init_object。
+
+	object_type create_object();
+helper函数，以i_server::sp为参数调用create_obbject。
 
 public:
 	container_type& container();
@@ -121,20 +117,20 @@ public:
 	size_t size();
 对象池中的对象个数，不包括被移除到临时链表的对象。
 
-	size_t invalid_object_size();
-获取无效对象总数（临时链表里面的对象），无效对象要么定时被删除，要么等待被重用，由宏控制。
-
-        object_type find(uint_fast64_t id);
+	object_type find(uint_fast64_t id);
 根据id查找有效对象。
 
 	object_type at(size_t index);
 获取指定位置的有效对象（连接池中的对象），位置序号从0开始，复杂度O(n)。
 
-	object_type invalid_object_at(size_t index);
-获取指定位置的无效对象，位置序号从0开始，复杂度O(n)。
+	size_t invalid_object_size();
+获取无效对象总数（临时链表里面的对象），无效对象要么定时被删除，要么等待被重用，由宏控制。
 
 	object_type invalid_object_find(uint_fast64_t id);
 根据id查找无效对象，复杂度O(n)。
+
+	object_type invalid_object_at(size_t index);
+获取指定位置的无效对象，位置序号从0开始，复杂度O(n)。
 
 	object_type invalid_object_pop(uint_fast64_t id);
 根据id查找无效对象，并且从容器中删除，复杂度O(n)。
@@ -151,7 +147,7 @@ public:
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred);
 	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred);
-与st_timer的同名函数类似，只操作有效对象。
+对调用一个对象调用__pred，只操作有效对象。
 
 protected:
 	boost::atomic_uint_fast64_t cur_id;
@@ -159,11 +155,12 @@ protected:
 
 	container_type object_can;
 	boost::shared_mutex object_can_mutex;
-存放有效对象（对象池）。
+	size_t max_size_;
+存放有效对象（hash表）。
 
 	boost::container::list<invalid_object> invalid_object_can;
 	boost::shared_mutex invalid_object_can_mutex;
-存放无效对象（临时链表）。
+存放无效对象（对象池，双向链表）。
 };
 
 } //namespace

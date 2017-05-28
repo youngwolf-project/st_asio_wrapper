@@ -27,10 +27,10 @@ namespace st_asio_wrapper
 
 //timers are identified by id.
 //for the same timer in the same st_timer, any manipulations are not thread safe, please pay special attention.
-//to resolve this defect, we must add a mutex member variable to timer_info, it's not worth
+//to resolve this defect, we must add a mutex member variable to timer_info, it's not worth. otherwise, they are thread safe.
 //
-//suppose you have more than one service thread(see st_service_pump for service thread number control), then:
-//for same st_timer: same timer, on_timer is called sequentially
+//suppose you have more than one service thread(see st_service_pump for service thread number controlling), then:
+//for same st_timer: same timer, on_timer is called in sequence
 //for same st_timer: distinct timer, on_timer is called concurrently
 //for distinct st_timer: on_timer is always called concurrently
 class st_timer : public st_object
@@ -63,7 +63,7 @@ public:
 		tid id;
 		timer_status status;
 		size_t interval_ms;
-		std::function<bool(tid)> call_back;
+		std::function<bool(tid)> call_back; //return true from call_back to continue the timer, or the timer will stop
 		boost::shared_ptr<timer_type> timer;
 
 		timer_info() : id(0), status(TIMER_FAKE), interval_ms(0) {}
@@ -118,23 +118,26 @@ public:
 	}
 
 	timer_info find_timer(tid id) const {return timer_can[id];}
+	bool is_timer(tid id) const {return timer_info::TIMER_OK == timer_can[id].status;}
 	void stop_timer(tid id) {stop_timer(timer_can[id]);}
-	void stop_all_timer() {do_something_to_all([this](timer_info& item) {ST_THIS stop_timer(item);});}
+	void stop_all_timer() {do_something_to_all([this](timer_info& item) {this->stop_timer(item);});}
+	void stop_all_timer(tid excepted_id) {do_something_to_all([=](timer_info& item) {if (excepted_id != item.id) this->stop_timer(item);});}
 
 	DO_SOMETHING_TO_ALL(timer_can)
 	DO_SOMETHING_TO_ONE(timer_can)
 
 protected:
-	void reset() {st_object::reset();}
-
-	void start_timer(timer_cinfo& ti)
+	void start_timer(timer_info& ti)
 	{
 		assert(timer_info::TIMER_OK == ti.status);
 
 		ti.timer->expires_from_now(milliseconds(ti.interval_ms));
-		//return true from call_back to continue the timer, or the timer will stop
-		ti.timer->async_wait(make_handler_error(
-			[this, &ti](const boost::system::error_code& ec) {if (!ec && ti.call_back(ti.id) && st_timer::timer_info::TIMER_OK == ti.status) ST_THIS start_timer(ti);}));
+		ti.timer->async_wait(make_handler_error([this, &ti](const boost::system::error_code& ec) {
+			if (!ec && ti.call_back(ti.id) && timer_info::TIMER_OK == ti.status)
+				this->start_timer(ti);
+			else
+				ti.status = timer_info::TIMER_CANCELED;
+		}));
 	}
 
 	void stop_timer(timer_info& ti)
@@ -147,6 +150,7 @@ protected:
 		}
 	}
 
+protected:
 	container_type timer_can;
 
 private:

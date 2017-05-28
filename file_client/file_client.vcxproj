@@ -147,10 +147,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="file_client.cpp" />
+    <ClInclude Include="file_client.h" />
+    <ClInclude Include="unpacker.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="file_client.h" />
+    <ClCompile Include="file_client.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -23,9 +23,6 @@ template<typename Socket>
 class st_sclient : public st_service_pump::i_service, public Socket
 {
 public:
-	using Socket::TIMER_BEGIN;
-	using Socket::TIMER_END;
-
 	st_sclient(st_service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
 	template<typename Arg>
 	st_sclient(st_service_pump& service_pump_, Arg& arg) : i_service(service_pump_), Socket(service_pump_, arg) {}
@@ -39,12 +36,9 @@ template<typename Socket, typename Pool>
 class st_client : public Pool
 {
 protected:
-	using Pool::TIMER_BEGIN;
-	using Pool::TIMER_END;
-
 	st_client(st_service_pump& service_pump_) : Pool(service_pump_) {}
 	template<typename Arg>
-	st_client(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg) {}
+	st_client(st_service_pump& service_pump_, const Arg& arg) : Pool(service_pump_, arg) {}
 
 	virtual bool init()
 	{
@@ -55,15 +49,15 @@ protected:
 
 public:
 	//parameter reset valid only if the service pump already started, or service pump will call object pool's init function before start service pump
-	bool add_client(typename Pool::object_ctype& client_ptr, bool reset = true)
+	bool add_socket(typename Pool::object_ctype& socket_ptr, bool reset = true)
 	{
-		if (ST_THIS add_object(client_ptr))
+		if (ST_THIS add_object(socket_ptr))
 		{
 			if (ST_THIS get_service_pump().is_service_started()) //service already started
 			{
 				if (reset)
-					client_ptr->reset();
-				client_ptr->start();
+					socket_ptr->reset();
+				socket_ptr->start();
 			}
 
 			return true;

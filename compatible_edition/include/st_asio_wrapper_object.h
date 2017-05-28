@@ -23,19 +23,17 @@ namespace st_asio_wrapper
 class st_object
 {
 protected:
-	st_object(boost::asio::io_service& _io_service_) : io_service_(_io_service_) {reset();}
 	virtual ~st_object() {}
 
 public:
 	bool stopped() const {return io_service_.stopped();}
 
 #if 0 == ST_ASIO_DELAY_CLOSE
-	void post(const boost::function<void()>& handler) {io_service_.post((async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-
 	typedef boost::function<void(const boost::system::error_code&)> handler_with_error;
-	handler_with_error make_handler_error(const handler_with_error& handler) const {return (async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1));}
-
 	typedef boost::function<void(const boost::system::error_code&, size_t)> handler_with_error_size;
+
+	void post(const boost::function<void()>& handler) {io_service_.post((async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	handler_with_error make_handler_error(const handler_with_error& handler) const {return (async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1));}
 	handler_with_error_size make_handler_error_size(const handler_with_error_size& handler) const
 		{return (async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1, boost::lambda::_2));}
 
@@ -44,9 +42,7 @@ public:
 	inline void set_async_calling(bool) {}
 
 protected:
-	void reset() {async_call_indicator = boost::make_shared<char>('\0');}
-
-protected:
+	st_object(boost::asio::io_service& _io_service_) : async_call_indicator(boost::make_shared<char>('\0')), io_service_(_io_service_) {}
 	boost::shared_ptr<char> async_call_indicator;
 #else
 	template<typename F> void post(const F& handler) {io_service_.post(handler);}
@@ -58,9 +54,7 @@ protected:
 	inline void set_async_calling(bool value) {async_calling = value;}
 
 protected:
-	void reset() {set_async_calling(false);}
-
-protected:
+	st_object(boost::asio::io_service& _io_service_) : async_calling(false), io_service_(_io_service_) {}
 	bool async_calling;
 #endif
 

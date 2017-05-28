@@ -18,39 +18,48 @@
 namespace st_asio_wrapper
 {
 
+#ifdef ST_ASIO_HAS_TEMPLATE_USING
+template<typename Socket> using st_tcp_sclient_base = st_sclient<Socket>;
+#else
+template<typename Socket> class st_tcp_sclient_base : public st_sclient<Socket>
+{
+public:
+	st_tcp_sclient_base(st_service_pump& service_pump_) : st_sclient<Socket>(service_pump_) {}
+	template<typename Arg>
+	st_tcp_sclient_base(st_service_pump& service_pump_, Arg& arg) : st_sclient<Socket>(service_pump_, arg) {}
+};
+#endif
+
 template<typename Socket, typename Pool = st_object_pool<Socket>>
 class st_tcp_client_base : public st_client<Socket, Pool>
 {
-protected:
+private:
 	typedef st_client<Socket, Pool> super;
 
 public:
-	using super::TIMER_BEGIN;
-	using super::TIMER_END;
-
 	st_tcp_client_base(st_service_pump& service_pump_) : super(service_pump_) {}
 	template<typename Arg>
-	st_tcp_client_base(st_service_pump& service_pump_, Arg arg) : super(service_pump_, arg) {}
+	st_tcp_client_base(st_service_pump& service_pump_, const Arg& arg) : super(service_pump_, arg) {}
 
 	//connected link size, may smaller than total object size(st_object_pool::size)
 	size_t valid_size()
 	{
 		size_t size = 0;
-		ST_THIS do_something_to_all([&size](typename Pool::object_ctype& item) {if (item->is_connected()) ++size;});
+		this->do_something_to_all([&size](typename Pool::object_ctype& item) {if (item->is_connected()) ++size;});
 		return size;
 	}
 
-	using super::add_client;
-	typename Pool::object_type add_client()
+	using super::add_socket;
+	typename Pool::object_type add_socket()
 	{
-		auto client_ptr(ST_THIS create_object());
-		return ST_THIS add_client(client_ptr, false) ? client_ptr : typename Pool::object_type();
+		auto socket_ptr(this->create_object());
+		return this->add_socket(socket_ptr, false) ? socket_ptr : typename Pool::object_type();
 	}
-	typename Pool::object_type add_client(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
+	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
 	{
-		auto client_ptr(ST_THIS create_object());
-		client_ptr->set_server_addr(port, ip);
-		return ST_THIS add_client(client_ptr, false) ? client_ptr : typename Pool::object_type();
+		auto socket_ptr(this->create_object());
+		socket_ptr->set_server_addr(port, ip);
+		return this->add_socket(socket_ptr, false) ? socket_ptr : typename Pool::object_type();
 	}
 
 	///////////////////////////////////////////////////
@@ -61,20 +70,23 @@ public:
 	//success at here just means put the msg into st_tcp_socket_base's send buffer
 	TCP_BROADCAST_MSG(safe_broadcast_msg, safe_send_msg)
 	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
+	//send message with sync mode
+	TCP_BROADCAST_MSG(sync_broadcast_msg, sync_send_msg)
+	TCP_BROADCAST_MSG(sync_broadcast_native_msg, sync_send_native_msg)
 	//msg sending interface
 	///////////////////////////////////////////////////
 
-	//functions with a client_ptr parameter will remove the link from object pool first, then call corresponding function, if you want to reconnect to the server,
-	//please call client_ptr's 'disconnect' 'force_shutdown' or 'graceful_shutdown' with true 'reconnect' directly.
-	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect(false);}
-	void disconnect(bool reconnect = false) {ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->disconnect(reconnect);});}
-	void force_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_shutdown(false);}
-	void force_shutdown(bool reconnect = false) {ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->force_shutdown(reconnect);});}
-	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = true) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown(false, sync);}
-	void graceful_shutdown(bool reconnect = false, bool sync = true) {ST_THIS do_something_to_all([=](typename Pool::object_ctype& item) {item->graceful_shutdown(reconnect, sync);});}
+	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function, if you want to reconnect to the server,
+	//please call socket_ptr's 'disconnect' 'force_shutdown' or 'graceful_shutdown' with true 'reconnect' directly.
+	void disconnect(typename Pool::object_ctype& socket_ptr) {this->del_object(socket_ptr); socket_ptr->disconnect(false);}
+	void disconnect(bool reconnect = false) {this->do_something_to_all([=](typename Pool::object_ctype& item) {item->disconnect(reconnect);});}
+	void force_shutdown(typename Pool::object_ctype& socket_ptr) {this->del_object(socket_ptr); socket_ptr->force_shutdown(false);}
+	void force_shutdown(bool reconnect = false) {this->do_something_to_all([=](typename Pool::object_ctype& item) {item->force_shutdown(reconnect);});}
+	void graceful_shutdown(typename Pool::object_ctype& socket_ptr, bool sync = true) {this->del_object(socket_ptr); socket_ptr->graceful_shutdown(false, sync);}
+	void graceful_shutdown(bool reconnect = false, bool sync = true) {this->do_something_to_all([=](typename Pool::object_ctype& item) {item->graceful_shutdown(reconnect, sync);});}
 
 protected:
-	virtual void uninit() {ST_THIS stop(); graceful_shutdown();}
+	virtual void uninit() {this->stop(); graceful_shutdown();}
 };
 
 } //namespace

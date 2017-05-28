@@ -32,16 +32,7 @@ namespace st_asio_wrapper
 {
 
 //st_asio_wrapper requires that container must take one and only one template argument.
-template <class T>
-class list : public boost::container::list<T>
-{
-protected:
-	typedef boost::container::list<T> super;
-
-public:
-	list() {}
-	list(size_t size) : super(size) {}
-};
+template<typename T> class list : public boost::container::list<T> {};
 
 class dummy_lockable
 {
@@ -63,7 +54,7 @@ public:
 	void unlock() {mutex.unlock();}
 
 private:
-	boost::shared_mutex mutex;
+	boost::mutex mutex;
 };
 
 //Container must at least has the following functions:
@@ -83,11 +74,9 @@ class queue : public Container, public Lockable
 {
 public:
 	typedef T data_type;
-	typedef Container super;
-	typedef queue<T, Container, Lockable> me;
 
 	queue() {}
-	queue(size_t size) : super(size) {}
+	queue(size_t capacity) : Container(capacity) {}
 
 	using Container::size;
 	using Container::clear;
@@ -100,32 +89,23 @@ public:
 	bool try_dequeue(T& item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
 
 	//not thread safe
-	bool enqueue_(const T& item) {this->emplace_back(item); return true;}
-	bool enqueue_(T& item) {this->emplace_back(); this->back().swap(item); return true;} //after this, item will becomes empty, please note.
-	void move_items_in_(boost::container::list<T>& can) {this->splice(this->end(), can);}
-	bool try_dequeue_(T& item) {if (this->empty()) return false; item.swap(this->front()); this->pop_front(); return true;}
+	bool enqueue_(const T& item) {ST_THIS emplace_back(item); return true;}
+	bool enqueue_(T& item) {ST_THIS emplace_back(); ST_THIS back().swap(item); return true;} //after this, item will becomes empty, please note.
+	void move_items_in_(boost::container::list<T>& can) {ST_THIS splice(ST_THIS end(), can);}
+	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); return true;}
 };
 
-template<typename T, typename Container>
-class non_lock_queue : public queue<T, Container, dummy_lockable> //totally not thread safe
+template<typename T, typename Container> class non_lock_queue : public queue<T, Container, dummy_lockable> //totally not thread safe
 {
-protected:
-	typedef queue<T, Container, dummy_lockable> super;
-
 public:
 	non_lock_queue() {}
-	non_lock_queue(size_t size) : super(size) {}
+	non_lock_queue(size_t capacity) : queue<T, Container, dummy_lockable>(capacity) {}
 };
-
-template<typename T, typename Container>
-class lock_queue : public queue<T, Container, lockable>
+template<typename T, typename Container> class lock_queue : public queue<T, Container, lockable>
 {
-protected:
-	typedef queue<T, Container, lockable> super;
-
 public:
 	lock_queue() {}
-	lock_queue(size_t size) : super(size) {}
+	lock_queue(size_t capacity) : queue<T, Container, lockable>(capacity) {}
 };
 
 } //namespace

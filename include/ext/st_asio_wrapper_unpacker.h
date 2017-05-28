@@ -17,22 +17,13 @@
 
 #include "st_asio_wrapper_ext.h"
 
-#ifdef ST_ASIO_HUGE_MSG
-#define ST_ASIO_HEAD_TYPE	uint32_t
-#define ST_ASIO_HEAD_N2H	ntohl
-#else
-#define ST_ASIO_HEAD_TYPE	uint16_t
-#define ST_ASIO_HEAD_N2H	ntohs
-#endif
-#define ST_ASIO_HEAD_LEN	(sizeof(ST_ASIO_HEAD_TYPE))
-
 namespace st_asio_wrapper { namespace ext {
 
 //protocol: length + body
 class unpacker : public i_unpacker<std::string>
 {
 public:
-	unpacker() {reset_state();}
+	unpacker() {reset();}
 	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means not available
 
 	bool parse_msg(size_t bytes_transferred, boost::container::list<std::pair<const char*, size_t>>& msg_can)
@@ -46,7 +37,7 @@ public:
 		while (unpack_ok) //considering sticky package problem, we need a loop
 			if ((size_t) -1 != cur_msg_len)
 			{
-				if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE || cur_msg_len <= ST_ASIO_HEAD_LEN)
+				if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE || cur_msg_len < ST_ASIO_HEAD_LEN)
 					unpack_ok = false;
 				else if (remain_len >= cur_msg_len) //one msg received
 				{
@@ -74,12 +65,15 @@ public:
 	}
 
 public:
-	virtual void reset_state() {cur_msg_len = -1; remain_len = 0;}
+	virtual void reset() {cur_msg_len = -1; remain_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		boost::container::list<std::pair<const char*, size_t>> msg_pos_can;
 		auto unpack_ok = parse_msg(bytes_transferred, msg_pos_can);
-		do_something_to_all(msg_pos_can, [&msg_can](decltype(msg_pos_can.front())& item) {msg_can.emplace_back(item.first, item.second);});
+		do_something_to_all(msg_pos_can, [&msg_can](decltype(msg_pos_can.front())& item) {
+			if (item.second > 0) //exclude heartbeat
+				msg_can.emplace_back(item.first, item.second);
+		});
 
 		if (unpack_ok && remain_len > 0)
 		{
@@ -107,7 +101,7 @@ public:
 			ST_ASIO_HEAD_TYPE head;
 			memcpy(&head, std::begin(raw_buff), ST_ASIO_HEAD_LEN);
 			cur_msg_len = ST_ASIO_HEAD_N2H(head);
-			if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE || cur_msg_len <= ST_ASIO_HEAD_LEN) //invalid msg, stop reading
+			if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE || cur_msg_len < ST_ASIO_HEAD_LEN) //invalid msg, stop reading
 				return 0;
 		}
 
@@ -118,7 +112,7 @@ public:
 #ifdef ST_ASIO_SCATTERED_RECV_BUFFER
 	//this is just to satisfy the compiler, it's not a real scatter-gather buffer,
 	//if you introduce a ring buffer, then you will have the chance to provide a real scatter-gather buffer.
-	virtual buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return buffer_type(1, boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len));}
+	virtual buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return buffer_type(1, boost::asio::buffer(raw_buff) + remain_len);}
 #else
 	virtual buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);}
 #endif
@@ -134,7 +128,14 @@ class udp_unpacker : public i_udp_unpacker<std::string>
 {
 public:
 	virtual msg_type parse_msg(size_t bytes_transferred) {assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE); return msg_type(raw_buff.data(), bytes_transferred);}
+
+#ifdef ST_ASIO_SCATTERED_RECV_BUFFER
+	//this is just to satisfy the compiler, it's not a real scatter-gather buffer,
+	//if you introduce a ring buffer, then you will have the chance to provide a real scatter-gather buffer.
+	virtual buffer_type prepare_next_recv() {return buffer_type(1, boost::asio::buffer(raw_buff));}
+#else
 	virtual buffer_type prepare_next_recv() {return boost::asio::buffer(raw_buff);}
+#endif
 
 protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
@@ -145,11 +146,11 @@ protected:
 template<typename T = replaceable_buffer>
 class replaceable_unpacker : public i_unpacker<T>
 {
-protected:
+private:
 	typedef i_unpacker<T> super;
 
 public:
-	virtual void reset_state() {unpacker_.reset_state();}
+	virtual void reset() {unpacker_.reset();}
 	virtual bool parse_msg(size_t bytes_transferred, typename super::container_type& msg_can)
 	{
 		unpacker::container_type tmp_can;
@@ -176,7 +177,7 @@ protected:
 template<typename T = replaceable_buffer>
 class replaceable_udp_unpacker : public i_udp_unpacker<T>
 {
-protected:
+private:
 	typedef i_packer<T> super;
 
 public:
@@ -188,7 +189,14 @@ public:
 		raw_msg->assign(raw_buff.data(), bytes_transferred);
 		return typename super::msg_type(raw_msg);
 	}
+
+#ifdef ST_ASIO_SCATTERED_RECV_BUFFER
+	//this is just to satisfy the compiler, it's not a real scatter-gather buffer,
+	//if you introduce a ring buffer, then you will have the chance to provide a real scatter-gather buffer.
+	virtual typename super::buffer_type prepare_next_recv() {return typename super::buffer_type(1, boost::asio::buffer(raw_buff));}
+#else
 	virtual typename super::buffer_type prepare_next_recv() {return boost::asio::buffer(raw_buff);}
+#endif
 
 protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
@@ -199,11 +207,11 @@ protected:
 class non_copy_unpacker : public i_unpacker<basic_buffer>
 {
 public:
-	non_copy_unpacker() {reset_state();}
+	non_copy_unpacker() {reset();}
 	size_t current_msg_length() const {return raw_buff.size();} //current msg's total length(not include the head), 0 means not available
 
 public:
-	virtual void reset_state() {raw_buff.clear(); step = 0;}
+	virtual void reset() {raw_buff.clear(); step = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		if (0 == step) //the head been received
@@ -213,15 +221,15 @@ public:
 			auto cur_msg_len = ST_ASIO_HEAD_N2H(head) - ST_ASIO_HEAD_LEN;
 			if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE - ST_ASIO_HEAD_LEN) //invalid size
 				return false;
-
-			raw_buff.assign(cur_msg_len); assert(!raw_buff.empty());
-			step = 1;
+			else if (cur_msg_len > 0) //exclude heartbeat
+			{
+				raw_buff.assign(cur_msg_len); assert(!raw_buff.empty());
+				step = 1;
+			}
 		}
 		else if (1 == step) //the body been received
 		{
-			assert(!raw_buff.empty());
-			if (bytes_transferred != raw_buff.size())
-				return false;
+			assert(!raw_buff.empty() && bytes_transferred == raw_buff.size());
 
 			msg_can.emplace_back(std::move(raw_buff));
 			step = 0;
@@ -283,7 +291,7 @@ public:
 	size_t fixed_length() const {return _fixed_length;}
 
 public:
-	virtual void reset_state() {}
+	virtual void reset() {}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		if (bytes_transferred != raw_buff.size())
@@ -315,7 +323,7 @@ private:
 class prefix_suffix_unpacker : public i_unpacker<std::string>
 {
 public:
-	prefix_suffix_unpacker() {reset_state();}
+	prefix_suffix_unpacker() {reset();}
 
 	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < ST_ASIO_MSG_BUFFER_SIZE); _prefix = prefix; _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
@@ -325,17 +333,17 @@ public:
 	{
 		assert(nullptr != buff);
 
-		if ((size_t) -1 == first_msg_len)
+		if ((size_t) -1 == cur_msg_len)
 		{
 			if (data_len >= _prefix.size())
 			{
 				if (0 != memcmp(_prefix.data(), buff, _prefix.size()))
 					return 0; //invalid msg, stop reading
 				else
-					first_msg_len = 0; //prefix been checked.
+					cur_msg_len = 0; //prefix been checked.
 			}
 		}
-		else if (0 != first_msg_len)
+		else if (0 != cur_msg_len)
 			return 0;
 
 		auto min_len = _prefix.size() + _suffix.size();
@@ -344,7 +352,7 @@ public:
 			auto end = (const char*) memmem(std::next(buff, _prefix.size()), data_len - _prefix.size(), _suffix.data(), _suffix.size());
 			if (nullptr != end)
 			{
-				first_msg_len = std::distance(buff, end) + _suffix.size(); //got a msg
+				cur_msg_len = std::distance(buff, end) + _suffix.size(); //got a msg
 				return 0;
 			}
 			else if (data_len >= ST_ASIO_MSG_BUFFER_SIZE)
@@ -369,7 +377,7 @@ public:
 	}
 
 public:
-	virtual void reset_state() {first_msg_len = -1; remain_len = 0;}
+	virtual void reset() {cur_msg_len = -1; remain_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		//length + msg
@@ -378,15 +386,15 @@ public:
 
 		auto pnext = std::begin(raw_buff);
 		auto min_len = _prefix.size() + _suffix.size();
-		while (0 == peek_msg(remain_len, pnext) && (size_t) -1 != first_msg_len && 0 != first_msg_len)
+		while (0 == peek_msg(remain_len, pnext) && (size_t) -1 != cur_msg_len && 0 != cur_msg_len)
 		{
-			assert(first_msg_len > min_len);
-			auto msg_len = first_msg_len - min_len;
+			assert(cur_msg_len > min_len);
+			auto msg_len = cur_msg_len - min_len;
 
 			msg_can.emplace_back(std::next(pnext, _prefix.size()), msg_len);
-			remain_len -= first_msg_len;
-			std::advance(pnext, first_msg_len);
-			first_msg_len = -1;
+			remain_len -= cur_msg_len;
+			std::advance(pnext, cur_msg_len);
+			cur_msg_len = -1;
 		}
 
 		if (pnext == std::begin(raw_buff)) //we should have at least got one msg.
@@ -414,7 +422,7 @@ public:
 	//this is just to satisfy the compiler, it's not a real scatter-gather buffer,
 	//if you introduce a ring buffer, then you will have the chance to provide a real scatter-gather buffer.
 #ifdef ST_ASIO_SCATTERED_RECV_BUFFER
-	virtual buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return buffer_type(1, boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len));}
+	virtual buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return buffer_type(1, boost::asio::buffer(raw_buff) + remain_len);}
 #else
 	virtual buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);}
 #endif
@@ -422,7 +430,7 @@ public:
 private:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
 	std::string _prefix, _suffix;
-	size_t first_msg_len;
+	size_t cur_msg_len; //-1 means prefix not received, 0 means prefix received but suffix not received, otherwise message length (include prefix and suffix)
 	size_t remain_len; //half-baked msg
 };
 
@@ -430,7 +438,7 @@ private:
 class stream_unpacker : public i_unpacker<std::string>
 {
 public:
-	virtual void reset_state() {}
+	virtual void reset() {}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		if (0 == bytes_transferred)

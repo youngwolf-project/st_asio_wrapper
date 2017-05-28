@@ -23,15 +23,3 @@ template<typename T, typename Container> using non_lock_queue = queue<T, Contain
 
 template<typename T, typename Container> using lock_queue = queue<T, Container, lockable>;
 有锁安全队列。
-
-方法：
-template<typename Q>
-size_t move_items_in(Q& dest, Q& other, size_t max_size = ST_ASIO_MAX_MSG_NUM)
-移动队列里项，不会拷贝。
-
-template<typename Q, typename Q2>
-size_t move_items_in(Q& dest, Q2& other, size_t max_size = ST_ASIO_MAX_MSG_NUM)
-移动队列里项，不会拷贝。
-
-splice_helper：
-拼接两个list，并且将结果（size()）限制在一个指定的大小之内。

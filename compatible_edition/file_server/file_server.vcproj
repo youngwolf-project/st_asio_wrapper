@@ -335,11 +335,15 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\file_socket.h"
+				RelativePath=".\common.h"
 				>
 			</File>
 			<File
-				RelativePath=".\packer_unpacker.h"
+				RelativePath=".\file_buffer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\file_socket.h"
 				>
 			</File>
 		</Filter>

@@ -69,10 +69,11 @@ public:
 	typedef boost::container::list<object_type> container_type;
 
 	st_service_pump() : started(false) {}
+	virtual ~st_service_pump() {stop_service();}
 
 	object_type find(int id)
 	{
-		boost::shared_lock<boost::shared_mutex> lock(service_can_mutex);
+		boost::lock_guard<boost::mutex> lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can), [id](object_ctype& item) {return id == item->id();});
 		return iter == std::end(service_can) ? nullptr : *iter;
 	}
@@ -81,7 +82,7 @@ public:
 	{
 		assert(nullptr != i_service_);
 
-		boost::unique_lock<boost::shared_mutex> lock(service_can_mutex);
+		boost::unique_lock<boost::mutex> lock(service_can_mutex);
 		service_can.remove(i_service_);
 		lock.unlock();
 
@@ -90,7 +91,7 @@ public:
 
 	void remove(int id)
 	{
-		boost::unique_lock<boost::shared_mutex> lock(service_can_mutex);
+		boost::unique_lock<boost::mutex> lock(service_can_mutex);
 		auto iter = std::find_if(std::begin(service_can), std::end(service_can), [id](object_ctype& item) {return id == item->id();});
 		if (iter != std::end(service_can))
 		{
@@ -106,11 +107,11 @@ public:
 	{
 		container_type temp_service_can;
 
-		boost::unique_lock<boost::shared_mutex> lock(service_can_mutex);
+		boost::unique_lock<boost::mutex> lock(service_can_mutex);
 		temp_service_can.splice(std::end(temp_service_can), service_can);
 		lock.unlock();
 
-		st_asio_wrapper::do_something_to_all(temp_service_can, [this](object_type& item) {ST_THIS stop_and_free(item);});
+		st_asio_wrapper::do_something_to_all(temp_service_can, [this](object_type& item) {this->stop_and_free(item);});
 	}
 
 	void start_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM) {if (!is_service_started()) do_service(thread_num);}
@@ -156,7 +157,7 @@ public:
 
 	bool is_running() const {return !stopped();}
 	bool is_service_started() const {return started;}
-	void add_service_thread(int thread_num) {for (auto i = 0; i < thread_num; ++i) service_threads.create_thread([this]() {boost::system::error_code ec; ST_THIS run(ec);});}
+	void add_service_thread(int thread_num) {for (auto i = 0; i < thread_num; ++i) service_threads.create_thread([this]() {boost::system::error_code ec; this->run(ec);});}
 
 protected:
 	void do_service(int thread_num)
@@ -204,13 +205,13 @@ private:
 	{
 		assert(nullptr != i_service_);
 
-		boost::unique_lock<boost::shared_mutex> lock(service_can_mutex);
+		boost::lock_guard<boost::mutex> lock(service_can_mutex);
 		service_can.emplace_back(i_service_);
 	}
 
 protected:
 	container_type service_can;
-	boost::shared_mutex service_can_mutex;
+	boost::mutex service_can_mutex;
 	boost::thread_group service_threads;
 	bool started;
 };

@@ -15,15 +15,6 @@
 
 #include "st_asio_wrapper_ext.h"
 
-#ifdef ST_ASIO_HUGE_MSG
-#define ST_ASIO_HEAD_TYPE	boost::uint32_t
-#define ST_ASIO_HEAD_H2N	htonl
-#else
-#define ST_ASIO_HEAD_TYPE	boost::uint16_t
-#define ST_ASIO_HEAD_H2N	htons
-#endif
-#define ST_ASIO_HEAD_LEN	(sizeof(ST_ASIO_HEAD_TYPE))
-
 namespace st_asio_wrapper { namespace ext {
 
 class packer_helper
@@ -92,7 +83,16 @@ public:
 
 		return true;
 	}
+	virtual bool pack_heartbeat(msg_type& msg)
+	{
+		ST_ASIO_HEAD_TYPE head_len = ST_ASIO_HEAD_LEN;
+		head_len = ST_ASIO_HEAD_H2N(head_len);
+		msg.assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
 
+		return true;
+	}
+
+	//do not use following helper functions for heartbeat messages.
 	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
 	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
@@ -103,7 +103,7 @@ public:
 template<typename T = replaceable_buffer>
 class replaceable_packer : public i_packer<T>
 {
-protected:
+private:
 	typedef i_packer<T> super;
 
 public:
@@ -112,6 +112,20 @@ public:
 	{
 		packer::msg_type str;
 		if (packer().pack_msg(str, pstr, len, num, native))
+		{
+			BOOST_AUTO(raw_msg, new string_buffer());
+			raw_msg->swap(str);
+			msg.raw_buffer(raw_msg);
+
+			return true;
+		}
+
+		return false;
+	}
+	virtual bool pack_heartbeat(typename super::msg_type& msg)
+	{
+		packer::msg_type str;
+		if (packer().pack_heartbeat(str))
 		{
 			BOOST_AUTO(raw_msg, new string_buffer());
 			raw_msg->swap(str);
@@ -134,6 +148,7 @@ class fixed_length_packer : public packer
 public:
 	using packer::pack_msg;
 	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false) {return packer::pack_msg(msg, pstr, len, num, true);}
+	//not support heartbeat because fixed_length_unpacker cannot recognize heartbeat message
 
 	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(msg.data());}
 	virtual const char* raw_data(msg_ctype& msg) const {return msg.data();}
@@ -171,6 +186,8 @@ public:
 
 		return true;
 	}
+	//not support heartbeat because prefix_suffix_unpacker cannot recognize heartbeat message, but it's possible to make
+	//prefix_suffix_unpacker to be able to recognize heartbeat message, just need some changes.
 
 	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), _prefix.size()));}
 	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), _prefix.size());}

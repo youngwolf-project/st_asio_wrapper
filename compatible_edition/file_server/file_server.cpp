@@ -3,7 +3,7 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		5051
-#define ST_ASIO_CLEAR_OBJECT_INTERVAL 60
+#define ST_ASIO_RESTORE_OBJECT
 #define ST_ASIO_ENHANCED_STABILITY
 #define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_INPUT_QUEUE non_lock_queue
@@ -11,12 +11,10 @@
 //but file_server only receive talking message, not send talking message proactively), the previous message has been
 //sent to file_client, so sending buffer will always be empty, which means we will never operate sending buffer concurrently,
 //so need no locks.
-#define ST_ASIO_HEARTBEAT_INTERVAL	5
 #define ST_ASIO_DEFAULT_PACKER	replaceable_packer<>
+#define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
+#define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
 //configuration
-
-#include "../include/st_asio_wrapper_server.h"
-using namespace st_asio_wrapper;
 
 #include "file_socket.h"
 

@@ -42,18 +42,21 @@ public:
 	};
 定时器数据结构。
 
-	st_timer(io_service& _io_service_);
-	virtual ~st_timer();
+	typedef const timer_info timer_cinfo;
+	typedef std::vector<timer_info> container_type;
 
-public:
-	typedef timer_info object_type;
-	typedef const object_type object_ctype;
-	typedef std::vector<object_type> container_type;
+	st_timer(io_service& _io_service_);
 
 	void update_timer_info(tid id, size_t milliseconds, boost::function<bool(tid)>&& call_back, bool start = false);
 	void update_timer_info(tid id, size_t milliseconds, const boost::function<bool(tid)>& call_back, bool start = false)
 更新timer，如果start为true，更新完了之后马上会开启或者重新开启这个timer。
 注意，对同一个st_timer里面的同一个定时器操作并不是线程安全的。
+
+	void change_timer_interval(tid id, size_t interval);
+只修改定时器间隔。
+
+	bool revive_timer(tid id);
+复活定时器，其它不做任何修改。
 
 	void set_timer(tid id, size_t milliseconds, boost::function<bool(tid)>&& call_back);
 	void set_timer(tid id, size_t milliseconds, const boost::function<bool(tid)>& call_back);
@@ -65,11 +68,20 @@ public:
 	bool start_timer(tid id);
 开启一个已经存在的定义器。注意stop_timer之后，定义器还是存在的，只是未启动。
 
+	timer_info find_timer(tid id);
+查找定义器，无论它是否有效。
+
+	bool is_timer(tid id) const;
+判断指定定时器是否有效。
+
 	void stop_timer(tid id);
 停止定时器，如果定时时间已经到达，且已经被post到io_server的队列中，则on_timer仍然会在未来某个时候被回调，这是asio的设计。
 
 	void stop_all_timer();
 停止所有定时器。
+
+	void stop_all_timer(tid excepted_id);
+停止所有定时器，除了excepted_id这个定时器。
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred);
 对所有定时器做一个操作，操作由__pred来定，st_asio_wrapper库只是调用__pred()。
@@ -78,11 +90,11 @@ public:
 与do_something_to_all类似，只是当__pred()返回真时就不再继续循环处理后面的定时器了（如果你永远返回false，那就等于so_something_to_all），跟查找功能类似。
 
 protected:
-	void start_timer(const timer_info& ti);
-内部使用的helper函数，真正的开启定时器（boost::asio::deadline_timer::async_wait）。
+	void start_timer(timer_info& ti);
+内部使用的helper函数，真正的开启定时器（timer_type::async_wait）。
 
 	void stop_timer(timer_info& ti);
-内部使用的helper函数，真正的结束定时器（调用boost::asio::deadline_timer::cancel）。
+内部使用的helper函数，真正的结束定时器（调用timer_type::cancel）。
 
 protected:
 	container_type timer_can;

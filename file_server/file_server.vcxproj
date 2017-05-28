@@ -147,12 +147,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="file_server.cpp" />
-    <ClCompile Include="file_socket.cpp" />
+    <ClInclude Include="common.h" />
+    <ClInclude Include="file_buffer.h" />
+    <ClInclude Include="file_socket.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="file_socket.h" />
-    <ClInclude Include="packer_unpacker.h" />
+    <ClCompile Include="file_server.cpp" />
+    <ClCompile Include="file_socket.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

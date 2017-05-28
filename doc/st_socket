@@ -4,6 +4,19 @@
 #endif
 static_assert(ST_ASIO_DELAY_CLOSE >= 0, "delay close duration must be bigger than or equal to zero.");
 
+#ifndef ASCS_HEARTBEAT_INTERVAL
+#define ASCS_HEARTBEAT_INTERVAL	0 //second(s)
+#endif
+发送心跳包间隔，在此间隔中，如果有消息被发送，将不会发送心跳包，直到下一个间隔再发。心跳包通过调用打包器的pack_heartbeat函数得到。
+如果想关闭心跳包，定义这个宏为0即可，此时你仍然可以以自己的逻辑来发送接收心跳包，并判断连接的有效性，只需要你调用check_heartbeat或者
+start_heartbeat即可，前者检测（然后如果未超时的话，将发送一个心跳包）一次，后者定时检查。
+
+#ifndef ASCS_HEARTBEAT_MAX_ABSENCE
+#define ASCS_HEARTBEAT_MAX_ABSENCE	3 //times of ASCS_HEARTBEAT_INTERVAL
+#endif
+static_assert(ASCS_HEARTBEAT_MAX_ABSENCE > 0, "heartbeat absence must be bigger than zero.");
+在ASCS_HEARTBEAT_INTERVAL * ASCS_HEARTBEAT_MAX_ABSENCE秒之内，如果没有收到任何数据，连接被认为是意外中断。
+
 namespace st_asio_wrapper
 {
 
@@ -18,12 +31,6 @@ protected:
 	typedef InQueue<in_msg, InContainer<in_msg>> in_container_type;
 	typedef OutQueue<out_msg, OutContainer<out_msg>> out_container_type;
 
-	static const tid TIMER_BEGIN = st_timer::TIMER_END;
-	static const tid TIMER_HANDLE_MSG = TIMER_BEGIN;
-	static const tid TIMER_DISPATCH_MSG = TIMER_BEGIN + 1;
-	static const tid TIMER_DELAY_CLOSE = TIMER_BEGIN + 2;
-	static const tid TIMER_END = TIMER_BEGIN + 10;
-
 	st_socket(boost::asio::io_service& io_service_);
 	template<typename Arg>
 	st_socket(boost::asio::io_service& io_service_, Arg& arg);
@@ -34,9 +41,6 @@ ssl使用。
 
 	void reset();
 被重用是调用。
-
-	void reset_state();
-重置所有状态。
 
 	void clear_buffer();
 清空所有buffer。
@@ -62,6 +66,12 @@ boost::asio::ssl::stream<boost::asio::ip::tcp::socket>对象及其从它们继�
 	virtual bool obsoleted();
 判断本对象是否可以被重用或者被释放。
 
+	virtual bool is_ready() = 0;
+是否可以开始发送和接收数据。
+
+	virtual void send_heartbeat() = 0;
+发送心跳包，由子类实现。
+
 	bool started() const;
 是否已经开始，已经开始意思是已经调用过start()了，多次调用start()会有严重的包乱顺问题，好在我在某个版本
 增加了防止多次调用start()的功能，之前靠用户保证，现在st_asio_wrapper库可以保证，即使用户多次调用也没问题。
@@ -74,22 +84,14 @@ boost::asio::ssl::stream<boost::asio::ip::tcp::socket>对象及其从它们继�
 st_socket内部有消息发送缓存，当连接未建立的时候，用户仍然可以发送消息（注意缓存满问题），这些消息会缓存起来，
 当连接建立之后，会自动开始真正的发送消息，这个功能就是调用这个函数实现的。
 
-	void suspend_send_msg(bool suspend);
-	bool suspend_send_msg() const;
-暂停／恢复消息发送，这里指暂停／恢复真正的消息发送，所以就算暂停了消息发送，在发送缓存可用的情况下，send_msg和send_safe_msg
-仍然可以成功调用。
-注意，如果消息发送处于暂停状态，则safe_send_msg在发送缓存溢出的情况下，马上返回失败，而不是等待发送缓存直到可用为止。
+	void start_heartbeat(int interval, int max_absence = ST_ASIO_HEARTBEAT_MAX_ABSENCE);
+开始定时发检测和送心跳包（未超时时）。
+
+	bool check_heartbeat(int interval, int max_absence = ST_ASIO_HEARTBEAT_MAX_ABSENCE);
+检测心跳包，如果未超时的话将发送一个心跳包。
+
 	bool is_sending_msg() const;
 是否正在发送数据。
-
-	void suspend_dispatch_msg(bool suspend);
-	bool suspend_dispatch_msg() const;
-暂停／恢复消息派发，这里的消息派发，是指当st_socket收到消息的时候，调用on_msg或者on_msg_handle，这个功能有什么用呢？
-当你在处理一个耗时消息时，不管你是在on_msg还是on_msg_handle里面处理，处理过程中，都将消耗掉一个service线程，那么必将对自己和
-其它st_socket的数据收发造成一定的影响（当所有service线程耗尽时，就不是一定的影响了，而是所有的st_socket在这期间都将无法发送和
-接收数据），为了解决这个问题，你可以开启一个线程来做这个耗时业务，但记得在启动线程之前，先暂停消息派发，线程结束之前，再恢复
-消息派发，这样消息就不会乱序，否则由于你开启线程之后，马上退出了on_msg或者on_msg_handle，那么下一条消息（如果有的话）将马上被
-派发，这样就出现了乱序问题（前一条消息还未处理完，后一条消息就被派发了）。
 
 	bool is_dispatching_msg() const;
 是否正在派发数据。
@@ -109,10 +111,10 @@ on_msg_handle来派发，在on_msg_handle里面，如果你发现仍然处理不
 	const struct statistic& get_statistic() const;
 综合统计信息。
 	
-	boost::shared_ptr<i_packer<typename Packer::msg_type>> inner_packer();
-	boost::shared_ptr<const i_packer<typename Packer::msg_type>> inner_packer() const;
+	boost::shared_ptr<i_packer<typename Packer::msg_type>> packer();
+	boost::shared_ptr<const i_packer<typename Packer::msg_type>> packer() const;
 
-	void inner_packer(const boost::shared_ptr<i_packer<typename Packer::msg_type>>& _packer_);
+	void packer(const boost::shared_ptr<i_packer<typename Packer::msg_type>>& _packer_);
 获取／修改打包器。
 注意，运行时修改打包器是非线程安全的，它会与消息发送冲突，由于消息发送和打包器修改都是使用者触发的，所以如果有资源竞争，使用者
 有义务解决冲突问题。不支持多线程一是为了效率，二是这个功能用得很少。
@@ -161,6 +163,9 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 发送接收失败时回调，对于st_tcp_socket，如果需要连接断开事件，建议重写on_recv_error。
 
+	virtual bool on_heartbeat_error() = 0;
+心跳包超时时回调。
+
 	virtual void on_close();
 当对象真正被close之前，会调用这个回调，用户可以在这里面释放资源，在这之后，对象可能会被重用或者被释放。
 
@@ -200,6 +205,9 @@ st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_sock
 	void do_dispatch_msg(bool need_lock);
 调用io_service::post发出一个异步调用，调度到时回调msg_handler。
 
+	bool do_direct_send_msg(InMsgType&& msg);
+将消息插入容器，内部使用。
+
 private:
 	template<typename Object> friend class object_pool;
 	void id(uint_fast64_t id);
@@ -207,9 +215,6 @@ private:
 
 	bool timer_handler(tid id);
 处理所有定时器
-
-	bool do_direct_send_msg(InMsgType&& msg);
-将消息插入容器，内部使用。
 
 private:
 	template<typename Object> friend class st_object_pool;
@@ -241,11 +246,9 @@ protected:
 里面的消息全部被处理掉，或者移到了recv_msg_buffer，st_socket会周期性的做以上尝试。
 
 	volatile bool sending;
-	bool paused_sending;
 	std::atomic_flag send_atomic;
 
 	volatile bool dispatching;
-	bool paused_dispatching;
 	std::atomic_flag dispatch_atomic;
 
 	volatile bool congestion_controlling;
@@ -258,6 +261,9 @@ protected:
 	struct statistic stat;
 	typename statistic::stat_time recv_idle_begin_time;
 时间消耗统计。
+
+	time_t last_send_time, last_recv_time;
+上次读写时间，由于判断是否需要发送心跳包，和心跳包是否超时。
 };
 
 } //namespace

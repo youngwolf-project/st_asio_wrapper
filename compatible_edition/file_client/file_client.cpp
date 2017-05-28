@@ -6,9 +6,10 @@
 #define ST_ASIO_SERVER_PORT		5051
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 //#define ST_ASIO_INPUT_QUEUE non_lock_queue
-//we cannot use non_lock_queue, because we also send messages (talking messages) out of ascs::socket::on_msg_send().
-#define ST_ASIO_HEARTBEAT_INTERVAL	5
+//we cannot use non_lock_queue, because we also send messages (talking messages) out of st_asio_wrapper::st_socket::on_msg_send().
 #define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
+#define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
+#define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
 //configuration
 
 #include "file_client.h"
@@ -45,11 +46,11 @@ int main(int argc, const char* argv[])
 //		argv[2] = "::1" //ipv6
 //		argv[2] = "127.0.0.1" //ipv4
 		if (argc > 2)
-			client.add_client(atoi(argv[1]), argv[2])->set_index(i);
+			client.add_socket(atoi(argv[1]), argv[2])->set_index(i);
 		else if (argc > 1)
-			client.add_client(atoi(argv[1]))->set_index(i);
+			client.add_socket(atoi(argv[1]))->set_index(i);
 		else
-			client.add_client()->set_index(i);
+			client.add_socket()->set_index(i);
 	}
 
 	sp.start_service();

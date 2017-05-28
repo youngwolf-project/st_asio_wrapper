@@ -29,7 +29,7 @@
 namespace st_asio_wrapper { namespace ext {
 
 typedef st_connector_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> st_connector;
-typedef st_sclient<st_connector> st_tcp_sclient;
+typedef st_tcp_sclient_base<st_connector> st_tcp_sclient;
 typedef st_tcp_client_base<st_connector> st_tcp_client;
 
 }} //namespace

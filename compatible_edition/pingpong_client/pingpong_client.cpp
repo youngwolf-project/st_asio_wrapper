@@ -68,7 +68,7 @@ protected:
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
 #endif
-	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {handle_msg(msg); return true;}
+	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	//congestion control, method #1, the peer needs its own congestion control too.
@@ -158,7 +158,7 @@ int main(int argc, const char* argv[])
 	//the server has such behavior too.
 
 	for (size_t i = 0; i < link_num; ++i)
-		client.add_client(port, ip);
+		client.add_socket(port, ip);
 
 	sp.start_service(thread_num);
 	while(sp.is_running())
@@ -200,8 +200,7 @@ int main(int argc, const char* argv[])
 
 			boost::uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
 			double used_time = (double) begin_time.elapsed().wall / 1000000000;
-			printf("time spent statistics: %f seconds.\n", used_time);
-			printf("speed: %f(*2) MBps.\n", total_msg_bytes / used_time / 1024 / 1024);
+			printf("finished in %f seconds, speed: %f(*2) MBps.\n", used_time, total_msg_bytes / used_time / 1024 / 1024);
 
 			delete[] init_msg;
 		}

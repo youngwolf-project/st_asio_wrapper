@@ -71,7 +71,7 @@ protected:
 		return re;
 	}
 
-	virtual bool on_msg_handle(out_msg_type& msg, bool link_down)
+	virtual bool on_msg_handle(out_msg_type& msg)
 	{
 		bool re = direct_send_msg(msg);
 		if (re)
@@ -86,7 +86,7 @@ protected:
 	}
 #else
 	//if we used receiving buffer, congestion control will become much simpler, like this:
-	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {return direct_send_msg(msg);}
+	virtual bool on_msg_handle(out_msg_type& msg) {return direct_send_msg(msg);}
 #endif
 	//msg handling end
 };
@@ -105,7 +105,7 @@ public:
 	}
 
 protected:
-	virtual bool on_accept(object_ctype& client_ptr) {boost::asio::ip::tcp::no_delay option(true); client_ptr->lowest_layer().set_option(option); return true;}
+	virtual bool on_accept(object_ctype& socket_ptr) {boost::asio::ip::tcp::no_delay option(true); socket_ptr->lowest_layer().set_option(option); return true;}
 };
 
 int main(int argc, const char* argv[])

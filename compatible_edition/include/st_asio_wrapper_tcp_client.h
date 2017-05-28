@@ -18,19 +18,24 @@
 namespace st_asio_wrapper
 {
 
+template<typename Socket> class st_tcp_sclient_base : public st_sclient<Socket>
+{
+public:
+	st_tcp_sclient_base(st_service_pump& service_pump_) : st_sclient<Socket>(service_pump_) {}
+	template<typename Arg>
+	st_tcp_sclient_base(st_service_pump& service_pump_, Arg& arg) : st_sclient<Socket>(service_pump_, arg) {}
+};
+
 template<typename Socket, typename Pool = st_object_pool<Socket> >
 class st_tcp_client_base : public st_client<Socket, Pool>
 {
-protected:
+private:
 	typedef st_client<Socket, Pool> super;
 
 public:
-	using super::TIMER_BEGIN;
-	using super::TIMER_END;
-
 	st_tcp_client_base(st_service_pump& service_pump_) : super(service_pump_) {}
 	template<typename Arg>
-	st_tcp_client_base(st_service_pump& service_pump_, Arg arg) : super(service_pump_, arg) {}
+	st_tcp_client_base(st_service_pump& service_pump_, const Arg& arg) : super(service_pump_, arg) {}
 
 	//connected link size, may smaller than total object size(st_object_pool::size)
 	size_t valid_size()
@@ -40,17 +45,17 @@ public:
 		return size;
 	}
 
-	using super::add_client;
-	typename Pool::object_type add_client()
+	using super::add_socket;
+	typename Pool::object_type add_socket()
 	{
-		BOOST_AUTO(client_ptr, ST_THIS create_object());
-		return ST_THIS add_client(client_ptr, false) ? client_ptr : typename Pool::object_type();
+		BOOST_AUTO(socket_ptr, ST_THIS create_object());
+		return ST_THIS add_socket(socket_ptr, false) ? socket_ptr : typename Pool::object_type();
 	}
-	typename Pool::object_type add_client(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
+	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
 	{
-		BOOST_AUTO(client_ptr, ST_THIS create_object());
-		client_ptr->set_server_addr(port, ip);
-		return ST_THIS add_client(client_ptr, false) ? client_ptr : typename Pool::object_type();
+		BOOST_AUTO(socket_ptr, ST_THIS create_object());
+		socket_ptr->set_server_addr(port, ip);
+		return ST_THIS add_socket(socket_ptr, false) ? socket_ptr : typename Pool::object_type();
 	}
 
 	///////////////////////////////////////////////////
@@ -61,16 +66,19 @@ public:
 	//success at here just means put the msg into st_tcp_socket_base's send buffer
 	TCP_BROADCAST_MSG(safe_broadcast_msg, safe_send_msg)
 	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
+	//send message with sync mode
+	TCP_BROADCAST_MSG(sync_broadcast_msg, sync_send_msg)
+	TCP_BROADCAST_MSG(sync_broadcast_native_msg, sync_send_native_msg)
 	//msg sending interface
 	///////////////////////////////////////////////////
 
-	//functions with a client_ptr parameter will remove the link from object pool first, then call corresponding function, if you want to reconnect to the server,
-	//please call client_ptr's 'disconnect' 'force_shutdown' or 'graceful_shutdown' with true 'reconnect' directly.
-	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect(false);}
+	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function, if you want to reconnect to the server,
+	//please call socket_ptr's 'disconnect' 'force_shutdown' or 'graceful_shutdown' with true 'reconnect' directly.
+	void disconnect(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->disconnect(false);}
 	void disconnect(bool reconnect = false) {ST_THIS do_something_to_all(boost::bind(&Socket::disconnect, _1, reconnect));}
-	void force_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_shutdown(false);}
+	void force_shutdown(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->force_shutdown(false);}
 	void force_shutdown(bool reconnect = false) {ST_THIS do_something_to_all(boost::bind(&Socket::force_shutdown, _1, reconnect));}
-	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = true) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown(false, sync);}
+	void graceful_shutdown(typename Pool::object_ctype& socket_ptr, bool sync = true) {ST_THIS del_object(socket_ptr); socket_ptr->graceful_shutdown(false, sync);}
 	void graceful_shutdown(bool reconnect = false, bool sync = true) {ST_THIS do_something_to_all(boost::bind(&Socket::graceful_shutdown, _1, reconnect, sync));}
 
 protected:

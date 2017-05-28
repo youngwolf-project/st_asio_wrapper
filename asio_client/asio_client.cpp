@@ -23,6 +23,8 @@
 //#define ST_ASIO_HUGE_MSG
 //#define ST_ASIO_MSG_BUFFER_SIZE (1024 * 1024)
 //#define ST_ASIO_MAX_MSG_NUM 8 //reduce msg buffer size to reduce memory occupation
+#define ST_ASIO_HEARTBEAT_INTERVAL 5 //if use stream_unpacker, heartbeat messages will be treated as normal messages,
+									 //because stream_unpacker doesn't support heartbeat
 //configuration
 
 //demonstrate how to use custom log system:
@@ -48,8 +50,6 @@ using namespace st_asio_wrapper::ext;
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define RECONNECT_COMMAND "reconnect"
-#define SUSPEND_COMMAND	"suspend"
-#define RESUME_COMMAND	"resume"
 
 int main(int argc, const char* argv[])
 {
@@ -85,13 +85,9 @@ int main(int argc, const char* argv[])
 		}
 		else if (RECONNECT_COMMAND == str)
 			client.graceful_shutdown(true);
-		//the following two commands demonstrate how to suspend msg sending, no matter recv buffer been used or not
-		else if (SUSPEND_COMMAND == str)
-			client.suspend_send_msg(true);
-		else if (RESUME_COMMAND == str)
-			client.suspend_send_msg(false);
 		else
-			client.safe_send_msg(str);
+			client.sync_send_msg(str);
+//			client.safe_send_msg(str);
 	}
 
 	return 0;

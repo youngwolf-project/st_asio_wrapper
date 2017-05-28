@@ -38,12 +38,9 @@ template<typename Socket, typename Pool = st_object_pool<Socket>, typename Serve
 class st_server_base : public Server, public Pool
 {
 public:
-	using Pool::TIMER_BEGIN;
-	using Pool::TIMER_END;
-
 	st_server_base(st_service_pump& service_pump_) : Pool(service_pump_), acceptor(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
 	template<typename Arg>
-	st_server_base(st_service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg), acceptor(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
+	st_server_base(st_service_pump& service_pump_, const Arg& arg) : Pool(service_pump_, arg), acceptor(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = std::string())
 	{
@@ -69,35 +66,66 @@ public:
 	//implement i_server's pure virtual functions
 	virtual st_service_pump& get_service_pump() {return Pool::get_service_pump();}
 	virtual const st_service_pump& get_service_pump() const {return Pool::get_service_pump();}
-	virtual bool del_client(const boost::shared_ptr<st_object>& client_ptr)
+	virtual bool del_socket(const boost::shared_ptr<st_object>& socket_ptr)
 	{
-		auto raw_client_ptr(boost::dynamic_pointer_cast<Socket>(client_ptr));
-		return raw_client_ptr && ST_THIS del_object(raw_client_ptr) ? raw_client_ptr->force_shutdown(), true : false;
-	}
+		auto raw_socket_ptr(boost::dynamic_pointer_cast<Socket>(socket_ptr));
+		if (!raw_socket_ptr)
+			return false;
 
-	//do not use graceful_shutdown() as client does, because in this function, object_can_mutex has been locked, graceful_shutdown will wait until on_recv_error() been invoked,
-	//but in on_recv_error(), we need to lock object_can_mutex too(in del_object()), this will cause dead lock
-	void shutdown_all_client() {ST_THIS do_something_to_all([](typename Pool::object_ctype& item) {item->force_shutdown();});}
+		raw_socket_ptr->force_shutdown();
+		return this->del_object(raw_socket_ptr);
+	}
+	//restore the invalid socket whose id is equal to id, if successful, socket_ptr's take_over function will be invoked,
+	//you can restore the invalid socket to socket_ptr, everything is restorable except socket::next_layer_ (on the other
+	//hand, restore socket::next_layer_ doesn't make any sense).
+	virtual bool restore_socket(const boost::shared_ptr<st_object>& socket_ptr, uint_fast64_t id)
+	{
+		auto raw_socket_ptr(boost::dynamic_pointer_cast<Socket>(socket_ptr));
+		if (!raw_socket_ptr)
+			return false;
+
+		auto this_id = raw_socket_ptr->id();
+		auto old_socket_ptr = this->change_object_id(raw_socket_ptr, id);
+		if (old_socket_ptr)
+		{
+			assert(raw_socket_ptr->id() == old_socket_ptr->id());
+
+			unified_out::info_out("object id " ST_ASIO_LLF " been reused, id " ST_ASIO_LLF " been discarded.", raw_socket_ptr->id(), this_id);
+			raw_socket_ptr->take_over(old_socket_ptr);
+
+			return true;
+		}
+
+		return false;
+	}
 
 	///////////////////////////////////////////////////
 	//msg sending interface
 	TCP_BROADCAST_MSG(broadcast_msg, send_msg)
 	TCP_BROADCAST_MSG(broadcast_native_msg, send_native_msg)
-	//guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into send buffer successfully
+	//guarantee send msg successfully even if can_overflow equal to false
+	//success at here just means putting the msg into st_socket's send buffer
 	TCP_BROADCAST_MSG(safe_broadcast_msg, safe_send_msg)
 	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
+	//send message with sync mode
+	TCP_BROADCAST_MSG(sync_broadcast_msg, sync_send_msg)
+	TCP_BROADCAST_MSG(sync_broadcast_native_msg, sync_send_native_msg)
 	//msg sending interface
 	///////////////////////////////////////////////////
 
-	void disconnect(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->disconnect();}
-	void force_shutdown(typename Pool::object_ctype& client_ptr) {ST_THIS del_object(client_ptr); client_ptr->force_shutdown();}
-	void graceful_shutdown(typename Pool::object_ctype& client_ptr, bool sync = false) {ST_THIS del_object(client_ptr); client_ptr->graceful_shutdown(sync);}
+	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function.
+	void disconnect(typename Pool::object_ctype& socket_ptr) {this->del_object(socket_ptr); socket_ptr->disconnect();}
+	void disconnect() {this->do_something_to_all([=](typename Pool::object_ctype& item) {item->disconnect();});}
+	void force_shutdown(typename Pool::object_ctype& socket_ptr) {this->del_object(socket_ptr); socket_ptr->force_shutdown();}
+	void force_shutdown() {this->do_something_to_all([=](typename Pool::object_ctype& item) {item->force_shutdown();});}
+	void graceful_shutdown(typename Pool::object_ctype& socket_ptr, bool sync = false) {this->del_object(socket_ptr); socket_ptr->graceful_shutdown(sync);}
+	void graceful_shutdown() {this->do_something_to_all([](typename Pool::object_ctype& item) {item->graceful_shutdown();});} //parameter sync must be false (the default value), or dead lock will occur.
 
 protected:
 	virtual bool init()
 	{
 		boost::system::error_code ec;
-		acceptor.open(server_addr.protocol(), ec); assert(!ec);
+		if (!acceptor.is_open()) {acceptor.open(server_addr.protocol(), ec); assert(!ec);} //user maybe has opened this acceptor (to set options for example)
 #ifndef ST_ASIO_NOT_REUSE_ADDRESS
 		acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true), ec); assert(!ec);
 #endif
@@ -106,21 +134,21 @@ protected:
 		acceptor.listen(boost::asio::ip::tcp::acceptor::max_connections, ec); assert(!ec);
 		if (ec) {get_service_pump().stop(); unified_out::error_out("listen failed."); return false;}
 
-		ST_THIS start();
+		this->start();
 
 		for (auto i = 0; i < ST_ASIO_ASYNC_ACCEPT_NUM; ++i)
 			start_next_accept();
 
 		return true;
 	}
-	virtual void uninit() {ST_THIS stop(); stop_listen(); shutdown_all_client();}
-	virtual bool on_accept(typename Pool::object_ctype& client_ptr) {return true;}
+	virtual void uninit() {this->stop(); stop_listen(); force_shutdown();}
+	virtual bool on_accept(typename Pool::object_ctype& socket_ptr) {return true;}
 
 	//if you want to ignore this error and continue to accept new connections immediately, return true in this virtual function;
 	//if you want to ignore this error and continue to accept new connections after a specific delay, start a timer immediately and return false (don't call stop_listen()),
 	// when the timer ends up, call start_next_accept() in the callback function.
 	//otherwise, don't rewrite this virtual function or call st_server_base::on_accept_error() directly after your code.
-	virtual bool on_accept_error(const boost::system::error_code& ec, typename Pool::object_ctype& client_ptr)
+	virtual bool on_accept_error(const boost::system::error_code& ec, typename Pool::object_ctype& socket_ptr)
 	{
 		if (boost::asio::error::operation_aborted != ec)
 		{
@@ -133,34 +161,34 @@ protected:
 
 	virtual void start_next_accept()
 	{
-		auto client_ptr = ST_THIS create_object(*this);
-		acceptor.async_accept(client_ptr->lowest_layer(), [=](const boost::system::error_code& ec) {ST_THIS accept_handler(ec, client_ptr);});
+		auto socket_ptr = this->create_object(*this);
+		acceptor.async_accept(socket_ptr->lowest_layer(), [=](const boost::system::error_code& ec) {this->accept_handler(ec, socket_ptr);});
 	}
 
 protected:
-	bool add_client(typename Pool::object_ctype& client_ptr)
+	bool add_socket(typename Pool::object_ctype& socket_ptr)
 	{
-		if (ST_THIS add_object(client_ptr))
+		if (this->add_object(socket_ptr))
 		{
-			client_ptr->show_info("client:", "arrive.");
+			socket_ptr->show_info("client:", "arrive.");
 			return true;
 		}
 
-		client_ptr->show_info("client:", "been refused because of too many clients.");
-		client_ptr->force_shutdown();
+		socket_ptr->show_info("client:", "been refused because of too many clients.");
+		socket_ptr->force_shutdown();
 		return false;
 	}
 
-	void accept_handler(const boost::system::error_code& ec, typename Pool::object_ctype& client_ptr)
+	void accept_handler(const boost::system::error_code& ec, typename Pool::object_ctype& socket_ptr)
 	{
 		if (!ec)
 		{
-			if (on_accept(client_ptr) && add_client(client_ptr))
-				client_ptr->start();
+			if (on_accept(socket_ptr) && add_socket(socket_ptr))
+				socket_ptr->start();
 
 			start_next_accept();
 		}
-		else if (on_accept_error(ec, client_ptr))
+		else if (on_accept_error(ec, socket_ptr))
 			start_next_accept();
 	}
 

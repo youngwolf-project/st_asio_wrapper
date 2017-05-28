@@ -17,6 +17,27 @@
 
 #include "../st_asio_wrapper_base.h"
 
+//the size of the buffer used when receiving msg, must equal to or larger than the biggest msg size,
+//the bigger this buffer is, the more msgs can be received in one time if there are enough msgs buffered in the SOCKET.
+//every unpackers have a fixed buffer with this size, every st_tcp_sockets have an unpacker, so, this size is not the bigger the better.
+//if you customized the packer and unpacker, the above principle maybe not right anymore, it should depends on your implementations.
+#ifndef ST_ASIO_MSG_BUFFER_SIZE
+#define ST_ASIO_MSG_BUFFER_SIZE	4000
+#elif ST_ASIO_MSG_BUFFER_SIZE <= 0
+	#error message buffer size must be bigger than zero.
+#endif
+
+#ifdef ST_ASIO_HUGE_MSG
+#define ST_ASIO_HEAD_TYPE	boost::uint32_t
+#define ST_ASIO_HEAD_H2N	htonl
+#define ST_ASIO_HEAD_N2H	ntohl
+#else
+#define ST_ASIO_HEAD_TYPE	boost::uint16_t
+#define ST_ASIO_HEAD_H2N	htons
+#define ST_ASIO_HEAD_N2H	ntohs
+#endif
+#define ST_ASIO_HEAD_LEN	(sizeof(ST_ASIO_HEAD_TYPE))
+
 namespace st_asio_wrapper { namespace ext {
 
 //implement i_buffer interface, then string_buffer can be wrapped by replaceable_buffer

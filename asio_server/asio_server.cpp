@@ -26,9 +26,13 @@
 #define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
 #define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
 #elif 2 == PACKER_UNPACKER_TYPE
+#undef ST_ASIO_HEARTBEAT_INTERVAL
+#define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat
 #define ST_ASIO_DEFAULT_PACKER fixed_length_packer
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
+#undef ST_ASIO_HEARTBEAT_INTERVAL
+#define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat
 #define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
 #define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
@@ -42,8 +46,6 @@ using namespace st_asio_wrapper::ext;
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
 #define LIST_STATUS		"status"
-#define SUSPEND_COMMAND	"suspend"
-#define RESUME_COMMAND	"resume"
 
 //demonstrate how to use custom packer
 //under the default behavior, each st_tcp_socket has their own packer, and cause memory waste
@@ -79,12 +81,12 @@ class echo_socket : public st_server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO
 public:
 	echo_socket(i_echo_server& server_) : st_server_socket_base(server_)
 	{
-		inner_packer(global_packer);
+		packer(global_packer);
 
 #if 2 == PACKER_UNPACKER_TYPE
-		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(inner_unpacker())->fixed_length(1024);
+		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(unpacker())->fixed_length(1024);
 #elif 3 == PACKER_UNPACKER_TYPE
-		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(inner_unpacker())->prefix_suffix("begin", "end");
+		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(unpacker())->prefix_suffix("begin", "end");
 #endif
 	}
 
@@ -121,7 +123,7 @@ protected:
 		return re;
 	}
 
-	virtual bool on_msg_handle(out_msg_type& msg, bool link_down)
+	virtual bool on_msg_handle(out_msg_type& msg)
 	{
 		auto re = send_msg(msg.data(), msg.size());
 		if (re)
@@ -136,7 +138,7 @@ protected:
 	}
 #else
 	//if we used receiving buffer, congestion control will become much simpler, like this:
-	virtual bool on_msg_handle(out_msg_type& msg, bool link_down) {return send_msg(msg.data(), msg.size());}
+	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg.data(), msg.size());}
 #endif
 	//msg handling end
 };
@@ -158,6 +160,27 @@ public:
 	virtual void test() {/*puts("in echo_server::test()");*/}
 };
 
+#if ST_ASIO_HEARTBEAT_INTERVAL > 0
+typedef st_server_socket_base<packer, unpacker> normal_socket;
+#else
+//demonstrate how to open heartbeat function without defining macro ST_ASIO_HEARTBEAT_INTERVAL
+class normal_socket : public st_server_socket_base<packer, unpacker>
+{
+public:
+	normal_socket(i_server& server_) : st_server_socket_base(server_) {}
+
+protected:
+	virtual bool do_start()
+	{
+		//demo asio_client needs heartbeat (macro ST_ASIO_HEARTBEAT_INTERVAL been defined), pleae note that the interval (here is 5) must be equal to
+		//macro ST_ASIO_HEARTBEAT_INTERVAL defined in demo asio_client, and macro ST_ASIO_HEARTBEAT_MAX_ABSENCE must has the same value as demo asio_client's.
+		start_heartbeat(5);
+
+		return st_server_socket_base::do_start();
+	}
+};
+#endif
+
 int main(int argc, const char* argv[])
 {
 	printf("usage: %s [<service thread number=1> [<port=%d> [ip=0.0.0.0]]]\n", argv[0], ST_ASIO_SERVER_PORT);
@@ -168,11 +191,11 @@ int main(int argc, const char* argv[])
 		puts("type " QUIT_COMMAND " to end.");
 
 	st_service_pump sp;
-	//only need a simple server? you can directly use st_server or st_server_base.
-	//because we use st_server_socket_base directly, so this server cannot support fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
-	//the reason is these packer and unpacker need additional initializations that st_server_socket_base not implemented, see echo_socket's constructor for more details.
-	typedef st_server_socket_base<packer, unpacker> normal_server_socket;
-	st_server_base<normal_server_socket> server_(sp);
+	//only need a simple server? you can directly use st_server or st_server_base, because of normal_socket,
+	//this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
+	//the reason is these packer and unpacker need additional initializations that normal_socket not implemented,
+	//see echo_socket's constructor for more details.
+	st_server_base<normal_socket> server_(sp);
 	echo_server echo_server_(sp); //echo server
 
 	if (argc > 3)
@@ -215,11 +238,6 @@ int main(int argc, const char* argv[])
 			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
 		}
-		//the following two commands demonstrate how to suspend msg dispatching, no matter recv buffer been used or not
-		else if (SUSPEND_COMMAND == str)
-			echo_server_.do_something_to_all([](echo_server::object_ctype& item) {item->suspend_dispatch_msg(true);});
-		else if (RESUME_COMMAND == str)
-			echo_server_.do_something_to_all([](echo_server::object_ctype& item) {item->suspend_dispatch_msg(false);});
 		else if (LIST_ALL_CLIENT == str)
 		{
 			puts("clients from normal server:");
@@ -229,22 +247,32 @@ int main(int argc, const char* argv[])
 		}
 		else
 		{
+//			/*
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
-//			server_.broadcast_msg(str.data(), str.size() + 1);
-			//send \0 character too, because asio_client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			server_.sync_broadcast_msg(str.data(), str.size() + 1);
+			//send \0 character too, because demo asio_client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
-
+//			*/
+			/*
+			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
+			server_.broadcast_msg(str.data(), str.size() + 1);
+			//send \0 character too, because demo asio_client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			//so need \0 character when printing it.
+			*/
+			/*
 			//if all clients used the same protocol, we can pack msg one time, and send it repeatedly like this:
 			packer p;
 			auto msg = p.pack_msg(str.data(), str.size() + 1);
-			//send \0 character too, because asio_client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
+			//send \0 character too, because demo asio_client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (!msg.empty())
 				server_.do_something_to_all([&msg](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(msg);});
-
-			//if asio_client is using stream_unpacker, we don't need to pack message, just send it.
-//			if (!str.empty())
-//				server_.do_something_to_all([&str](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(str);});
+			*/
+			/*
+			//if demo asio_client is using stream_unpacker
+			if (!str.empty())
+				server_.do_something_to_all([&str](st_server_base<normal_server_socket>::object_ctype& item) {item->direct_send_msg(str);});
+			*/
 		}
 	}
 
