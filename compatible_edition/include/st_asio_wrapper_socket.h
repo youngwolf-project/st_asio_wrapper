@@ -221,8 +221,6 @@ protected:
 	virtual void do_recv_msg() = 0;
 	//st_socket will guarantee not call these 3 functions in more than one thread concurrently.
 
-	virtual bool is_closable() {return true;}
-
 	//generally, you don't have to rewrite on_send_error to maintain the status of connections (TCP)
 	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0; //receiving error or peer endpoint quit(false ec means ok)
@@ -283,11 +281,8 @@ protected:
 			lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
 		}
 
-		if (is_closable())
-		{
-			set_async_calling(true);
-			set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, boost::bind(&st_socket::timer_handler, this, _1));
-		}
+		set_async_calling(true);
+		set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, boost::bind(&st_socket::timer_handler, this, _1));
 
 		return true;
 	}

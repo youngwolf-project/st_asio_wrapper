@@ -128,7 +128,6 @@ protected:
 	//after how much time(ms), st_connector_base will try to reconnect to the server, negative means give up.
 	virtual int prepare_reconnect(const boost::system::error_code& ec) {return ST_ASIO_RECONNECT_INTERVAL;}
 	virtual void on_connect() {unified_out::info_out("connecting success.");}
-	virtual bool is_closable() {return !need_reconnect;}
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_shutdown();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
@@ -136,9 +135,6 @@ protected:
 
 		force_shutdown(this->is_shutting_down() ? need_reconnect : prepare_reconnect(ec) >= 0);
 		this->status = super::link_status::BROKEN;
-
-		if (need_reconnect)
-			this->start();
 	}
 
 	virtual void on_async_shutdown_error() {force_shutdown(need_reconnect);}
@@ -147,6 +143,18 @@ protected:
 		show_info("client link:", "broke unexpectedly.");
 		force_shutdown(this->is_shutting_down() ? need_reconnect : prepare_reconnect(boost::system::error_code(boost::asio::error::network_down)) >= 0);
 		return false;
+	}
+
+	//reconnect at here rather than in on_recv_error to make sure that there's no any async invocations performed on this socket before reconnectiong
+	virtual void on_close()
+	{
+		if (!need_reconnect)
+			super::on_close();
+		else
+		{
+			this->stop_all_timer();
+			this->start();
+		}
 	}
 
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
