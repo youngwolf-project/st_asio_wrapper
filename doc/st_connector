@@ -63,9 +63,6 @@ virtual int prepare_reconnect(const boost::system::error_code& ec);
 	virtual void on_connect();
 连接成功时回调，用户重写它以得到连接成功事件。
 
-	virtual bool is_closable();
-如果正在重连接，则不允许close这个st_connector。
-
 	virtual void on_unpack_error();
 解包错误，默认的行为是关闭连接，可以重写以自定义行为。
 
@@ -77,6 +74,10 @@ virtual int prepare_reconnect(const boost::system::error_code& ec);
 
 	virtual bool on_heartbeat_error();
 心跳检测超时时回调。
+
+	virtual void on_close();
+如果需要重连接，则执行重连接，所以用户在重写它的时候，如果需要重连接逻辑，还得调用st_connector_base::on_close，
+要么就得自己实现。
 
 	bool prepare_next_reconnect(const boost::system::error_code& ec);
 如果允许（io_service仍然在运行且prepare_reconnect返回大于等于0），启动定时器以延时一小段时间之后重新连接服务器。

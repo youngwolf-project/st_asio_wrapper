@@ -150,11 +150,6 @@ protected:
 	virtual void do_recv_msg() = 0;
 真正的消息接收（调用asio函数），具体怎么发请看st_tcp_socket和st_udp_socket的实现。
 
-	virtual bool is_closable();
-当连接主动或者被被关闭时（shutdown），是否可以close它，只有close之后的对象才可以被释放或者被重用，默认返回true。
-那么什么时候不是closable的呢，答案是设置了重连的st_connector_base，其它情况都是closable的，使用者通过重写这个函数，可以加
-上自己的逻辑。
-
 	virtual bool is_send_allowed() const;
 是否允许发送消息，对于st_socket来说，只要未暂停消息发送，就是允许消息发送，子类重写这个函数实现自己的判断逻辑，然后加上
 st_socket的判断结果，最终确认是否可发送数据。请看st_tcp_socket、st_connector和st_udp_socket的实现。
