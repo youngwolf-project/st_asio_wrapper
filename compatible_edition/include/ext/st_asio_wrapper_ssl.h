@@ -27,12 +27,13 @@
 
 namespace st_asio_wrapper { namespace ext {
 
+typedef st_ssl_client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> st_ssl_client_socket;
+typedef st_ssl_client_socket st_ssl_connector;
+typedef st_ssl_tcp_sclient_base<st_ssl_client_socket> st_ssl_tcp_sclient;
+typedef st_ssl_tcp_client_base<st_ssl_client_socket> st_ssl_tcp_client;
+
 typedef st_ssl_server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> st_ssl_server_socket;
 typedef st_ssl_server_base<st_ssl_server_socket> st_ssl_server;
-
-typedef st_ssl_connector_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> st_ssl_connector;
-typedef st_ssl_tcp_sclient_base<st_ssl_connector> st_ssl_tcp_sclient;
-typedef st_ssl_tcp_client_base<st_ssl_connector> st_ssl_tcp_client;
 
 }} //namespace
 

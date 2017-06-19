@@ -44,7 +44,7 @@ public:
 	static void debug_out(const char* fmt, ...) {all_out_helper2("debug");}
 };
 
-#include "../include/ext/st_asio_wrapper_client.h"
+#include "../include/ext/st_asio_wrapper_tcp.h"
 using namespace st_asio_wrapper::ext;
 
 #define QUIT_COMMAND	"quit"

@@ -159,7 +159,7 @@ public:
 	{
 		assert(interval > 0 && max_absence > 0);
 
-		if (is_ready() && last_recv_time > 0) //check of last_recv_time is essential, because user may call check_heartbeat before do_start
+		if (last_recv_time > 0 && is_ready()) //check of last_recv_time is essential, because user may call check_heartbeat before do_start
 		{
 			auto now = time(nullptr);
 			if (now - last_recv_time >= interval * max_absence)
@@ -278,7 +278,7 @@ protected:
 		}
 
 		set_async_calling(true);
-		set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, [this](tid id)->bool {return this->timer_handler(id);});
+		set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, [this](tid id)->bool {return this->timer_handler(TIMER_DELAY_CLOSE);});
 
 		return true;
 	}
@@ -313,7 +313,7 @@ protected:
 		else
 		{
 			recv_idle_begin_time = statistic::local_time();
-			set_timer(TIMER_HANDLE_MSG, 50, [this](tid id)->bool {return this->timer_handler(id);});
+			set_timer(TIMER_HANDLE_MSG, 50, [this](tid id)->bool {return this->timer_handler(TIMER_HANDLE_MSG);});
 		}
 	}
 
@@ -392,6 +392,7 @@ private:
 				boost::system::error_code ec;
 				lowest_layer().close(ec);
 			}
+			change_timer_status(TIMER_DELAY_CLOSE, timer_info::TIMER_CANCELED);
 			on_close();
 			set_async_calling(false);
 			break;
@@ -415,7 +416,7 @@ private:
 		{
 			last_dispatch_msg.restart(end_time);
 			dispatching = false;
-			set_timer(TIMER_DISPATCH_MSG, 50, [this](tid id)->bool {return this->timer_handler(id);});
+			set_timer(TIMER_DISPATCH_MSG, 50, [this](tid id)->bool {return this->timer_handler(TIMER_DISPATCH_MSG);});
 		}
 		else //dispatch msg in sequence
 		{

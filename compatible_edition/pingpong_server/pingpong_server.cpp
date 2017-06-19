@@ -17,7 +17,7 @@
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 //configuration
 
-#include "../include/ext/st_asio_wrapper_server.h"
+#include "../include/ext/st_asio_wrapper_tcp.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 

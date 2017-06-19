@@ -162,13 +162,13 @@ public:
 	{
 		assert(interval > 0 && max_absence > 0);
 
-		if (is_ready() && last_recv_time > 0) //check of last_recv_time is essential, because user may call check_heartbeat before do_start
+		if (last_recv_time > 0 && is_ready()) //check of last_recv_time is essential, because user may call check_heartbeat before do_start
 		{
 			time_t now = time(NULL);
 			if (now - last_recv_time >= interval * max_absence)
 				return on_heartbeat_error();
 
-			if (!ST_THIS is_sending_msg() && now - last_send_time >= interval) //don't need to send heartbeat if we're sending messages
+			if (!is_sending_msg() && now - last_send_time >= interval) //don't need to send heartbeat if we're sending messages
 				send_heartbeat();
 		}
 
@@ -398,6 +398,7 @@ private:
 				boost::system::error_code ec;
 				lowest_layer().close(ec);
 			}
+			change_timer_status(TIMER_DELAY_CLOSE, timer_info::TIMER_CANCELED);
 			on_close();
 			set_async_calling(false);
 			break;

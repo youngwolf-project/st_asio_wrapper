@@ -26,13 +26,13 @@ namespace st_asio_wrapper
 {
 
 //timers are identified by id.
-//for the same timer in the same st_timer, any manipulations are not thread safe, please pay special attention.
+//for the same timer in the same st_timer object, any manipulations are not thread safe, please pay special attention.
 //to resolve this defect, we must add a mutex member variable to timer_info, it's not worth. otherwise, they are thread safe.
 //
 //suppose you have more than one service thread(see st_service_pump for service thread number controlling), then:
-//for same st_timer: same timer, on_timer is called in sequence
-//for same st_timer: distinct timer, on_timer is called concurrently
-//for distinct st_timer: on_timer is always called concurrently
+//for same st_timer object: same timer, on_timer is called in sequence
+//for same st_timer object: distinct timer, on_timer is called concurrently
+//for distinct st_timer object: on_timer is always called concurrently
 class st_timer : public st_object
 {
 public:
@@ -90,16 +90,11 @@ public:
 	void update_timer_info(tid id, size_t interval, const std::function<bool(tid)>& call_back, bool start = false)
 		{update_timer_info(id, interval, std::function<bool(tid)>(call_back), start);}
 
+	void change_timer_status(tid id, timer_info::timer_status status) {timer_can[id].status = status;}
 	void change_timer_interval(tid id, size_t interval) {timer_can[id].interval_ms = interval;}
 
-	bool revive_timer(tid id)
-	{
-		if (timer_info::TIMER_FAKE == timer_can[id].status)
-			return false;
-
-		timer_can[id].status = timer_info::TIMER_OK;
-		return true;
-	}
+	void change_timer_call_back(tid id, std::function<bool(tid)>&& call_back) {timer_can[id].call_back.swap(call_back);}
+	void change_timer_call_back(tid id, const std::function<bool(tid)>& call_back) {change_timer_call_back(id, std::function<bool(tid)>(call_back));}
 
 	void set_timer(tid id, size_t interval, std::function<bool(tid)>&& call_back) {update_timer_info(id, interval, std::move(call_back), true);}
 	void set_timer(tid id, size_t interval, const std::function<bool(tid)>& call_back) {update_timer_info(id, interval, call_back, true);}
