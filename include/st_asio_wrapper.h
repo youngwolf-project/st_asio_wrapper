@@ -191,13 +191,34 @@
  * Move macro ST_ASIO_MSG_BUFFER_SIZE from st_asio_wrapper to st_asio_wrapper::ext, because it doesn't belong to st_asio_wrapper.
  * Use boost::unordered::unordered_map instead of unordered_set, because we used one of the overloaded function find, which is marked as 'not encouraged to use'.
  *
+ * ===============================================================
+ * 2017.6.19	version 1.4.1
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ *
+ * HIGHLIGHT:
+ *
+ * FIX:
+ * Fix race condition on member variable last_send_msg in st_tcp_socket_base.
+ *
+ * ENHANCEMENTS:
+ * Optimize reconnecting mechanism.
+ * Enhance class st_timer.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ *
+ * REPLACEMENTS:
+ * Rename st_connector_base and st_ssl_connector_base to st_client_socket_base and st_ssl_client_socket_base, the former is still available, but is just an alias.
+ *
  */
 
 #ifndef ST_ASIO_WRAPPER_H_
 #define ST_ASIO_WRAPPER_H_
 
-#define ST_ASIO_WRAPPER_VER		10400	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_WRAPPER_VERSION	"1.4.0"
+#define ST_ASIO_WRAPPER_VER		10401	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_WRAPPER_VERSION	"1.4.1"
 
 //boost and compiler check
 #ifdef _MSC_VER

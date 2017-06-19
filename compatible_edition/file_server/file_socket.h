@@ -2,7 +2,7 @@
 #ifndef FILE_SOCKET_H_
 #define FILE_SOCKET_H_
 
-#include "../include/ext/st_asio_wrapper_server.h"
+#include "../include/ext/st_asio_wrapper_tcp.h"
 using namespace st_asio_wrapper::ext;
 
 #include "file_buffer.h"

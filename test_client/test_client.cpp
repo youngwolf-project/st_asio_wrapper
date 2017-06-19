@@ -43,7 +43,7 @@
 #endif
 //configuration
 
-#include "../include/ext/st_asio_wrapper_client.h"
+#include "../include/ext/st_asio_wrapper_tcp.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 
@@ -86,10 +86,10 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //msg sending interface
 ///////////////////////////////////////////////////
 
-class test_socket : public st_connector
+class test_socket : public st_client_socket
 {
 public:
-	test_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), recv_bytes(0), recv_index(0)
+	test_socket(boost::asio::io_service& io_service_) : st_client_socket(io_service_), recv_bytes(0), recv_index(0)
 	{
 #if 2 == PACKER_UNPACKER_TYPE
 		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(unpacker())->fixed_length(1024);

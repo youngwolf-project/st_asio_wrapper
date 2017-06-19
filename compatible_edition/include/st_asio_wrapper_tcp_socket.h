@@ -129,7 +129,7 @@ protected:
 				shutdown();
 			else if (!sync)
 				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&st_tcp_socket_base::async_shutdown_handler, this,
-					boost::lambda::_1, ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100), true, false));
+					ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100), true, false));
 			else
 			{
 				int loop_num = ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100; //seconds to 10 milliseconds
@@ -292,22 +292,22 @@ private:
 		}
 		else
 		{
-			ST_THIS sending = false;
 			ST_THIS on_send_error(ec);
 			last_send_msg.clear(); //clear sending messages after on_send_error, then user can decide how to deal with them in on_send_error
+
+			ST_THIS sending = false; //must after the erasure of last_send_msg to avoid race condition
 		}
 	}
 
-	bool async_shutdown_handler(st_timer::tid id, size_t loop_num)
+	bool async_shutdown_handler(size_t loop_num)
 	{
-		assert(TIMER_ASYNC_SHUTDOWN == id);
-
 		if (GRACEFUL_SHUTTING_DOWN == ST_THIS status)
 		{
 			--loop_num;
 			if (loop_num > 0)
 			{
-				ST_THIS update_timer_info(id, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&st_tcp_socket_base::async_shutdown_handler, this, id, loop_num), true, false));
+				ST_THIS update_timer_info(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&st_tcp_socket_base::async_shutdown_handler, this,
+					loop_num), true, false));
 				return true;
 			}
 			else

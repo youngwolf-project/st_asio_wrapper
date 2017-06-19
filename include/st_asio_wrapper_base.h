@@ -389,8 +389,7 @@ struct statistic
 	uint_fast64_t recv_msg_sum; //msgs returned by i_unpacker::parse_msg
 	uint_fast64_t recv_byte_sum; //msgs (in bytes) returned by i_unpacker::parse_msg
 	stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
-	stat_duration recv_idle_sum;
-	//during this duration, st_socket suspended msg reception (receiving buffer overflow, msg dispatching suspended or doing congestion control)
+	stat_duration recv_idle_sum; //during this duration, st_socket suspended msg reception (receiving buffer overflow or doing congestion control)
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	stat_duration handle_time_1_sum; //on_msg consumed time, this indicate the efficiency of msg handling
 #endif

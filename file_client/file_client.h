@@ -4,7 +4,7 @@
 
 #include <boost/timer/timer.hpp>
 
-#include "../include/ext/st_asio_wrapper_client.h"
+#include "../include/ext/st_asio_wrapper_tcp.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 
@@ -18,14 +18,14 @@ extern st_atomic<unsigned short> completed_client_num;
 extern int link_num;
 extern fl_type file_size;
 
-class file_socket : public base_socket, public st_connector
+class file_socket : public base_socket, public st_client_socket
 {
 public:
-	file_socket(boost::asio::io_service& io_service_) : st_connector(io_service_), index(-1) {}
+	file_socket(boost::asio::io_service& io_service_) : st_client_socket(io_service_), index(-1) {}
 	virtual ~file_socket() {clear();}
 
 	//reset all, be ensure that there's no any operations performed on this file_socket when invoke it
-	virtual void reset() {clear(); st_connector::reset();}
+	virtual void reset() {clear(); st_client_socket::reset();}
 
 	void set_index(int index_) {index = index_;}
 	fl_type get_rest_size() const
@@ -92,7 +92,7 @@ protected:
 		memcpy(std::next(buffer, ORDER_LEN), &id, sizeof(uint_fast64_t));
 		send_msg(buffer, sizeof(buffer), true);
 
-		st_connector::on_connect();
+		st_client_socket::on_connect();
 	}
 
 private:

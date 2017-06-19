@@ -16,7 +16,7 @@
 #include <boost/asio/ssl.hpp>
 
 #include "st_asio_wrapper_object_pool.h"
-#include "st_asio_wrapper_connector.h"
+#include "st_asio_wrapper_client_socket.h"
 #include "st_asio_wrapper_tcp_client.h"
 #include "st_asio_wrapper_server_socket.h"
 #include "st_asio_wrapper_server.h"
@@ -106,13 +106,13 @@ protected:
 template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
 	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class st_ssl_connector_base : public socket<st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>>
+class st_ssl_client_socket_base : public socket<st_client_socket_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>>
 {
 private:
-	typedef socket<st_connector_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>> super;
+	typedef socket<st_client_socket_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>> super;
 
 public:
-	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : super(io_service_, ctx) {}
+	st_ssl_client_socket_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : super(io_service_, ctx) {}
 
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false)
@@ -216,13 +216,26 @@ private:
 };
 
 #ifdef ST_ASIO_HAS_TEMPLATE_USING
-template<typename Socket, typename Pool = st_ssl_object_pool<Socket>, typename Server = i_server>
-using st_ssl_server_base = st_server_base<Socket, Pool, Server>;
+template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+using st_ssl_connector_base = st_ssl_client_socket_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>;
+template<typename Socket, typename Pool = st_ssl_object_pool<Socket>, typename Server = i_server> using st_ssl_server_base = st_server_base<Socket, Pool, Server>;
 template<typename Socket> using st_ssl_tcp_sclient_base = st_tcp_sclient_base<Socket>;
 template<typename Socket, typename Pool = st_ssl_object_pool<Socket>> using st_ssl_tcp_client_base = st_tcp_client_base<Socket, Pool>;
 #else
-template<typename Socket, typename Pool = st_ssl_object_pool<Socket>, typename Server = i_server>
-class st_ssl_server_base : public st_server_base<Socket, Pool, Server>
+template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class st_ssl_connector_base : public st_ssl_client_socket_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer>
+{
+private:
+	typedef st_ssl_client_socket_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer> super;
+
+public:
+	st_ssl_connector_base(boost::asio::io_service& io_service_, boost::asio::ssl::context& ctx) : super(io_service_, ctx) {}
+};
+template<typename Socket, typename Pool = st_ssl_object_pool<Socket>, typename Server = i_server> class st_ssl_server_base : public st_server_base<Socket, Pool, Server>
 {
 public:
 	st_ssl_server_base(st_service_pump& service_pump_, boost::asio::ssl::context::method m) : st_server_base<Socket, Pool, Server>(service_pump_, m) {}

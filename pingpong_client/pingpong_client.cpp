@@ -14,7 +14,7 @@
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 //configuration
 
-#include "../include/ext/st_asio_wrapper_client.h"
+#include "../include/ext/st_asio_wrapper_tcp.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::ext;
 
@@ -51,10 +51,10 @@ st_atomic<unsigned short> completed_session_num;
 //which means pingpong_server can send msgs back with can_overflow parameter equal to true, and memory occupation
 //will be under control.
 
-class echo_socket : public st_connector
+class echo_socket : public st_client_socket
 {
 public:
-	echo_socket(boost::asio::io_service& io_service_) : st_connector(io_service_) {}
+	echo_socket(boost::asio::io_service& io_service_) : st_client_socket(io_service_) {}
 
 	void begin(size_t msg_num, const char* msg, size_t msg_len)
 	{
@@ -66,7 +66,7 @@ public:
 	}
 
 protected:
-	virtual void on_connect() {boost::asio::ip::tcp::no_delay option(true); lowest_layer().set_option(option); st_connector::on_connect();}
+	virtual void on_connect() {boost::asio::ip::tcp::no_delay option(true); lowest_layer().set_option(option); st_client_socket::on_connect();}
 
 	//msg handling
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
