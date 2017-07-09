@@ -14,13 +14,11 @@
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 //configuration
 
-#include "../include/ext/st_asio_wrapper_tcp.h"
+#include "../include/ext/tcp.h"
 using namespace st_asio_wrapper;
+using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
-
-#ifdef _MSC_VER
-#define atoll _atoi64
-#endif
+using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
 #define LIST_STATUS		"status"
@@ -29,7 +27,7 @@ boost::timer::cpu_timer begin_time;
 #if BOOST_VERSION >= 105300
 boost::atomic_ushort completed_session_num;
 #else
-st_atomic<unsigned short> completed_session_num;
+atomic<unsigned short> completed_session_num;
 #endif
 
 //about congestion control
@@ -51,10 +49,10 @@ st_atomic<unsigned short> completed_session_num;
 //which means pingpong_server can send msgs back with can_overflow parameter equal to true, and memory occupation
 //will be under control.
 
-class echo_socket : public st_client_socket
+class echo_socket : public client_socket
 {
 public:
-	echo_socket(boost::asio::io_service& io_service_) : st_client_socket(io_service_) {}
+	echo_socket(boost::asio::io_service& io_service_) : client_socket(io_service_) {}
 
 	void begin(size_t msg_num, const char* msg, size_t msg_len)
 	{
@@ -66,7 +64,7 @@ public:
 	}
 
 protected:
-	virtual void on_connect() {boost::asio::ip::tcp::no_delay option(true); lowest_layer().set_option(option); st_client_socket::on_connect();}
+	virtual void on_connect() {boost::asio::ip::tcp::no_delay option(true); lowest_layer().set_option(option); client_socket::on_connect();}
 
 	//msg handling
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
@@ -80,7 +78,7 @@ protected:
 	{
 		send_bytes += msg.size();
 		if (send_bytes < total_bytes)
-			direct_send_msg(std::move(msg), true);
+			direct_send_msg(msg, true);
 	}
 
 private:
@@ -106,28 +104,28 @@ private:
 				begin_time.stop();
 		}
 		else
-			direct_send_msg(std::move(msg), true);
+			direct_send_msg(msg, true);
 	}
 #endif
 
 private:
-	uint64_t total_bytes, send_bytes, recv_bytes;
+	boost::uint64_t total_bytes, send_bytes, recv_bytes;
 };
 
-class echo_client : public st_tcp_client_base<echo_socket>
+class echo_client : public client_base<echo_socket>
 {
 public:
-	echo_client(st_service_pump& service_pump_) : st_tcp_client_base<echo_socket>(service_pump_) {}
+	echo_client(service_pump& service_pump_) : client_base<echo_socket>(service_pump_) {}
 
 	statistic get_statistic()
 	{
 		statistic stat;
-		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic();});
+		do_something_to_all(stat += boost::lambda::bind(&echo_socket::get_statistic, *boost::lambda::_1));
 
 		return stat;
 	}
 
-	void begin(size_t msg_num, const char* msg, size_t msg_len) {do_something_to_all([=](object_ctype& item) {item->begin(msg_num, msg, msg_len);});}
+	void begin(size_t msg_num, const char* msg, size_t msg_len) {do_something_to_all(boost::bind(&echo_socket::begin, _1, msg_num, msg, msg_len));}
 };
 
 int main(int argc, const char* argv[])
@@ -146,15 +144,15 @@ int main(int argc, const char* argv[])
 	printf("exec: echo_client with " ST_ASIO_SF " links\n", link_num);
 	///////////////////////////////////////////////////////////
 
-	st_service_pump sp;
+	service_pump sp;
 	echo_client client(sp);
 
-//	argv[2] = "::1" //ipv6
-//	argv[2] = "127.0.0.1" //ipv4
+//	argv[3] = "::1" //ipv6
+//	argv[3] = "127.0.0.1" //ipv4
 	std::string ip = argc > 3 ? argv[3] : ST_ASIO_SERVER_IP;
 	unsigned short port = argc > 2 ? atoi(argv[2]) : ST_ASIO_SERVER_PORT;
 
-	auto thread_num = 1;
+	int thread_num = 1;
 	if (argc > 1)
 		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
 	//add one thread will seriously impact IO throughput when doing performance benchmark, this is because the business logic is very simple (send original messages back,
@@ -181,20 +179,20 @@ int main(int argc, const char* argv[])
 		{
 			size_t msg_num = 1024;
 			size_t msg_len = 1024; //must greater than or equal to sizeof(size_t)
-			auto msg_fill = '0';
+			char msg_fill = '0';
 
 			boost::char_separator<char> sep(" \t");
-			boost::tokenizer<boost::char_separator<char>> tok(str, sep);
-			auto iter = std::begin(tok);
-			if (iter != std::end(tok)) msg_num = std::max((size_t) atoll(iter++->data()), (size_t) 1);
-			if (iter != std::end(tok)) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE, std::max((size_t) atoi(iter++->data()), (size_t) 1));
-			if (iter != std::end(tok)) msg_fill = *iter++->data();
+			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
+			BOOST_AUTO(iter, tok.begin());
+			if (iter != tok.end()) msg_num = std::max((size_t) atoi(iter++->data()), (size_t) 1);
+			if (iter != tok.end()) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE, std::max((size_t) atoi(iter++->data()), (size_t) 1));
+			if (iter != tok.end()) msg_fill = *iter++->data();
 
 			printf("test parameters after adjustment: " ST_ASIO_SF " " ST_ASIO_SF " %c\n", msg_num, msg_len, msg_fill);
 			puts("performance test begin, this application will have no response during the test!");
 
 			completed_session_num = (unsigned short) link_num;
-			auto init_msg = new char[msg_len];
+			char* init_msg = new char[msg_len];
 			memset(init_msg, msg_fill, msg_len);
 			client.begin(msg_num, init_msg, msg_len);
 			begin_time.start();
@@ -202,8 +200,8 @@ int main(int argc, const char* argv[])
 			while (0 != completed_session_num)
 				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
 
-			uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
-			auto used_time = (double) begin_time.elapsed().wall / 1000000000;
+			boost::uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
+			double used_time = (double) begin_time.elapsed().wall / 1000000000;
 			printf("finished in %f seconds, speed: %f(*2) MBps.\n", used_time, total_msg_bytes / used_time / 1024 / 1024);
 
 			delete[] init_msg;

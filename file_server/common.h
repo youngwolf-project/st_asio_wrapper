@@ -38,7 +38,7 @@ if head equal to:
 class base_socket
 {
 public:
-	base_socket() : state(TRANS_IDLE), file(nullptr)  {}
+	base_socket() : state(TRANS_IDLE), file(NULL)  {}
 
 protected:
 	enum TRANS_STATE {TRANS_IDLE, TRANS_PREPARE, TRANS_BUSY};

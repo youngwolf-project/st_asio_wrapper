@@ -3,15 +3,16 @@
 #boost_include_dir = -I/usr/local/include/
 #boost_lib_dir = -L/usr/local/lib/
 
-cflag = -Wall -fexceptions -std=c++11
+cflag = -Wall -fexceptions -std=c++98
 ifeq (${MAKECMDGOALS}, debug)
 	cflag += -g -DDEBUG
 	dir = debug
 else
-	cflag += -O2 -DNDEBUG
+	cflag += -O -DNDEBUG
 	lflag = -s
 	dir = release
 endif
+cflag += -DBOOST_ASIO_NO_DEPRECATED
 
 kernel = ${shell uname -s}
 ifeq (${kernel}, SunOS)

@@ -2,12 +2,13 @@
 #ifndef FILE_SOCKET_H_
 #define FILE_SOCKET_H_
 
-#include "../include/ext/st_asio_wrapper_tcp.h"
-using namespace st_asio_wrapper::ext;
+#include "../include/ext/tcp.h"
+using namespace st_asio_wrapper::tcp;
+using namespace st_asio_wrapper::ext::tcp;
 
 #include "file_buffer.h"
 
-class file_socket : public base_socket, public st_server_socket
+class file_socket : public base_socket, public server_socket
 {
 public:
 	file_socket(i_server& server_);
@@ -17,7 +18,7 @@ public:
 	//because we don't use objects pool(we don't defined ST_ASIO_REUSE_OBJECT), so this virtual function will
 	//not be invoked, and can be omitted, but we keep it for possibly future using
 	virtual void reset();
-	virtual void take_over(boost::shared_ptr<st_server_socket> socket_ptr); //move socket_ptr into this socket
+	virtual void take_over(boost::shared_ptr<server_socket> socket_ptr); //move socket_ptr into this socket
 //	virtual void take_over(boost::shared_ptr<file_socket> socket_ptr); //this works too, but brings warnings with -Woverloaded-virtual option.
 
 protected:
