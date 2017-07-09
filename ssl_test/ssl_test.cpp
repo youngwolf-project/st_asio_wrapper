@@ -107,6 +107,9 @@ int main(int argc, const char* argv[])
 #else
 		else if (RESTART_COMMAND == str)
 		{
+			client_.force_shutdown(true); //important, or client will not be able to reconnect to the server
+//			client_.force_shutdown(true); //if you used single_client
+
 			sp.stop_service(&client_);
 			sp.stop_service();
 
