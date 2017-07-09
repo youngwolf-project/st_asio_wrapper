@@ -4,34 +4,36 @@
 
 #include <boost/timer/timer.hpp>
 
-#include "../include/ext/st_asio_wrapper_tcp.h"
+#include "../include/ext/tcp.h"
 using namespace st_asio_wrapper;
+using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
+using namespace st_asio_wrapper::ext::tcp;
 
 #include "unpacker.h"
 
 #if BOOST_VERSION >= 105300
 extern boost::atomic_ushort completed_client_num;
 #else
-extern st_atomic<unsigned short> completed_client_num;
+extern atomic<unsigned short> completed_client_num;
 #endif
 extern int link_num;
 extern fl_type file_size;
 
-class file_socket : public base_socket, public st_client_socket
+class file_socket : public base_socket, public client_socket
 {
 public:
-	file_socket(boost::asio::io_service& io_service_) : st_client_socket(io_service_), index(-1) {}
+	file_socket(boost::asio::io_service& io_service_) : client_socket(io_service_), index(-1) {}
 	virtual ~file_socket() {clear();}
 
 	//reset all, be ensure that there's no any operations performed on this file_socket when invoke it
-	virtual void reset() {clear(); st_client_socket::reset();}
+	virtual void reset() {clear(); client_socket::reset();}
 
 	void set_index(int index_) {index = index_;}
 	fl_type get_rest_size() const
 	{
-		auto unpacker = boost::dynamic_pointer_cast<const data_unpacker>(this->unpacker());
-		return unpacker ? unpacker->get_rest_size() : 0;
+		BOOST_AUTO(up, boost::dynamic_pointer_cast<const data_unpacker>(unpacker()));
+		return up ? up->get_rest_size() : 0;
 	}
 	operator fl_type() const {return get_rest_size();}
 
@@ -47,7 +49,7 @@ public:
 		else
 			file = fopen(file_name.data(), "r+b");
 
-		if (nullptr == file)
+		if (NULL == file)
 		{
 			printf("can't create file %s.\n", file_name.data());
 			return false;
@@ -85,24 +87,24 @@ protected:
 
 	virtual void on_connect()
 	{
-		uint_fast64_t id = index;
-		char buffer[ORDER_LEN + sizeof(uint_fast64_t)];
+		boost::uint_fast64_t id = index;
+		char buffer[ORDER_LEN + sizeof(boost::uint_fast64_t)];
 
 		*buffer = 3; //head
-		memcpy(std::next(buffer, ORDER_LEN), &id, sizeof(uint_fast64_t));
+		memcpy(boost::next(buffer, ORDER_LEN), &id, sizeof(boost::uint_fast64_t));
 		send_msg(buffer, sizeof(buffer), true);
 
-		st_client_socket::on_connect();
+		client_socket::on_connect();
 	}
 
 private:
 	void clear()
 	{
 		state = TRANS_IDLE;
-		if (nullptr != file)
+		if (NULL != file)
 		{
 			fclose(file);
-			file = nullptr;
+			file = NULL;
 		}
 
 		unpacker(boost::make_shared<ST_ASIO_DEFAULT_UNPACKER>());
@@ -126,10 +128,10 @@ private:
 		switch (*msg.data())
 		{
 		case 0:
-			if (ORDER_LEN + DATA_LEN == msg.size() && nullptr != file && TRANS_PREPARE == state)
+			if (ORDER_LEN + DATA_LEN == msg.size() && NULL != file && TRANS_PREPARE == state)
 			{
 				fl_type length;
-				memcpy(&length, std::next(msg.data(), ORDER_LEN), DATA_LEN);
+				memcpy(&length, boost::next(msg.data(), ORDER_LEN), DATA_LEN);
 				if (-1 == length)
 				{
 					if (0 == index)
@@ -141,8 +143,8 @@ private:
 					if (0 == index)
 						file_size = length;
 
-					auto my_length = length / link_num;
-					auto offset = my_length * index;
+					fl_type my_length = length / link_num;
+					fl_type offset = my_length * index;
 
 					if (link_num - 1 == index)
 						my_length = length - offset;
@@ -150,8 +152,8 @@ private:
 					{
 						char buffer[ORDER_LEN + OFFSET_LEN + DATA_LEN];
 						*buffer = 1; //head
-						memcpy(std::next(buffer, ORDER_LEN), &offset, OFFSET_LEN);
-						memcpy(std::next(buffer, ORDER_LEN + OFFSET_LEN), &my_length, DATA_LEN);
+						memcpy(boost::next(buffer, ORDER_LEN), &offset, OFFSET_LEN);
+						memcpy(boost::next(buffer, ORDER_LEN + OFFSET_LEN), &my_length, DATA_LEN);
 
 						state = TRANS_BUSY;
 						send_msg(buffer, sizeof(buffer), true);
@@ -166,7 +168,7 @@ private:
 			break;
 		case 2:
 			if (0 == index)
-				printf("server says: %s\n", std::next(msg.data(), ORDER_LEN));
+				printf("server says: %s\n", boost::next(msg.data(), ORDER_LEN));
 			break;
 		default:
 			break;
@@ -177,19 +179,19 @@ private:
 	int index;
 };
 
-class file_client : public st_tcp_client_base<file_socket>
+class file_client : public client_base<file_socket>
 {
 public:
-	static const tid TIMER_BEGIN = st_tcp_client_base<file_socket>::TIMER_END;
+	static const tid TIMER_BEGIN = client_base<file_socket>::TIMER_END;
 	static const tid UPDATE_PROGRESS = TIMER_BEGIN;
 	static const tid TIMER_END = TIMER_BEGIN + 10;
 
-	file_client(st_service_pump& service_pump_) : st_tcp_client_base<file_socket>(service_pump_) {}
+	file_client(service_pump& service_pump_) : client_base<file_socket>(service_pump_) {}
 
 	void start()
 	{
 		begin_time.start();
-		set_timer(UPDATE_PROGRESS, 50, [this](tid id)->bool {return this->update_progress_handler(id, -1);});
+		set_timer(UPDATE_PROGRESS, 50, boost::bind(&file_client::update_progress_handler, this, _1, -1));
 	}
 
 	void stop(const std::string& file_name)
@@ -197,15 +199,15 @@ public:
 		stop_timer(UPDATE_PROGRESS);
 		update_progress_handler(UPDATE_PROGRESS, 0);
 
-		auto used_time = (double) begin_time.elapsed().wall / 1000000000;
+		double used_time = (double) begin_time.elapsed().wall / 1000000000;
 		printf("\ntransfer %s end, speed: %f MBps.\n", file_name.data(), file_size / used_time / 1024 / 1024);
 	}
 
 	fl_type get_total_rest_size()
 	{
 		fl_type total_rest_size = 0;
-		do_something_to_all([&total_rest_size](object_ctype& item) {total_rest_size += *item;});
-//		do_something_to_all([&total_rest_size](object_ctype& item) {total_rest_size += item->get_rest_size();});
+		do_something_to_all(total_rest_size += *boost::lambda::_1);
+//		do_something_to_all(total_rest_size += boost::lambda::bind(&file_socket::get_rest_size, *boost::lambda::_1));
 
 		return total_rest_size;
 	}
@@ -215,14 +217,14 @@ private:
 	{
 		assert(UPDATE_PROGRESS == id);
 
-		auto total_rest_size = get_total_rest_size();
-		auto new_percent = (unsigned) ((file_size - total_rest_size) * 100 / file_size);
+		fl_type total_rest_size = get_total_rest_size();
+		unsigned new_percent = (unsigned) ((file_size - total_rest_size) * 100 / file_size);
 		if (last_percent != new_percent)
 		{
 			printf("\r%u%%", new_percent);
 			fflush(stdout);
 
-			this->update_timer_info(id, 50, [new_percent, this](tid id)->bool {return this->update_progress_handler(id, new_percent);});
+			ST_THIS update_timer_info(id, 50, boost::bind(&file_client::update_progress_handler, this, _1, new_percent));
 		}
 
 		return total_rest_size > 0;

@@ -4,6 +4,10 @@
  ST_SERVICE_THREAD_NUM被改成了ST_ASIO_SERVICE_THREAD_NUM
  size_t_format被改成了ST_ASIO_SF
 
-每个直接或者间接从st_timer继承的类中，都定义了TIMER_BEGIN和TIMER_END两个静态常量，
+每个直接或者间接从timer继承的类中，都定义了TIMER_BEGIN和TIMER_END两个静态常量，
 用户自定义定时器ID必须从父类的TIMER_END开始。
 
+其它所有文档请参看ascs的开发文档，主要的不同点仅三个：
+1. 最外层的命名空间是st_asio_wrapper而非ascs；
+2. 类atomic仅在st_asio_wrapper中存在；
+3. 类cpu_timer仅在ascs中存在；

@@ -17,13 +17,10 @@
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 //configuration
 
-#include "../include/ext/st_asio_wrapper_tcp.h"
+#include "../include/ext/tcp.h"
 using namespace st_asio_wrapper;
-using namespace st_asio_wrapper::ext;
-
-#ifdef _MSC_VER
-#define atoll _atoi64
-#endif
+using namespace st_asio_wrapper::tcp;
+using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
 #define LIST_STATUS		"status"
@@ -47,19 +44,18 @@ using namespace st_asio_wrapper::ext;
 //which means pingpong_server can send msgs back with can_overflow parameter equal to true, and memory occupation
 //will be under control.
 
-class echo_socket : public st_server_socket
+class echo_socket : public server_socket
 {
 public:
-	echo_socket(i_server& server_) : st_server_socket(server_) {}
+	echo_socket(i_server& server_) : server_socket(server_) {}
 
 protected:
 	//msg handling: send the original msg back(echo server)
 	//congestion control, method #1, the peer needs its own congestion control too.
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-	//this virtual function doesn't exists if ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER been defined
+#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //this virtual function doesn't exist if ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER been defined
 	virtual bool on_msg(out_msg_type& msg)
 	{
-		auto re = direct_send_msg(std::move(msg));
+		bool re = direct_send_msg(msg);
 		if (!re)
 		{
 			//cannot handle (send it back) this msg timely, begin congestion control
@@ -73,7 +69,7 @@ protected:
 
 	virtual bool on_msg_handle(out_msg_type& msg)
 	{
-		auto re = direct_send_msg(std::move(msg));
+		bool re = direct_send_msg(msg);
 		if (re)
 		{
 			//successfully handled the only one msg in receiving buffer, end congestion control
@@ -86,20 +82,20 @@ protected:
 	}
 #else
 	//if we used receiving buffer, congestion control will become much simpler, like this:
-	virtual bool on_msg_handle(out_msg_type& msg) {return direct_send_msg(std::move(msg));}
+	virtual bool on_msg_handle(out_msg_type& msg) {return direct_send_msg(msg);}
 #endif
 	//msg handling end
 };
 
-class echo_server : public st_server_base<echo_socket>
+class echo_server : public server_base<echo_socket>
 {
 public:
-	echo_server(st_service_pump& service_pump_) : st_server_base(service_pump_) {}
+	echo_server(service_pump& service_pump_) : server_base<echo_socket>(service_pump_) {}
 
 	statistic get_statistic()
 	{
 		statistic stat;
-		do_something_to_all([&stat](object_ctype& item) {stat += item->get_statistic();});
+		do_something_to_all(stat += boost::lambda::bind(&echo_socket::get_statistic, *boost::lambda::_1));
 
 		return stat;
 	}
@@ -116,7 +112,7 @@ int main(int argc, const char* argv[])
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
-	st_service_pump sp;
+	service_pump sp;
 	echo_server echo_server_(sp);
 
 	if (argc > 3)
@@ -124,7 +120,7 @@ int main(int argc, const char* argv[])
 	else if (argc > 2)
 		echo_server_.set_server_addr(atoi(argv[2]));
 
-	auto thread_num = 1;
+	int thread_num = 1;
 	if (argc > 1)
 		thread_num = std::min(16, std::max(thread_num, atoi(argv[1])));
 

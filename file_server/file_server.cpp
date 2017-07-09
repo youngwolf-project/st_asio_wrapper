@@ -2,7 +2,7 @@
 #include <iostream>
 
 //configuration
-#define ST_ASIO_SERVER_PORT		5050
+#define ST_ASIO_SERVER_PORT		5051
 #define ST_ASIO_RESTORE_OBJECT
 #define ST_ASIO_ENHANCED_STABILITY
 #define ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -31,8 +31,8 @@ int main(int argc, const char* argv[])
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
-	st_service_pump sp;
-	st_server_base<file_socket> file_server_(sp);
+	service_pump sp;
+	server_base<file_socket> file_server_(sp);
 
 	if (argc > 2)
 		file_server_.set_server_addr(atoi(argv[1]), argv[2]);

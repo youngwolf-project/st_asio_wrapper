@@ -10,12 +10,12 @@
 //#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
 //#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
 #define ST_ASIO_HEARTBEAT_INTERVAL 5 //SSL has supported heartbeat because we used user data instead of OOB to implement
-									 //heartbeat since 1.2.0
+									 //heartbeat since 1.4.0
 //configuration
 
-#include "../include/ext/st_asio_wrapper_ssl.h"
+#include "../include/ext/ssl.h"
 using namespace st_asio_wrapper;
-using namespace st_asio_wrapper::ext;
+using namespace st_asio_wrapper::ext::ssl;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
@@ -31,9 +31,9 @@ int main(int argc, const char* argv[])
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
-	st_service_pump sp;
+	service_pump sp;
 
-	st_ssl_server server_(sp, boost::asio::ssl::context::sslv23_server);
+	server server_(sp, boost::asio::ssl::context::sslv23_server);
 	server_.context().set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
 	server_.context().set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
 	server_.context().load_verify_file("client_certs/server.crt");
@@ -43,7 +43,7 @@ int main(int argc, const char* argv[])
 
 ///*
 	//method #1
-	st_ssl_tcp_client client_(sp, boost::asio::ssl::context::sslv23_client);
+	client client_(sp, boost::asio::ssl::context::sslv23_client);
 	client_.context().set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
 	client_.context().set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
 	client_.context().load_verify_file("certs/server.crt");
@@ -57,7 +57,7 @@ int main(int argc, const char* argv[])
 //*/
 /*
 	//method #2
-	//to use st_ssl_tcp_sclient, we must construct ssl context first.
+	//to use single_client, we must construct ssl context first.
 	boost::asio::ssl::context ctx(boost::asio::ssl::context::sslv23_client);
 	ctx.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
 	ctx.set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
@@ -66,7 +66,7 @@ int main(int argc, const char* argv[])
 	ctx.use_private_key_file("client_certs/server.key", boost::asio::ssl::context::pem);
 	ctx.use_tmp_dh_file("client_certs/dh1024.pem");
 
-	st_ssl_tcp_sclient client_(sp, ctx);
+	single_client client_(sp, ctx);
 */
 	sp.start_service();
 	while(sp.is_running())
@@ -84,7 +84,7 @@ int main(int argc, const char* argv[])
 			printf("link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
 			server_.list_all_object();
 
-			//if you used st_ssl_tcp_sclient, comment out following codes.
+			//if you used single_client, comment out following codes.
 			puts("\nclient:");
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client_.size(), client_.valid_size(), client_.invalid_object_size());
 			client_.list_all_object();
@@ -101,12 +101,15 @@ int main(int argc, const char* argv[])
 //			client_.graceful_shutdown(client_.at(0), false);
 //			client_.force_shutdown(client_.at(0));
 
-//			client_.graceful_shutdown(); //if you used st_ssl_tcp_sclient
-//			client_.graceful_shutdown(false, false); //if you used st_ssl_tcp_sclient
-//			client_.force_shutdown(); //if you used st_ssl_tcp_sclient
+//			client_.graceful_shutdown(); //if you used single_client
+//			client_.graceful_shutdown(false, false); //if you used single_client
+//			client_.force_shutdown(); //if you used single_client
 #else
 		else if (RESTART_COMMAND == str)
 		{
+			client_.force_shutdown(true); //important, or client will not be able to reconnect to the server
+//			client_.force_shutdown(true); //if you used single_client
+
 			sp.stop_service(&client_);
 			sp.stop_service();
 
@@ -126,25 +129,25 @@ int main(int argc, const char* argv[])
 			//sync shutdown and reconnect to the server
 			client_.at(0)->graceful_shutdown(true);
 //			client_.at(0)->force_shutdown(true);
-//			client_.graceful_shutdown(true); //if you used st_ssl_tcp_sclient
-//			client_.force_shutdown(true); //if you used st_ssl_tcp_sclient
+//			client_.graceful_shutdown(true); //if you used single_client
+//			client_.force_shutdown(true); //if you used single_client
 
 			//async shutdown and reconnect to the server
 //			client_.at(0)->graceful_shutdown(true, false);
-//			client_.graceful_shutdown(true, false); //if you used st_ssl_tcp_sclient
+//			client_.graceful_shutdown(true, false); //if you used single_client
 
 			//sync shutdown and not reconnect to the server
 //			client_.at(0)->graceful_shutdown();
 //			client_.at(0)->force_shutdown();
 //			client_.graceful_shutdown(client_.at(0));
 //			client_.force_shutdown(client_.at(0));
-//			client_.graceful_shutdown(); //if you used st_ssl_tcp_sclient
-//			client_.force_shutdown(); //if you used st_ssl_tcp_sclient
+//			client_.graceful_shutdown(); //if you used single_client
+//			client_.force_shutdown(); //if you used single_client
 
 			//async shutdown and not reconnect to the server
 //			client_.at(0)->graceful_shutdown(false, false);
 //			client_.graceful_shutdown(client_.at(0), false);
-//			client_.graceful_shutdown(false, false); //if you used st_ssl_tcp_sclient
+//			client_.graceful_shutdown(false, false); //if you used single_client
 #endif
 		else
 			server_.broadcast_msg(str);

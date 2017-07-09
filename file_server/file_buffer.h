@@ -1,7 +1,7 @@
 #ifndef FILE_BUFFER_H_
 #define FILE_BUFFER_H_
 
-#include "../include/st_asio_wrapper_base.h"
+#include "../include/base.h"
 using namespace st_asio_wrapper;
 
 #include "common.h"
@@ -11,10 +11,10 @@ class file_buffer : public i_buffer
 public:
 	file_buffer(FILE* file, fl_type data_len) : _file(file), _data_len(data_len)
 	{
-		assert(nullptr != _file);
+		assert(NULL != _file);
 
 		buffer = new char[boost::asio::detail::default_max_transfer_size];
-		assert(nullptr != buffer);
+		assert(NULL != buffer);
 
 		read();
 	}
