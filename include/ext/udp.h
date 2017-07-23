@@ -30,7 +30,8 @@ namespace st_asio_wrapper { namespace ext { namespace udp {
 
 typedef st_asio_wrapper::udp::socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UDP_UNPACKER> socket;
 typedef st_asio_wrapper::udp::single_service_base<socket> single_service;
-typedef st_asio_wrapper::udp::service_base<socket> service;
+typedef st_asio_wrapper::udp::multi_service_base<socket> multi_service;
+typedef multi_service service;
 
 }}} //namespace
 

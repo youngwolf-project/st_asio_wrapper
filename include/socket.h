@@ -91,7 +91,7 @@ public:
 	bool started() const {return started_;}
 	void start()
 	{
-		if (!started_ && !stopped() && !is_timer(TIMER_DELAY_CLOSE))
+		if (!started_ && !is_timer(TIMER_DELAY_CLOSE) && !stopped())
 		{
 			scope_atomic_lock<> lock(start_atomic);
 			if (!started_ && lock.locked())
@@ -100,23 +100,7 @@ public:
 	}
 
 	//return false if send buffer is empty or sending not allowed
-	bool send_msg()
-	{
-		if (!sending && !stopped() && is_ready())
-		{
-			scope_atomic_lock<> lock(send_atomic);
-			if (!sending && lock.locked())
-			{
-				sending = true;
-				lock.unlock();
-
-				if (!do_send_msg())
-					sending = false;
-			}
-		}
-
-		return sending;
-	}
+	bool send_msg() {if (lock_sending_flag() && !do_send_msg()) sending = false; return sending;}
 
 	void start_heartbeat(int interval, int max_absence = ST_ASIO_HEARTBEAT_MAX_ABSENCE)
 	{
@@ -191,8 +175,9 @@ public:
 protected:
 	virtual bool do_start() = 0;
 	virtual bool do_send_msg() = 0;
+	virtual bool do_send_msg(InMsgType& msg) = 0; //after this call, msg becomes empty, please note.
 	virtual void do_recv_msg() = 0;
-	//socket will guarantee not call these 3 functions in more than one thread concurrently.
+	//socket will guarantee not call these 4 functions in more than one thread concurrently.
 
 	//generally, you don't have to rewrite this to maintain the status of connections (TCP)
 	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
@@ -295,23 +280,7 @@ protected:
 	}
 
 	//return false if receiving buffer is empty
-	bool dispatch_msg()
-	{
-		if (!dispatching)
-		{
-			scope_atomic_lock<> lock(dispatch_atomic);
-			if (!dispatching && lock.locked())
-			{
-				dispatching = true;
-				lock.unlock();
-
-				if (!do_dispatch_msg())
-					dispatching = false;
-			}
-		}
-
-		return dispatching;
-	}
+	bool dispatch_msg() {if (lock_dispatching_flag() && !do_dispatch_msg()) dispatching = false; return dispatching;}
 
 	//return false if receiving buffer is empty
 	bool do_dispatch_msg()
@@ -329,18 +298,43 @@ protected:
 	{
 		if (msg.empty())
 			unified_out::error_out("found an empty message, please check your packer.");
+		else if (lock_sending_flag())
+			do_send_msg(msg);
 		else
 		{
-			in_msg unused;
-			unused.swap(msg);
+			in_msg unused(msg);
 			send_msg_buffer.enqueue(unused);
 			send_msg();
 		}
 
-		//even if we meet an empty message (most likely, this is because message length is too long, or insufficient memory), we still return true, why?
+		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
 		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
 		//the packer provider has the responsibility to write detailed reasons down when packing message failed.
 		return true;
+	}
+
+	bool lock_sending_flag()
+	{
+		if (!sending && is_ready())
+		{
+			scope_atomic_lock<> lock(send_atomic);
+			if (!sending && lock.locked())
+				return sending = true;
+		}
+
+		return false;
+	}
+
+	bool lock_dispatching_flag()
+	{
+		if (!dispatching)
+		{
+			scope_atomic_lock<> lock(dispatch_atomic);
+			if (!dispatching && lock.locked())
+				return dispatching = true;
+		}
+
+		return false;
 	}
 
 private:

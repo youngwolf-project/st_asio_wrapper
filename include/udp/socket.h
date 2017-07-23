@@ -97,17 +97,8 @@ public:
 	{
 		if (msg.empty())
 			unified_out::error_out("empty message, will not send it.");
-		else if (!ST_THIS sending && !ST_THIS stopped() && is_ready())
-		{
-			scope_atomic_lock<> lock(ST_THIS send_atomic);
-			if (!ST_THIS sending && lock.locked())
-			{
-				ST_THIS sending = true;
-				lock.unlock();
-
-				return do_sync_send_msg(peer_addr, msg);
-			}
-		}
+		else if (ST_THIS lock_sending_flag())
+			return do_sync_send_msg(peer_addr, msg);
 
 		return 0;
 	}
@@ -158,6 +149,15 @@ protected:
 		}
 
 		return false;
+	}
+
+	virtual bool do_send_msg(in_msg_type& msg)
+	{
+		last_send_msg = msg;
+		ST_THIS next_layer().async_send_to(ST_ASIO_SEND_BUFFER_TYPE(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr,
+				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+
+		return true;
 	}
 
 	virtual void do_recv_msg()
@@ -211,14 +211,13 @@ private:
 		{
 			ST_THIS last_recv_time = time(NULL);
 
-			typename Unpacker::msg_type msg;
+			out_msg_type msg(temp_addr);
 			unpacker_->parse_msg(msg, bytes_transferred);
 			if (!msg.empty())
 			{
 				++ST_THIS stat.recv_msg_sum;
 				ST_THIS stat.recv_byte_sum += msg.size();
-				ST_THIS temp_msg_buffer.emplace_back();
-				ST_THIS temp_msg_buffer.back().swap(temp_addr, msg);
+				ST_THIS temp_msg_buffer.emplace_back(boost::ref(msg));
 			}
 			ST_THIS handle_msg();
 		}

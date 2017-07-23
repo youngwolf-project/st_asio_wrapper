@@ -33,7 +33,8 @@ namespace st_asio_wrapper { namespace ext { namespace tcp {
 typedef st_asio_wrapper::tcp::client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> client_socket;
 typedef client_socket connector;
 typedef st_asio_wrapper::tcp::single_client_base<client_socket> single_client;
-typedef st_asio_wrapper::tcp::client_base<client_socket> client;
+typedef st_asio_wrapper::tcp::multi_client_base<client_socket> multi_client;
+typedef multi_client client;
 
 typedef st_asio_wrapper::tcp::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> server_socket;
 typedef st_asio_wrapper::tcp::server_base<server_socket> server;

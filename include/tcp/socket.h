@@ -89,17 +89,8 @@ public:
 	{
 		if (msg.empty())
 			unified_out::error_out("empty message, will not send it.");
-		else if (!ST_THIS sending && !ST_THIS stopped() && is_ready())
-		{
-			scope_atomic_lock<> lock(ST_THIS send_atomic);
-			if (!ST_THIS sending && lock.locked())
-			{
-				ST_THIS sending = true;
-				lock.unlock();
-
-				return do_sync_send_msg(msg);
-			}
-		}
+		else if (ST_THIS lock_sending_flag())
+			return do_sync_send_msg(msg);
 
 		return 0;
 	}
@@ -182,6 +173,15 @@ protected:
 
 		last_send_msg.front().restart();
 		boost::asio::async_write(ST_THIS next_layer(), bufs,
+			ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+		return true;
+	}
+
+	virtual bool do_send_msg(in_msg_type& msg)
+	{
+		BOOST_AUTO(buf, ST_ASIO_SEND_BUFFER_TYPE(msg.data(), msg.size()));
+		last_send_msg.emplace_back(boost::ref(msg));
+		boost::asio::async_write(ST_THIS next_layer(), buf,
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		return true;
 	}

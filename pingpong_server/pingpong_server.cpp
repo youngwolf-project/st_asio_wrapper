@@ -15,6 +15,7 @@
 //if pingpong_client send message in on_msg_send(), then using non_lock_queue as input queue in pingpong_server will lead
 //undefined behavior, please note.
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
+#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //configuration
 
 #include "../include/ext/tcp.h"
@@ -24,6 +25,8 @@ using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
 #define LIST_STATUS		"status"
+#define INCREASE_THREAD	"increase_thread"
+#define DECREASE_THREAD	"decrease_thread"
 
 //about congestion control
 //
@@ -137,6 +140,10 @@ int main(int argc, const char* argv[])
 			puts("");
 			puts(echo_server_.get_statistic().to_string().data());
 		}
+		else if (INCREASE_THREAD == str)
+			sp.add_service_thread(1);
+		else if (DECREASE_THREAD == str)
+			sp.del_service_thread(1);
 	}
 
 	return 0;

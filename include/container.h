@@ -27,6 +27,7 @@ public:
 	typedef boost::lock_guard<dummy_lockable> lock_guard;
 
 	//lockable, dummy
+	bool is_lockable() const {return false;}
 	void lock() const {}
 	void unlock() const {}
 };
@@ -37,16 +38,17 @@ public:
 	typedef boost::lock_guard<lockable> lock_guard;
 
 	//lockable
+	bool is_lockable() const {return true;}
 	void lock() {mutex.lock();}
 	void unlock() {mutex.unlock();}
 
 private:
-	boost::mutex mutex;
+	boost::mutex mutex; //boost::mutex is more efficient than boost::shared_mutex
 };
 
-//Container must at least has the following functions:
+//Container must at least has the following functions (like list):
 // Container() and Container(size_t) constructor
-// size (must be thread safe, but doesn't have to be coherent, std::list before gcc 5 doesn't meet this requirement, boost::container::list always does)
+// size (must be thread safe, but doesn't have to be coherent, std::list before gcc 5 doesn't meet this requirement, boost::container::list does)
 // empty (must be thread safe, but doesn't have to be coherent)
 // clear
 // swap
@@ -56,7 +58,7 @@ private:
 // front
 // back
 // pop_front
-template<typename T, typename Container, typename Lockable>
+template<typename T, typename Container, typename Lockable> //thread safety depends on Container or Lockable
 class queue : public Container, public Lockable
 {
 public:
@@ -65,9 +67,11 @@ public:
 	queue() {}
 	queue(size_t capacity) : Container(capacity) {}
 
+	bool is_thread_safe() const {return Lockable::is_lockable();}
 	using Container::size;
-	using Container::clear;
-	using Container::swap;
+	using Container::empty;
+	void clear() {typename Lockable::lock_guard lock(*this); Container::clear();}
+	void swap(Container& other) {typename Lockable::lock_guard lock(*this); Container::swap(other);}
 
 	//thread safe
 	bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
@@ -82,7 +86,7 @@ public:
 	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); return true;}
 };
 
-template<typename T, typename Container> class non_lock_queue : public queue<T, Container, dummy_lockable> //totally not thread safe
+template<typename T, typename Container> class non_lock_queue : public queue<T, Container, dummy_lockable> //thread safety depends on Container
 {
 public:
 	non_lock_queue() {}

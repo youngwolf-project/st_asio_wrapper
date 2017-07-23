@@ -142,7 +142,7 @@ protected:
 
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
 	{
-		if ((boost::asio::error::operation_aborted != ec || need_reconnect) && !ST_THIS stopped())
+		if (ST_THIS started() && (boost::asio::error::operation_aborted != ec || need_reconnect) && !ST_THIS stopped())
 		{
 #ifdef _WIN32
 			if (boost::asio::error::connection_refused != ec && boost::asio::error::network_unreachable != ec && boost::asio::error::timed_out != ec)
