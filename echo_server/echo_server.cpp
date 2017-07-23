@@ -10,6 +10,8 @@
 #define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 //#define ST_ASIO_USE_STEADY_TIMER
 //#define ST_ASIO_USE_SYSTEM_TIMER
+#define ST_ASIO_AVOID_AUTO_STOP_SERVICE
+#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //#define ST_ASIO_MAX_MSG_NUM		16
 //if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_MSG_NUM macro.
 //please think about if we have 512 links, how much memory we can accupy at most with default ST_ASIO_MAX_MSG_NUM?
@@ -48,6 +50,8 @@ using namespace st_asio_wrapper::ext::tcp;
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
 #define LIST_STATUS		"status"
+#define INCREASE_THREAD	"increase_thread"
+#define DECREASE_THREAD	"decrease_thread"
 
 //demonstrate how to use custom packer
 //under the default behavior, each tcp::socket has their own packer, and cause memory waste
@@ -250,6 +254,10 @@ int main(int argc, const char* argv[])
 			puts("clients from echo server:");
 			echo_server_.list_all_object();
 		}
+		else if (INCREASE_THREAD == str)
+			sp.add_service_thread(1);
+		else if (DECREASE_THREAD == str)
+			sp.del_service_thread(1);
 		else
 		{
 //			/*

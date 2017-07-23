@@ -1,19 +1,20 @@
 /*
- * connector.h
- *
- *  Created on: 2012-3-2
- *      Author: youngwolf
- *		email: mail2tao@163.com
- *		QQ: 676218192
- *		Community on QQ: 198941541
- *
- * this class only used at client endpoint
- */
+* alias.h
+*
+*  Created on: 2017-7-17
+*      Author: youngwolf
+*		email: mail2tao@163.com
+*		QQ: 676218192
+*		Community on QQ: 198941541
+*
+* some alias, they are deprecated.
+*/
 
-#ifndef ST_ASIO_CONNECTOR_H_
-#define ST_ASIO_CONNECTOR_H_
+#ifndef ST_ASIO_TCP_ALIAS_H_
+#define ST_ASIO_TCP_ALIAS_H_
 
 #include "client_socket.h"
+#include "client.h"
 
 namespace st_asio_wrapper { namespace tcp {
 
@@ -30,6 +31,12 @@ public:
 	template<typename Arg> connector_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg) {}
 };
 
+template<typename Socket, typename Pool = object_pool<Socket> > class client_base : public multi_client_base<Socket, Pool>
+{
+public:
+	client_base(service_pump& service_pump_) : multi_client_base<Socket, Pool>(service_pump_) {}
+};
+
 }} //namespace
 
-#endif /* ST_ASIO_CONNECTOR_H_ */
+#endif /* ST_ASIO_TCP_ALIAS_H_ */

@@ -11,6 +11,8 @@
 #define ST_ASIO_CLEAR_OBJECT_INTERVAL 1
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
+#define ST_ASIO_AVOID_AUTO_STOP_SERVICE
+#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //#define ST_ASIO_MAX_MSG_NUM		16
 //if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_MSG_NUM macro.
 //please think about if we have 512 links, how much memory we can accupy at most with default ST_ASIO_MAX_MSG_NUM?
@@ -53,6 +55,8 @@ using namespace st_asio_wrapper::ext::tcp;
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
 #define LIST_STATUS		"status"
+#define INCREASE_THREAD	"increase_thread"
+#define DECREASE_THREAD	"decrease_thread"
 
 static bool check_msg;
 
@@ -159,10 +163,10 @@ private:
 	size_t recv_index, msg_num;
 };
 
-class echo_client : public client_base<echo_socket>
+class echo_client : public multi_client_base<echo_socket>
 {
 public:
-	echo_client(service_pump& service_pump_) : client_base<echo_socket>(service_pump_) {}
+	echo_client(service_pump& service_pump_) : multi_client_base<echo_socket>(service_pump_) {}
 
 	boost::uint64_t get_recv_bytes()
 	{
@@ -465,6 +469,10 @@ int main(int argc, const char* argv[])
 			sp.stop_service();
 			sp.start_service(thread_num);
 		}
+		else if (INCREASE_THREAD == str)
+			sp.add_service_thread(1);
+		else if (DECREASE_THREAD == str)
+			sp.del_service_thread(1);
 		else
 		{
 			if ('+' == str[0] || '-' == str[0])

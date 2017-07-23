@@ -12,9 +12,9 @@
  * license: www.boost.org/LICENSE_1_0.txt
  *
  * Known issues:
- * 1. since 1.2.0, with boost-1.49, compatible edition's st_object::is_last_async_call() cannot work properly, it is because before asio calling any callbacks, it copied
- *    the callback(not a good behaviour), this cause st_object::is_last_async_call() never return true, so objects in st_object_pool can never be reused or freed.
- *    To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro.
+ * 1. since 1.2.0, with boost-1.49, compatible edition's st_object::is_last_async_call() cannot work properly, it is because before asio calling any callbacks,
+ *    it copied the callback(not a good behaviour), this cause st_object::is_last_async_call() never return true, so objects in st_object_pool can never be reused
+ *    or freed. To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro.
  *    BTW, boost-1.61 and standard edition even with boost-1.49 don't have such issue, I'm not sure in which edition, asio fixed this defect,
  *    if you have other versions, please help me to find out the minimum version via the following steps:
  *     1. Compile demo asio_server and test_client;
@@ -25,6 +25,8 @@
  * 2. since 1.3.5 until 1.4, heartbeat function cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
  * 3. since 1.3.5 until 1.4, UDP doesn't support heartbeat because UDP doesn't support OOB data.
  * 4. since 1.3.5 until 1.4, SSL doesn't support heartbeat because SSL doesn't support OOB data.
+ * 5. with old openssl (at least 0.9.7), ssl::client_socket_base and ssl_server_socket_base are not reuable, i'm not sure in which version,
+ *    they became available, seems it's 1.0.0.
  *
  * change log:
  * 2012.7.7
@@ -241,17 +243,49 @@
  * Use mutable_buffer and const_buffer instead of mutable_buffers_1 and const_buffers_1 if possible, this can gain some performance improvement.
  * Call force_shutdown instead of graceful_shutdown in tcp::client_base::uninit().
  *
+ * ===============================================================
+ * 2017.7.23	version 2.0.1
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * i_server has been moved from st_asio_wrapper to st_asio_wrapper::tcp.
+ *
+ * HIGHLIGHT:
+ * Support decreasing (increasing already supported) the number of service thread at runtime by defining ST_ASIO_DECREASE_THREAD_AT_RUNTIME macro,
+ *  suggest to define ST_ASIO_AVOID_AUTO_STOP_SERVICE macro too.
+ *
+ * FIX:
+ * Always directly shutdown ssl::client_socket_base if macro ST_ASIO_REUSE_SSL_STREAM been defined.
+ * Make queue::clear and swap thread-safe if possible.
+ *
+ * ENHANCEMENTS:
+ * Optimized and simplified auto_buffer, shared_buffer and ext::basic_buffer.
+ * Optimized class obj_with_begin_time.
+ * Not use sending buffer (send_msg_buffer) if possible.
+ * Reduced stopped() invocation (because it needs locks).
+ * Introduced boost::asio::io_service::work (boost::asio::executor_work_guard) by defining ST_ASIO_AVOID_AUTO_STOP_SERVICE macro.
+ * Add function service_pump::service_thread_num to fetch the real number of service thread (must define ST_ASIO__DECREASE_THREAD_AT_RUNTIME macro).
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ * Move all deprecated classes (connector_base, client_base, service_base) to alias.h
+ * Refactor the mechanism of message sending.
+ *
+ * REPLACEMENTS:
+ * Rename tcp::client_base to tcp::multi_client_base, ext::tcp::client to ext::tcp::multi_client, udp::service_base to udp::multi_service_base,
+ *  ext::udp::service to ext::udp::multi_service. Old ones are still available, but have became alias.
+ *
  */
 
-#ifndef ST_CONFIG_H_
-#define ST_CONFIG_H_
+#ifndef ST_ASIO_CONFIG_H_
+#define ST_ASIO_CONFIG_H_
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1200)
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20000	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.0.0"
+#define ST_ASIO_VER		20001	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.0.1"
 
 //boost and compiler check
 #ifdef _MSC_VER
@@ -259,8 +293,8 @@
 	#define ST_THIS //workaround to make up the BOOST_AUTO's defect under vc2008 and compiler bugs before vc2012
 	#define ST_ASIO_LLF "%I64u" //format used to print 'uint_fast64_t'
 
-	#if _MSC_VER >= 1700
-		#pragma message("Your compiler is Visual C++ 11.0 or higher, you can use ascs to gain some performance improvement.")
+	#if _MSC_VER >= 1800
+		#pragma message("Your compiler is Visual C++ 12.0 (2013) or higher, you can use ascs to gain some performance improvement.")
 	#endif
 #elif defined(__GNUC__)
 	#define ST_ASIO_SF "%zu" //format used to print 'size_t'
@@ -322,7 +356,7 @@
 //don't write any logs.
 //#define ST_ASIO_NO_UNIFIED_OUT
 
-//if defined, service_pump will catch exceptions for asio::io_service::run().
+//if defined, service_pump will catch exceptions for boost::asio::io_service::run().
 //#define ST_ASIO_ENHANCED_STABILITY
 
 //if defined, boost::asio::steady_timer will be used in st_asio_wrapper::timer.
@@ -492,9 +526,15 @@
 
 //#define ST_ASIO_REUSE_SSL_STREAM
 //if you need ssl::client_socket_base to be able to reconnect the server, or to open object pool in ssl::object_pool, you must define this macro.
-//I tried many ways, onle one way can make asio::ssl::stream reusable, which is:
+//I tried many ways, onle one way can make boost::asio::ssl::stream reusable, which is:
 // don't call any shutdown functions of boost::asio::ssl::stream, just call boost::asio::ip::tcp::socket's shutdown function,
 // this seems not a normal procedure, but it works, I believe that asio's defect caused this problem.
+
+//#define ST_ASIO_AVOID_AUTO_STOP_SERVICE
+//wrap service_pump with asio::io_service::work (asio::executor_work_guard), then it will never run out
+
+//#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+//enable decreasing service thread at runtime.
 //configurations
 
-#endif /* ST_CONFIG_H_ */
+#endif /* ST_ASIO_CONFIG_H_ */

@@ -12,6 +12,7 @@
 #define ST_ASIO_MSG_BUFFER_SIZE	65536
 #define ST_ASIO_INPUT_QUEUE non_lock_queue //we will never operate sending buffer concurrently, so need no locks.
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
+#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //configuration
 
 #include "../include/ext/tcp.h"
@@ -22,6 +23,8 @@ using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
 #define LIST_STATUS		"status"
+#define INCREASE_THREAD	"increase_thread"
+#define DECREASE_THREAD	"decrease_thread"
 
 boost::timer::cpu_timer begin_time;
 #if BOOST_VERSION >= 105300
@@ -112,10 +115,10 @@ private:
 	boost::uint64_t total_bytes, send_bytes, recv_bytes;
 };
 
-class echo_client : public client_base<echo_socket>
+class echo_client : public multi_client_base<echo_socket>
 {
 public:
-	echo_client(service_pump& service_pump_) : client_base<echo_socket>(service_pump_) {}
+	echo_client(service_pump& service_pump_) : multi_client_base<echo_socket>(service_pump_) {}
 
 	statistic get_statistic()
 	{
@@ -175,6 +178,10 @@ int main(int argc, const char* argv[])
 			puts("");
 			puts(client.get_statistic().to_string().data());
 		}
+		else if (INCREASE_THREAD == str)
+			sp.add_service_thread(1);
+		else if (DECREASE_THREAD == str)
+			sp.del_service_thread(1);
 		else if (!str.empty())
 		{
 			size_t msg_num = 1024;
