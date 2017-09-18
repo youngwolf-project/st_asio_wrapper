@@ -78,20 +78,7 @@ public:
 	}
 
 protected:
-	virtual bool do_start()
-	{
-		ST_THIS status = super::CONNECTED;
-		ST_THIS last_recv_time = time(NULL);
-#if ST_ASIO_HEARTBEAT_INTERVAL > 0
-		ST_THIS start_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);
-#endif
-		ST_THIS send_msg(); //send buffer may have msgs, send them
-		ST_THIS do_recv_msg();
-
-		return true;
-	}
-
-	virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); ST_THIS force_shutdown();}
+	virtual void on_unpack_error() {unified_out::error_out("can not unpack msg."); force_shutdown();}
 	//do not forget to force_shutdown this socket(in del_socket(), there's a force_shutdown() invocation)
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{

@@ -33,14 +33,14 @@ private:
 	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	socket_base(boost::asio::io_service& io_service_) : super(io_service_), unpacker_(boost::make_shared<Unpacker>()) {}
+	socket_base(boost::asio::io_context& io_context_) : super(io_context_), unpacker_(boost::make_shared<Unpacker>()) {}
 
 	virtual bool is_ready() {return ST_THIS lowest_layer().is_open();}
 	virtual void send_heartbeat()
 	{
 		in_msg_type msg(peer_addr);
-		this->packer_->pack_heartbeat(msg);
-		this->do_direct_send_msg(msg);
+		ST_THIS packer_->pack_heartbeat(msg);
+		ST_THIS do_direct_send_msg(msg);
 	}
 
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
@@ -108,17 +108,6 @@ public:
 	void show_info(const char* head, const char* tail) const {unified_out::info_out("%s %s:%hu %s", head, local_addr.address().to_string().data(), local_addr.port(), tail);}
 
 protected:
-	virtual bool do_start()
-	{
-		this->last_recv_time = time(NULL);
-#if ST_ASIO_HEARTBEAT_INTERVAL > 0
-		this->start_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);
-#endif
-		do_recv_msg();
-
-		return true;
-	}
-
 	//send message with sync mode
 	//return -1 means error occurred, otherwise the number of bytes been sent
 	size_t do_sync_send_msg(typename Packer::msg_ctype& msg) {return do_sync_send_msg(peer_addr, msg);}
@@ -178,7 +167,7 @@ protected:
 
 	virtual bool on_heartbeat_error()
 	{
-		this->last_recv_time = time(NULL); //avoid repetitive warnings
+		ST_THIS stat.last_recv_time = time(NULL); //avoid repetitive warnings
 		unified_out::warning_out("%s:%hu is not available", peer_addr.address().to_string().data(), peer_addr.port());
 		return true;
 	}
@@ -209,7 +198,7 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			ST_THIS last_recv_time = time(NULL);
+			ST_THIS stat.last_recv_time = time(NULL);
 
 			out_msg_type msg(temp_addr);
 			unpacker_->parse_msg(msg, bytes_transferred);
@@ -233,7 +222,7 @@ private:
 	{
 		if (!ec)
 		{
-			ST_THIS last_send_time = time(NULL);
+			ST_THIS stat.last_send_time = time(NULL);
 
 			ST_THIS stat.send_byte_sum += bytes_transferred;
 			++ST_THIS stat.send_msg_sum;

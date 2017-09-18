@@ -293,13 +293,29 @@ struct statistic
 	static stat_time local_time() {return stat_time();}
 	typedef dummy_duration stat_duration;
 #endif
-	statistic() : send_msg_sum(0), send_byte_sum(0), recv_msg_sum(0), recv_byte_sum(0) {}
-	void reset()
+	statistic() {reset_number();}
+
+	void reset_number()
 	{
-		send_msg_sum = send_byte_sum = 0;
+		send_msg_sum = 0;
+		send_byte_sum = 0;
+
+		recv_msg_sum = 0;
+		recv_byte_sum = 0;
+
+		last_send_time = 0;
+		last_recv_time = 0;
+
+		establish_time = 0;
+		break_time = 0;
+	}
+
+#ifdef ST_ASIO_FULL_STATISTIC
+	void reset() {reset_number(); reset_duration();}
+	void reset_duration()
+	{
 		send_delay_sum = send_time_sum = pack_time_sum = stat_duration();
 
-		recv_msg_sum = recv_byte_sum = 0;
 		dispatch_dealy_sum = recv_idle_sum = stat_duration();
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 		handle_time_1_sum = stat_duration();
@@ -307,6 +323,9 @@ struct statistic
 		handle_time_2_sum = stat_duration();
 		unpack_time_sum = stat_duration();
 	}
+#else
+	void reset() {reset_number();}
+#endif
 
 	statistic& operator+=(const struct statistic& other)
 	{
@@ -379,6 +398,12 @@ struct statistic
 #endif
 	stat_duration handle_time_2_sum; //on_msg_handle consumed time, this indicate the efficiency of msg handling
 	stat_duration unpack_time_sum; //udp::socket_base will not gather this item
+
+	time_t last_send_time; //include heartbeat
+	time_t last_recv_time; //include heartbeat
+
+	time_t establish_time; //time of link establishment
+	time_t break_time; //time of link broken
 };
 
 class auto_duration

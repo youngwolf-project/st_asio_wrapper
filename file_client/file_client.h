@@ -23,7 +23,7 @@ extern fl_type file_size;
 class file_socket : public base_socket, public client_socket
 {
 public:
-	file_socket(boost::asio::io_service& io_service_) : client_socket(io_service_), index(-1) {}
+	file_socket(boost::asio::io_context& io_context_) : client_socket(io_context_), index(-1) {}
 	virtual ~file_socket() {clear();}
 
 	//reset all, be ensure that there's no any operations performed on this file_socket when invoke it

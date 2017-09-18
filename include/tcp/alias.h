@@ -27,8 +27,8 @@ private:
 	typedef client_socket_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	connector_base(boost::asio::io_service& io_service_) : super(io_service_) {}
-	template<typename Arg> connector_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg) {}
+	connector_base(boost::asio::io_context& io_context_) : super(io_context_) {}
+	template<typename Arg> connector_base(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {}
 };
 
 template<typename Socket, typename Pool = object_pool<Socket> > class client_base : public multi_client_base<Socket, Pool>

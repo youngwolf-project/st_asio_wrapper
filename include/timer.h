@@ -55,18 +55,19 @@ public:
 		enum timer_status {TIMER_FAKE, TIMER_OK, TIMER_CANCELED};
 
 		tid id;
+		unsigned char seq;
 		timer_status status;
 		size_t interval_ms;
 		boost::function<bool (tid)> call_back; //return true from call_back to continue the timer, or the timer will stop
 		boost::shared_ptr<timer_type> timer;
 
-		timer_info() : id(0), status(TIMER_FAKE), interval_ms(0) {}
+		timer_info() : seq(-1), status(TIMER_FAKE), interval_ms(0) {}
 	};
 
 	typedef const timer_info timer_cinfo;
 	typedef std::vector<timer_info> container_type;
 
-	timer(boost::asio::io_service& _io_service_) : object(_io_service_), timer_can(256)
+	timer(boost::asio::io_context& io_context_) : object(io_context_), timer_can((tid) -1)
 		{tid id = -1; do_something_to_all(boost::lambda::bind(&timer_info::id, boost::lambda::_1) = ++boost::lambda::var(id));}
 
 	//after this call, call_back cannot be used again, please note.
@@ -75,7 +76,7 @@ public:
 		timer_info& ti = timer_can[id];
 
 		if (timer_info::TIMER_FAKE == ti.status)
-			ti.timer = boost::make_shared<timer_type>(boost::ref(io_service_));
+			ti.timer = boost::make_shared<timer_type>(boost::ref(io_context_));
 		ti.status = timer_info::TIMER_OK;
 		ti.interval_ms = interval;
 		ti.call_back.swap(call_back);
@@ -133,7 +134,7 @@ protected:
 #else
 		ti.timer->expires_from_now(milliseconds(ti.interval_ms));
 #endif
-		ti.timer->async_wait(make_handler_error(boost::bind(&timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti))));
+		ti.timer->async_wait(make_handler_error(boost::bind(&timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti), ++ti.seq)));
 	}
 
 	void stop_timer(timer_info& ti)
@@ -145,12 +146,12 @@ protected:
 		}
 	}
 
-	void timer_handler(const boost::system::error_code& ec, timer_info& ti)
+	void timer_handler(const boost::system::error_code& ec, timer_info& ti, unsigned char prev_seq)
 	{
 		//return true from call_back to continue the timer, or the timer will stop
 		if (!ec && ti.call_back(ti.id) && timer_info::TIMER_OK == ti.status)
 			start_timer(ti);
-		else
+		else if (prev_seq == ti.seq) //exclude a particular situation--start the same timer in call_back and return false
 			ti.status = timer_info::TIMER_CANCELED;
 	}
 
@@ -158,7 +159,7 @@ protected:
 	container_type timer_can;
 
 private:
-	using object::io_service_;
+	using object::io_context_;
 };
 
 } //namespace
