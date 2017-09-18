@@ -212,7 +212,7 @@ private:
 		}
 #ifdef _MSC_VER
 		else if (boost::asio::error::connection_refused == ec || boost::asio::error::connection_reset == ec)
-			do_start();
+			do_recv_msg();
 #endif
 		else
 			on_recv_error(ec);
