@@ -41,14 +41,6 @@ class echo_server : public server_base<echo_socket>
 public:
 	echo_server(service_pump& service_pump_) : server_base<echo_socket>(service_pump_) {}
 
-	statistic get_statistic()
-	{
-		statistic stat;
-		do_something_to_all(stat += boost::lambda::bind(&echo_socket::get_statistic, *boost::lambda::_1));
-
-		return stat;
-	}
-
 protected:
 	virtual bool on_accept(object_ctype& socket_ptr) {boost::asio::ip::tcp::no_delay option(true); socket_ptr->lowest_layer().set_option(option); return true;}
 };

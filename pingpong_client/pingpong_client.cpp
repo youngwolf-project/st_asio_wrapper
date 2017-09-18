@@ -55,7 +55,7 @@ atomic<unsigned short> completed_session_num;
 class echo_socket : public client_socket
 {
 public:
-	echo_socket(boost::asio::io_service& io_service_) : client_socket(io_service_) {}
+	echo_socket(boost::asio::io_context& io_context_) : client_socket(io_context_) {}
 
 	void begin(size_t msg_num, const char* msg, size_t msg_len)
 	{
@@ -119,14 +119,6 @@ class echo_client : public multi_client_base<echo_socket>
 {
 public:
 	echo_client(service_pump& service_pump_) : multi_client_base<echo_socket>(service_pump_) {}
-
-	statistic get_statistic()
-	{
-		statistic stat;
-		do_something_to_all(stat += boost::lambda::bind(&echo_socket::get_statistic, *boost::lambda::_1));
-
-		return stat;
-	}
 
 	void begin(size_t msg_num, const char* msg, size_t msg_len) {do_something_to_all(boost::bind(&echo_socket::begin, _1, msg_num, msg, msg_len));}
 };

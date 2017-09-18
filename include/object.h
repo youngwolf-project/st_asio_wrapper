@@ -26,16 +26,17 @@ protected:
 	virtual ~object() {}
 
 public:
-	bool stopped() const {return io_service_.stopped();}
+	bool stopped() const {return io_context_.stopped();}
 
 #if 0 == ST_ASIO_DELAY_CLOSE
 	typedef boost::function<void(const boost::system::error_code&)> handler_with_error;
 	typedef boost::function<void(const boost::system::error_code&, size_t)> handler_with_error_size;
 
 	#if BOOST_ASIO_VERSION >= 101100
-	void post(const boost::function<void()>& handler) {boost::asio::post(io_service_, (async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	void post(const boost::function<void()>& handler) {boost::asio::post(io_context_, (async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	void defer(const boost::function<void()>& handler) {boost::asio::defer(io_context_, (async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler))));}
 	#else
-	void post(const boost::function<void()>& handler) {io_service_.post((async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	void post(const boost::function<void()>& handler) {io_context_.post((async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler))));}
 	#endif
 
 	handler_with_error make_handler_error(const handler_with_error& handler) const {return (async_call_indicator, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1));}
@@ -47,13 +48,14 @@ public:
 	inline void set_async_calling(bool) {}
 
 protected:
-	object(boost::asio::io_service& _io_service_) : async_call_indicator(boost::make_shared<char>('\0')), io_service_(_io_service_) {}
+	object(boost::asio::io_context& _io_context_) : async_call_indicator(boost::make_shared<char>('\0')), io_context_(_io_context_) {}
 	boost::shared_ptr<char> async_call_indicator;
 #else
 	#if BOOST_ASIO_VERSION >= 101100
-	template<typename F> void post(const F& handler) {boost::asio::post(io_service_, handler);}
+	template<typename F> void post(const F& handler) {boost::asio::post(io_context_, handler);}
+	template<typename F> void defer(const F& handler) {boost::asio::defer(io_context_, handler);}
 	#else
-	template<typename F> void post(const F& handler) {io_service_.post(handler);}
+	template<typename F> void post(const F& handler) {io_context_.post(handler);}
 	#endif
 
 	template<typename F> inline const F& make_handler_error(const F& f) const {return f;}
@@ -64,11 +66,11 @@ protected:
 	inline void set_async_calling(bool value) {async_calling = value;}
 
 protected:
-	object(boost::asio::io_service& _io_service_) : async_calling(false), io_service_(_io_service_) {}
+	object(boost::asio::io_context& _io_context_) : async_calling(false), io_context_(_io_context_) {}
 	bool async_calling;
 #endif
 
-	boost::asio::io_service& io_service_;
+	boost::asio::io_context& io_context_;
 };
 
 } //namespace

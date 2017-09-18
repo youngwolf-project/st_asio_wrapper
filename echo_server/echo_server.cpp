@@ -156,14 +156,6 @@ class echo_server : public echo_server_base
 public:
 	echo_server(service_pump& service_pump_) : echo_server_base(service_pump_) {}
 
-	statistic get_statistic()
-	{
-		statistic stat;
-		do_something_to_all(stat += boost::lambda::bind(&echo_socket::get_statistic, *boost::lambda::_1));
-
-		return stat;
-	}
-
 	//from i_echo_server, pure virtual function, we must implement it.
 	virtual void test() {/*puts("in echo_server::test()");*/}
 };

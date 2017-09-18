@@ -34,8 +34,8 @@ private:
 protected:
 	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN};
 
-	socket_base(boost::asio::io_service& io_service_) : super(io_service_) {first_init();}
-	template<typename Arg> socket_base(boost::asio::io_service& io_service_, Arg& arg) : super(io_service_, arg) {first_init();}
+	socket_base(boost::asio::io_context& io_context_) : super(io_context_) {first_init();}
+	template<typename Arg> socket_base(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {first_init();}
 
 	//helper function, just call it in constructor
 	void first_init() {status = BROKEN; unpacker_ = boost::make_shared<Unpacker>();}
@@ -141,6 +141,15 @@ protected:
 		return ec ? -1 : send_size;
 	}
 
+	virtual bool do_start()
+	{
+		status = CONNECTED;
+		ST_THIS stat.establish_time = time(NULL);
+
+		on_connect(); //in this virtual function, this->stat.last_recv_time has not been updated, please note
+		return super::do_start();
+	}
+
 	//return false if send buffer is empty
 	virtual bool do_send_msg()
 	{
@@ -196,6 +205,7 @@ protected:
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
+	virtual void on_connect() {}
 	//msg can not be unpacked
 	//the link is still available, so don't need to shutdown this tcp::socket_base at both client and server endpoint
 	virtual void on_unpack_error() = 0;
@@ -225,7 +235,7 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			ST_THIS last_recv_time = time(NULL);
+			ST_THIS stat.last_recv_time = time(NULL);
 
 			typename Unpacker::container_type temp_msg_can;
 			auto_duration dur(ST_THIS stat.unpack_time_sum);
@@ -257,7 +267,7 @@ private:
 	{
 		if (!ec)
 		{
-			ST_THIS last_send_time = time(NULL);
+			ST_THIS stat.last_send_time = time(NULL);
 
 			ST_THIS stat.send_byte_sum += bytes_transferred;
 			if (last_send_msg.empty()) //send message with sync mode
@@ -294,7 +304,7 @@ private:
 
 	bool async_shutdown_handler(size_t loop_num)
 	{
-		if (GRACEFUL_SHUTTING_DOWN == ST_THIS status)
+		if (GRACEFUL_SHUTTING_DOWN == status)
 		{
 			--loop_num;
 			if (loop_num > 0)

@@ -18,7 +18,7 @@
 namespace st_asio_wrapper
 {
 
-class service_pump : public boost::asio::io_service
+class service_pump : public boost::asio::io_context
 {
 public:
 	class i_service
@@ -61,7 +61,18 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::container::list<object_type> container_type;
 
-	service_pump() : started(false), real_thread_num(0), del_thread_num(0), del_thread_req(false) {}
+	service_pump() : started(false)
+#ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+		, real_thread_num(0), del_thread_num(0), del_thread_req(false)
+#endif
+#ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
+#if BOOST_ASIO_VERSION >= 101100
+		, work(boost::asio::make_work_guard(boost::ref(*this)))
+#else
+		, work(boost::make_shared<boost::asio::io_service::work>(boost::ref(*this)))
+#endif
+#endif
+	{}
 	virtual ~service_pump() {stop_service();}
 
 	object_type find(int id)
@@ -167,13 +178,6 @@ public:
 protected:
 	void do_service(int thread_num)
 	{
-#ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
-#if ASIO_VERSION >= 101100
-		work = boost::make_shared<boost::asio::executor_work_guard<executor_type>>(get_executor());
-#else
-		work = boost::make_shared<boost::asio::io_service::work>(boost::ref(*this));
-#endif
-#endif
 		started = true;
 		unified_out::info_out("service pump started.");
 
@@ -191,8 +195,9 @@ protected:
 		service_threads.join_all();
 
 		started = false;
-		del_thread_num.store(0, boost::memory_order_relaxed);
-
+#ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+		del_thread_num = 0;
+#endif
 		unified_out::info_out("service pump end.");
 	}
 
@@ -217,8 +222,9 @@ protected:
 	size_t run()
 	{
 		size_t n = 0;
-		std::stringstream os;
+		boost::unique_lock<boost::mutex> lock(del_thread_mutex, boost::defer_lock);
 
+		std::stringstream os;
 		os << "service thread[" << boost::this_thread::get_id() << "] begin.";
 		unified_out::info_out(os.str().data());
 		++real_thread_num;
@@ -226,21 +232,27 @@ protected:
 		{
 			if (del_thread_req)
 			{
-				if (del_thread_num.fetch_sub(1, boost::memory_order_relaxed) > 0)
-					break;
+				if (--del_thread_num >= 0)
+				{
+					lock.lock();
+					if (real_thread_num > 1)
+						break;
+					else
+						lock.unlock();
+				}
 				else
 				{
 					del_thread_req = false;
-					del_thread_num.fetch_add(1, boost::memory_order_relaxed);
+					++del_thread_num;
 				}
 			}
 
 			//we cannot always decrease service thread timely (because run_one can block).
 			size_t this_n = 0;
 #ifdef ST_ASIO_ENHANCED_STABILITY
-			try {this_n = boost::asio::io_service::run_one();} catch (const boost::system::system_error& e) {if (!on_exception(e)) break;}
+			try {this_n = boost::asio::io_context::run_one();} catch (const boost::system::system_error& e) {if (!on_exception(e)) break;}
 #else
-			this_n = boost::asio::io_service::run_one();
+			this_n = boost::asio::io_context::run_one();
 #endif
 			if (this_n > 0)
 				n += this_n; //n can overflow, please note.
@@ -248,14 +260,15 @@ protected:
 				break;
 		}
 		--real_thread_num;
-		os.str(""); os << "service thread[" << boost::this_thread::get_id() << "] end.";
+		os.str("");
+		os << "service thread[" << boost::this_thread::get_id() << "] end.";
 		unified_out::info_out(os.str().data());
 
 		return n;
 	}
 #else
 #ifdef ST_ASIO_ENHANCED_STABILITY
-	size_t run() {while (true) {try {return boost::asio::io_service::run();} catch (const boost::system::system_error& e) {if (!on_exception(e)) return 0;}}}
+	size_t run() {while (true) {try {return boost::asio::io_context::run();} catch (const boost::system::system_error& e) {if (!on_exception(e)) return 0;}}}
 #endif
 #endif
 
@@ -273,18 +286,20 @@ private:
 
 protected:
 	bool started;
-
 	container_type service_can;
 	boost::mutex service_can_mutex;
-
 	boost::thread_group service_threads;
+
+#ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 	atomic_int_fast32_t real_thread_num;
 	atomic_int_fast32_t del_thread_num;
+	boost::mutex del_thread_mutex;
 	bool del_thread_req;
+#endif
 
 #ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
 #if ASIO_VERSION >= 101100
-	boost::shared_ptr<boost::asio::executor_work_guard<executor_type>> work;
+	boost::asio::executor_work_guard<executor_type> work;
 #else
 	boost::shared_ptr<boost::asio::io_service::work> work;
 #endif

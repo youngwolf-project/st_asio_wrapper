@@ -100,44 +100,28 @@ protected:
 	{
 		assert(object_ptr && !object_ptr->is_equal_to(-1));
 
-		boost::unique_lock<boost::mutex> lock(invalid_object_can_mutex);
-		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&Object::is_equal_to, _1, id)));
-		//cannot use invalid_object_pop(boost::uint_fast64_t), it's too arbitrary
-		if (iter != invalid_object_can.end() && (*iter).unique() && (*iter)->obsoleted())
+		BOOST_AUTO(old_object_ptr, invalid_object_pop(id));
+		if (old_object_ptr)
 		{
-			BOOST_AUTO(invalid_object_ptr, *iter);
-			invalid_object_can.erase(iter);
-			lock.unlock();
-
 			assert(!find(id));
 
 			boost::lock_guard<boost::mutex> lock(object_can_mutex);
 			object_can.erase(object_ptr->id());
 			object_ptr->id(id);
 			object_can.emplace(id, object_ptr); //must succeed
-
-			return invalid_object_ptr;
 		}
 
-		return object_type();
+		return old_object_ptr;
 	}
 
 #if defined(ST_ASIO_REUSE_OBJECT) && !defined(ST_ASIO_RESTORE_OBJECT)
 	object_type reuse_object()
 	{
-		boost::unique_lock<boost::mutex> lock(invalid_object_can_mutex);
-		for (BOOST_AUTO(iter, invalid_object_can.begin()); iter != invalid_object_can.end(); ++iter)
-			if ((*iter).unique() && (*iter)->obsoleted())
-			{
-				BOOST_AUTO(object_ptr, *iter);
-				invalid_object_can.erase(iter);
-				lock.unlock();
+		BOOST_AUTO(object_ptr, invalid_object_pop());
+		if (object_ptr)
+			object_ptr->reset();
 
-				object_ptr->reset();
-				return object_ptr;
-			}
-
-		return object_type();
+		return object_ptr;
 	}
 
 	template<typename Arg>
@@ -236,7 +220,7 @@ public:
 	{
 		boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
 		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&Object::is_equal_to, _1, id)));
-		if (iter != invalid_object_can.end())
+		if (iter != invalid_object_can.end() && (*iter).unique() && (*iter)->obsoleted())
 		{
 			BOOST_AUTO(object_ptr, *iter);
 			invalid_object_can.erase(iter);
@@ -245,7 +229,19 @@ public:
 		return object_type();
 	}
 
-	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}
+	//this method has linear complexity, please note.
+	object_type invalid_object_pop()
+	{
+		boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
+		for (BOOST_AUTO(iter, invalid_object_can.begin()); iter != invalid_object_can.end(); ++iter)
+			if ((*iter).unique() && (*iter)->obsoleted())
+			{
+				BOOST_AUTO(object_ptr, *iter);
+				invalid_object_can.erase(iter);
+				return object_ptr;
+			}
+		return object_type();
+	}
 
 	//Kick out obsoleted objects
 	//Consider the following assumptions:
@@ -281,7 +277,7 @@ public:
 
 	//free a specific number of objects
 	//if you used object pool(define ST_ASIO_REUSE_OBJECT or ST_ASIO_RESTORE_OBJECT), you can manually call this function to free some objects
-	// after the object pool(invalid_object_size()) goes big enough for memory saving (because the objects in invalid_object_can
+	// after the object pool(invalid_object_size()) gets big enough for memory saving (because the objects in invalid_object_can
 	// are waiting for reusing and will never be freed).
 	//if you don't used object pool, object_pool will invoke this function automatically and periodically, so you don't need to invoke this function exactly
 	//return affected object number.
@@ -307,6 +303,9 @@ public:
 		return num_affected;
 	}
 
+	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}
+	statistic get_statistic() {statistic stat; do_something_to_all(stat += boost::lambda::bind(&Object::get_statistic, *boost::lambda::_1)); return stat;}
+
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred)
 		{boost::lock_guard<boost::mutex> lock(object_can_mutex); for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter) __pred(iter->second);}
 
@@ -321,7 +320,7 @@ protected:
 	size_t max_size_;
 
 	//because all objects are dynamic created and stored in object_can, maybe when receiving error occur
-	//(you are recommended to delete the object from object_can, for example via i_server::del_socket), some other asynchronous calls are still queued in boost::asio::io_service,
+	//(you are recommended to delete the object from object_can, for example via i_server::del_socket), some other asynchronous calls are still queued in boost::asio::io_context,
 	//and will be dequeued in the future, we must guarantee these objects not be freed from the heap or reused, so we move these objects from object_can to invalid_object_can,
 	//and free them from the heap or reuse them in the near future.
 	//if ST_ASIO_CLEAR_OBJECT_INTERVAL been defined, clear_obsoleted_object() will be invoked automatically and periodically to move all invalid objects into invalid_object_can.
