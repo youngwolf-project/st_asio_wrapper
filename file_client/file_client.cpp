@@ -18,13 +18,13 @@
 #define RESTART_COMMAND	"restart"
 #define REQUEST_FILE	"get"
 
-#if BOOST_VERSION >= 105300
-boost::atomic_ushort completed_client_num;
-#else
-atomic<unsigned short> completed_client_num;
-#endif
 int link_num = 1;
 fl_type file_size;
+#if BOOST_VERSION >= 105300
+boost::atomic_int_fast64_t received_size;
+#else
+atomic<boost::int_fast64_t> received_size;
+#endif
 
 int main(int argc, const char* argv[])
 {
@@ -72,23 +72,12 @@ int main(int argc, const char* argv[])
 			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
 			for (BOOST_AUTO(iter, tok.begin()); iter != tok.end(); ++iter)
 			{
-				completed_client_num = 0;
-				file_size = 0;
+				file_size = -1;
+				received_size = 0;
 
-				printf("transfer %s begin.\n", iter->data());
-				if (client.find(0)->get_file(*iter))
-				{
-					client.do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t (file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
-						boost::lambda::bind(&file_socket::get_file, *boost::lambda::_1, *iter)));
-					client.start();
-
-					while (completed_client_num != (unsigned short) link_num)
+				if (client.get_file(*iter))
+					while (client.is_transferring())
 						boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
-
-					client.stop(*iter);
-				}
-				else
-					printf("transfer %s failed!\n", iter->data());
 			}
 		}
 		else

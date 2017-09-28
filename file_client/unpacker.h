@@ -7,6 +7,12 @@ using namespace st_asio_wrapper::tcp;
 
 #include "../file_server/common.h"
 
+#if BOOST_VERSION >= 105300
+extern boost::atomic_int_fast64_t received_size;
+#else
+extern atomic<boost::int_fast64_t> received_size;
+#endif
+
 class data_unpacker : public i_unpacker<replaceable_buffer>
 {
 public:
@@ -19,13 +25,12 @@ public:
 	}
 	~data_unpacker() {delete[] buffer;}
 
-	fl_type get_rest_size() const {return _data_len;}
-
 	virtual void reset() {_file = NULL; delete[] buffer; buffer = NULL; _data_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		assert(_data_len >= (fl_type) bytes_transferred && bytes_transferred > 0);
 		_data_len -= bytes_transferred;
+		received_size += bytes_transferred;
 
 		if (bytes_transferred != fwrite(buffer, 1, bytes_transferred, _file))
 		{
