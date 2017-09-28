@@ -12,13 +12,13 @@ using namespace st_asio_wrapper::ext::tcp;
 
 #include "unpacker.h"
 
-#if BOOST_VERSION >= 105300
-extern boost::atomic_ushort completed_client_num;
-#else
-extern atomic<unsigned short> completed_client_num;
-#endif
 extern int link_num;
 extern fl_type file_size;
+#if BOOST_VERSION >= 105300
+extern boost::atomic_int_fast64_t received_size;
+#else
+extern atomic<boost::int_fast64_t> received_size;
+#endif
 
 class file_socket : public base_socket, public client_socket
 {
@@ -30,13 +30,6 @@ public:
 	virtual void reset() {clear(); client_socket::reset();}
 
 	void set_index(int index_) {index = index_;}
-	fl_type get_rest_size() const
-	{
-		BOOST_AUTO(up, boost::dynamic_pointer_cast<const data_unpacker>(unpacker()));
-		return up ? up->get_rest_size() : 0;
-	}
-	operator fl_type() const {return get_rest_size();}
-
 	bool get_file(const std::string& file_name)
 	{
 		assert(!file_name.empty());
@@ -109,7 +102,7 @@ private:
 
 		unpacker(boost::make_shared<ST_ASIO_DEFAULT_UNPACKER>());
 	}
-	void trans_end() {clear(); ++completed_client_num;}
+	void trans_end() {clear();}
 
 	void handle_msg(out_msg_ctype& msg)
 	{
@@ -188,28 +181,28 @@ public:
 
 	file_client(service_pump& service_pump_) : multi_client_base<file_socket>(service_pump_) {}
 
-	void start()
+	bool is_transferring() const {return is_timer(UPDATE_PROGRESS);}
+	bool get_file(const std::string& file_name)
 	{
-		begin_time.start();
-		set_timer(UPDATE_PROGRESS, 50, boost::bind(&file_client::update_progress_handler, this, _1, -1));
-	}
+		if (is_transferring())
+			printf("file transfer is ongoing for file %s", file_name.data());
+		else
+		{
+			printf("transfer %s begin.\n", file_name.data());
+			if (find(0)->get_file(file_name))
+			{
+				do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t (file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
+					boost::lambda::bind(&file_socket::get_file, *boost::lambda::_1, file_name)));
+				begin_time.start();
+				set_timer(UPDATE_PROGRESS, 50, boost::bind(&file_client::update_progress_handler, this, _1, -1));
 
-	void stop(const std::string& file_name)
-	{
-		stop_timer(UPDATE_PROGRESS);
-		update_progress_handler(UPDATE_PROGRESS, 0);
+				return true;
+			}
+			else
+				printf("transfer %s failed!\n", file_name.data());
+		}
 
-		double used_time = (double) begin_time.elapsed().wall / 1000000000;
-		printf("\ntransfer %s end, speed: %f MBps.\n", file_name.data(), file_size / used_time / 1024 / 1024);
-	}
-
-	fl_type get_total_rest_size()
-	{
-		fl_type total_rest_size = 0;
-		do_something_to_all(total_rest_size += *boost::lambda::_1);
-//		do_something_to_all(total_rest_size += boost::lambda::bind(&file_socket::get_rest_size, *boost::lambda::_1));
-
-		return total_rest_size;
+		return false;
 	}
 
 private:
@@ -217,17 +210,26 @@ private:
 	{
 		assert(UPDATE_PROGRESS == id);
 
-		fl_type total_rest_size = get_total_rest_size();
-		unsigned new_percent = (unsigned) ((file_size - total_rest_size) * 100 / file_size);
-		if (last_percent != new_percent)
+		if (file_size < 0)
+			return true;
+		else if (file_size > 0)
 		{
-			printf("\r%u%%", new_percent);
-			fflush(stdout);
+			unsigned new_percent = (unsigned) (received_size * 100 / file_size);
+			if (last_percent != new_percent)
+			{
+				printf("\r%u%%", new_percent);
+				fflush(stdout);
 
-			ST_THIS update_timer_info(id, 50, boost::bind(&file_client::update_progress_handler, this, _1, new_percent));
+				update_timer_info(id, 50, boost::bind(&file_client::update_progress_handler, this, _1, new_percent));
+			}
 		}
 
-		return total_rest_size > 0;
+		if (received_size < file_size)
+			return true;
+
+		double used_time = (double) begin_time.elapsed().wall / 1000000000;
+		printf("\r100%%\nend, speed: %f MBps.\n", file_size / used_time / 1024 / 1024);
+		return false;
 	}
 
 protected:

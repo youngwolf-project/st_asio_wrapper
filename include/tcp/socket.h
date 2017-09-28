@@ -188,9 +188,9 @@ protected:
 
 	virtual bool do_send_msg(in_msg_type& msg)
 	{
-		BOOST_AUTO(buf, ST_ASIO_SEND_BUFFER_TYPE(msg.data(), msg.size()));
-		last_send_msg.emplace_back(boost::ref(msg));
-		boost::asio::async_write(ST_THIS next_layer(), buf,
+		last_send_msg.emplace_back();
+		last_send_msg.back().swap(msg);
+		boost::asio::async_write(ST_THIS next_layer(), ST_ASIO_SEND_BUFFER_TYPE(last_send_msg.back().data(), last_send_msg.back().size()),
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		return true;
 	}
