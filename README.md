@@ -6,21 +6,22 @@ st_asio_wrapper is an asynchronous c/s framework based on Boost.Asio, besides al
 1. Based on message just like UDP with several couple of build-in packer and unpacker;</br>
 2. Support packer and unpacker customization, and replacing packer and unpacker at run-time;</br>
 3. Automatically reconnect to the server after link broken;</br>
-4. Widely support timers;</br>
-5. Support object pool, object reusing;</br>
+4. Support object pool, object reusing and restoration;</br>
+5. Worker thread management;</br>
 6. Support message buffer;</br>
-7. Support ssl;</br>
-8. Support TCP/UDP.</br>
+7. Widely support timers;</br>
+8. Support TCP/UDP;</br>
+9. Support ssl;</br>
 
 Quick start:
 -
 ### server:
 Derive your own socket from `server_socket_base`, you must at least re-write the `on_msg` or `on_msg_handle` virtual function and handle messages in it;</br>
-Create a `service_pump` object, create a `server_base` object, call `service_pump::start_service`;</br>
+Create a `service_pump` object, create a `server_base<your_socket>` object, call `service_pump::start_service`;</br>
 Call `server_socket_base::send_msg` when you have messages need to send.</br>
 ### client:
 Derive your own socket from `client_socket_base`, you must at least re-write the `on_msg` or `on_msg_handle` virtual function and handle messages in it;</br>
-Create a `service_pump` object, create a `tcp::client_base` object, set server address via `client_socket_base::set_server_addr`, call `service_pump::start_service`;</br>
+Create a `service_pump` object, create a `multi_client_base<your_socket>` object, add some socket via `multi_client_base::add_socket`, call `service_pump::start_service`;</br>
 Call `client_socket_base::send_msg` when you have messages need to send.</br>
 
 Directory structure:
