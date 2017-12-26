@@ -13,18 +13,19 @@ else
 	dir = release
 endif
 cflag += -DBOOST_ASIO_NO_DEPRECATED
+common_libs = -lboost_system -lboost_thread -lboost_chrono
 
 kernel = ${shell uname -s}
 ifeq (${kernel}, SunOS)
 cflag += -pthreads ${ext_cflag} ${boost_include_dir}
-lflag += -pthreads -lsocket -lnsl ${boost_lib_dir} -lboost_system -lboost_thread ${ext_libs}
+lflag += -pthreads -lsocket -lnsl ${boost_lib_dir} ${common_libs} ${ext_libs}
 else
 ifeq (${kernel}, FreeBSD)
 cflag += -pthread ${ext_cflag} ${boost_include_dir}
-lflag += -pthread ${boost_lib_dir} -lboost_system -lboost_thread -lboost_atomic ${ext_libs}
+lflag += -pthread ${boost_lib_dir} ${common_libs} -lboost_atomic ${ext_libs}
 else # here maybe still have other kernels need to be separated out
 cflag += -pthread ${ext_cflag} ${boost_include_dir}
-lflag += -pthread ${boost_lib_dir} -lboost_system -lboost_thread ${ext_libs}
+lflag += -pthread ${boost_lib_dir} ${common_libs} ${ext_libs}
 endif
 endif
 

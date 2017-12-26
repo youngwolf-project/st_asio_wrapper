@@ -54,6 +54,9 @@ protected:
 	{
 		assert(object_ptr && !object_ptr->is_equal_to(-1));
 
+		if (!object_ptr)
+			return false;
+
 		boost::lock_guard<boost::mutex> lock(object_can_mutex);
 		return object_can.size() < max_size_ ? object_can.emplace(object_ptr->id(), object_ptr).second : false;
 	}
@@ -71,7 +74,7 @@ protected:
 		if (exist)
 		{
 			boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
-			invalid_object_can.emplace_back(object_ptr);
+			try {invalid_object_can.emplace_back(object_ptr);} catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what());}
 		}
 
 		return exist;
@@ -114,6 +117,20 @@ protected:
 		return old_object_ptr;
 	}
 
+#define CREATE_OBJECT_1_ARG(first_way) \
+BOOST_AUTO(object_ptr, first_way()); \
+if (!object_ptr) \
+	try {object_ptr = boost::make_shared<Object>(arg);} catch (const std::exception& e) {unified_out::error_out("cannot create object (%s)", e.what());} \
+init_object(object_ptr); \
+return object_ptr;
+
+#define CREATE_OBJECT_2_ARG(first_way) \
+BOOST_AUTO(object_ptr, first_way()); \
+if (!object_ptr) \
+	try {object_ptr = boost::make_shared<Object>(arg1, arg2);} catch (const std::exception& e) {unified_out::error_out("cannot create object (%s)", e.what());} \
+init_object(object_ptr); \
+return object_ptr;
+
 #if defined(ST_ASIO_REUSE_OBJECT) && !defined(ST_ASIO_RESTORE_OBJECT)
 	object_type reuse_object()
 	{
@@ -124,46 +141,14 @@ protected:
 		return object_ptr;
 	}
 
-	template<typename Arg>
-	object_type create_object(Arg& arg)
-	{
-		BOOST_AUTO(object_ptr, reuse_object());
-		if (!object_ptr)
-			object_ptr = boost::make_shared<Object>(arg);
-
-		init_object(object_ptr);
-		return object_ptr;
-	}
-
-	template<typename Arg1, typename Arg2>
-	object_type create_object(Arg1& arg1, Arg2& arg2)
-	{
-		BOOST_AUTO(object_ptr, reuse_object());
-		if (!object_ptr)
-			object_ptr = boost::make_shared<Object>(arg1, arg2);
-
-		init_object(object_ptr);
-		return object_ptr;
-	}
+	template<typename Arg> object_type create_object(Arg& arg) {CREATE_OBJECT_1_ARG(reuse_object);}
+	template<typename Arg1, typename Arg2> object_type create_object(Arg1& arg1, Arg2& arg2) {CREATE_OBJECT_2_ARG(reuse_object);}
 #else
-	template<typename Arg>
-	object_type create_object(Arg& arg)
-	{
-		BOOST_AUTO(object_ptr, boost::make_shared<Object>(arg));
-		init_object(object_ptr);
-		return object_ptr;
-	}
-
-	template<typename Arg1, typename Arg2>
-	object_type create_object(Arg1& arg1, Arg2& arg2)
-	{
-		BOOST_AUTO(object_ptr, boost::make_shared<Object>(arg1, arg2));
-		init_object(object_ptr);
-		return object_ptr;
-	}
+	template<typename Arg> object_type create_object(Arg& arg) {CREATE_OBJECT_1_ARG(object_type);}
+	template<typename Arg1, typename Arg2> object_type create_object(Arg1& arg1, Arg2& arg2) {CREATE_OBJECT_2_ARG(object_type);}
 #endif
 
-	object_type create_object() {return create_object(boost::ref(sp));}
+	object_type create_object() {return create_object(boost::ref(get_service_pump()));}
 
 public:
 	//to configure unordered_set(for example, set factor or reserved size), not thread safe, so must be called before service_pump startup.
@@ -256,7 +241,7 @@ public:
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
 			if (iter->second->obsoleted())
 			{
-				objects.emplace_back(iter->second);
+				try {objects.emplace_back(iter->second);} catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what());}
 				iter = object_can.erase(iter);
 			}
 			else

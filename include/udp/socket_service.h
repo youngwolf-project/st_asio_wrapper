@@ -36,8 +36,13 @@ public:
 	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = std::string())
 	{
 		BOOST_AUTO(socket_ptr, ST_THIS create_object());
-		socket_ptr->set_local_addr(port, ip);
-		return ST_THIS add_socket(socket_ptr) ? socket_ptr : typename Pool::object_type();
+		if (!socket_ptr)
+			return typename Pool::object_type();
+		else
+		{
+			socket_ptr->set_local_addr(port, ip);
+			return ST_THIS add_socket(socket_ptr) ? socket_ptr : typename Pool::object_type();
+		}
 	}
 
 	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function

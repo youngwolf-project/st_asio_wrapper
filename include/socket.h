@@ -366,7 +366,7 @@ protected:
 		{
 			scope_atomic_lock<> lock(send_atomic);
 			if (!sending && lock.locked())
-				return sending = true;
+				return (sending = true);
 		}
 
 		return false;
@@ -378,7 +378,7 @@ protected:
 		{
 			scope_atomic_lock<> lock(dispatch_atomic);
 			if (!dispatching && lock.locked())
-				return dispatching = true;
+				return (dispatching = true);
 		}
 
 		return false;

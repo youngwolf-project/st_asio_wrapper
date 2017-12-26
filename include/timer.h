@@ -71,21 +71,24 @@ public:
 		{tid id = -1; do_something_to_all(boost::lambda::bind(&timer_info::id, boost::lambda::_1) = ++boost::lambda::var(id));}
 
 	//after this call, call_back cannot be used again, please note.
-	void update_timer_info(tid id, size_t interval, boost::function<bool(tid)>& call_back, bool start = false)
+	bool update_timer_info(tid id, size_t interval, boost::function<bool(tid)>& call_back, bool start = false)
 	{
 		timer_info& ti = timer_can[id];
 
 		if (timer_info::TIMER_FAKE == ti.status)
-			ti.timer = boost::make_shared<timer_type>(boost::ref(io_context_));
+			try {ti.timer = boost::make_shared<timer_type>(boost::ref(io_context_));}
+			catch (const std::exception& e) {unified_out::error_out("cannot create timer %d (%s)", ti.id, e.what()); return false;}
 		ti.status = timer_info::TIMER_OK;
 		ti.interval_ms = interval;
 		ti.call_back.swap(call_back);
 
 		if (start)
 			start_timer(ti);
+
+		return true;
 	}
-	void update_timer_info(tid id, size_t interval, const boost::function<bool (tid)>& call_back, bool start = false)
-		{BOOST_AUTO(unused, call_back); update_timer_info(id, interval, unused, start);}
+	bool update_timer_info(tid id, size_t interval, const boost::function<bool (tid)>& call_back, bool start = false)
+		{BOOST_AUTO(unused, call_back); return update_timer_info(id, interval, unused, start);}
 
 	void change_timer_status(tid id, timer_info::timer_status status) {timer_can[id].status = status;}
 	void change_timer_interval(tid id, size_t interval) {timer_can[id].interval_ms = interval;}
@@ -95,8 +98,8 @@ public:
 	void change_timer_call_back(tid id, const boost::function<bool(tid)>& call_back) {BOOST_AUTO(unused, call_back); change_timer_call_back(id, unused);}
 
 	//after this call, call_back cannot be used again, please note.
-	void set_timer(tid id, size_t interval, boost::function<bool(tid)>& call_back) {update_timer_info(id, interval, call_back, true);}
-	void set_timer(tid id, size_t interval, const boost::function<bool(tid)>& call_back) {update_timer_info(id, interval, call_back, true);}
+	bool set_timer(tid id, size_t interval, boost::function<bool(tid)>& call_back) {return update_timer_info(id, interval, call_back, true);}
+	bool set_timer(tid id, size_t interval, const boost::function<bool(tid)>& call_back) {return update_timer_info(id, interval, call_back, true);}
 
 	bool start_timer(tid id)
 	{
@@ -129,7 +132,7 @@ protected:
 	{
 		assert(timer_info::TIMER_OK == ti.status);
 
-#if BOOST_ASIO_VERSION >= 101100
+#if BOOST_ASIO_VERSION >= 101100 && (defined(ST_ASIO_USE_STEADY_TIMER) || defined(ST_ASIO_USE_SYSTEM_TIMER))
 		ti.timer->expires_after(milliseconds(ti.interval_ms));
 #else
 		ti.timer->expires_from_now(milliseconds(ti.interval_ms));
@@ -141,7 +144,7 @@ protected:
 	{
 		if (timer_info::TIMER_OK == ti.status) //enable stopping timers that has been stopped
 		{
-			try {ti.timer->cancel();} catch (const boost::system::system_error& e) {}
+			try {ti.timer->cancel();} catch (const boost::system::system_error& e) {unified_out::error_out("cannot stop timer %d (%d %s)", ti.id, e.code().value(), e.what());}
 			ti.status = timer_info::TIMER_CANCELED;
 		}
 	}

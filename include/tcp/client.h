@@ -53,8 +53,13 @@ public:
 	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
 	{
 		BOOST_AUTO(socket_ptr, ST_THIS create_object());
-		socket_ptr->set_server_addr(port, ip);
-		return ST_THIS add_socket(socket_ptr, false) ? socket_ptr : typename Pool::object_type();
+		if (!socket_ptr)
+			return typename Pool::object_type();
+		else
+		{
+			socket_ptr->set_server_addr(port, ip);
+			return ST_THIS add_socket(socket_ptr, false) ? socket_ptr : typename Pool::object_type();
+		}
 	}
 
 	///////////////////////////////////////////////////

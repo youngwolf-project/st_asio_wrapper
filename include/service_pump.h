@@ -63,11 +63,11 @@ public:
 
 	service_pump() : started(false)
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-		, real_thread_num(0), del_thread_num(0), del_thread_req(false)
+		, real_thread_num(0), del_thread_num(0)
 #endif
 #ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
 #if BOOST_ASIO_VERSION >= 101100
-		, work(boost::asio::make_work_guard(boost::ref(*this)))
+		, work(get_executor())
 #else
 		, work(boost::make_shared<boost::asio::io_service::work>(boost::ref(*this)))
 #endif
@@ -171,8 +171,8 @@ public:
 
 	void add_service_thread(int thread_num) {for (int i = 0; i < thread_num; ++i) service_threads.create_thread(boost::bind(&service_pump::run, this));}
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-	void del_service_thread(int thread_num) {if (thread_num > 0) {del_thread_num.fetch_add(thread_num, boost::memory_order_relaxed); del_thread_req = true;}}
-	int service_thread_num() const {return real_thread_num.load(boost::memory_order_relaxed);}
+	void del_service_thread(int thread_num) {if (thread_num > 0) {del_thread_num += thread_num;}}
+	int service_thread_num() const {return real_thread_num;}
 #endif
 
 protected:
@@ -222,7 +222,6 @@ protected:
 	size_t run()
 	{
 		size_t n = 0;
-		boost::unique_lock<boost::mutex> lock(del_thread_mutex, boost::defer_lock);
 
 		std::stringstream os;
 		os << "service thread[" << boost::this_thread::get_id() << "] begin.";
@@ -230,21 +229,17 @@ protected:
 		++real_thread_num;
 		while (true)
 		{
-			if (del_thread_req)
+			if (del_thread_num > 0)
 			{
 				if (--del_thread_num >= 0)
 				{
-					lock.lock();
-					if (real_thread_num > 1)
+					if (--real_thread_num > 0) //forbid to stop all service thread
 						break;
 					else
-						lock.unlock();
+						++real_thread_num;
 				}
 				else
-				{
-					del_thread_req = false;
 					++del_thread_num;
-				}
 			}
 
 			//we cannot always decrease service thread timely (because run_one can block).
@@ -257,9 +252,11 @@ protected:
 			if (this_n > 0)
 				n += this_n; //n can overflow, please note.
 			else
+			{
+				--real_thread_num;
 				break;
+			}
 		}
-		--real_thread_num;
 		os.str("");
 		os << "service thread[" << boost::this_thread::get_id() << "] end.";
 		unified_out::info_out(os.str().data());
@@ -293,12 +290,10 @@ protected:
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 	atomic_int_fast32_t real_thread_num;
 	atomic_int_fast32_t del_thread_num;
-	boost::mutex del_thread_mutex;
-	bool del_thread_req;
 #endif
 
 #ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
-#if ASIO_VERSION >= 101100
+#if BOOST_ASIO_VERSION >= 101100
 	boost::asio::executor_work_guard<executor_type> work;
 #else
 	boost::shared_ptr<boost::asio::io_service::work> work;

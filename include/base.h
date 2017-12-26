@@ -93,8 +93,8 @@ private:
 	atomic_type& atomic;
 };
 
-class service_pump;
 class object;
+class service_pump;
 namespace tcp
 {
 	class i_server

@@ -355,7 +355,7 @@ void send_msg_concurrently(echo_client& client, size_t send_thread_num, size_t m
 	begin_time.stop();
 
 	double used_time = (double) begin_time.elapsed().wall / 1000000000;
-	printf(" finished in %f seconds, speed: %f(*2) MBps.\n", used_time, total_msg_bytes / used_time / 1024 / 1024);
+	printf(" finished in %f seconds, TPS: %f(*2), speed: %f(*2) MBps.\n", used_time, link_num * msg_num / used_time, total_msg_bytes / used_time / 1024 / 1024);
 }
 
 static bool is_testing;

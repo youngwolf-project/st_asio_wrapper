@@ -108,7 +108,7 @@ protected:
 	{
 		//the type of tcp::server_socket_base::server now can be controlled by derived class(echo_socket),
 		//which is actually i_echo_server, so, we can invoke i_echo_server::test virtual function.
-		server.test();
+		get_server().test();
 		echo_socket_base::on_recv_error(ec);
 	}
 
@@ -171,14 +171,9 @@ public:
 	normal_socket(i_server& server_) : normal_socket_base(server_) {}
 
 protected:
-	virtual bool do_start()
-	{
-		//demo client needs heartbeat (macro ST_ASIO_HEARTBEAT_INTERVAL been defined), pleae note that the interval (here is 5) must be equal to
-		//macro ST_ASIO_HEARTBEAT_INTERVAL defined in demo client, and macro ST_ASIO_HEARTBEAT_MAX_ABSENCE must has the same value as demo client's.
-		start_heartbeat(5);
-
-		return normal_socket_base::do_start();
-	}
+	//demo client needs heartbeat (macro ST_ASIO_HEARTBEAT_INTERVAL been defined), pleae note that the interval (here is 5) must be equal to
+	//macro ST_ASIO_HEARTBEAT_INTERVAL defined in demo client, and macro ST_ASIO_HEARTBEAT_MAX_ABSENCE must has the same value as demo client's.
+	virtual void on_connect() {start_heartbeat(5);}
 };
 #endif
 

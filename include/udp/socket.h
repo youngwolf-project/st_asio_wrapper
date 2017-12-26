@@ -142,7 +142,7 @@ protected:
 
 	virtual bool do_send_msg(in_msg_type& msg)
 	{
-		last_send_msg.swap(msg);
+		last_send_msg = msg;
 		boost::lock_guard<boost::mutex> lock(shutdown_mutex);
 		ST_THIS next_layer().async_send_to(ST_ASIO_SEND_BUFFER_TYPE(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr,
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));

@@ -62,7 +62,7 @@ public:
 	void force_shutdown(bool reconnect = false)
 	{
 		if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
-			show_info("client link:", "been shut down.");
+			ST_THIS show_info("client link:", "been shut down.");
 
 		need_reconnect = reconnect;
 		super::force_shutdown();
@@ -77,26 +77,10 @@ public:
 		if (ST_THIS is_broken())
 			return force_shutdown(reconnect);
 		else if (!ST_THIS is_shutting_down())
-			show_info("client link:", "being shut down gracefully.");
+			ST_THIS show_info("client link:", "being shut down gracefully.");
 
 		need_reconnect = reconnect;
 		super::graceful_shutdown(sync);
-	}
-
-	void show_info(const char* head, const char* tail) const
-	{
-		boost::system::error_code ec;
-		BOOST_AUTO(ep, ST_THIS lowest_layer().local_endpoint(ec));
-		if (!ec)
-			unified_out::info_out("%s %s:%hu %s", head, ep.address().to_string().data(), ep.port(), tail);
-	}
-
-	void show_info(const char* head, const char* tail, const boost::system::error_code& ec) const
-	{
-		boost::system::error_code ec2;
-		BOOST_AUTO(ep, ST_THIS lowest_layer().local_endpoint(ec2));
-		if (!ec2)
-			unified_out::info_out("%s %s:%hu %s (%d %s)", head, ep.address().to_string().data(), ep.port(), tail, ec.value(), ec.message().data());
 	}
 
 protected:
@@ -122,7 +106,7 @@ protected:
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_shutdown();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
-		show_info("client link:", "broken/been shut down", ec);
+		ST_THIS show_info("client link:", "broken/been shut down", ec);
 
 		force_shutdown(ST_THIS is_shutting_down() ? need_reconnect : prepare_reconnect(ec) >= 0);
 		ST_THIS status = super::BROKEN;
@@ -131,7 +115,7 @@ protected:
 	virtual void on_async_shutdown_error() {force_shutdown(need_reconnect);}
 	virtual bool on_heartbeat_error()
 	{
-		show_info("client link:", "broke unexpectedly.");
+		ST_THIS show_info("client link:", "broke unexpectedly.");
 		force_shutdown(ST_THIS is_shutting_down() ? need_reconnect : prepare_reconnect(boost::system::error_code(boost::asio::error::network_down)) >= 0);
 		return false;
 	}

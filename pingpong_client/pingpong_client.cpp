@@ -201,7 +201,7 @@ int main(int argc, const char* argv[])
 
 			boost::uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
 			double used_time = (double) begin_time.elapsed().wall / 1000000000;
-			printf("finished in %f seconds, speed: %f(*2) MBps.\n", used_time, total_msg_bytes / used_time / 1024 / 1024);
+			printf("finished in %f seconds, TPS: %f(*2), speed: %f(*2) MBps.\n", used_time, link_num * msg_num / used_time, total_msg_bytes / used_time / 1024 / 1024);
 
 			delete[] init_msg;
 		}

@@ -15,11 +15,11 @@
 
 #include <boost/asio/ssl.hpp>
 
-#include "../../object_pool.h"
-#include "../client_socket.h"
 #include "../client.h"
-#include "../server_socket.h"
 #include "../server.h"
+#include "../client_socket.h"
+#include "../server_socket.h"
+#include "../../object_pool.h"
 
 namespace st_asio_wrapper { namespace ssl {
 
@@ -157,9 +157,8 @@ public:
 	object_pool(service_pump& service_pump_, boost::asio::ssl::context::method m) : super(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& context() {return ctx;}
 
-	typename object_pool::object_type create_object() {return create_object(boost::ref(ST_THIS sp));}
-	template<typename Arg>
-	typename object_pool::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
+	typename object_pool::object_type create_object() {return create_object(boost::ref(ST_THIS get_service_pump()));}
+	template<typename Arg> typename object_pool::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
 
 protected:
 	boost::asio::ssl::context ctx;
@@ -200,7 +199,7 @@ private:
 		if (!ec)
 			super::do_start(); //return to tcp::server_socket_base::do_start
 		else
-			this->server.del_socket(ST_THIS shared_from_this());
+			this->get_server().del_socket(ST_THIS shared_from_this());
 	}
 };
 
