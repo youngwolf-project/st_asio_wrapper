@@ -62,13 +62,13 @@ protected:
 			set_async_calling(false);
 		}
 
-		clear_buffer();
+		stat.reset();
 		packer_->reset();
 		sending = false;
 		dispatching = false;
-		congestion_controlling = false;
-		stat.reset();
 		recv_idle_began = false;
+		congestion_controlling = false;
+		clear_buffer();
 	}
 
 	void clear_buffer()
@@ -121,7 +121,7 @@ public:
 	}
 
 	//interval's unit is second
-	//if macro ST_ASIO_HEARTBEAT_INTERVAL is bigger than zero, subclass will call start_heartbeat automatically with interval equal to ST_ASIO_HEARTBEAT_INTERVAL,
+	//if macro ST_ASIO_HEARTBEAT_INTERVAL been defined and is bigger than zero, start_heartbeat will be called automatically with interval equal to ST_ASIO_HEARTBEAT_INTERVAL,
 	//and max_absence equal to ST_ASIO_HEARTBEAT_MAX_ABSENCE (so check_heartbeat will be called regularly). otherwise, you can call check_heartbeat with you own logic.
 	//return false for timeout (timeout check will only be performed on valid links), otherwise true (even the link has not established yet).
 	bool check_heartbeat(int interval, int max_absence = ST_ASIO_HEARTBEAT_MAX_ABSENCE)
@@ -204,7 +204,7 @@ protected:
 	virtual bool do_send_msg() = 0;
 	virtual bool do_send_msg(InMsgType& msg) = 0; //after this call, msg becomes empty, please note.
 	virtual void do_recv_msg() = 0;
-	//socket will guarantee not call these 4 functions in more than one thread concurrently.
+	//socket will guarantee not call these 4 functions (include do_start()) in more than one thread concurrently.
 
 	//generally, you don't have to rewrite this to maintain the status of connections (TCP)
 	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
@@ -212,10 +212,11 @@ protected:
 	virtual bool on_heartbeat_error() = 0; //heartbeat timed out, return true to continue heartbeat function (useful for UDP)
 
 	//if ST_ASIO_DELAY_CLOSE is equal to zero, in this callback, socket guarantee that there's no any other async call associated it,
-	// include user timers(created by set_timer()) and user async calls(started via post()), this means you can clean up any resource
+	// include user timers(created by set_timer()) and user async calls(started via post() or defer()), this means you can clean up any resource
 	// in this socket except this socket itself, because this socket maybe is being maintained by object_pool.
 	//otherwise (bigger than zero), socket simply call this callback ST_ASIO_DELAY_CLOSE seconds later after link down, no any guarantees.
 	virtual void on_close() {unified_out::info_out("on_close()");}
+	virtual void after_close() {} //a good case for using this is to reconnect to the server, please refer to client_socket_base.
 
 #ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 	//if you want to use your own receive buffer, you can move the msg to your own receive buffer, then handle them as your own strategy(may be you'll need a msg dispatch thread),
@@ -269,7 +270,10 @@ protected:
 		}
 
 		if (stopped())
+		{
 			on_close();
+			after_close();
+		}
 		else
 		{
 			set_async_calling(true);
@@ -413,6 +417,7 @@ private:
 			}
 			change_timer_status(TIMER_DELAY_CLOSE, timer_info::TIMER_CANCELED);
 			on_close();
+			after_close();
 			set_async_calling(false);
 			break;
 		default:

@@ -356,6 +356,26 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2018.4.17	version 2.0.5
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * Do reconnecting in client_socket_base::after_close rather in client_socket_base::on_close.
+ *
+ * HIGHLIGHT:
+ *
+ * FIX:
+ * Reconnectiong may happen in st_asio_wrapper::socket::reset, it's not a right behavior.
+ *
+ * ENHANCEMENTS:
+ * Add st_asio_wrapper::socket::after_close virtual function, a good case for using it is to reconnect to the server in client_socket_base.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -365,8 +385,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20004	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.0.4"
+#define ST_ASIO_VER		20005	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.0.5"
 
 //boost and compiler check
 #ifdef _MSC_VER
