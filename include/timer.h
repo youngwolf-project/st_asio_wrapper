@@ -19,7 +19,7 @@
 #include <boost/asio/system_timer.hpp>
 #endif
 
-#include "object.h"
+#include "base.h"
 
 //If you inherit a class from class X, your own timer ids must begin from X::TIMER_END
 namespace st_asio_wrapper
@@ -33,7 +33,8 @@ namespace st_asio_wrapper
 //for same timer object: same timer, on_timer is called in sequence
 //for same timer object: distinct timer, on_timer is called concurrently
 //for distinct timer object: on_timer is always called concurrently
-class timer : public object
+template<typename Executor>
+class timer : public Executor
 {
 public:
 #ifdef ST_ASIO_USE_STEADY_TIMER
@@ -67,7 +68,7 @@ public:
 	typedef const timer_info timer_cinfo;
 	typedef std::vector<timer_info> container_type;
 
-	timer(boost::asio::io_context& io_context_) : object(io_context_), timer_can((tid) -1)
+	timer(boost::asio::io_context& io_context_) : Executor(io_context_), timer_can((tid) -1)
 		{tid id = -1; do_something_to_all(boost::lambda::bind(&timer_info::id, boost::lambda::_1) = ++boost::lambda::var(id));}
 
 	//after this call, call_back cannot be used again, please note.
@@ -90,7 +91,7 @@ public:
 	bool update_timer_info(tid id, size_t interval, const boost::function<bool (tid)>& call_back, bool start = false)
 		{BOOST_AUTO(unused, call_back); return update_timer_info(id, interval, unused, start);}
 
-	void change_timer_status(tid id, timer_info::timer_status status) {timer_can[id].status = status;}
+	void change_timer_status(tid id, typename timer_info::timer_status status) {timer_can[id].status = status;}
 	void change_timer_interval(tid id, size_t interval) {timer_can[id].interval_ms = interval;}
 
 	//after this call, call_back cannot be used again, please note.
@@ -137,7 +138,7 @@ protected:
 #else
 		ti.timer->expires_from_now(milliseconds(ti.interval_ms));
 #endif
-		ti.timer->async_wait(make_handler_error(boost::bind(&timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti), ++ti.seq)));
+		ti.timer->async_wait(ST_THIS make_handler_error(boost::bind(&timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti), ++ti.seq)));
 	}
 
 	void stop_timer(timer_info& ti)
@@ -158,11 +159,9 @@ protected:
 			ti.status = timer_info::TIMER_CANCELED;
 	}
 
-protected:
-	container_type timer_can;
-
 private:
-	using object::io_context_;
+	container_type timer_can;
+	using Executor::io_context_;
 };
 
 } //namespace

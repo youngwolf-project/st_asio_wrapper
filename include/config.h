@@ -357,7 +357,7 @@
  * REPLACEMENTS:
  *
  * ===============================================================
- * 2018.4.17	version 2.0.5
+ * 2018.4.18	version 2.0.5
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Do reconnecting in client_socket_base::after_close rather in client_socket_base::on_close.
@@ -376,6 +376,41 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2018.4.x	version 2.1.0
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * Not support sync sending mode anymore.
+ * Explicitly need macro ST_ASIO_RECV_AFTER_HANDLING to gain the ability of changing the unpacker at runtime.
+ * Function disconnect, force_shutdown and graceful_shutdown in udp::socket_base will now be performed asynchronously.
+ * Not support macro ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER anymore, which means now we have the behavior as this macro always defined,
+ *  thus, virtual function st_asio_wrapper::socket::on_msg() is useless and also has been deleted.
+ * statistic.handle_time_2_sum has been renamed to handle_time_sum.
+ *
+ * HIGHLIGHT:
+ * Because of introduction of asio::io_context::strand (which is required, see FIX section for more details), we wiped two atomic in st_asio_wrapper::socket.
+ *
+ * FIX:
+ * Wiped race condition between async_read and async_write on the same st_asio_wrapper::socket, so sync sending mode will not be supported anymore.
+ *
+ * ENHANCEMENTS:
+ * Explicitly define macro ST_ASIO_RECV_AFTER_HANDLING to gain the ability of changing the unpacker at runtime.
+ *
+ * DELETION:
+ * Deleted virtual function bool st_asio_wrapper::socket::on_msg().
+ * Not support sync sending mode anymore, so we reduced an atomic object in st_asio_wrapper::socket.
+ *
+ * REFACTORING:
+ * If you want to change unpacker at runtime, first, you must define macro ST_ASIO_RECV_AFTER_HANDLING, second, you must call st_asio_wrapper::socket::recv_msg and
+ *  guarantee only zero or one recv_msg invocation (include initiating and asynchronous operation, this may need mutex, please carefully design your logic),
+ *  see file_client for more details.
+ * Class object has been split into executor and tracked_executor, object_pool use the former, and st_asio_wrapper::socket use the latter.
+ *
+ * REPLACEMENTS:
+ * Renamed macro ST_ASIO_MSG_HANDLING_INTERVAL_STEP1 to ST_ASIO_MSG_RESUMING_INTERVAL.
+ * Renamed macro ST_ASIO_MSG_HANDLING_INTERVAL_STEP2 to ST_ASIO_MSG_HANDLING_INTERVAL.
+ * Renamed statistic.handle_time_2_sum to handle_time_sum.
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -385,8 +420,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20005	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.0.5"
+#define ST_ASIO_VER		20100	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.1.0"
 
 //boost and compiler check
 #ifdef _MSC_VER
@@ -480,9 +515,6 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 
 //full statistic include time consumption, or only numerable informations will be gathered
 //#define ST_ASIO_FULL_STATISTIC
-
-//when got some msgs, not call on_msg(), but asynchronously dispatch them, on_msg_handle() will be called later.
-//#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 
 //after every msg sent, call st_asio_wrapper::socket::on_msg_send()
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -638,24 +670,29 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //enable decreasing service thread at runtime.
 
-#ifndef ST_ASIO_MSG_HANDLING_INTERVAL_STEP1
-#define ST_ASIO_MSG_HANDLING_INTERVAL_STEP1	50 //milliseconds
-#elif ST_ASIO_MSG_HANDLING_INTERVAL_STEP1 < 0
-	#error the interval of msg handling step 1 must be bigger than or equal to zero.
+#ifndef ST_ASIO_MSG_RESUMING_INTERVAL
+#define ST_ASIO_MSG_RESUMING_INTERVAL	50 //milliseconds
+#elif ST_ASIO_MSG_RESUMING_INTERVAL < 0
+	#error the interval of msg resuming must be bigger than or equal to zero.
 #endif
-//msg handling step 1
-//move msg from temp_msg_buffer to recv_msg_buffer (because on_msg return false or macro ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER been defined)
-//if above process failed, retry it after ST_ASIO_MSG_HANDLING_INTERVAL_STEP1 milliseconds later.
-//this value can be changed via msg_handling_interval_step1(size_t) at runtime.
+//msg receiving
+//if receiving buffer is overflow, message receiving will stop and resume after the buffer becomes available, 
+//this is the interval of receiving buffer checking.
+//this value can be changed via st_asio_wrapper::socket::msg_resuming_interval(size_t) at runtime.
 
-#ifndef ST_ASIO_MSG_HANDLING_INTERVAL_STEP2
-#define ST_ASIO_MSG_HANDLING_INTERVAL_STEP2	50 //milliseconds
-#elif ST_ASIO_MSG_HANDLING_INTERVAL_STEP2 < 0
-	#error the interval of msg handling step 2 must be bigger than or equal to zero.
+#ifndef ST_ASIO_MSG_HANDLING_INTERVAL
+#define ST_ASIO_MSG_HANDLING_INTERVAL	50 //milliseconds
+#elif ST_ASIO_MSG_HANDLING_INTERVAL < 0
+	#error the interval of msg handling must be bigger than or equal to zero.
 #endif
-//msg handling step 2
-//call on_msg_handle, if failed, retry it after ST_ASIO_MSG_HANDLING_INTERVAL_STEP2 milliseconds later.
-//this value can be changed via msg_handling_interval_step2(size_t) at runtime.
+//msg handling
+//call on_msg_handle, if failed, retry it after ST_ASIO_MSG_HANDLING_INTERVAL milliseconds later.
+//this value can be changed via msg_handling_interval(size_t) at runtime.
+
+//#define ST_ASIO_RECV_AFTER_HANDLING
+//to gain the ability of changing the unpacker at runtime, with this mcro, st_asio_wrapper will not do message receiving automatically (except the firt one),
+//user need to call st_asio_wrapper::socket::recv_msg(), if you need to change the unpacker, do it before recv_msg() invocation, please note.
+//because user can call recv_msg() at any time, it's your responsibility to keep the recv buffer not overflowed, please pay special attention.
 
 //configurations
 

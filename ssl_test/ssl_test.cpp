@@ -5,7 +5,6 @@
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_REUSE_SSL_STREAM
-//#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_ENHANCED_STABILITY
 //#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
 //#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>

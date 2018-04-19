@@ -6,7 +6,6 @@
 #define ST_ASIO_DELAY_CLOSE		1 //this demo not used object pool and doesn't need life cycle management,
 								  //so, define this to avoid hooks for async call (and slightly improve efficiency),
 								  //any value which is bigger than zero is okay.
-#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_CUSTOM_LOG
 #define ST_ASIO_DEFAULT_UNPACKER non_copy_unpacker
 //#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
@@ -86,8 +85,7 @@ int main(int argc, const char* argv[])
 		else if (RECONNECT_COMMAND == str)
 			client.graceful_shutdown(true);
 		else
-			client.sync_send_msg(str);
-//			client.safe_send_msg(str);
+			client.safe_send_msg(str);
 	}
 
 	return 0;

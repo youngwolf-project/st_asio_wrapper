@@ -199,7 +199,7 @@ private:
 		if (!ec)
 			super::do_start(); //return to tcp::server_socket_base::do_start
 		else
-			this->get_server().del_socket(ST_THIS shared_from_this());
+			ST_THIS get_server().del_socket(ST_THIS shared_from_this());
 	}
 };
 

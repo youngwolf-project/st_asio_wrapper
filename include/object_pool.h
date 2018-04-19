@@ -17,26 +17,27 @@
 #include <boost/unordered_map.hpp>
 
 #include "timer.h"
+#include "executor.h"
 #include "service_pump.h"
 
 namespace st_asio_wrapper
 {
 
 template<typename Object>
-class object_pool : public service_pump::i_service, protected timer
+class object_pool : public service_pump::i_service, protected timer<executor>
 {
 public:
 	typedef boost::shared_ptr<Object> object_type;
 	typedef const object_type object_ctype;
 	typedef boost::unordered::unordered_map<boost::uint_fast64_t, object_type> container_type;
 
-	static const tid TIMER_BEGIN = timer::TIMER_END;
+	static const tid TIMER_BEGIN = timer<executor>::TIMER_END;
 	static const tid TIMER_FREE_SOCKET = TIMER_BEGIN;
 	static const tid TIMER_CLEAR_SOCKET = TIMER_BEGIN + 1;
 	static const tid TIMER_END = TIMER_BEGIN + 10;
 
 protected:
-	object_pool(service_pump& service_pump_) : i_service(service_pump_), timer(service_pump_), cur_id(-1), max_size_(ST_ASIO_MAX_OBJECT_NUM) {}
+	object_pool(service_pump& service_pump_) : i_service(service_pump_), timer<executor>(service_pump_), cur_id(-1), max_size_(ST_ASIO_MAX_OBJECT_NUM) {}
 
 	void start()
 	{
@@ -288,8 +289,9 @@ public:
 		return num_affected;
 	}
 
-	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}
 	statistic get_statistic() {statistic stat; do_something_to_all(stat += boost::lambda::bind(&Object::get_statistic, *boost::lambda::_1)); return stat;}
+	void list_all_status() {do_something_to_all(boost::bind(&Object::show_status, _1));}
+	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred)
 		{boost::lock_guard<boost::mutex> lock(object_can_mutex); for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter) __pred(iter->second);}
