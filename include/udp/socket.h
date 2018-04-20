@@ -229,7 +229,7 @@ private:
 		//on windows, sending a msg to addr_any may cause errors, please note
 		//for UDP, sending error will not stop subsequent sendings.
 		if (!do_send_msg(true) && !ST_THIS send_msg_buffer.empty())
-			ST_THIS send_msg(); //just make sure no pending msgs
+			send_msg(); //just make sure no pending msgs
 	}
 
 	bool set_addr(boost::asio::ip::udp::endpoint& endpoint, unsigned short port, const std::string& ip)
