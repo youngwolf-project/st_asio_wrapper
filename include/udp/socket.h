@@ -147,7 +147,7 @@ private:
 		if (0 == boost::asio::buffer_size(recv_buff))
 			unified_out::error_out("The unpacker returned an empty buffer, quit receiving!");
 		else
-			ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, ST_THIS make_strand(strand,
+			ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 	}
 
@@ -188,7 +188,7 @@ private:
 			ST_THIS stat.send_delay_sum += statistic::local_time() - last_send_msg.begin_time;
 
 			last_send_msg.restart();
-			ST_THIS next_layer().async_send_to(ST_ASIO_SEND_BUFFER_TYPE(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr, ST_THIS make_strand(strand,
+			ST_THIS next_layer().async_send_to(ST_ASIO_SEND_BUFFER_TYPE(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr, make_strand_handler(strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}

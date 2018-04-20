@@ -30,9 +30,6 @@ public:
 	bool stopped() const {return io_context_.stopped();}
 
 #if BOOST_ASIO_VERSION >= 101100
-	template <typename F> inline static boost::asio::executor_binder<typename boost::asio::decay<F>::type, boost::asio::io_context::strand>
-		make_strand(boost::asio::io_context::strand& strand, BOOST_ASIO_MOVE_ARG(F) f) {return boost::asio::bind_executor(strand, BOOST_ASIO_MOVE_CAST(F)(f));}
-
 	template<typename F> void post(const F& handler) {boost::asio::post(io_context_, handler);}
 	template<typename F> void defer(const F& handler) {boost::asio::defer(io_context_, handler);}
 	template<typename F> void dispatch(const F& handler) {boost::asio::dispatch(io_context_, handler);}
@@ -40,8 +37,6 @@ public:
 	template<typename F> void defer_strand(boost::asio::io_context::strand& strand, const F& handler) {boost::asio::defer(strand, handler);}
 	template<typename F> void dispatch_strand(boost::asio::io_context::strand& strand, const F& handler) {boost::asio::dispatch(strand, handler);}
 #else
-	template <typename F> static boost::asio::detail::wrapped_handler<boost::asio::strand, F> make_strand(boost::asio::io_context::strand& strand, F f) {return strand.wrap(f);}
-
 	template<typename F> void post(const F& handler) {io_context_.post(handler);}
 	template<typename F> void dispatch(const F& handler) {io_context_.dispatch(handler);}
 	template<typename F> void post_strand(boost::asio::io_context::strand& strand, const F& handler) {strand.post(handler);}

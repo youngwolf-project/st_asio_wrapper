@@ -461,6 +461,9 @@
 
 #if BOOST_ASIO_VERSION < 101100
 namespace boost {namespace asio {typedef io_service io_context;}}
+#define make_strand_handler(S, F) S.wrap(F)
+#else
+#define make_strand_handler(S, F) boost::asio::bind_executor(S, F)
 #endif
 //boost and compiler check
 

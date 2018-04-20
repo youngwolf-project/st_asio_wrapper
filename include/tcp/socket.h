@@ -198,7 +198,7 @@ private:
 			unified_out::error_out("The unpacker returned an empty buffer, quit receiving!");
 		else
 			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
-				boost::bind(&socket_base::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), ST_THIS make_strand(strand,
+				boost::bind(&socket_base::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), make_strand_handler(strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 	}
 
@@ -255,7 +255,7 @@ private:
 		if ((ST_THIS sending = !bufs.empty()))
 		{
 			last_send_msg.front().restart();
-			boost::asio::async_write(ST_THIS next_layer(), bufs, ST_THIS make_strand(strand,
+			boost::asio::async_write(ST_THIS next_layer(), bufs, make_strand_handler(strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
