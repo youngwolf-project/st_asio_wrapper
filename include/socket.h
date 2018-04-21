@@ -335,12 +335,10 @@ private:
 		return false;
 	}
 
-	void dispatch_msg() {if (!dispatching) dispatch_strand(strand, boost::bind(&socket::do_dispatch_msg, this));}
+	//do not use dispatch_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
+	void dispatch_msg() {if (!dispatching) post_strand(strand, boost::bind(&socket::do_dispatch_msg, this));}
 	void do_dispatch_msg()
 	{
-		if (dispatching)
-			return;
-
 		if ((dispatching = !last_dispatch_msg.empty() || recv_msg_buffer.try_dequeue(last_dispatch_msg)))
 		{
 			BOOST_AUTO(begin_time, statistic::local_time());
@@ -361,6 +359,8 @@ private:
 				dispatch_msg(); //just make sure no pending msgs
 			}
 		}
+		else if (!recv_msg_buffer.empty())
+			dispatch_msg(); //just make sure no pending msgs
 	}
 
 	bool timer_handler(tid id)
