@@ -187,7 +187,7 @@ protected:
 #if ST_ASIO_HEARTBEAT_INTERVAL > 0
 		start_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);
 #endif
-
+		assert(is_ready());
 		send_msg(); //send buffer may have msgs, send them
 		recv_msg();
 
@@ -292,7 +292,8 @@ protected:
 		{
 			in_msg unused(msg);
 			send_msg_buffer.enqueue(unused);
-			send_msg();
+			if (!sending && is_ready())
+				send_msg();
 		}
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?

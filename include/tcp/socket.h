@@ -175,7 +175,7 @@ private:
 #ifndef ST_ASIO_RECV_AFTER_HANDLING
 	virtual void recv_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
 #endif
-	virtual void send_msg() {if (!ST_THIS sending) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
+	virtual void send_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
 
 	void shutdown()
 	{
@@ -281,7 +281,7 @@ private:
 #endif
 			last_send_msg.clear();
 			if (!do_send_msg(true) && !ST_THIS send_msg_buffer.empty()) //send msg in sequence
-				send_msg(); //just make sure no pending msgs
+				do_send_msg(true); //just make sure no pending msgs
 		}
 		else
 		{
