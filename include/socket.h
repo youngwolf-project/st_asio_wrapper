@@ -43,6 +43,9 @@ protected:
 		_id = -1;
 		packer_ = boost::make_shared<Packer>();
 		sending = false;
+#ifdef ST_ASIO_PASSIVE_RECV
+		reading = false;
+#endif
 		started_ = false;
 		dispatching = false;
 		recv_idle_began = false;
@@ -64,6 +67,9 @@ protected:
 		stat.reset();
 		packer_->reset();
 		sending = false;
+#ifdef ST_ASIO_PASSIVE_RECV
+		reading = false;
+#endif
 		dispatching = false;
 		recv_idle_began = false;
 		clear_buffer();
@@ -129,16 +135,19 @@ public:
 				if (!on_heartbeat_error())
 					return false;
 
-			if (!is_sending_msg() && now - stat.last_send_time >= interval) //don't need to send heartbeat if we're sending messages
+			if (!sending && now - stat.last_send_time >= interval) //don't need to send heartbeat if we're sending messages
 				send_heartbeat();
 		}
 
 		return true;
 	}
 
-	bool is_sending_msg() const {return sending;}
+	bool is_sending() const {return sending;}
+#ifdef ST_ASIO_PASSIVE_RECV
+	bool is_reading() const {return reading;}
+#endif
+	bool is_dispatching() const {return dispatching;}
 	bool is_recv_idle() const {return recv_idle_began;}
-	bool is_dispatching_msg() const {return dispatching;}
 
 	void msg_resuming_interval(size_t interval) {msg_resuming_interval_ = interval;}
 	size_t msg_resuming_interval() const {return msg_resuming_interval_;}
@@ -163,6 +172,10 @@ public:
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is available or not,
 	//this can exhaust all virtual memory, please pay special attentions.
 	bool is_send_buffer_available() const {return send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
+
+	//if you define macro ST_ASIO_PASSIVE_RECV and call recv_msg greedily, the receiving buffer may overflow, this can exhaust all virtual memory,
+	//to avoid this problem, call recv_msg only if is_recv_buffer_available returns true.
+	bool is_recv_buffer_available() const {return send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
 
 	//don't use the packer but insert into send buffer directly
 	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false) {InMsgType unused(msg); return direct_send_msg(unused, can_overflow);}
@@ -275,7 +288,7 @@ protected:
 			dispatch_msg();
 		}
 
-#ifndef ST_ASIO_RECV_AFTER_HANDLING
+#ifndef ST_ASIO_PASSIVE_RECV
 		if (check_receiving(false))
 			return true;
 
@@ -404,6 +417,10 @@ protected:
 
 	volatile bool sending;
 	in_container_type send_msg_buffer;
+
+#ifdef ST_ASIO_PASSIVE_RECV
+	volatile bool reading;
+#endif
 
 	struct statistic stat;
 

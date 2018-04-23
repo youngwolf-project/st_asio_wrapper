@@ -5,7 +5,7 @@
 //configuration
 #define ST_ASIO_SERVER_PORT		5051
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
-#define ST_ASIO_RECV_AFTER_HANDLING
+#define ST_ASIO_PASSIVE_RECV
 //#define ST_ASIO_INPUT_QUEUE non_lock_queue
 //we cannot use non_lock_queue, because we also send messages (talking messages) out of st_asio_wrapper::socket::on_msg_send().
 #define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>

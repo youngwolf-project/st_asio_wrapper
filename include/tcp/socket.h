@@ -97,19 +97,27 @@ public:
 		unified_out::info_out(
 			"\n\tid: " ST_ASIO_LLF
 			"\n\tstarted: %d"
-			"\n\tlink status: %d"
+			"\n\tsending: %d"
+#ifdef ST_ASIO_PASSIVE_RECV
+			"\n\treading: %d"
+#endif
 			"\n\tdispatching: %d"
+			"\n\tlink status: %d"
 			"\n\trecv suspended: %d",
-			ST_THIS id(), ST_THIS started(), status, ST_THIS is_dispatching_msg(), ST_THIS is_recv_idle());
+			ST_THIS id(), ST_THIS started(), ST_THIS is_sending(),
+#ifdef ST_ASIO_PASSIVE_RECV
+			ST_THIS is_reading(),
+#endif
+			ST_THIS is_dispatching(), status, ST_THIS is_recv_idle());
 	}
 
 	//get or change the unpacker at runtime
 	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker() {return unpacker_;}
 	boost::shared_ptr<const i_unpacker<out_msg_type> > unpacker() const {return unpacker_;}
-#ifdef ST_ASIO_RECV_AFTER_HANDLING
-	//changing unpacker must before calling ascs::socket::recv_msg, and define ST_ASIO_RECV_AFTER_HANDLING macro.
+#ifdef ST_ASIO_PASSIVE_RECV
+	//changing unpacker must before calling ascs::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
 	void unpacker(const boost::shared_ptr<i_unpacker<out_msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
-	virtual void recv_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
+	virtual void recv_msg() {if (!ST_THIS reading && is_ready()) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
 #endif
 
 	///////////////////////////////////////////////////
@@ -172,7 +180,7 @@ protected:
 	virtual bool on_msg_handle(out_msg_type& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 
 private:
-#ifndef ST_ASIO_RECV_AFTER_HANDLING
+#ifndef ST_ASIO_PASSIVE_RECV
 	virtual void recv_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
 #endif
 	virtual void send_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
@@ -192,18 +200,28 @@ private:
 
 	void do_recv_msg()
 	{
+#ifdef ST_ASIO_PASSIVE_RECV
+		if (ST_THIS reading)
+			return;
+#endif
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
 		assert(boost::asio::buffer_size(recv_buff) > 0);
 		if (0 == boost::asio::buffer_size(recv_buff))
 			unified_out::error_out("The unpacker returned an empty buffer, quit receiving!");
 		else
+		{
+#ifdef ST_ASIO_PASSIVE_RECV
+			ST_THIS reading = true;
+#endif
 			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
 				boost::bind(&socket_base::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), make_strand_handler(strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+		}
 	}
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
+		bool keep_reading = false;
 		if (!ec && bytes_transferred > 0)
 		{
 			ST_THIS stat.last_recv_time = time(NULL);
@@ -213,14 +231,19 @@ private:
 			bool unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
 			dur.end();
 
-			if (ST_THIS handle_msg(temp_msg_can))
-				do_recv_msg(); //receive msg in sequence
-
+			keep_reading = ST_THIS handle_msg(temp_msg_can);
 			if (!unpack_ok)
 				on_unpack_error(); //the user will decide whether to reset the unpacker or not in this callback
 		}
 		else
 			ST_THIS on_recv_error(ec);
+
+		if (keep_reading)
+			do_recv_msg(); //receive msg in sequence
+#ifdef ST_ASIO_PASSIVE_RECV
+		else
+			ST_THIS reading = false;
+#endif
 	}
 
 	bool do_send_msg(bool in_strand)
