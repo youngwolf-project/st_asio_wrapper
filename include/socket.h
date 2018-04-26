@@ -169,7 +169,7 @@ public:
 	boost::shared_ptr<const i_packer<typename Packer::msg_type> > packer() const {return packer_;}
 	void packer(const boost::shared_ptr<i_packer<typename Packer::msg_type> >& _packer_) {packer_ = _packer_;}
 
-	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is available or not,
+	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is overflow or not,
 	//this can exhaust all virtual memory, please pay special attentions.
 	bool is_send_buffer_available() const {return send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
 
