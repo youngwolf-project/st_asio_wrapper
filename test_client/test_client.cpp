@@ -110,10 +110,6 @@ protected:
 		if (0 == --msg_num)
 			return;
 
-#if 2 == PACKER_UNPACKER_TYPE //there's no fixed_length_packer
-		auto pstr = const_cast<char*>(msg.data());
-		auto msg_len = msg.size();
-#else
 		auto pstr = inner_packer()->raw_data(msg);
 		auto msg_len = inner_packer()->raw_data_len(msg);
 #if 2 == PACKER_UNPACKER_TYPE

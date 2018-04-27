@@ -108,10 +108,6 @@ protected:
 		if (0 == --msg_num)
 			return;
 
-#if 2 == PACKER_UNPACKER_TYPE //there's no fixed_length_packer
-		char* pstr = const_cast<char*>(msg.data());
-		size_t msg_len = msg.size();
-#else
 		char* pstr = inner_packer()->raw_data(msg);
 		size_t msg_len = inner_packer()->raw_data_len(msg);
 #if 2 == PACKER_UNPACKER_TYPE
