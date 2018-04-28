@@ -136,7 +136,7 @@ public:
 		if (unpack_ok && remain_len > 0)
 		{
 			const char* pnext = boost::next(msg_pos_can.back().first, msg_pos_can.back().second);
-			memcpy(raw_buff.begin(), pnext, remain_len); //left behind unparsed data
+			memmove(raw_buff.begin(), pnext, remain_len); //left behind unparsed data
 		}
 
 		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
@@ -332,7 +332,7 @@ public:
 		if (pnext == raw_buff.begin()) //we should have at least got one msg.
 			return false;
 		else if (remain_len > 0) //left behind unparsed msg
-			memcpy(raw_buff.begin(), pnext, remain_len);
+			memmove(raw_buff.begin(), pnext, remain_len);
 
 		return true;
 	}
@@ -446,7 +446,7 @@ public:
 		if (pnext == raw_buff.begin()) //we should have at least got one msg.
 			return false;
 		else if (remain_len > 0)
-			memcpy(raw_buff.begin(), pnext, remain_len); //left behind unparsed msg
+			memmove(raw_buff.begin(), pnext, remain_len); //left behind unparsed msg
 
 		return true;
 	}

@@ -136,7 +136,7 @@ public:
 		if (unpack_ok && remain_len > 0)
 		{
 			auto pnext = std::next(msg_pos_can.back().first, msg_pos_can.back().second);
-			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed data
+			memmove(std::begin(raw_buff), pnext, remain_len); //left behind unparsed data
 		}
 
 		//if unpacking failed, successfully parsed msgs will still returned via msg_can(stick package), please note.
@@ -331,7 +331,7 @@ public:
 		if (pnext == std::begin(raw_buff)) //we should have at least got one msg.
 			return false;
 		else if (remain_len > 0) //left behind unparsed msg
-			memcpy(std::begin(raw_buff), pnext, remain_len);
+			memmove(std::begin(raw_buff), pnext, remain_len);
 
 		return true;
 	}
@@ -445,7 +445,7 @@ public:
 		if (pnext == std::begin(raw_buff)) //we should have at least got one msg.
 			return false;
 		else if (remain_len > 0)
-			memcpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
+			memmove(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
 
 		return true;
 	}
