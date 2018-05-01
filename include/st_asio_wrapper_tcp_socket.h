@@ -235,6 +235,9 @@ private:
 			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
 			dur.end();
 
+			if (!unpack_ok)
+				on_unpack_error(); //the user will decide whether to reset the unpacker or not in this callback
+
 			auto msg_num = temp_msg_can.size();
 			if (msg_num > 0)
 			{
@@ -248,9 +251,6 @@ private:
 				}
 			}
 			this->handle_msg();
-
-			if (!unpack_ok)
-				on_unpack_error(); //the user will decide whether to reset the unpacker or not in this callback
 		}
 		else
 			this->on_recv_error(ec);
