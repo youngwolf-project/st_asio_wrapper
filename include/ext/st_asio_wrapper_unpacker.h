@@ -400,7 +400,7 @@ public:
 		if (pnext == std::begin(raw_buff)) //we should have at least got one msg.
 			return false;
 		else if (remain_len > 0)
-			memmovecpy(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
+			memmove(std::begin(raw_buff), pnext, remain_len); //left behind unparsed msg
 
 		return true;
 	}
