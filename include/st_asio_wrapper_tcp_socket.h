@@ -190,7 +190,13 @@ private:
 		if (!ec && bytes_transferred > 0)
 		{
 			typename Unpacker::container_type temp_msg_can;
-			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
+			if (!unpacker_->parse_msg(bytes_transferred, temp_msg_can))
+			{
+				on_unpack_error();
+				//reset unpacker's state after on_unpack_error(), so user can get the left half-baked msg in on_unpack_error()
+				unpacker_->reset_state();
+			}
+
 			auto msg_num = temp_msg_can.size();
 			if (msg_num > 0)
 			{
@@ -204,13 +210,6 @@ private:
 				}
 			}
 			ST_THIS dispatch_msg();
-
-			if (!unpack_ok)
-			{
-				on_unpack_error();
-				//reset unpacker's state after on_unpack_error(), so user can get the left half-baked msg in on_unpack_error()
-				unpacker_->reset_state();
-			}
 		}
 		else
 			ST_THIS on_recv_error(ec);
