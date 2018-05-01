@@ -174,15 +174,14 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			auto unpack_ok = unpacker_->parse_msg(bytes_transferred, ST_THIS temp_msg_buffer);
-			ST_THIS dispatch_msg();
-
-			if (!unpack_ok)
+			if (!unpacker_->parse_msg(bytes_transferred, ST_THIS temp_msg_buffer))
 			{
 				on_unpack_error();
 				//reset unpacker's state after on_unpack_error(), so user can get the left half-baked msg in on_unpack_error()
 				unpacker_->reset_state();
 			}
+
+			ST_THIS dispatch_msg();
 		}
 		else
 			ST_THIS on_recv_error(ec);
