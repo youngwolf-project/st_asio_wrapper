@@ -8,6 +8,7 @@
 //#define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 #define ST_ASIO_CLEAR_OBJECT_INTERVAL 1
+#define ST_ASIO_DISPATCH_BATCH_MSG
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
@@ -63,7 +64,7 @@ static bool check_msg;
 ///////////////////////////////////////////////////
 //msg sending interface
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
-void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow) \
 { \
 	size_t index = (size_t) ((boost::uint64_t) rand() * (size() - 1) / RAND_MAX); \
 	at(index)->SEND_FUNNAME(pstr, len, num, can_overflow); \
@@ -98,13 +99,24 @@ public:
 		memset(buff, msg_fill, msg_len);
 		memcpy(buff, &recv_index, sizeof(size_t)); //seq
 
-		send_msg(buff, msg_len);
+		send_msg(buff, msg_len, false);
 		delete[] buff;
 	}
 
 protected:
 	//msg handling
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	virtual size_t on_msg_handle(out_queue_type& can)
+	{
+		out_container_type tmp_can;
+		can.swap(tmp_can);
+
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&echo_socket::handle_msg, this, _1));
+		return tmp_can.size();
+	}
+#else
 	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}
+#endif
 	//msg handling end
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -237,7 +249,7 @@ void send_msg_randomly(echo_client& client, size_t msg_num, size_t msg_len, char
 	{
 		memcpy(buff, &i, sizeof(size_t)); //seq
 
-		client.safe_random_send_msg(buff, msg_len); //can_overflow is false, it's important
+		client.safe_random_send_msg(buff, msg_len, false); //can_overflow is false, it's important
 		send_bytes += msg_len;
 
 		unsigned new_percent = (unsigned) (100 * send_bytes / total_msg_bytes);
@@ -266,8 +278,8 @@ void thread_runtine(boost::container::list<echo_client::object_type>& link_group
 	for (size_t i = 0; i < msg_num; ++i)
 	{
 		memcpy(buff, &i, sizeof(size_t)); //seq
-
-		st_asio_wrapper::do_something_to_all(link_group, boost::bind(&echo_socket::safe_send_msg, _1, buff, msg_len, false)); //can_overflow is false, it's important
+		st_asio_wrapper::do_something_to_all(link_group, boost::bind((bool (echo_socket::*)(const char*, size_t, bool)) &echo_socket::safe_send_msg, _1, buff, msg_len, false));
+		//can_overflow is false, it's important
 	}
 	delete[] buff;
 }

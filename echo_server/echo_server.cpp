@@ -5,6 +5,7 @@
 #define ST_ASIO_SERVER_PORT		9528
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FREE_OBJECT_INTERVAL 60 //it's useless if ST_ASIO_REUSE_OBJECT macro been defined
+#define ST_ASIO_DISPATCH_BATCH_MSG
 #define ST_ASIO_ENHANCED_STABILITY
 #define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 //#define ST_ASIO_USE_STEADY_TIMER
@@ -97,7 +98,21 @@ protected:
 	}
 
 	//msg handling: send the original msg back(echo server)
-	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg.data(), msg.size());}
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	virtual size_t on_msg_handle(out_queue_type& can)
+	{
+		if (!is_send_buffer_available())
+			return 0;
+
+		out_container_type tmp_can;
+		can.swap(tmp_can);
+
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(out_msg_ctype&, bool)) &echo_socket::send_msg, this, _1, true));
+		return tmp_can.size();
+	}
+#else
+	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg, false);}
+#endif
 	//msg handling end
 };
 
@@ -205,7 +220,7 @@ int main(int argc, const char* argv[])
 		{
 //			/*
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
-			server_.broadcast_msg(str.data(), str.size() + 1);
+			server_.broadcast_msg(str.data(), str.size() + 1, false);
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 //			*/
@@ -216,12 +231,12 @@ int main(int argc, const char* argv[])
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
-				server_.do_something_to_all(boost::bind((bool (normal_server_socket::*)(packer::msg_ctype&, bool)) &normal_server_socket::direct_send_msg, _1, boost::cref(msg), false));
+				server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(msg), false));
 			*/
 			/*
-			//if demo client is using stream_unpacker
+			//if demo client is using stream_unpacker, we totally don't need encoding messages.
 			if (!str.empty())
-				server_.do_something_to_all(boost::bind((bool (normal_server_socket::*)(packer::msg_ctype&, bool)) &normal_server_socket::direct_send_msg, _1, boost::cref(str), false));
+				server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
 			*/
 		}
 	}

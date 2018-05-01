@@ -115,7 +115,7 @@ public:
 	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker() {return unpacker_;}
 	boost::shared_ptr<const i_unpacker<out_msg_type> > unpacker() const {return unpacker_;}
 #ifdef ST_ASIO_PASSIVE_RECV
-	//changing unpacker must before calling ascs::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
+	//changing unpacker must before calling st_asio_wrapper::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
 	void unpacker(const boost::shared_ptr<i_unpacker<out_msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
 	virtual void recv_msg() {if (!ST_THIS reading && is_ready()) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
 #endif
@@ -177,8 +177,6 @@ protected:
 	virtual void on_unpack_error() = 0;
 	virtual void on_async_shutdown_error() = 0;
 
-	virtual bool on_msg_handle(out_msg_type& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
-
 private:
 #ifndef ST_ASIO_PASSIVE_RECV
 	virtual void recv_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
@@ -221,7 +219,9 @@ private:
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
-		bool keep_reading = false;
+#ifdef ST_ASIO_PASSIVE_RECV
+		ST_THIS reading = false;
+#endif
 		if (!ec && bytes_transferred > 0)
 		{
 			ST_THIS stat.last_recv_time = time(NULL);
@@ -231,19 +231,14 @@ private:
 			bool unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
 			dur.end();
 
-			keep_reading = ST_THIS handle_msg(temp_msg_can);
 			if (!unpack_ok)
 				on_unpack_error(); //the user will decide whether to reset the unpacker or not in this callback
+
+			if (ST_THIS handle_msg(temp_msg_can))
+				do_recv_msg(); //receive msg in sequence
 		}
 		else
 			ST_THIS on_recv_error(ec);
-
-		if (keep_reading)
-			do_recv_msg(); //receive msg in sequence
-#ifdef ST_ASIO_PASSIVE_RECV
-		else
-			ST_THIS reading = false;
-#endif
 	}
 
 	bool do_send_msg(bool in_strand)
@@ -262,7 +257,7 @@ private:
 			typename super::in_msg msg;
 			BOOST_AUTO(end_time, statistic::local_time());
 
-			typename super::in_container_type::lock_guard lock(ST_THIS send_msg_buffer);
+			typename super::in_queue_type::lock_guard lock(ST_THIS send_msg_buffer);
 			while (ST_THIS send_msg_buffer.try_dequeue_(msg))
 			{
 				ST_THIS stat.send_delay_sum += end_time - msg.begin_time;

@@ -377,7 +377,7 @@
  * REPLACEMENTS:
  *
  * ===============================================================
- * 2018.4.x	version 2.1.0
+ * 2018.5.x	version 2.1.0
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Not support sync sending mode anymore.
@@ -390,9 +390,16 @@
  * Macro ST_ASIO_MSG_HANDLING_INTERVAL_STEP2 has been renamed to ST_ASIO_MSG_HANDLING_INTERVAL.
  * st_asio_wrapper::socket::is_sending_msg() has been renamed to is_sending().
  * st_asio_wrapper::socket::is_dispatching_msg() has been renamed to is_dispatching().
+ * typedef st_asio_wrapper::socket::in_container_type has been renamed to in_queue_type.
+ * typedef st_asio_wrapper::socket::out_container_type has been renamed to out_queue_type.
+ * Wipe default value for parameter can_overflow in function send_msg, send_native_msg, safe_send_msg, safe_send_native_msg,
+ *  broadcast_msg, broadcast_native_msg, safe_broadcast_msg and safe_broadcast_native_msg, this is because we added template parameter to some of them,
+ *  and the compiler will complain (ambiguity) if we omit the can_overflow parameter. So take send_msg function for example, if you omitted can_overflow
+ *  before, then in 2.1, you must supplement it, like send_msg(...) -> send_msg(..., false).
  *
  * HIGHLIGHT:
- * Because of introduction of asio::io_context::strand (which is required, see FIX section for more details), we wiped two atomic in st_asio_wrapper::socket.
+ * After introducedo asio::io_context::strand (which is required, see FIX section for more details), we wiped two atomic in st_asio_wrapper::socket.
+ * Introduced macro ST_ASIO_DISPATCH_BATCH_MSG, then all messages will be dispatched via on_handle_msg with a variable-length contianer.
  *
  * FIX:
  * Wiped race condition between async_read and async_write on the same st_asio_wrapper::socket, so sync sending mode will not be supported anymore.
@@ -401,6 +408,10 @@
  * Explicitly define macro ST_ASIO_PASSIVE_RECV to gain the ability of changing the unpacker at runtime.
  * Add function st_asio_wrapper::socket::is_reading() if macro ST_ASIO_PASSIVE_RECV been defined, otherwise, the socket will always be reading.
  * Add function st_asio_wrapper::socket::is_recv_buffer_available(), you can use it before calling recv_msg() to avoid receiving buffer overflow.
+ * Add typedef st_asio_wrapper::socket::in_container_type to represent the container type used by in_queue_type (sending buffer).
+ * Add typedef st_asio_wrapper::socket::out_container_type to represent the container type used by out_queue_type (receiving buffer).
+ * Generalize function send_msg, send_native_msg, safe_send_msg, safe_send_native_msg, broadcast_msg, broadcast_native_msg,
+ *  safe_broadcast_msg and safe_broadcast_native_msg.
  *
  * DELETION:
  * Deleted virtual function bool st_asio_wrapper::socket::on_msg().
@@ -699,6 +710,11 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //to gain the ability of changing the unpacker at runtime, with this mcro, st_asio_wrapper will not do message receiving automatically (except the firt one),
 //user need to call st_asio_wrapper::socket::recv_msg(), if you need to change the unpacker, do it before recv_msg() invocation, please note.
 //because user can call recv_msg() at any time, it's your responsibility to keep the recv buffer not overflowed, please pay special attention.
+
+//#define ST_ASIO_DISPATCH_BATCH_MSG
+//all messages will be dispatched via on_handle_msg with a variable-length container, this will change the signature of function on_msg_handle,
+//it's very useful if you want to re-dispatch message in your own logic or with very simple message handling (such as echo server).
+//it's your responsibility to remove handled messages from the container (can be part of them).
 
 //configurations
 

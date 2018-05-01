@@ -77,7 +77,9 @@ protected:
 
 	void clear_buffer()
 	{
+#ifndef ST_ASIO_DISPATCH_BATCH_MSG
 		last_dispatch_msg.clear();
+#endif
 		send_msg_buffer.clear();
 		recv_msg_buffer.clear();
 	}
@@ -85,8 +87,10 @@ protected:
 public:
 	typedef obj_with_begin_time<InMsgType> in_msg;
 	typedef obj_with_begin_time<OutMsgType> out_msg;
-	typedef InQueue<in_msg, InContainer<in_msg> > in_container_type;
-	typedef OutQueue<out_msg, OutContainer<out_msg> > out_container_type;
+	typedef InContainer<in_msg> in_container_type;
+	typedef OutContainer<out_msg> out_container_type;
+	typedef InQueue<in_msg, in_container_type> in_queue_type;
+	typedef OutQueue<out_msg, out_container_type> out_queue_type;
 
 	boost::uint_fast64_t id() const {return _id;}
 	bool is_equal_to(boost::uint_fast64_t id) const {return _id == id;}
@@ -219,10 +223,22 @@ protected:
 	virtual void on_close() {unified_out::info_out("on_close()");}
 	virtual void after_close() {} //a good case for using this is to reconnect to the server, please refer to client_socket_base.
 
-	//handling msg in om_msg_handle() will not block msg receiving on the same socket
-	//return true means msg been handled, false means msg cannot be handled right now, and socket will re-dispatch it asynchronously
+	//return true (or > 0) means msg been handled, false (or 0) means msg cannot be handled right now, and socket will re-dispatch it asynchronously
 	//notice: using inconstant is for the convenience of swapping
-	virtual bool on_msg_handle(OutMsgType& msg) = 0;
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	virtual size_t on_msg_handle(out_queue_type& can)
+	{
+		out_container_type tmp_can;
+		can.swap(tmp_can);
+
+		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
+			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
+
+		return tmp_can.size();
+	}
+#else
+	virtual bool on_msg_handle(OutMsgType& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
+#endif
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	//one msg has sent to the kernel buffer, msg is the right msg
@@ -352,6 +368,23 @@ private:
 	void dispatch_msg() {if (!dispatching) post_strand(strand, boost::bind(&socket::do_dispatch_msg, this));}
 	void do_dispatch_msg()
 	{
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+		if ((dispatching = !recv_msg_buffer.empty()))
+		{
+			BOOST_AUTO(begin_time, statistic::local_time());
+			stat.dispatch_dealy_sum += begin_time - recv_msg_buffer.front().begin_time;
+			size_t re = on_msg_handle(recv_msg_buffer);
+			BOOST_AUTO(end_time, statistic::local_time());
+			stat.handle_time_sum += end_time - begin_time;
+
+			if (0 == re) //dispatch failed, re-dispatch
+			{
+				recv_msg_buffer.front().restart(end_time);
+				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
+			}
+			else
+			{
+#else
 		if ((dispatching = !last_dispatch_msg.empty() || recv_msg_buffer.try_dequeue(last_dispatch_msg)))
 		{
 			BOOST_AUTO(begin_time, statistic::local_time());
@@ -365,15 +398,16 @@ private:
 				last_dispatch_msg.restart(end_time);
 				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
 			}
-			else //dispatch msg in sequence
+			else
 			{
 				last_dispatch_msg.clear();
+#endif
 				dispatching = false;
-				dispatch_msg(); //just make sure no pending msgs
+				dispatch_msg(); //dispatch msg in sequence
 			}
 		}
-		else if (!recv_msg_buffer.empty())
-			dispatch_msg(); //just make sure no pending msgs
+		else if (!recv_msg_buffer.empty()) //just make sure no pending msgs
+			dispatch_msg();
 	}
 
 	bool timer_handler(tid id)
@@ -412,11 +446,10 @@ private:
 	}
 
 protected:
-	out_msg last_dispatch_msg;
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer_;
 
 	volatile bool sending;
-	in_container_type send_msg_buffer;
+	in_queue_type send_msg_buffer;
 
 #ifdef ST_ASIO_PASSIVE_RECV
 	volatile bool reading;
@@ -431,7 +464,11 @@ private:
 	volatile bool started_; //has started or not
 	atomic_size_t start_atomic;
 
-	out_container_type recv_msg_buffer;
+#ifndef ST_ASIO_DISPATCH_BATCH_MSG
+	out_msg last_dispatch_msg;
+#endif
+
+	out_queue_type recv_msg_buffer;
 	typename statistic::stat_time recv_idle_begin_time;
 	bool recv_idle_began;
 

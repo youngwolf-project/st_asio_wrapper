@@ -85,7 +85,7 @@ public:
 			"\n\tdispatching: %d"
 			"\n\trecv suspended: %d",
 			ST_THIS id(), ST_THIS started(), ST_THIS is_sending(),
-#ifdef ASCS_PASSIVE_RECV
+#ifdef ST_ASIO_PASSIVE_RECV
 			ST_THIS is_reading(),
 #endif
 			ST_THIS is_dispatching(), ST_THIS is_recv_idle());
@@ -126,8 +126,6 @@ protected:
 		unified_out::warning_out("%s:%hu is not available", peer_addr.address().to_string().data(), peer_addr.port());
 		return true;
 	}
-
-	virtual bool on_msg_handle(out_msg_type& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 
 private:
 #ifndef ST_ASIO_PASSIVE_RECV

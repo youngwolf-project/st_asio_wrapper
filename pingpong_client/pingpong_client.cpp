@@ -45,7 +45,7 @@ public:
 		total_bytes *= msg_num;
 		send_bytes = recv_bytes = 0;
 
-		send_native_msg(msg, msg_len);
+		send_native_msg(msg, msg_len, false);
 	}
 
 protected:
