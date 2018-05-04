@@ -398,7 +398,7 @@
  *  before, then in 2.1, you must supplement it, like send_msg(...) -> send_msg(..., false).
  *
  * HIGHLIGHT:
- * After introducedo asio::io_context::strand (which is required, see FIX section for more details), we wiped two atomic in st_asio_wrapper::socket.
+ * After introduced boost::asio::io_context::strand (which is required, see FIX section for more details), we wiped two atomic in st_asio_wrapper::socket.
  * Introduced macro ST_ASIO_DISPATCH_BATCH_MSG, then all messages will be dispatched via on_handle_msg with a variable-length contianer.
  *
  * FIX:

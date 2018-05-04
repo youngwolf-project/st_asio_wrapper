@@ -19,14 +19,17 @@ namespace st_asio_wrapper
 {
 
 #if 0 == ST_ASIO_DELAY_CLOSE
-class tracked_executor : public executor
+class tracked_executor
 {
 protected:
-	tracked_executor(boost::asio::io_context& io_context_) : executor(io_context_), aci(boost::make_shared<char>('\0')) {}
+	virtual ~tracked_executor() {}
+	tracked_executor(boost::asio::io_context& _io_context_) : io_context_(_io_context_), aci(boost::make_shared<char>('\0')) {}
 
 public:
 	typedef boost::function<void(const boost::system::error_code&)> handler_with_error;
 	typedef boost::function<void(const boost::system::error_code&, size_t)> handler_with_error_size;
+
+	bool stopped() const {return io_context_.stopped();}
 
 	#if BOOST_ASIO_VERSION >= 101100
 	void post(const boost::function<void()>& handler) {boost::asio::post(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
@@ -54,6 +57,9 @@ public:
 	bool is_async_calling() const {return !aci.unique();}
 	bool is_last_async_call() const {return aci.use_count() <= 2;} //can only be called in callbacks
 	inline void set_async_calling(bool) {}
+
+protected:
+	boost::asio::io_context& io_context_;
 
 private:
 	boost::shared_ptr<char> aci; //asynchronous calling indicator
