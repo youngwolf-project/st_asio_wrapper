@@ -414,6 +414,7 @@
  *  safe_broadcast_msg and safe_broadcast_native_msg.
  *
  * DELETION:
+ * Deleted macro ST_ASIO_SEND_BUFFER_TYPE.
  * Deleted virtual function bool st_asio_wrapper::socket::on_msg().
  * Not support sync sending mode anymore, so we reduced an atomic object in st_asio_wrapper::socket.
  *
@@ -648,15 +649,6 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 	#else
 	#define ST_ASIO_RECV_BUFFER_TYPE boost::asio::mutable_buffers_1
 	#endif
-#endif
-
-#ifdef ST_ASIO_SEND_BUFFER_TYPE
-	#error macro ST_ASIO_SEND_BUFFER_TYPE is just used internally.
-#endif
-#if BOOST_ASIO_VERSION >= 101100
-#define ST_ASIO_SEND_BUFFER_TYPE boost::asio::const_buffer
-#else
-#define ST_ASIO_SEND_BUFFER_TYPE boost::asio::const_buffers_1
 #endif
 
 #ifndef ST_ASIO_HEARTBEAT_INTERVAL

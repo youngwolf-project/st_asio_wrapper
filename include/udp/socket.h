@@ -168,8 +168,20 @@ private:
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
-		bool keep_reading = false;
-		if (!ec && bytes_transferred > 0)
+#ifdef ST_ASIO_PASSIVE_RECV
+		ST_THIS reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
+#endif
+		bool keep_reading = !ec;
+		if (ec)
+		{
+#ifdef _MSC_VER
+			if (boost::asio::error::connection_refused == ec || boost::asio::error::connection_reset == ec)
+				keep_reading = true;
+			else
+#endif
+				on_recv_error(ec);
+		}
+		else if (bytes_transferred > 0)
 		{
 			ST_THIS stat.last_recv_time = time(NULL);
 
@@ -183,23 +195,12 @@ private:
 				ST_THIS stat.recv_byte_sum += temp_msg_can.front().size();
 			}
 
-			keep_reading = ST_THIS handle_msg(temp_msg_can);
+			keep_reading = ST_THIS handle_msg(temp_msg_can); //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 		}
-#ifdef _MSC_VER
-		else if (boost::asio::error::connection_refused == ec || boost::asio::error::connection_reset == ec)
-#ifndef ST_ASIO_PASSIVE_RECV
-			keep_reading = true
-#endif
-			;
-#endif
-		else
-			on_recv_error(ec);
 
+#ifndef ST_ASIO_PASSIVE_RECV
 		if (keep_reading)
 			do_recv_msg(); //receive msg in sequence
-#ifdef ST_ASIO_PASSIVE_RECV
-		else
-			ST_THIS reading = false;
 #endif
 	}
 
@@ -213,7 +214,7 @@ private:
 			ST_THIS stat.send_delay_sum += statistic::local_time() - last_send_msg.begin_time;
 
 			last_send_msg.restart();
-			ST_THIS next_layer().async_send_to(ST_ASIO_SEND_BUFFER_TYPE(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr, make_strand_handler(strand,
+			ST_THIS next_layer().async_send_to(boost::asio::buffer(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr, make_strand_handler(strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}

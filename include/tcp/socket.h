@@ -220,9 +220,11 @@ private:
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
-		ST_THIS reading = false;
+		ST_THIS reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
-		if (!ec && bytes_transferred > 0)
+		if (ec)
+			ST_THIS on_recv_error(ec);
+		else if (bytes_transferred > 0)
 		{
 			ST_THIS stat.last_recv_time = time(NULL);
 
@@ -234,11 +236,13 @@ private:
 			if (!unpack_ok)
 				on_unpack_error(); //the user will decide whether to reset the unpacker or not in this callback
 
-			if (ST_THIS handle_msg(temp_msg_can))
+			if (ST_THIS handle_msg(temp_msg_can)) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
+#ifndef ST_ASIO_PASSIVE_RECV
 		else
-			ST_THIS on_recv_error(ec);
+			do_recv_msg(); //receive msg in sequence
+#endif
 	}
 
 	bool do_send_msg(bool in_strand)
