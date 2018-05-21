@@ -53,9 +53,7 @@ int main(int argc, const char* argv[])
 			sp.start_service();
 		}
 		else
-			service.direct_sync_send_msg(str); //to send to different endpoints, use overloads that take a const boost::asio::ip::udp::endpoint& parameter
-//			service.sync_send_native_msg(str); //to send to different endpoints, use overloads that take a const boost::asio::ip::udp::endpoint& parameter
-//			service.safe_send_native_msg(str); //to send to different endpoints, use overloads that take a const boost::asio::ip::udp::endpoint& parameter
+			service.safe_send_native_msg(str, false); //to send to different endpoints, use overloads that take a const boost::asio::ip::udp::endpoint& parameter
 	}
 
 	return 0;

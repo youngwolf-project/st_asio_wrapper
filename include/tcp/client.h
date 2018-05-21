@@ -70,9 +70,6 @@ public:
 	//success at here just means put the msg into tcp::socket_base's send buffer
 	TCP_BROADCAST_MSG(safe_broadcast_msg, safe_send_msg)
 	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
-	//send message with sync mode
-	TCP_BROADCAST_MSG(sync_broadcast_msg, sync_send_msg)
-	TCP_BROADCAST_MSG(sync_broadcast_native_msg, sync_send_native_msg)
 	//msg sending interface
 	///////////////////////////////////////////////////
 

@@ -69,13 +69,9 @@ public:
 
 protected:
 	//msg handling
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-	//we always handle messages in on_msg(), so we don't care the type of input queue and input container at all.
-	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
-#endif
-	//we will change unpacker at runtime, this operation can only be done in on_msg(), reset() or constructor,
-	//so we must guarantee all messages to be handled in on_msg()
-	//virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}
+	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); if (0 == get_pending_recv_msg_num()) recv_msg(); return true;}
+	//only raise recv_msg() invocation after recveiving buffer becomes empty, it's very important, otherwise we must use mutex to guarantee that at any time,
+	//there only exists one or zero asynchronous reception.
 	//msg handling end
 
 	virtual void on_connect()
@@ -109,7 +105,11 @@ private:
 		if (TRANS_BUSY == state)
 		{
 			assert(msg.empty());
-			trans_end();
+
+			BOOST_AUTO(unp, boost::dynamic_pointer_cast<data_unpacker>(unpacker()));
+			if (NULL == unp || unp->is_finished())
+				trans_end();
+
 			return;
 		}
 		else if (msg.size() <= ORDER_LEN)

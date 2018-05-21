@@ -14,6 +14,7 @@
 #define ST_ASIO_SOCKET_H_
 
 #include "timer.h"
+#include "tracked_executor.h"
 
 namespace st_asio_wrapper
 {
@@ -21,19 +22,20 @@ namespace st_asio_wrapper
 template<typename Socket, typename Packer, typename Unpacker, typename InMsgType, typename OutMsgType,
 	template<typename, typename> class InQueue, template<typename> class InContainer,
 	template<typename, typename> class OutQueue, template<typename> class OutContainer>
-class socket : public timer
+class socket : public timer<tracked_executor>
 {
 public:
-	static const tid TIMER_BEGIN = timer::TIMER_END;
-	static const tid TIMER_HANDLE_MSG = TIMER_BEGIN;
+	static const tid TIMER_BEGIN = timer<tracked_executor>::TIMER_END;
+	static const tid TIMER_CHECK_RECV = TIMER_BEGIN;
 	static const tid TIMER_DISPATCH_MSG = TIMER_BEGIN + 1;
 	static const tid TIMER_DELAY_CLOSE = TIMER_BEGIN + 2;
 	static const tid TIMER_HEARTBEAT_CHECK = TIMER_BEGIN + 3;
 	static const tid TIMER_END = TIMER_BEGIN + 10;
 
 protected:
-	socket(boost::asio::io_context& io_context_) : timer(io_context_), next_layer_(io_context_) {first_init();}
-	template<typename Arg> socket(boost::asio::io_context& io_context_, Arg& arg) : timer(io_context_), next_layer_(io_context_, arg) {first_init();}
+	socket(boost::asio::io_context& io_context_) : timer<tracked_executor>(io_context_), next_layer_(io_context_), strand(io_context_) {first_init();}
+	template<typename Arg>
+	socket(boost::asio::io_context& io_context_, Arg& arg) : timer<tracked_executor>(io_context_), next_layer_(io_context_, arg), strand(io_context_) {first_init();}
 
 	//helper function, just call it in constructor
 	void first_init()
@@ -41,14 +43,14 @@ protected:
 		_id = -1;
 		packer_ = boost::make_shared<Packer>();
 		sending = false;
-		dispatching = false;
-		congestion_controlling = false;
+#ifdef ST_ASIO_PASSIVE_RECV
+		reading = false;
+#endif
 		started_ = false;
+		dispatching = false;
 		recv_idle_began = false;
-		msg_handling_interval_step1_ = ST_ASIO_MSG_HANDLING_INTERVAL_STEP1;
-		msg_handling_interval_step2_ = ST_ASIO_MSG_HANDLING_INTERVAL_STEP2;
-		send_atomic.store(0, boost::memory_order_relaxed);
-		dispatch_atomic.store(0, boost::memory_order_relaxed);
+		msg_resuming_interval_ = ST_ASIO_MSG_RESUMING_INTERVAL;
+		msg_handling_interval_ = ST_ASIO_MSG_HANDLING_INTERVAL;
 		start_atomic.store(0, boost::memory_order_relaxed);
 	}
 
@@ -65,25 +67,30 @@ protected:
 		stat.reset();
 		packer_->reset();
 		sending = false;
+#ifdef ST_ASIO_PASSIVE_RECV
+		reading = false;
+#endif
 		dispatching = false;
 		recv_idle_began = false;
-		congestion_controlling = false;
 		clear_buffer();
 	}
 
 	void clear_buffer()
 	{
+#ifndef ST_ASIO_DISPATCH_BATCH_MSG
 		last_dispatch_msg.clear();
+#endif
 		send_msg_buffer.clear();
 		recv_msg_buffer.clear();
-		temp_msg_buffer.clear();
 	}
 
 public:
 	typedef obj_with_begin_time<InMsgType> in_msg;
 	typedef obj_with_begin_time<OutMsgType> out_msg;
-	typedef InQueue<in_msg, InContainer<in_msg> > in_container_type;
-	typedef OutQueue<out_msg, OutContainer<out_msg> > out_container_type;
+	typedef InContainer<in_msg> in_container_type;
+	typedef OutContainer<out_msg> out_container_type;
+	typedef InQueue<in_msg, in_container_type> in_queue_type;
+	typedef OutQueue<out_msg, out_container_type> out_queue_type;
 
 	boost::uint_fast64_t id() const {return _id;}
 	bool is_equal_to(boost::uint_fast64_t id) const {return _id == id;}
@@ -107,9 +114,6 @@ public:
 				started_ = do_start();
 		}
 	}
-
-	//return false if send buffer is empty or sending not allowed
-	bool send_msg() {if (lock_sending_flag() && !do_send_msg()) sending = false; return sending;}
 
 	void start_heartbeat(int interval, int max_absence = ST_ASIO_HEARTBEAT_MAX_ABSENCE)
 	{
@@ -135,24 +139,25 @@ public:
 				if (!on_heartbeat_error())
 					return false;
 
-			if (!is_sending_msg() && now - stat.last_send_time >= interval) //don't need to send heartbeat if we're sending messages
+			if (!sending && now - stat.last_send_time >= interval) //don't need to send heartbeat if we're sending messages
 				send_heartbeat();
 		}
 
 		return true;
 	}
 
-	bool is_sending_msg() const {return sending;}
-	bool is_dispatching_msg() const {return dispatching;}
+	bool is_sending() const {return sending;}
+#ifdef ST_ASIO_PASSIVE_RECV
+	bool is_reading() const {return reading;}
+#endif
+	bool is_dispatching() const {return dispatching;}
+	bool is_recv_idle() const {return recv_idle_began;}
 
-	void congestion_control(bool enable) {congestion_controlling = enable;} //enable congestion controlling in on_msg, disable it in on_msg_handle, please note.
-	bool congestion_control() const {return congestion_controlling;}
+	void msg_resuming_interval(size_t interval) {msg_resuming_interval_ = interval;}
+	size_t msg_resuming_interval() const {return msg_resuming_interval_;}
 
-	void msg_handling_interval_step1(size_t interval) {msg_handling_interval_step1_ = interval;}
-	size_t msg_handling_interval_step1() const {return msg_handling_interval_step1_;}
-
-	void msg_handling_interval_step2(size_t interval) {msg_handling_interval_step2_ = interval;}
-	size_t msg_handling_interval_step2() const {return msg_handling_interval_step2_;}
+	void msg_handling_interval(size_t interval) {msg_handling_interval_ = interval;}
+	size_t msg_handling_interval() const {return msg_handling_interval_;}
 
 	//in st_asio_wrapper, it's thread safe to access stat without mutex, because for a specific member of stat, st_asio_wrapper will never access it concurrently.
 	//in other words, in a specific thread, st_asio_wrapper just access only one member of stat.
@@ -162,15 +167,19 @@ public:
 	const struct statistic& get_statistic() const {return stat;}
 
 	//get or change the packer at runtime
-	//changing packer at runtime is not thread-safe, please pay special attention
+	//changing packer at runtime is not thread-safe (if we're sending messages concurrently), please pay special attention,
 	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer() {return packer_;}
 	boost::shared_ptr<const i_packer<typename Packer::msg_type> > packer() const {return packer_;}
 	void packer(const boost::shared_ptr<i_packer<typename Packer::msg_type> >& _packer_) {packer_ = _packer_;}
 
-	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is available or not,
+	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is overflow or not,
 	//this can exhaust all virtual memory, please pay special attentions.
 	bool is_send_buffer_available() const {return send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
+
+	//if you define macro ST_ASIO_PASSIVE_RECV and call recv_msg greedily, the receiving buffer may overflow, this can exhaust all virtual memory,
+	//to avoid this problem, call recv_msg only if is_recv_buffer_available returns true.
+	bool is_recv_buffer_available() const {return recv_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
 
 	//don't use the packer but insert into send buffer directly
 	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false) {InMsgType unused(msg); return direct_send_msg(unused, can_overflow);}
@@ -195,16 +204,12 @@ protected:
 #if ST_ASIO_HEARTBEAT_INTERVAL > 0
 		start_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);
 #endif
+		assert(is_ready());
 		send_msg(); //send buffer may have msgs, send them
-		do_recv_msg();
+		recv_msg();
 
 		return true;
 	}
-
-	virtual bool do_send_msg() = 0;
-	virtual bool do_send_msg(InMsgType& msg) = 0; //after this call, msg becomes empty, please note.
-	virtual void do_recv_msg() = 0;
-	//socket will guarantee not call these 4 functions (include do_start()) in more than one thread concurrently.
 
 	//generally, you don't have to rewrite this to maintain the status of connections (TCP)
 	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
@@ -212,30 +217,28 @@ protected:
 	virtual bool on_heartbeat_error() = 0; //heartbeat timed out, return true to continue heartbeat function (useful for UDP)
 
 	//if ST_ASIO_DELAY_CLOSE is equal to zero, in this callback, socket guarantee that there's no any other async call associated it,
-	// include user timers(created by set_timer()) and user async calls(started via post() or defer()), this means you can clean up any resource
+	// include user timers(created by set_timer()) and user async calls(started via post(), dispatch() or defer()), this means you can clean up any resource
 	// in this socket except this socket itself, because this socket maybe is being maintained by object_pool.
 	//otherwise (bigger than zero), socket simply call this callback ST_ASIO_DELAY_CLOSE seconds later after link down, no any guarantees.
 	virtual void on_close() {unified_out::info_out("on_close()");}
 	virtual void after_close() {} //a good case for using this is to reconnect to the server, please refer to client_socket_base.
 
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-	//if you want to use your own receive buffer, you can move the msg to your own receive buffer, then handle them as your own strategy(may be you'll need a msg dispatch thread),
-	//or you can handle the msg at here, but this will reduce efficiency because this msg handling will block the next msg receiving on the same socket,
-	//but if you can handle the msg very fast, you are recommended to handle them at here, which will inversely more efficient,
-	//because msg receive buffer and msg dispatching are not needed any more.
-	//
-	//return true means msg been handled, socket will not maintain it anymore, return false means msg cannot be handled right now, you must handle it in on_msg_handle()
-	//notice: on_msg_handle() will not be invoked from within this function
-	//
-	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
-	virtual bool on_msg(OutMsgType& msg) = 0;
-#endif
+	//return true (or > 0) means msg been handled, false (or 0) means msg cannot be handled right now, and socket will re-dispatch it asynchronously
+	//notice: using inconstant is for the convenience of swapping
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	virtual size_t on_msg_handle(out_queue_type& can)
+	{
+		out_container_type tmp_can;
+		can.swap(tmp_can);
 
-	//handling msg in om_msg_handle() will not block msg receiving on the same socket
-	//return true means msg been handled, false means msg cannot be handled right now, and socket will re-dispatch it asynchronously
-	//
-	//notice: the msg is unpacked, using inconstant is for the convenience of swapping
-	virtual bool on_msg_handle(OutMsgType& msg) = 0;
+		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
+			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
+
+		return tmp_can.size();
+	}
+#else
+	virtual bool on_msg_handle(OutMsgType& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
+#endif
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	//one msg has sent to the kernel buffer, msg is the right msg
@@ -283,65 +286,30 @@ protected:
 		return true;
 	}
 
-	//call this in subclasses' recv_handler only
-	//subclasses must guarantee not call this function in more than one thread concurrently.
-	void handle_msg()
+	template<typename T> bool handle_msg(T& temp_msg_can)
 	{
-		BOOST_TYPEOF(temp_msg_buffer) temp_buffer;
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-		if (!temp_msg_buffer.empty() && !congestion_controlling)
+		size_t msg_num = temp_msg_can.size();
+		if (msg_num > 0)
 		{
-			auto_duration(stat.handle_time_1_sum);
-			for (BOOST_AUTO(iter, temp_msg_buffer.begin()); !congestion_controlling && iter != temp_msg_buffer.end();)
-				if (on_msg(*iter))
-					temp_msg_buffer.erase(iter++);
-				else
-					temp_buffer.splice(temp_buffer.end(), temp_msg_buffer, iter++);
-		}
-#else
-		temp_buffer.swap(temp_msg_buffer);
-#endif
+			stat.recv_msg_sum += msg_num;
+			boost::container::list<out_msg> temp_buffer(msg_num);
+			BOOST_AUTO(op_iter, temp_buffer.begin());
+			for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++op_iter, ++iter)
+			{
+				stat.recv_byte_sum += iter->size();
+				op_iter->swap(*iter);
+			}
 
-		if (!temp_buffer.empty())
-		{
 			recv_msg_buffer.move_items_in(temp_buffer);
 			dispatch_msg();
 		}
 
-		if (temp_msg_buffer.empty() && recv_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM)
-		{
-			if (recv_idle_began)
-			{
-				recv_idle_began = false;
-				stat.recv_idle_sum += statistic::local_time() - recv_idle_begin_time;
-			}
-
-			do_recv_msg(); //receive msg in sequence
-		}
-		else
-		{
-			if (!recv_idle_began)
-			{
-				recv_idle_began = true;
-				recv_idle_begin_time = statistic::local_time();
-			}
-
-			set_timer(TIMER_HANDLE_MSG, msg_handling_interval_step1_, boost::bind(&socket::timer_handler, this, _1));
-		}
-	}
-
-	//return false if receiving buffer is empty
-	bool dispatch_msg() {if (lock_dispatching_flag() && !do_dispatch_msg()) dispatching = false; return dispatching;}
-
-	//return false if receiving buffer is empty
-	bool do_dispatch_msg()
-	{
-		if (!last_dispatch_msg.empty() || recv_msg_buffer.try_dequeue(last_dispatch_msg))
-		{
-			post(boost::bind(&socket::msg_handler, this));
+#ifndef ST_ASIO_PASSIVE_RECV
+		if (check_receiving(false))
 			return true;
-		}
 
+		set_timer(TIMER_CHECK_RECV, msg_resuming_interval_, boost::bind(&socket::timer_handler, this, _1));
+#endif
 		return false;
 	}
 
@@ -349,13 +317,12 @@ protected:
 	{
 		if (msg.empty())
 			unified_out::error_out("found an empty message, please check your packer.");
-		else if (lock_sending_flag())
-			do_send_msg(msg);
 		else
 		{
 			in_msg unused(msg);
 			send_msg_buffer.enqueue(unused);
-			send_msg();
+			if (!sending && is_ready())
+				send_msg();
 		}
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
@@ -364,44 +331,94 @@ protected:
 		return true;
 	}
 
-	bool lock_sending_flag()
-	{
-		if (!sending && is_ready())
-		{
-			scope_atomic_lock<> lock(send_atomic);
-			if (!sending && lock.locked())
-				return (sending = true);
-		}
-
-		return false;
-	}
-
-	bool lock_dispatching_flag()
-	{
-		if (!dispatching)
-		{
-			scope_atomic_lock<> lock(dispatch_atomic);
-			if (!dispatching && lock.locked())
-				return (dispatching = true);
-		}
-
-		return false;
-	}
-
 private:
+	virtual void recv_msg() = 0;
+	virtual void send_msg() = 0;
+
 	//please do not change id at runtime via the following function, except this socket is not managed by object_pool,
 	//it should only be used by object_pool when reusing or creating new socket.
 	template<typename Object> friend class object_pool;
 	void id(boost::uint_fast64_t id) {_id = id;}
 
+	bool check_receiving(bool raise_recv)
+	{
+		if (is_recv_buffer_available())
+		{
+			if (recv_idle_began)
+			{
+				recv_idle_began = false;
+				stat.recv_idle_sum += statistic::local_time() - recv_idle_begin_time;
+			}
+
+			if (raise_recv)
+				recv_msg(); //receive msg in sequence
+
+			return true;
+		}
+		else if (!recv_idle_began)
+		{
+			recv_idle_began = true;
+			recv_idle_begin_time = statistic::local_time();
+		}
+
+		return false;
+	}
+
+	//do not use dispatch_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
+	void dispatch_msg() {if (!dispatching) post_strand(strand, boost::bind(&socket::do_dispatch_msg, this));}
+	void do_dispatch_msg()
+	{
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+		if ((dispatching = !recv_msg_buffer.empty()))
+		{
+			BOOST_AUTO(begin_time, statistic::local_time());
+			stat.dispatch_dealy_sum += begin_time - recv_msg_buffer.front().begin_time;
+			size_t re = on_msg_handle(recv_msg_buffer);
+			BOOST_AUTO(end_time, statistic::local_time());
+			stat.handle_time_sum += end_time - begin_time;
+
+			if (0 == re) //dispatch failed, re-dispatch
+			{
+				recv_msg_buffer.front().restart(end_time);
+				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
+			}
+			else
+			{
+#else
+		if ((dispatching = !last_dispatch_msg.empty() || recv_msg_buffer.try_dequeue(last_dispatch_msg)))
+		{
+			BOOST_AUTO(begin_time, statistic::local_time());
+			stat.dispatch_dealy_sum += begin_time - last_dispatch_msg.begin_time;
+			bool re = on_msg_handle(last_dispatch_msg); //must before next msg dispatching to keep sequence
+			BOOST_AUTO(end_time, statistic::local_time());
+			stat.handle_time_sum += end_time - begin_time;
+
+			if (!re) //dispatch failed, re-dispatch
+			{
+				last_dispatch_msg.restart(end_time);
+				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
+			}
+			else
+			{
+				last_dispatch_msg.clear();
+#endif
+				dispatching = false;
+				dispatch_msg(); //dispatch msg in sequence
+			}
+		}
+		else if (!recv_msg_buffer.empty()) //just make sure no pending msgs
+			dispatch_msg();
+	}
+
 	bool timer_handler(tid id)
 	{
 		switch (id)
 		{
-		case TIMER_HANDLE_MSG:
-			handle_msg();
+		case TIMER_CHECK_RECV:
+			return !check_receiving(true);
 			break;
 		case TIMER_DISPATCH_MSG:
+			dispatching = false;
 			dispatch_msg();
 			break;
 		case TIMER_DELAY_CLOSE:
@@ -428,61 +445,37 @@ private:
 		return false;
 	}
 
-	void msg_handler()
-	{
-		BOOST_AUTO(begin_time, statistic::local_time());
-		stat.dispatch_dealy_sum += begin_time - last_dispatch_msg.begin_time;
-		bool re = on_msg_handle(last_dispatch_msg); //must before next msg dispatching to keep sequence
-		BOOST_AUTO(end_time, statistic::local_time());
-		stat.handle_time_2_sum += end_time - begin_time;
-
-		if (!re) //dispatch failed, re-dispatch
-		{
-			last_dispatch_msg.restart(end_time);
-			dispatching = false;
-			set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_step2_, boost::bind(&socket::timer_handler, this, _1));
-		}
-		else //dispatch msg in sequence
-		{
-			last_dispatch_msg.clear();
-			if (!do_dispatch_msg())
-			{
-				dispatching = false;
-				if (!recv_msg_buffer.empty())
-					dispatch_msg(); //just make sure no pending msgs
-			}
-		}
-	}
-
 protected:
-	boost::uint_fast64_t _id;
-	Socket next_layer_;
-
-	out_msg last_dispatch_msg;
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer_;
 
-	in_container_type send_msg_buffer;
-	out_container_type recv_msg_buffer;
-	boost::container::list<out_msg> temp_msg_buffer;
-	//subclass will invoke handle_msg() when got some msgs. if these msgs can't be dispatched via on_msg() because of congestion control opened,
-	//socket will delay 'msg_handling_interval_step1_' milliseconds(non-blocking) to invoke handle_msg() again, temp_msg_buffer is used to hold these msgs temporarily.
-
 	volatile bool sending;
-	atomic_size_t send_atomic;
+	in_queue_type send_msg_buffer;
 
-	volatile bool dispatching;
-	atomic_size_t dispatch_atomic;
+#ifdef ST_ASIO_PASSIVE_RECV
+	volatile bool reading;
+#endif
 
-	volatile bool congestion_controlling;
+	struct statistic stat;
+
+private:
+	boost::uint_fast64_t _id;
+	Socket next_layer_;
 
 	volatile bool started_; //has started or not
 	atomic_size_t start_atomic;
 
-	struct statistic stat;
+#ifndef ST_ASIO_DISPATCH_BATCH_MSG
+	out_msg last_dispatch_msg;
+#endif
+
+	out_queue_type recv_msg_buffer;
 	typename statistic::stat_time recv_idle_begin_time;
 	bool recv_idle_began;
 
-	size_t msg_handling_interval_step1_, msg_handling_interval_step2_;
+	volatile bool dispatching;
+	boost::asio::io_context::strand strand;
+
+	size_t msg_resuming_interval_, msg_handling_interval_;
 };
 
 } //namespace

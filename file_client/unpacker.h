@@ -25,6 +25,8 @@ public:
 	}
 	~data_unpacker() {delete[] buffer;}
 
+	bool is_finished() const {return 0 == _data_len;}
+
 	virtual void reset() {_file = NULL; delete[] buffer; buffer = NULL; _data_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
@@ -38,9 +40,7 @@ public:
 			return false;
 		}
 
-		if (0 == _data_len)
-			msg_can.emplace_back();
-
+		msg_can.emplace_back(); //need empty message to trigger the next message receiving
 		return true;
 	}
 

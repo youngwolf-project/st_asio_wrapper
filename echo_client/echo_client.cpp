@@ -7,8 +7,8 @@
 #define ST_ASIO_SERVER_PORT		9528
 //#define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
-//#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER //force to use the msg recv buffer
 #define ST_ASIO_CLEAR_OBJECT_INTERVAL 1
+#define ST_ASIO_DISPATCH_BATCH_MSG
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
@@ -54,32 +54,17 @@ using namespace st_asio_wrapper::ext::tcp;
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define LIST_ALL_CLIENT	"list_all_client"
-#define LIST_STATUS		"status"
+#define STATISTIC		"statistic"
+#define STATUS			"status"
 #define INCREASE_THREAD	"increase_thread"
 #define DECREASE_THREAD	"decrease_thread"
 
 static bool check_msg;
 
-//about congestion control
-//
-//in 1.3, congestion control has been removed (no post_msg nor post_native_msg anymore), this is because
-//without known the business (or logic), framework cannot always do congestion control properly.
-//now, users should take the responsibility to do congestion control, there're two ways:
-//
-//1. for receiver, if you cannot handle msgs timely, which means the bottleneck is in your business,
-//    you should open/close congestion control intermittently;
-//   for sender, send msgs in on_msg_send() or use sending buffer limitation (like safe_send_msg(..., false)),
-//    but must not in service threads, please note.
-//
-//2. for sender, if responses are available (like pingpong test), send msgs in on_msg()/on_msg_handle(),
-//    but this will reduce IO throughput because SOCKET's sliding window is not fully used, pleae note.
-//
-//echo_client chose method #1
-
 ///////////////////////////////////////////////////
 //msg sending interface
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
-void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow) \
 { \
 	size_t index = (size_t) ((boost::uint64_t) rand() * (size() - 1) / RAND_MAX); \
 	at(index)->SEND_FUNNAME(pstr, len, num, can_overflow); \
@@ -114,21 +99,28 @@ public:
 		memset(buff, msg_fill, msg_len);
 		memcpy(buff, &recv_index, sizeof(size_t)); //seq
 
-		send_msg(buff, msg_len);
+		send_msg(buff, msg_len, false);
 		delete[] buff;
 	}
 
 protected:
 	//msg handling
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-	//this virtual function doesn't exists if ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER been defined
-	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
-#endif
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	virtual size_t on_msg_handle(out_queue_type& can)
+	{
+		//to consume part of messages in can, see echo_server.
+		out_container_type tmp_can;
+		can.swap(tmp_can);
+
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&echo_socket::handle_msg, this, _1));
+		return tmp_can.size();
+	}
+#else
 	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}
+#endif
 	//msg handling end
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-	//congestion control, method #1, the peer needs its own congestion control too.
 	virtual void on_msg_send(in_msg_type& msg)
 	{
 		if (0 == --msg_num)
@@ -151,7 +143,7 @@ private:
 	{
 		recv_bytes += msg.size();
 		if (check_msg && (msg.size() < sizeof(size_t) || 0 != memcmp(&recv_index, msg.data(), sizeof(size_t))))
-			printf("check msg error: " ST_ASIO_SF ".\n", recv_index);
+			printf("check msg error: " ST_ASIO_LLF "->" ST_ASIO_SF "/" ST_ASIO_SF ".\n", id(), recv_index, *(size_t*) msg.data());
 		++recv_index;
 
 		//i'm the bottleneck -_-
@@ -258,8 +250,7 @@ void send_msg_randomly(echo_client& client, size_t msg_num, size_t msg_len, char
 	{
 		memcpy(buff, &i, sizeof(size_t)); //seq
 
-		//congestion control, method #1, the peer needs its own congestion control too.
-		client.safe_random_send_msg(buff, msg_len); //can_overflow is false, it's important
+		client.safe_random_send_msg(buff, msg_len, false); //can_overflow is false, it's important
 		send_bytes += msg_len;
 
 		unsigned new_percent = (unsigned) (100 * send_bytes / total_msg_bytes);
@@ -288,9 +279,8 @@ void thread_runtine(boost::container::list<echo_client::object_type>& link_group
 	for (size_t i = 0; i < msg_num; ++i)
 	{
 		memcpy(buff, &i, sizeof(size_t)); //seq
-
-		//congestion control, method #1, the peer needs its own congestion control too.
-		st_asio_wrapper::do_something_to_all(link_group, boost::bind(&echo_socket::safe_send_msg, _1, buff, msg_len, false)); //can_overflow is false, it's important
+		st_asio_wrapper::do_something_to_all(link_group, boost::bind((bool (echo_socket::*)(const char*, size_t, bool)) &echo_socket::safe_send_msg, _1, buff, msg_len, false));
+		//can_overflow is false, it's important
 	}
 	delete[] buff;
 }
@@ -444,14 +434,20 @@ int main(int argc, const char* argv[])
 		std::getline(std::cin, str);
 		if (str.empty())
 			;
-		else if (LIST_STATUS == str)
+		else if (STATISTIC == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
 			puts("");
 			puts(client.get_statistic().to_string().data());
 		}
+		else if (STATUS == str)
+			client.list_all_status();
 		else if (LIST_ALL_CLIENT == str)
 			client.list_all_object();
+		else if (INCREASE_THREAD == str)
+			sp.add_service_thread(1);
+		else if (DECREASE_THREAD == str)
+			sp.del_service_thread(1);
 		else if (is_testing)
 			puts("testing has not finished yet!");
 		else if (QUIT_COMMAND == str)
@@ -461,10 +457,6 @@ int main(int argc, const char* argv[])
 			sp.stop_service();
 			sp.start_service(thread_num);
 		}
-		else if (INCREASE_THREAD == str)
-			sp.add_service_thread(1);
-		else if (DECREASE_THREAD == str)
-			sp.del_service_thread(1);
 		else
 		{
 			if ('+' == str[0] || '-' == str[0])

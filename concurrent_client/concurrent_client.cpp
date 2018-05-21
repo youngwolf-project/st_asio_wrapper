@@ -7,7 +7,6 @@
 #define ST_ASIO_MAX_OBJECT_NUM	102400
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
-//#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #define ST_ASIO_MSG_BUFFER_SIZE	1024
 #define ST_ASIO_INPUT_QUEUE		non_lock_queue //we will never operate sending buffer concurrently, so need no locks
 #define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
@@ -19,7 +18,9 @@ using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
-#define LIST_STATUS		"status"
+#define LIST_ALL_CLIENT	"list_all_client"
+#define STATISTIC		"statistic"
+#define STATUS			"status"
 #define INCREASE_THREAD	"increase_thread"
 #define DECREASE_THREAD	"decrease_thread"
 
@@ -50,9 +51,6 @@ protected:
 	}
 
 	//msg handling
-#ifndef ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
-	virtual bool on_msg(out_msg_type& msg) {handle_msg(msg); return true;}
-#endif
 	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}
 
 private:
@@ -133,12 +131,16 @@ int main(int argc, const char* argv[])
 		std::getline(std::cin, str);
 		if (QUIT_COMMAND == str)
 			sp.stop_service();
-		else if (LIST_STATUS == str)
+		else if (STATISTIC == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
 			puts("");
 			puts(client.get_statistic().to_string().data());
 		}
+		else if (STATUS == str)
+			client.list_all_status();
+		else if (LIST_ALL_CLIENT == str)
+			client.list_all_object();
 		else if (INCREASE_THREAD == str)
 			sp.add_service_thread(1);
 		else if (DECREASE_THREAD == str)
