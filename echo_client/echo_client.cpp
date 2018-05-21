@@ -108,6 +108,7 @@ protected:
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	virtual size_t on_msg_handle(out_queue_type& can)
 	{
+		//to consume part of messages in can, see echo_server.
 		out_container_type tmp_can;
 		can.swap(tmp_can);
 
@@ -142,7 +143,7 @@ private:
 	{
 		recv_bytes += msg.size();
 		if (check_msg && (msg.size() < sizeof(size_t) || 0 != memcmp(&recv_index, msg.data(), sizeof(size_t))))
-			printf("check msg error: " ST_ASIO_SF ".\n", recv_index);
+			printf("check msg error: " ST_ASIO_LLF "->" ST_ASIO_SF "/" ST_ASIO_SF ".\n", id(), recv_index, *(size_t*) msg.data());
 		++recv_index;
 
 		//i'm the bottleneck -_-

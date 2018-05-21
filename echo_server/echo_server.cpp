@@ -105,9 +105,18 @@ protected:
 			return 0;
 
 		out_container_type tmp_can;
-		can.swap(tmp_can);
+		//this manner requires the container used by the message queue can be spliced (such as std::list, but not std::vector,
+		// ascs doesn't require this characteristic).
+		//these code can be compiled because we used list as the container of the message queue, see macro ST_ASIO_OUTPUT_CONTAINER for more details
+		//to consume all of messages in can, see echo_client.
+		can.lock();
+		BOOST_AUTO(begin_iter, can.begin());
+		//don't be too greedy, here is in a service thread, we should not block this thread for a long time
+		BOOST_AUTO(end_iter, can.size() > 10 ? boost::next(begin_iter, 10) : can.end());
+		tmp_can.splice(tmp_can.end(), can, begin_iter, end_iter);
+		can.unlock();
 
-		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(out_msg_ctype&, bool)) &echo_socket::send_msg, this, _1, true));
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(out_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
 		return tmp_can.size();
 	}
 #else
