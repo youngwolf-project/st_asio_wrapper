@@ -116,7 +116,7 @@ protected:
 		tmp_can.splice(tmp_can.end(), can, begin_iter, end_iter);
 		can.unlock();
 
-		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(out_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(out_msg_ctype&, bool)) &echo_socket::send_msg, this, _1, true));
 		return tmp_can.size();
 	}
 #else
