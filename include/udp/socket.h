@@ -185,17 +185,9 @@ private:
 		{
 			ST_THIS stat.last_recv_time = time(NULL);
 
-			boost::container::list<out_msg_type> temp_msg_can;
-			temp_msg_can.emplace_back(temp_addr);
-
-			unpacker_->parse_msg(temp_msg_can.front(), bytes_transferred);
-			if (!temp_msg_can.front().empty())
-			{
-				++ST_THIS stat.recv_msg_sum;
-				ST_THIS stat.recv_byte_sum += temp_msg_can.front().size();
-			}
-
-			keep_reading = ST_THIS handle_msg(temp_msg_can); //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
+			out_msg_type temp_msg(temp_addr);
+			unpacker_->parse_msg(temp_msg, bytes_transferred);
+			keep_reading = ST_THIS handle_msg(temp_msg); //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 		}
 
 #ifndef ST_ASIO_PASSIVE_RECV
