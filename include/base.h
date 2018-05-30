@@ -256,6 +256,9 @@ namespace udp
 		using MsgType::operator=;
 		using MsgType::swap;
 		void swap(udp_msg& other) {MsgType::swap(other); std::swap(peer_addr, other.peer_addr);}
+
+		udp_msg(const udp_msg& other) : MsgType(other), peer_addr(other.peer_addr) {}
+		udp_msg(udp_msg& other) {swap(other);} //after this call, other becomes empty, please note.
 	};
 
 	template<typename MsgType>
@@ -264,7 +267,6 @@ namespace udp
 	public:
 		typedef MsgType msg_type;
 		typedef const msg_type msg_ctype;
-		typedef boost::container::list<udp_msg<msg_type> > container_type;
 		typedef ST_ASIO_RECV_BUFFER_TYPE buffer_type;
 
 	protected:
