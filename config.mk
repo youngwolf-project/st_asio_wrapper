@@ -8,7 +8,7 @@ ifeq (${MAKECMDGOALS}, debug)
 	cflag += -g -DDEBUG
 	dir = debug
 else
-	cflag += -O -DNDEBUG
+	cflag += -O2 -DNDEBUG
 	lflag = -s
 	dir = release
 endif
