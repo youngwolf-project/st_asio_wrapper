@@ -22,6 +22,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
+#include <boost/chrono.hpp>
 #include <boost/thread.hpp>
 #include <boost/version.hpp>
 #include <boost/date_time.hpp>

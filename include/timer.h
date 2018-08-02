@@ -53,7 +53,7 @@ public:
 
 	struct timer_info
 	{
-		enum timer_status : char {TIMER_CREATED, TIMER_STARTED, TIMER_CANCELED};
+		enum timer_status {TIMER_CREATED, TIMER_STARTED, TIMER_CANCELED};
 
 		tid id;
 		unsigned char seq;
@@ -80,7 +80,7 @@ public:
 			BOOST_AUTO(iter, std::find(timer_can.begin(), timer_can.end(), id));
 			if (iter == timer_can.end())
 			{
-				try {timer_can.emplace_back(id, io_context_); ti = &timer_can.back();}
+				try {timer_can.emplace_back(id, boost::ref(io_context_)); ti = &timer_can.back();}
 				catch (const std::exception& e) {unified_out::error_out("cannot create timer %d (%s)", id, e.what()); return false;}
 			}
 			else
