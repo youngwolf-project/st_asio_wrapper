@@ -21,11 +21,11 @@ using namespace st_asio_wrapper::ext;
 using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
-#define LIST_ALL_CLIENT	"list_all_client"
-#define STATISTIC		"statistic"
 #define STATUS			"status"
-#define INCREASE_THREAD	"increase_thread"
-#define DECREASE_THREAD	"decrease_thread"
+#define STATISTIC		"statistic"
+#define LIST_ALL_CLIENT	"list all client"
+#define INCREASE_THREAD	"increase thread"
+#define DECREASE_THREAD	"decrease thread"
 
 boost::timer::cpu_timer begin_time;
 #if BOOST_VERSION >= 105300

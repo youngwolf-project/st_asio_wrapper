@@ -17,11 +17,11 @@ using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
-#define LIST_ALL_CLIENT	"list_all_client"
-#define STATISTIC		"statistic"
 #define STATUS			"status"
-#define INCREASE_THREAD	"increase_thread"
-#define DECREASE_THREAD	"decrease_thread"
+#define STATISTIC		"statistic"
+#define LIST_ALL_CLIENT	"list all client"
+#define INCREASE_THREAD	"increase thread"
+#define DECREASE_THREAD	"decrease thread"
 
 class echo_socket : public server_socket
 {
@@ -67,7 +67,7 @@ int main(int argc, const char* argv[])
 	while(sp.is_running())
 	{
 		std::string str;
-		std::cin >> str;
+		std::getline(std::cin, str);
 		if (QUIT_COMMAND == str)
 			sp.stop_service();
 		else if (STATISTIC == str)

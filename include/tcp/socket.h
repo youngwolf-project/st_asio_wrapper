@@ -43,7 +43,7 @@ protected:
 public:
 	static const typename super::tid TIMER_BEGIN = super::TIMER_END;
 	static const typename super::tid TIMER_ASYNC_SHUTDOWN = TIMER_BEGIN;
-	static const typename super::tid TIMER_END = TIMER_BEGIN + 10;
+	static const typename super::tid TIMER_END = TIMER_BEGIN + 5;
 
 	virtual bool obsoleted() {return !is_shutting_down() && super::obsoleted();}
 	virtual bool is_ready() {return is_connected();}
@@ -321,7 +321,7 @@ private:
 			--loop_num;
 			if (loop_num > 0)
 			{
-				ST_THIS update_timer_info(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::async_shutdown_handler, this,
+				ST_THIS change_timer_call_back(TIMER_ASYNC_SHUTDOWN, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::async_shutdown_handler, this,
 					loop_num), true, false));
 				return true;
 			}

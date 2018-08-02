@@ -13,8 +13,6 @@
 #ifndef ST_ASIO_EXT_H_
 #define ST_ASIO_EXT_H_
 
-#include <string>
-
 #include "../base.h"
 
 //the size of the buffer used when receiving msg, must equal to or larger than the biggest msg size,

@@ -177,17 +177,36 @@ class file_client : public multi_client_base<file_socket>
 public:
 	static const tid TIMER_BEGIN = multi_client_base<file_socket>::TIMER_END;
 	static const tid UPDATE_PROGRESS = TIMER_BEGIN;
-	static const tid TIMER_END = TIMER_BEGIN + 10;
+	static const tid TIMER_END = TIMER_BEGIN + 5;
 
 	file_client(service_pump& service_pump_) : multi_client_base<file_socket>(service_pump_) {}
 
-	bool is_transferring() const {return is_timer(UPDATE_PROGRESS);}
-	bool get_file(const std::string& file_name)
+	void get_file(boost::container::list<std::string>& files)
 	{
-		if (is_transferring())
-			printf("file transfer is ongoing for file %s", file_name.data());
-		else
+		boost::unique_lock<boost::mutex> lock(file_list_mutex);
+		file_list.splice(file_list.end(), files);
+		lock.unlock();
+
+		get_file();
+	}
+
+private:
+	void get_file()
+	{
+		boost::lock_guard<boost::mutex> lock(file_list_mutex);
+
+		if (is_timer(UPDATE_PROGRESS))
+			return;
+
+		while (!file_list.empty())
 		{
+			std::string file_name;
+			file_name.swap(file_list.front());
+			file_list.pop_front();
+
+			file_size = -1;
+			received_size = 0;
+
 			printf("transfer %s begin.\n", file_name.data());
 			if (find(0)->get_file(file_name))
 			{
@@ -196,16 +215,13 @@ public:
 				begin_time.start();
 				set_timer(UPDATE_PROGRESS, 50, boost::bind(&file_client::update_progress_handler, this, _1, -1));
 
-				return true;
+				break;
 			}
 			else
 				printf("transfer %s failed!\n", file_name.data());
 		}
-
-		return false;
 	}
 
-private:
 	bool update_progress_handler(tid id, unsigned last_percent)
 	{
 		assert(UPDATE_PROGRESS == id);
@@ -220,7 +236,7 @@ private:
 				printf("\r%u%%", new_percent);
 				fflush(stdout);
 
-				update_timer_info(id, 50, boost::bind(&file_client::update_progress_handler, this, _1, new_percent));
+				change_timer_call_back(id, boost::bind(&file_client::update_progress_handler, this, _1, new_percent));
 			}
 		}
 
@@ -229,11 +245,17 @@ private:
 
 		double used_time = (double) begin_time.elapsed().wall / 1000000000;
 		printf("\r100%%\nend, speed: %f MBps.\n", file_size / used_time / 1024 / 1024);
+		change_timer_status(id, timer_info::TIMER_CANCELED);
+		get_file();
+
 		return false;
 	}
 
 protected:
 	boost::timer::cpu_timer begin_time;
+
+	boost::container::list<std::string> file_list;
+	boost::mutex file_list_mutex;
 };
 
 #endif //#ifndef FILE_CLIENT_H_

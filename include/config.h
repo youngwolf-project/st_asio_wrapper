@@ -426,6 +426,29 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2018.8.2		version 2.1.1
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * The data type of timer ID has been changed from unsigned char to unsigned short.
+ *
+ * HIGHLIGHT:
+ * Dynamically allocate timers when needed (multithreading releated behaviors kept as before, so we must introduce a mutex for st_asio_wrapper::timer object).
+ *
+ * FIX:
+ *
+ * ENHANCEMENTS:
+ * The range of timer ID has been expanded from [0, 256) to [0, 65536).
+ * Add new macro ST_ASIO_ALIGNED_TIMER to align timers.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ * Realigned member variables for st_asio_wrapper::socket to save a few memory.
+ * Make demos more easier to use.
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -435,8 +458,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20100	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.1.0"
+#define ST_ASIO_VER		20101	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.1.1"
 
 //boost and compiler check
 #ifdef _MSC_VER
@@ -707,6 +730,11 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //all messages will be dispatched via on_handle_msg with a variable-length container, this will change the signature of function on_msg_handle,
 //it's very useful if you want to re-dispatch message in your own logic or with very simple message handling (such as echo server).
 //it's your responsibility to remove handled messages from the container (can be part of them).
+
+//#define ST_ASIO_ALIGNED_TIMER
+//for example, start a timer at xx:xx:xx, interval is 10 seconds, the callback will be called at (xx:xx:xx + 10), and suppose that the callback
+//returned at (xx:xx:xx + 11), then the interval will be temporarily changed to 9 seconds to make the next callback to be called at (xx:xx:xx + 20),
+//if you don't define this macro, the next callback will be called at (xx:xx:xx + 21), plase note.
 
 //configurations
 

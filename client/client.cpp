@@ -7,6 +7,7 @@
 								  //so, define this to avoid hooks for async call (and slightly improve efficiency),
 								  //any value which is bigger than zero is okay.
 #define ST_ASIO_DISPATCH_BATCH_MSG
+#define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_CUSTOM_LOG
 #define ST_ASIO_DEFAULT_UNPACKER non_copy_unpacker
 //#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
@@ -49,7 +50,7 @@ using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
-#define RECONNECT_COMMAND "reconnect"
+#define RECONNECT		"reconnect"
 
 int main(int argc, const char* argv[])
 {
@@ -83,7 +84,7 @@ int main(int argc, const char* argv[])
 			sp.stop_service();
 			sp.start_service();
 		}
-		else if (RECONNECT_COMMAND == str)
+		else if (RECONNECT == str)
 			client.graceful_shutdown(true);
 		else
 			client.safe_send_msg(str, false);

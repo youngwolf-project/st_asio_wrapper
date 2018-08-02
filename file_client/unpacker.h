@@ -40,7 +40,7 @@ public:
 			return false;
 		}
 
-		msg_can.emplace_back(); //need empty message to trigger the next message receiving
+		msg_can.emplace_back(); //need empty message to trigger the next receiving
 		return true;
 	}
 

@@ -10,6 +10,7 @@
 #define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 //#define ST_ASIO_USE_STEADY_TIMER
 //#define ST_ASIO_USE_SYSTEM_TIMER
+#define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
 #define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //#define ST_ASIO_MAX_MSG_NUM		16
@@ -48,11 +49,11 @@ using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
-#define LIST_ALL_CLIENT	"list_all_client"
-#define STATISTIC		"statistic"
 #define STATUS			"status"
-#define INCREASE_THREAD	"increase_thread"
-#define DECREASE_THREAD	"decrease_thread"
+#define STATISTIC		"statistic"
+#define LIST_ALL_CLIENT	"list all client"
+#define INCREASE_THREAD	"increase thread"
+#define DECREASE_THREAD	"decrease thread"
 
 //demonstrate how to use custom packer
 //under the default behavior, each tcp::socket has their own packer, and cause memory waste
@@ -194,7 +195,7 @@ int main(int argc, const char* argv[])
 	while(sp.is_running())
 	{
 		std::string str;
-		std::cin >> str;
+		std::getline(std::cin, str);
 		if (QUIT_COMMAND == str)
 			sp.stop_service();
 		else if (RESTART_COMMAND == str)
@@ -243,7 +244,7 @@ int main(int argc, const char* argv[])
 				server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(msg), false));
 			*/
 			/*
-			//if demo client is using stream_unpacker, we totally don't need encoding messages.
+			//if demo client is using stream_unpacker
 			if (!str.empty())
 				server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
 			*/

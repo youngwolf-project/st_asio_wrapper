@@ -17,6 +17,9 @@
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
+#define STATUS			"status"
+#define STATISTIC		"statistic"
+#define LIST_ALL_CLIENT	"list all client"
 #define REQUEST_FILE	"get"
 
 int link_num = 1;
@@ -66,20 +69,28 @@ int main(int argc, const char* argv[])
 			sp.stop_service();
 			sp.start_service();
 		}
+		else if (STATISTIC == str)
+		{
+			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client.size(), client.valid_size(), client.invalid_object_size());
+			puts("");
+			puts(client.get_statistic().to_string().data());
+		}
+		else if (STATUS == str)
+			client.list_all_status();
+		else if (LIST_ALL_CLIENT == str)
+			client.list_all_object();
 		else if (str.size() > sizeof(REQUEST_FILE) && !strncmp(REQUEST_FILE, str.data(), sizeof(REQUEST_FILE) - 1) && isspace(str[sizeof(REQUEST_FILE) - 1]))
 		{
 			str.erase(0, sizeof(REQUEST_FILE));
+
 			boost::char_separator<char> sep(" \t");
 			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
-			for (BOOST_AUTO(iter, tok.begin()); iter != tok.end(); ++iter)
-			{
-				file_size = -1;
-				received_size = 0;
 
-				if (client.get_file(*iter))
-					while (client.is_transferring())
-						boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
-			}
+			boost::container::list<std::string> file_list;
+			for (BOOST_AUTO(iter, tok.begin()); iter != tok.end(); ++iter)
+				file_list.push_back(*iter);
+
+			client.get_file(file_list);
 		}
 		else
 			client.at(0)->talk(str);
