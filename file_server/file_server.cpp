@@ -20,7 +20,9 @@
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
-#define LIST_ALL_CLIENT	"list_all_client"
+#define STATUS			"status"
+#define STATISTIC		"statistic"
+#define LIST_ALL_CLIENT	"list all client"
 
 int main(int argc, const char* argv[])
 {
@@ -51,6 +53,14 @@ int main(int argc, const char* argv[])
 			sp.stop_service();
 			sp.start_service();
 		}
+		else if (STATISTIC == str)
+		{
+			printf("link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", file_server_.size(), file_server_.invalid_object_size());
+			puts("");
+			puts(file_server_.get_statistic().to_string().data());
+		}
+		else if (STATUS == str)
+			file_server_.list_all_status();
 		else if (LIST_ALL_CLIENT == str)
 			file_server_.list_all_object();
 	}

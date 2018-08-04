@@ -13,8 +13,8 @@
 #ifndef ST_ASIO_SOCKET_H_
 #define ST_ASIO_SOCKET_H_
 
-#include "timer.h"
 #include "tracked_executor.h"
+#include "timer.h"
 
 namespace st_asio_wrapper
 {
@@ -24,8 +24,11 @@ template<typename Socket, typename Packer, typename Unpacker, typename InMsgType
 	template<typename, typename> class OutQueue, template<typename> class OutContainer>
 class socket : public timer<tracked_executor>
 {
+private:
+	typedef timer<tracked_executor> super;
+
 public:
-	static const tid TIMER_BEGIN = timer<tracked_executor>::TIMER_END;
+	static const tid TIMER_BEGIN = super::TIMER_END;
 	static const tid TIMER_CHECK_RECV = TIMER_BEGIN;
 	static const tid TIMER_DISPATCH_MSG = TIMER_BEGIN + 1;
 	static const tid TIMER_DELAY_CLOSE = TIMER_BEGIN + 2;
@@ -33,9 +36,8 @@ public:
 	static const tid TIMER_END = TIMER_BEGIN + 10;
 
 protected:
-	socket(boost::asio::io_context& io_context_) : timer<tracked_executor>(io_context_), next_layer_(io_context_), strand(io_context_) {first_init();}
-	template<typename Arg>
-	socket(boost::asio::io_context& io_context_, Arg& arg) : timer<tracked_executor>(io_context_), next_layer_(io_context_, arg), strand(io_context_) {first_init();}
+	socket(boost::asio::io_context& io_context_) : super(io_context_), next_layer_(io_context_), strand(io_context_) {first_init();}
+	template<typename Arg> socket(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_), next_layer_(io_context_, arg), strand(io_context_) {first_init();}
 
 	//helper function, just call it in constructor
 	void first_init()
@@ -153,8 +155,8 @@ public:
 	bool is_dispatching() const {return dispatching;}
 	bool is_recv_idle() const {return recv_idle_began;}
 
-	void msg_resuming_interval(size_t interval) {msg_resuming_interval_ = interval;}
-	size_t msg_resuming_interval() const {return msg_resuming_interval_;}
+	void msg_resuming_interval(unsigned interval) {msg_resuming_interval_ = interval;}
+	unsigned msg_resuming_interval() const {return msg_resuming_interval_;}
 
 	void msg_handling_interval(size_t interval) {msg_handling_interval_ = interval;}
 	size_t msg_handling_interval() const {return msg_handling_interval_;}
@@ -467,36 +469,35 @@ private:
 	}
 
 protected:
+	struct statistic stat;
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer_;
 
-	volatile bool sending;
 	in_queue_type send_msg_buffer;
+	volatile bool sending;
 
 #ifdef ST_ASIO_PASSIVE_RECV
 	volatile bool reading;
 #endif
 
-	struct statistic stat;
-
 private:
+	bool recv_idle_began;
+	volatile bool dispatching;
+	volatile bool started_; //has started or not
+
+	typename statistic::stat_time recv_idle_begin_time;
+	out_queue_type recv_msg_buffer;
+
 	boost::uint_fast64_t _id;
 	Socket next_layer_;
-
-	volatile bool started_; //has started or not
-	atomic_size_t start_atomic;
 
 #ifndef ST_ASIO_DISPATCH_BATCH_MSG
 	out_msg last_dispatch_msg;
 #endif
 
-	out_queue_type recv_msg_buffer;
-	typename statistic::stat_time recv_idle_begin_time;
-	bool recv_idle_began;
-
-	volatile bool dispatching;
+	atomic_size_t start_atomic;
 	boost::asio::io_context::strand strand;
 
-	size_t msg_resuming_interval_, msg_handling_interval_;
+	unsigned msg_resuming_interval_, msg_handling_interval_;
 };
 
 } //namespace

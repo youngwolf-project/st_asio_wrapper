@@ -16,8 +16,8 @@
 
 #include <boost/unordered_map.hpp>
 
-#include "timer.h"
 #include "executor.h"
+#include "timer.h"
 #include "service_pump.h"
 
 namespace st_asio_wrapper

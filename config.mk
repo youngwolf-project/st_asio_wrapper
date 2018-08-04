@@ -8,7 +8,7 @@ ifeq (${MAKECMDGOALS}, debug)
 	cflag += -g -DDEBUG
 	dir = debug
 else
-	cflag += -O -DNDEBUG
+	cflag += -O2 -DNDEBUG
 	lflag = -s
 	dir = release
 endif
@@ -17,17 +17,19 @@ common_libs = -lboost_system -lboost_thread -lboost_chrono
 
 kernel = ${shell uname -s}
 ifeq (${kernel}, SunOS)
-cflag += -pthreads ${ext_cflag} ${boost_include_dir}
-lflag += -pthreads -lsocket -lnsl ${boost_lib_dir} ${common_libs} ${ext_libs}
+cflag += -pthreads
+lflag += -pthreads -lsocket -lnsl
 else
+cflag += -pthread
+lflag += -pthread
 ifeq (${kernel}, FreeBSD)
-cflag += -pthread ${ext_cflag} ${boost_include_dir}
-lflag += -pthread ${boost_lib_dir} ${common_libs} -lboost_atomic ${ext_libs}
-else # here maybe still have other kernels need to be separated out
-cflag += -pthread ${ext_cflag} ${boost_include_dir}
-lflag += -pthread ${boost_lib_dir} ${common_libs} ${ext_libs}
+common_libs += -lboost_atomic
+#here maybe still have other kernels need to be separated out
 endif
 endif
+
+cflag += ${ext_cflag} ${boost_include_dir}
+lflag += ${boost_lib_dir} ${common_libs} ${ext_libs}
 
 target = ${dir}/${module}
 sources = ${shell ls *.cpp}

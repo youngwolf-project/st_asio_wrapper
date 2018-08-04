@@ -7,7 +7,7 @@
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 #define ST_ASIO_MSG_BUFFER_SIZE	65536
 #define ST_ASIO_INPUT_QUEUE non_lock_queue
-//if pingpong_client only send message in on_msg() or on_msg_handle(), which means a responsive system, a real pingpong test,
+//if pingpong_client only send message in on_msg_handle(), which means a responsive system, a real pingpong test,
 //then, before pingpong_server send each message, the previous message has been sent to pingpong_client,
 //so sending buffer will always be empty, which means we will never operate sending buffer concurrently, so need no locks.
 //
@@ -23,11 +23,11 @@ using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
-#define LIST_ALL_CLIENT	"list_all_client"
-#define STATISTIC		"statistic"
 #define STATUS			"status"
-#define INCREASE_THREAD	"increase_thread"
-#define DECREASE_THREAD	"decrease_thread"
+#define STATISTIC		"statistic"
+#define LIST_ALL_CLIENT	"list all client"
+#define INCREASE_THREAD	"increase thread"
+#define DECREASE_THREAD	"decrease thread"
 
 class echo_socket : public server_socket
 {
@@ -73,7 +73,7 @@ int main(int argc, const char* argv[])
 	while(sp.is_running())
 	{
 		std::string str;
-		std::cin >> str;
+		std::getline(std::cin, str);
 		if (QUIT_COMMAND == str)
 			sp.stop_service();
 		else if (STATISTIC == str)

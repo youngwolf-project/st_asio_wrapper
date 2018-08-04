@@ -18,7 +18,7 @@ using namespace st_asio_wrapper::ext::ssl;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
-#define RECONNECT_COMMAND "reconnect"
+#define RECONNECT		"reconnect"
 #define SHOW_ALL_LINKS	"show_all_links"
 #define SHUTDOWN_LINK	"shutdown"
 
@@ -42,7 +42,7 @@ int main(int argc, const char* argv[])
 
 ///*
 	//method #1
-	client client_(sp, boost::asio::ssl::context::sslv23_client);
+	multi_client client_(sp, boost::asio::ssl::context::sslv23_client);
 	client_.context().set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
 	client_.context().set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
 	client_.context().load_verify_file("certs/server.crt");
@@ -89,7 +89,7 @@ int main(int argc, const char* argv[])
 			client_.list_all_object();
 		}
 #ifndef ST_ASIO_REUSE_SSL_STREAM
-		else if (RESTART_COMMAND == str || RECONNECT_COMMAND == str)
+		else if (RESTART_COMMAND == str || RECONNECT == str)
 			puts("please define macro ST_ASIO_REUSE_SSL_STREAM to test this feature.");
 		else if (SHUTDOWN_LINK == str)
 //			server_.at(0)->graceful_shutdown();
@@ -111,7 +111,7 @@ int main(int argc, const char* argv[])
 
 			sp.start_service();
 		}
-		else if (RECONNECT_COMMAND == str)
+		else if (RECONNECT == str)
 //			server_.graceful_shutdown();
 			client_.graceful_shutdown(true);
 		else if (SHUTDOWN_LINK == str)

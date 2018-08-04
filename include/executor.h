@@ -13,6 +13,8 @@
 #ifndef _ST_ASIO_EXECUTOR_H_
 #define _ST_ASIO_EXECUTOR_H_
 
+#include <boost/functional.hpp>
+
 #include <boost/asio.hpp>
 
 #include "config.h"
