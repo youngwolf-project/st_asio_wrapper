@@ -16,17 +16,17 @@ st_asio_wrapper is an asynchronous c/s framework based on Boost.Asio, besides al
 Quick start:
 -
 ### server:
-Derive your own socket from `server_socket_base`, you must at least re-write the `on_msg` or `on_msg_handle` virtual function and handle messages in it;</br>
+Derive your own socket from `server_socket_base`, you must at least re-write `on_msg_handle` virtual function and handle messages in it;</br>
 Create a `service_pump` object, create a `server_base<your_socket>` object, call `service_pump::start_service`;</br>
-Call `server_socket_base::send_msg` when you have messages need to send.</br>
+Call `server_socket_base::send_msg` or `server_base::broadcast_msg` when you have messages need to send.</br>
 ### client:
 Derive your own socket from `client_socket_base`, you must at least re-write the `on_msg` or `on_msg_handle` virtual function and handle messages in it;</br>
 Create a `service_pump` object, create a `multi_client_base<your_socket>` object, add some socket via `multi_client_base::add_socket`, call `service_pump::start_service`;</br>
-Call `client_socket_base::send_msg` when you have messages need to send.</br>
+Call `client_socket_base::send_msg` or `multi_client_base::broadcast_msg` when you have messages need to send.</br>
 
 Directory structure:
 -
-All source codes are placed in directory `include`, other directories hold demos, documents are placed in directory `doc`.</br>
+All source codes are placed in directory `include`, other directories hold demos, for documents, please refer to this project  https://github.com/youngwolf-project/ascs/ .</br>
 
 Demos:
 -
@@ -51,7 +51,7 @@ No special limitations, just need you to compile boost successfully.</br>
 
 Boost requirement:
 -
-1.49 or highter, earlier edition maybe can work, but I'm not sure.</br>
+1.49 or highter.</br>
 
 email: mail2tao@163.com
 -
