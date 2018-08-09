@@ -11,6 +11,8 @@
 #define ST_ASIO_DISPATCH_BATCH_MSG
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
+//#define ST_ASIO_USE_STEADY_TIMER
+#define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
 #define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //#define ST_ASIO_MAX_MSG_NUM		16

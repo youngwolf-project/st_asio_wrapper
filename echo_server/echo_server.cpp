@@ -8,7 +8,7 @@
 #define ST_ASIO_DISPATCH_BATCH_MSG
 #define ST_ASIO_ENHANCED_STABILITY
 #define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
-//#define ST_ASIO_USE_STEADY_TIMER
+#define ST_ASIO_USE_STEADY_TIMER
 //#define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
