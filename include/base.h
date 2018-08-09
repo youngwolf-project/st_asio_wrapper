@@ -348,28 +348,22 @@ struct statistic
 	std::string to_string() const
 	{
 		std::ostringstream s;
-#ifdef ST_ASIO_FULL_STATISTIC
-		s << std::setfill('0') << "send corresponding statistic:\n"
+		s << "send corresponding statistic:\n"
 			<< "message sum: " << send_msg_sum << std::endl
 			<< "size in bytes: " << send_byte_sum << std::endl
+#ifdef ST_ASIO_FULL_STATISTIC
 			<< "send delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(send_delay_sum).count() << std::endl
 			<< "send duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(send_time_sum).count() << std::endl
 			<< "pack duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(pack_time_sum).count() << std::endl
+#endif
 			<< "\nrecv corresponding statistic:\n"
 			<< "message sum: " << recv_msg_sum << std::endl
-			<< "size in bytes: " << recv_byte_sum << std::endl
-
-			<< "dispatch delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(dispatch_dealy_sum).count() << std::endl
+			<< "size in bytes: " << recv_byte_sum
+#ifdef ST_ASIO_FULL_STATISTIC
+			<< "\ndispatch delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(dispatch_dealy_sum).count() << std::endl
 			<< "recv idle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(recv_idle_sum).count() << std::endl
 			<< "on_msg_handle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(handle_time_sum).count() << std::endl
 			<< "unpack duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(unpack_time_sum).count();
-#else
-		s << std::setfill('0') << "send corresponding statistic:\n"
-			<< "message sum: " << send_msg_sum << std::endl
-			<< "size in bytes: " << send_byte_sum << std::endl
-			<< "\nrecv corresponding statistic:\n"
-			<< "message sum: " << recv_msg_sum << std::endl
-			<< "size in bytes: " << recv_byte_sum;
 #endif
 		return s.str();
 	}
