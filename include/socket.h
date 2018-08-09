@@ -359,7 +359,7 @@ private:
 			if (recv_idle_began)
 			{
 				recv_idle_began = false;
-				stat.recv_idle_sum += statistic::local_time() - recv_idle_begin_time;
+				stat.recv_idle_sum += statistic::now() - recv_idle_begin_time;
 			}
 
 			if (raise_recv)
@@ -370,7 +370,7 @@ private:
 		else if (!recv_idle_began)
 		{
 			recv_idle_began = true;
-			recv_idle_begin_time = statistic::local_time();
+			recv_idle_begin_time = statistic::now();
 		}
 
 		return false;
@@ -394,10 +394,10 @@ private:
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 		if ((dispatching = !recv_msg_buffer.empty()))
 		{
-			BOOST_AUTO(begin_time, statistic::local_time());
+			BOOST_AUTO(begin_time, statistic::now());
 			stat.dispatch_dealy_sum += begin_time - recv_msg_buffer.front().begin_time;
 			size_t re = on_msg_handle(recv_msg_buffer);
-			BOOST_AUTO(end_time, statistic::local_time());
+			BOOST_AUTO(end_time, statistic::now());
 			stat.handle_time_sum += end_time - begin_time;
 
 			if (0 == re) //dispatch failed, re-dispatch
@@ -410,10 +410,10 @@ private:
 #else
 		if ((dispatching = !last_dispatch_msg.empty() || recv_msg_buffer.try_dequeue(last_dispatch_msg)))
 		{
-			BOOST_AUTO(begin_time, statistic::local_time());
+			BOOST_AUTO(begin_time, statistic::now());
 			stat.dispatch_dealy_sum += begin_time - last_dispatch_msg.begin_time;
 			bool re = on_msg_handle(last_dispatch_msg); //must before next msg dispatching to keep sequence
-			BOOST_AUTO(end_time, statistic::local_time());
+			BOOST_AUTO(end_time, statistic::now());
 			stat.handle_time_sum += end_time - begin_time;
 
 			if (!re) //dispatch failed, re-dispatch

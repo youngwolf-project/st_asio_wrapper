@@ -285,15 +285,15 @@ namespace udp
 struct statistic
 {
 #ifdef ST_ASIO_FULL_STATISTIC
-	typedef boost::posix_time::ptime stat_time;
-	static stat_time local_time() {return boost::date_time::microsec_clock<boost::posix_time::ptime>::local_time();}
-	typedef boost::posix_time::time_duration stat_duration;
+	typedef boost::chrono::system_clock::time_point stat_time;
+	static stat_time now() {return boost::chrono::system_clock::now();}
+	typedef boost::chrono::system_clock::duration stat_duration;
 #else
 	struct dummy_duration {dummy_duration& operator+=(const dummy_duration& other) {return *this;}}; //not a real duration, just satisfy compiler(d1 += d2)
 	struct dummy_time {dummy_duration operator-(const dummy_time& other) {return dummy_duration();}}; //not a real time, just satisfy compiler(t1 - t2)
 
 	typedef dummy_time stat_time;
-	static stat_time local_time() {return stat_time();}
+	static stat_time now() {return stat_time();}
 	typedef dummy_duration stat_duration;
 #endif
 	statistic() {reset_number();}
@@ -349,20 +349,20 @@ struct statistic
 	{
 		std::ostringstream s;
 #ifdef ST_ASIO_FULL_STATISTIC
-		BOOST_AUTO(tw, boost::posix_time::time_duration::num_fractional_digits());
 		s << std::setfill('0') << "send corresponding statistic:\n"
 			<< "message sum: " << send_msg_sum << std::endl
 			<< "size in bytes: " << send_byte_sum << std::endl
-			<< "send delay: " << send_delay_sum.total_seconds() << "." << std::setw(tw) << send_delay_sum.fractional_seconds() << std::setw(0) << std::endl
-			<< "send duration: " << send_time_sum.total_seconds() << "." << std::setw(tw) << send_time_sum.fractional_seconds() << std::setw(0) << std::endl
-			<< "pack duration: " << pack_time_sum.total_seconds() << "." << std::setw(tw) << pack_time_sum.fractional_seconds() << std::setw(0) << std::endl
+			<< "send delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(send_delay_sum).count() << std::endl
+			<< "send duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(send_time_sum).count() << std::endl
+			<< "pack duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(pack_time_sum).count() << std::endl
 			<< "\nrecv corresponding statistic:\n"
 			<< "message sum: " << recv_msg_sum << std::endl
 			<< "size in bytes: " << recv_byte_sum << std::endl
-			<< "dispatch delay: " << dispatch_dealy_sum.total_seconds() << "." << std::setw(tw) << dispatch_dealy_sum.fractional_seconds() << std::setw(0) << std::endl
-			<< "recv idle duration: " << recv_idle_sum.total_seconds() << "." << std::setw(tw) << recv_idle_sum.fractional_seconds() << std::setw(0) << std::endl
-			<< "on_msg_handle duration: " << handle_time_sum.total_seconds() << "." << std::setw(tw) << handle_time_sum.fractional_seconds() << std::endl
-			<< "unpack duration: " << unpack_time_sum.total_seconds() << "." << std::setw(tw) << unpack_time_sum.fractional_seconds();
+
+			<< "dispatch delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(dispatch_dealy_sum).count() << std::endl
+			<< "recv idle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(recv_idle_sum).count() << std::endl
+			<< "on_msg_handle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(handle_time_sum).count() << std::endl
+			<< "unpack duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(unpack_time_sum).count();
 #else
 		s << std::setfill('0') << "send corresponding statistic:\n"
 			<< "message sum: " << send_msg_sum << std::endl
@@ -400,10 +400,10 @@ struct statistic
 class auto_duration
 {
 public:
-	auto_duration(statistic::stat_duration& duration_) : started(true), begin_time(statistic::local_time()), duration(duration_) {}
+	auto_duration(statistic::stat_duration& duration_) : started(true), begin_time(statistic::now()), duration(duration_) {}
 	~auto_duration() {end();}
 
-	void end() {if (started) duration += statistic::local_time() - begin_time; started = false;}
+	void end() {if (started) duration += statistic::now() - begin_time; started = false;}
 
 private:
 	bool started;
@@ -418,7 +418,7 @@ struct obj_with_begin_time : public T
 	obj_with_begin_time(T& obj) {T::swap(obj); restart();} //after this call, obj becomes empty, please note.
 	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, msg becomes empty, please note.
 
-	void restart() {restart(statistic::local_time());}
+	void restart() {restart(statistic::now());}
 	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
 	void swap(T& obj) {T::swap(obj); restart();}
 	void swap(obj_with_begin_time& other) {T::swap(other); std::swap(begin_time, other.begin_time);}
@@ -500,7 +500,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 #define SAFE_SEND_MSG_CHECK \
 { \
 	if (!is_ready()) return false; \
-	boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50)); \
+	boost::this_thread::sleep_for(boost::chrono::milliseconds(50)); \
 }
 
 #define GET_PENDING_MSG_NUM(FUNNAME, CAN) size_t FUNNAME() const {return CAN.size();}

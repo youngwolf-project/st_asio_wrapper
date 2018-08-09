@@ -495,6 +495,8 @@
 
 #if BOOST_VERSION < 104900
 	#error st_asio_wrapper only support boost 1.49 or higher.
+#elif BOOST_VERSION == 104900
+	namespace boost {namespace this_thread {static inline void sleep_for(const chrono::milliseconds& rel_time) {sleep(posix_time::milliseconds(rel_time.count()));}}}
 #endif
 
 #if BOOST_ASIO_VERSION < 101100

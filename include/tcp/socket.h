@@ -152,7 +152,7 @@ protected:
 			{
 				int loop_num = ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100; //seconds to 10 milliseconds
 				while (--loop_num >= 0 && GRACEFUL_SHUTTING_DOWN == status)
-					boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
+					boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
 				if (loop_num < 0) //graceful shutdown is impossible
 				{
 					unified_out::info_out("failed to graceful shutdown within %d seconds", ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
@@ -259,7 +259,7 @@ private:
 #endif
 			size_t size = 0;
 			typename super::in_msg msg;
-			BOOST_AUTO(end_time, statistic::local_time());
+			BOOST_AUTO(end_time, statistic::now());
 
 			typename super::in_queue_type::lock_guard lock(ST_THIS send_msg_buffer);
 			while (ST_THIS send_msg_buffer.try_dequeue_(msg))
@@ -292,7 +292,7 @@ private:
 			ST_THIS stat.last_send_time = time(NULL);
 
 			ST_THIS stat.send_byte_sum += bytes_transferred;
-			ST_THIS stat.send_time_sum += statistic::local_time() - last_send_msg.front().begin_time;
+			ST_THIS stat.send_time_sum += statistic::now() - last_send_msg.front().begin_time;
 			ST_THIS stat.send_msg_sum += last_send_msg.size();
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(last_send_msg.front());

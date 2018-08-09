@@ -147,7 +147,7 @@ private:
 		++recv_index;
 
 		//i'm the bottleneck -_-
-//		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
+//		boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
 	}
 
 private:
@@ -220,7 +220,7 @@ void send_msg_one_by_one(echo_client& client, size_t msg_num, size_t msg_len, ch
 	unsigned percent = 0;
 	do
 	{
-		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
 
 		unsigned new_percent = (unsigned) (100 * client.get_recv_bytes() / total_msg_bytes);
 		if (percent != new_percent)
@@ -263,7 +263,7 @@ void send_msg_randomly(echo_client& client, size_t msg_num, size_t msg_len, char
 	}
 
 	while(client.get_recv_bytes() < total_msg_bytes)
-		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
 
 	begin_time.stop();
 	delete[] buff;
@@ -331,7 +331,7 @@ void send_msg_concurrently(echo_client& client, size_t send_thread_num, size_t m
 	unsigned percent = 0;
 	do
 	{
-		boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
 
 		unsigned new_percent = (unsigned) (100 * client.get_recv_bytes() / total_msg_bytes);
 		if (percent != new_percent)

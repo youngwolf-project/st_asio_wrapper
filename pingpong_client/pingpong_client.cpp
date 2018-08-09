@@ -178,7 +178,7 @@ int main(int argc, const char* argv[])
 			begin_time.start();
 
 			while (0 != completed_session_num)
-				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
+				boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
 
 			boost::uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
 			double used_time = (double) begin_time.elapsed().wall / 1000000000;
