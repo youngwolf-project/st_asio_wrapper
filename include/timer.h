@@ -37,12 +37,18 @@ template<typename Executor>
 class timer : public Executor
 {
 public:
-#ifdef ST_ASIO_USE_STEADY_TIMER
-	typedef boost::chrono::milliseconds milliseconds;
-	typedef boost::asio::steady_timer timer_type;
-#elif defined(ST_ASIO_USE_SYSTEM_TIMER)
-	typedef boost::chrono::milliseconds milliseconds;
-	typedef boost::asio::system_timer timer_type;
+#if defined(ST_ASIO_USE_STEADY_TIMER) || defined(ST_ASIO_USE_SYSTEM_TIMER)
+	#ifdef BOOST_ASIO_HAS_STD_CHRONO
+		typedef std::chrono::milliseconds milliseconds;
+	#else
+		typedef boost::chrono::milliseconds milliseconds;
+	#endif
+
+	#ifdef ST_ASIO_USE_STEADY_TIMER
+		typedef boost::asio::steady_timer timer_type;
+	#else
+		typedef boost::asio::system_timer timer_type;
+	#endif
 #else
 	typedef boost::posix_time::milliseconds milliseconds;
 	typedef boost::asio::deadline_timer timer_type;
@@ -193,4 +199,3 @@ private:
 } //namespace
 
 #endif /* ST_ASIO_TIMER_H_ */
-
