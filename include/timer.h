@@ -140,20 +140,21 @@ public:
 	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex)
 
 protected:
-	bool start_timer(timer_info& ti)
+	bool start_timer(timer_info& ti, unsigned interval_ms)
 	{
 		if (!ti.call_back)
 			return false;
 
 		ti.status = timer_info::TIMER_STARTED;
 #if BOOST_ASIO_VERSION >= 101100 && (defined(ST_ASIO_USE_STEADY_TIMER) || defined(ST_ASIO_USE_SYSTEM_TIMER))
-		ti.timer.expires_after(milliseconds(ti.interval_ms));
+		ti.timer.expires_after(milliseconds(interval_ms));
 #else
-		ti.timer.expires_from_now(milliseconds(ti.interval_ms));
+		ti.timer.expires_from_now(milliseconds(interval_ms));
 #endif
 		ti.timer.async_wait(ST_THIS make_handler_error(boost::bind(&timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti), ++ti.seq)));
 		return true;
 	}
+	bool start_timer(timer_info& ti) {return start_timer(ti, ti.interval_ms);}
 
 	void timer_handler(const boost::system::error_code& ec, timer_info& ti, unsigned char prev_seq)
 	{
@@ -166,9 +167,7 @@ protected:
 			if (elapsed_ms > ti.interval_ms)
 				elapsed_ms %= ti.interval_ms;
 
-			ti.interval_ms -= elapsed_ms;
-			start_timer(ti);
-			ti.interval_ms += elapsed_ms;
+			start_timer(ti, ti.interval_ms - elapsed_ms);
 		}
 #else
 		if (!ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)
