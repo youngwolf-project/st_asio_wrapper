@@ -96,7 +96,7 @@ int main(int argc, const char* argv[])
 
 	sp.start_service();
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(500)); //to be more efficiently, start the worker thread in tcp::socket_base::on_connect().
-	BOOST_AUTO(t, boost::thread(boost::bind(&sync_recv_thread, boost::ref(client))));
+	boost::thread t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(client)));
 	while(sp.is_running())
 	{
 		std::string str;

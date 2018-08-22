@@ -62,7 +62,7 @@ int main(int argc, const char* argv[])
 //	service.lowest_layer().set_option(boost::asio::ip::multicast::join_group(boost::asio::ip::address::from_string("x.x.x.x")));
 //	sp.start_service();
 
-	BOOST_AUTO(t, boost::thread(boost::bind(&sync_recv_thread, boost::ref(service))));
+	boost::thread t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(service)));
 	while(sp.is_running())
 	{
 		std::string str;
