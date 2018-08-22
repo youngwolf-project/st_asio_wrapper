@@ -109,7 +109,7 @@ public:
 	bool change_timer_interval(tid id, size_t interval) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->interval_ms = interval, true : false;}
 
 	//after this call, call_back cannot be used again, please note.
-	bool change_timer_call_back(tid id, boost::function<bool(tid)>& call_back) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->call_back.swap(call_back), true : false; }
+	bool change_timer_call_back(tid id, boost::function<bool(tid)>& call_back) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->call_back.swap(call_back), true : false;}
 	bool change_timer_call_back(tid id, const boost::function<bool(tid)>& call_back) {BOOST_AUTO(unused, call_back); return change_timer_call_back(id, unused);}
 
 	//after this call, call_back cannot be used again, please note.
@@ -151,6 +151,8 @@ protected:
 #else
 		ti.timer.expires_from_now(milliseconds(interval_ms));
 #endif
+
+		//if timer already started, this will cancel it first
 		ti.timer.async_wait(ST_THIS make_handler_error(boost::bind(&timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti), ++ti.seq)));
 		return true;
 	}
@@ -158,7 +160,6 @@ protected:
 
 	void timer_handler(const boost::system::error_code& ec, timer_info& ti, unsigned char prev_seq)
 	{
-		//return true from call_back to continue the timer, or the timer will stop
 #ifdef ST_ASIO_ALIGNED_TIMER
 		BOOST_AUTO(begin_time, boost::chrono::system_clock::now());
 		if (!ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)

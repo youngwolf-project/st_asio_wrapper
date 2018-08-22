@@ -211,35 +211,32 @@ public:
 };
 
 //unpacker concept
-namespace tcp
+template<typename MsgType>
+class i_unpacker
 {
-	template<typename MsgType>
-	class i_unpacker
-	{
-	public:
-		typedef MsgType msg_type;
-		typedef const msg_type msg_ctype;
-		typedef boost::container::list<msg_type> container_type;
-		typedef ST_ASIO_RECV_BUFFER_TYPE buffer_type;
+public:
+	typedef MsgType msg_type;
+	typedef const msg_type msg_ctype;
+	typedef boost::container::list<msg_type> container_type;
+	typedef ST_ASIO_RECV_BUFFER_TYPE buffer_type;
 
-		bool stripped() const {return _stripped;}
-		void stripped(bool stripped_) {_stripped = stripped_;}
+	bool stripped() const {return _stripped;}
+	void stripped(bool stripped_) {_stripped = stripped_;}
 
-	protected:
-		i_unpacker() : _stripped(true) {}
-		virtual ~i_unpacker() {}
+protected:
+	i_unpacker() : _stripped(true) {}
+	virtual ~i_unpacker() {}
 
-	public:
-		virtual void reset() = 0;
-		//heartbeat must not be included in msg_can, otherwise you must handle heartbeat at where you handle normal messges.
-		virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
-		virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) = 0;
-		virtual buffer_type prepare_next_recv() = 0;
+public:
+	virtual void reset() {}
+	//heartbeat must not be included in msg_can, otherwise you must handle heartbeat at where you handle normal messges.
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return 0;}
+	virtual buffer_type prepare_next_recv() = 0;
 
-	private:
-		bool _stripped;
-	};
-} //namespace
+private:
+	bool _stripped;
+};
 
 namespace udp
 {
@@ -260,24 +257,6 @@ namespace udp
 
 		udp_msg(const udp_msg& other) : MsgType(other), peer_addr(other.peer_addr) {}
 		udp_msg(udp_msg& other) {swap(other);} //after this call, other becomes empty, please note.
-	};
-
-	template<typename MsgType>
-	class i_unpacker
-	{
-	public:
-		typedef MsgType msg_type;
-		typedef const msg_type msg_ctype;
-		typedef ST_ASIO_RECV_BUFFER_TYPE buffer_type;
-
-	protected:
-		virtual ~i_unpacker() {}
-
-	public:
-		virtual void reset() {}
-		//heartbeat must be omitted (return false), otherwise you must handle heartbeat at where you handle normal messges.
-		virtual void parse_msg(msg_type& msg, size_t bytes_transferred) = 0;
-		virtual buffer_type prepare_next_recv() = 0;
 	};
 } //namespace
 //unpacker concept
@@ -405,6 +384,27 @@ private:
 	statistic::stat_duration& duration;
 };
 
+#ifdef ST_ASIO_SYNC_SEND
+template<typename T>
+struct obj_with_begin_time : public T
+{
+	obj_with_begin_time(bool need_cv = false) {check_and_create_cv(need_cv);}
+	obj_with_begin_time(T& obj, bool need_cv = false) {T::swap(obj); restart(); check_and_create_cv(need_cv);} //after this call, obj becomes empty, please note.
+	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, msg becomes empty, please note.
+
+	void restart() {restart(statistic::now());}
+	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
+
+	void check_and_create_cv(bool need_cv) {if (!need_cv) cv.reset(); else if (!cv) cv = boost::make_shared<boost::condition_variable>();}
+
+	void swap(T& obj, bool need_cv = false) {T::swap(obj); restart(); check_and_create_cv(need_cv);}
+	void swap(obj_with_begin_time& other) {T::swap(other); std::swap(begin_time, other.begin_time); cv.swap(other.cv);}
+	void clear() {cv.reset(); T::clear();}
+
+	typename statistic::stat_time begin_time;
+	boost::shared_ptr<boost::condition_variable> cv;
+};
+#else
 template<typename T>
 struct obj_with_begin_time : public T
 {
@@ -419,6 +419,7 @@ struct obj_with_begin_time : public T
 
 	typename statistic::stat_time begin_time;
 };
+#endif
 
 //free functions, used to do something to any container(except map and multimap) optionally with any mutex
 template<typename _Can, typename _Mutex, typename _Predicate>
@@ -440,33 +441,6 @@ void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 
 template<typename _Can, typename _Predicate>
 void do_something_to_one(_Can& __can, const _Predicate& __pred) {for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) if (__pred(*iter)) break;}
-
-template<typename _Can>
-bool splice_helper(_Can& dest_can, _Can& src_can, size_t max_size = ST_ASIO_MAX_MSG_NUM)
-{
-	size_t size = dest_can.size();
-	if (size < max_size) //dest_can can hold more items.
-	{
-		size = max_size - size; //maximum items can be handled this time
-		BOOST_AUTO(begin_iter, src_can.begin()); BOOST_AUTO(end_iter, src_can.end());
-		if (src_can.size() > size) //some items left behind
-		{
-			size_t left_num = src_can.size() - size;
-			if (left_num > size) //find the minimum movement
-				std::advance(end_iter = begin_iter, size);
-			else
-				std::advance(end_iter, -(int) left_num);
-		}
-		else
-			size = src_can.size();
-		//use size to avoid std::distance() call, so, size must correct
-		dest_can.splice(dest_can.end(), src_can, begin_iter, end_iter, size);
-
-		return size > 0;
-	}
-
-	return false;
-}
 
 //member functions, used to do something to any member container(except map and multimap) optionally with any member mutex
 #define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)
@@ -507,7 +481,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow) {return FUNNAME(&pstr, &len, 1, can_overflow);} \
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, bool can_overflow) {return FUNNAME(buffer.data(), buffer.size(), can_overflow);}
 
-#define TCP_SEND_MSG(FUNNAME, NATIVE) \
+#define TCP_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
@@ -516,7 +490,7 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 	in_msg_type msg; \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
-	return ST_THIS do_direct_send_msg(msg); \
+	return ST_THIS SEND_FUNNAME(msg); \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
@@ -542,7 +516,7 @@ template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, bool can_overflow) 
 template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const Buffer& buffer, bool can_overflow) \
 	{return FUNNAME(peer_addr, buffer.data(), buffer.size(), can_overflow);}
 
-#define UDP_SEND_MSG(FUNNAME, NATIVE) \
+#define UDP_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow) {return FUNNAME(peer_addr, pstr, len, num, can_overflow);} \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow) \
 { \
@@ -550,7 +524,7 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const 
 		return false; \
 	in_msg_type msg(peer_addr); \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
-	return ST_THIS do_direct_send_msg(msg); \
+	return ST_THIS SEND_FUNNAME(msg); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 

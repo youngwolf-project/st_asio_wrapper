@@ -19,7 +19,7 @@
 namespace st_asio_wrapper
 {
 
-template<typename Socket, typename Packer, typename Unpacker, typename InMsgType, typename OutMsgType,
+template<typename Socket, typename Packer, typename InMsgType, typename OutMsgType,
 	template<typename, typename> class InQueue, template<typename> class InContainer,
 	template<typename, typename> class OutQueue, template<typename> class OutContainer>
 class socket : public timer<tracked_executor>
@@ -48,8 +48,14 @@ protected:
 #ifdef ST_ASIO_PASSIVE_RECV
 		reading = false;
 #endif
+#ifdef ST_ASIO_SYNC_RECV
+		status = NOT_REQUESTED;
+#endif
 		started_ = false;
 		dispatching = false;
+#ifndef ST_ASIO_DISPATCH_BATCH_MSG
+		dispatched = true;
+#endif
 		recv_idle_began = false;
 		msg_resuming_interval_ = ST_ASIO_MSG_RESUMING_INTERVAL;
 		msg_handling_interval_ = ST_ASIO_MSG_HANDLING_INTERVAL;
@@ -72,7 +78,13 @@ protected:
 #ifdef ST_ASIO_PASSIVE_RECV
 		reading = false;
 #endif
+#ifdef ST_ASIO_SYNC_RECV
+		status = NOT_REQUESTED;
+#endif
 		dispatching = false;
+#ifndef ST_ASIO_DISPATCH_BATCH_MSG
+		dispatched = true;
+#endif
 		recv_idle_began = false;
 		clear_buffer();
 	}
@@ -164,7 +176,7 @@ public:
 	//in st_asio_wrapper, it's thread safe to access stat without mutex, because for a specific member of stat, st_asio_wrapper will never access it concurrently.
 	//in other words, in a specific thread, st_asio_wrapper just access only one member of stat.
 	//but user can access stat out of st_asio_wrapper via get_statistic function, although user can only read it, there's still a potential risk,
-	//so whether it's thread safe or not depends on std::chrono::system_clock::duration.
+	//so whether it's thread safe or not depends on boost::chrono::system_clock::duration.
 	//i can make it thread safe in st_asio_wrapper, but is it worth to do so? this is a problem.
 	const struct statistic& get_statistic() const {return stat;}
 
@@ -184,9 +196,47 @@ public:
 	bool is_recv_buffer_available() const {return recv_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
 
 	//don't use the packer but insert into send buffer directly
-	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false) {InMsgType unused(msg); return direct_send_msg(unused, can_overflow);}
+	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false)
+		{if (!can_overflow && !is_send_buffer_available()) return false; InMsgType unused(msg); return do_direct_send_msg(unused);}
 	//after this call, msg becomes empty, please note.
 	bool direct_send_msg(InMsgType& msg, bool can_overflow = false) {return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
+
+#ifdef ST_ASIO_SYNC_SEND
+	//don't use the packer but insert into send buffer directly, then wait for the sending to finish.
+	bool direct_sync_send_msg(const InMsgType& msg, bool can_overflow = false)
+		{if (!can_overflow && !is_send_buffer_available()) return false; InMsgType unused(msg); do_direct_sync_send_msg(unused);}
+	//after this call, msg becomes empty, please note.
+	bool direct_sync_send_msg(InMsgType& msg, bool can_overflow = false) {return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg) : false;}
+#endif
+
+#ifdef ST_ASIO_SYNC_RECV
+	bool sync_recv_msg(boost::container::list<OutMsgType>& msg_can)
+	{
+		if (stopped())
+			return false;
+
+		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
+		if (NOT_REQUESTED != status)
+			return false;
+
+#ifdef ST_ASIO_PASSIVE_RECV
+		recv_msg();
+#endif
+		status = REQUESTED;
+		sync_recv_cv.wait(lock);
+
+		bool re = RESPONDED == status;
+		status = NOT_REQUESTED;
+		if (re)
+		{
+			msg_can.clear();
+			msg_can.swap(temp_msg_can);
+		}
+		sync_recv_cv.notify_one();
+
+		return re;
+	}
+#endif
 
 	//how many msgs waiting for sending or dispatching
 	GET_PENDING_MSG_NUM(get_pending_send_msg_num, send_msg_buffer)
@@ -276,6 +326,9 @@ protected:
 
 		if (stopped())
 		{
+#ifdef ST_ASIO_SYNC_RECV
+			sync_recv_cv.notify_one();
+#endif
 			on_close();
 			after_close();
 		}
@@ -288,35 +341,42 @@ protected:
 		return true;
 	}
 
-	bool handle_msg(OutMsgType& temp_msg)
+	bool handle_msg()
 	{
-		if (!temp_msg.empty())
+#ifdef ST_ASIO_PASSIVE_RECV
+		if (temp_msg_can.empty())
+			temp_msg_can.emplace_back(); //empty message, makes users always having the chance to call recv_msg().
+#endif
+
+#ifdef ST_ASIO_SYNC_RECV
+		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
+		if (REQUESTED == status)
 		{
-			++stat.recv_msg_sum;
-			stat.recv_byte_sum += temp_msg.size();
-			out_msg msg(temp_msg);
-			recv_msg_buffer.enqueue(msg);
-			//do not use following statement, it will bring memory replication
-			//recv_msg_buffer.enqueue(out_msg(temp_msg));
-			dispatch_msg();
+			status = RESPONDED;
+			sync_recv_cv.notify_one();
+
+			sync_recv_cv.wait(lock);
 		}
-
-		return handled_msg();
-	}
-
-	template<typename T> bool handle_msg(T& temp_msg_can)
-	{
+		lock.unlock();
+#endif
 		size_t msg_num = temp_msg_can.size();
 		if (msg_num > 0)
 		{
+#ifndef ST_ASIO_PASSIVE_RECV
 			stat.recv_msg_sum += msg_num;
+#endif
 			boost::container::list<out_msg> temp_buffer(msg_num);
 			BOOST_AUTO(op_iter, temp_buffer.begin());
 			for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++op_iter, ++iter)
 			{
+#ifdef ST_ASIO_PASSIVE_RECV
+				if (!iter->empty())
+					++stat.recv_msg_sum;
+#endif
 				stat.recv_byte_sum += iter->size();
 				op_iter->swap(*iter);
 			}
+			temp_msg_can.clear();
 
 			recv_msg_buffer.move_items_in(temp_buffer);
 			dispatch_msg();
@@ -342,6 +402,30 @@ protected:
 		//the packer provider has the responsibility to write detailed reasons down when packing message failed.
 		return true;
 	}
+
+#ifdef ST_ASIO_SYNC_SEND
+	bool do_direct_sync_send_msg(InMsgType& msg)
+	{
+		if (stopped())
+			return false;
+		else if (msg.empty())
+		{
+			unified_out::error_out("found an empty message, please check your packer.");
+			return false;
+		}
+
+		in_msg unused(msg, true);
+		BOOST_AUTO(cv, unused.cv);
+		send_msg_buffer.enqueue(unused);
+		if (!sending && is_ready())
+			send_msg();
+
+		boost::unique_lock<boost::mutex> lock(sync_send_mutex);
+		cv->wait(lock);
+
+		return true;
+	}
+#endif
 
 private:
 	virtual void recv_msg() = 0;
@@ -408,7 +492,7 @@ private:
 			else
 			{
 #else
-		if ((dispatching = !last_dispatch_msg.empty() || recv_msg_buffer.try_dequeue(last_dispatch_msg)))
+		if ((dispatching = !dispatched || recv_msg_buffer.try_dequeue(last_dispatch_msg)))
 		{
 			BOOST_AUTO(begin_time, statistic::now());
 			stat.dispatch_dealy_sum += begin_time - last_dispatch_msg.begin_time;
@@ -423,6 +507,7 @@ private:
 			}
 			else
 			{
+				dispatched = true;
 				last_dispatch_msg.clear();
 #endif
 				dispatching = false;
@@ -456,6 +541,9 @@ private:
 				lowest_layer().close(ec);
 			}
 			change_timer_status(TIMER_DELAY_CLOSE, timer_info::TIMER_CANCELED);
+#ifdef ST_ASIO_SYNC_RECV
+			sync_recv_cv.notify_one();
+#endif
 			on_close();
 			after_close();
 			set_async_calling(false);
@@ -471,6 +559,7 @@ private:
 protected:
 	struct statistic stat;
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer_;
+	boost::container::list<OutMsgType> temp_msg_can;
 
 	in_queue_type send_msg_buffer;
 	volatile bool sending;
@@ -481,8 +570,12 @@ protected:
 
 private:
 	bool recv_idle_began;
-	volatile bool dispatching;
 	volatile bool started_; //has started or not
+	volatile bool dispatching;
+#ifndef ST_ASIO_DISPATCH_BATCH_MSG
+	bool dispatched;
+	out_msg last_dispatch_msg;
+#endif
 
 	typename statistic::stat_time recv_idle_begin_time;
 	out_queue_type recv_msg_buffer;
@@ -490,12 +583,20 @@ private:
 	boost::uint_fast64_t _id;
 	Socket next_layer_;
 
-#ifndef ST_ASIO_DISPATCH_BATCH_MSG
-	out_msg last_dispatch_msg;
-#endif
-
 	atomic_size_t start_atomic;
 	boost::asio::io_context::strand strand;
+
+#ifdef ST_ASIO_SYNC_SEND
+	boost::mutex sync_send_mutex;
+#endif
+
+#ifdef ST_ASIO_SYNC_RECV
+	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED};
+	volatile sync_recv_status status;
+
+	boost::mutex sync_recv_mutex;
+	boost::condition_variable sync_recv_cv;
+#endif
 
 	unsigned msg_resuming_interval_, msg_handling_interval_;
 };

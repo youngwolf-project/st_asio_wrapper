@@ -449,6 +449,36 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2018.8.22	version 2.1.2
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * If macro ST_ASIO_PASSIVE_RECV been defined, you may receive empty messages in on_msg_handle() and sync_recv_msg(), this makes you always having
+ *  the chance to call recv_msg().
+ * i_unpacker has been moved from namespace st_asio_wrapper::tcp and st_asio_wrapper::udp to namespace st_asio_wrapper, and the signature of
+ *  st_asio_wrapper::udp::i_unpacker::parse_msg has been changed to obey st_asio_wrapper::tcp::i_unpacker::parse_msg.
+ *
+ * HIGHLIGHT:
+ * Fully support sync message sending and receiving (even be able to mix with async message sending and receiving without any limitations), but please note
+ *  that this feature will slightly impact efficiency even if you always use async message sending and receiving, so only open this feature when realy needed.
+ *
+ * FIX:
+ * Fix race condition when aligning timers, see macro ST_ASIO_ALIGNED_TIMER for more details.
+ * Fix error check for UDP on cygwin and mingw.
+ * Fix bug: demo file_client may not be able to receive all content of the file it required if you get more than one file in a single request.
+ *
+ * ENHANCEMENTS:
+ * Add new macro ST_ASIO_SYNC_SEND and ST_ASIO_SYNC_RECV to support sync message sending and receiving.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ * i_unpacker has been moved from namespace st_asio_wrapper::tcp and st_asio_wrapper::udp to namespace st_asio_wrapper, and the signature of
+ *  st_asio_wrapper::udp::i_unpacker::parse_msg has been changed to obey st_asio_wrapper::tcp::i_unpacker::parse_msg, the purpose of this change is to make
+ *  socket::sync_recv_msg() can be easily implemented, otherwise, sync_recv_msg() must be implemented by tcp::socket_base and udp::socket_base respectively.
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -458,8 +488,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20101	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.1.1"
+#define ST_ASIO_VER		20102	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.1.2"
 
 //boost and compiler check
 #ifdef _MSC_VER
@@ -725,8 +755,11 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 
 //#define ST_ASIO_PASSIVE_RECV
 //to gain the ability of changing the unpacker at runtime, with this mcro, st_asio_wrapper will not do message receiving automatically (except the firt one),
-//user need to call st_asio_wrapper::socket::recv_msg(), if you need to change the unpacker, do it before recv_msg() invocation, please note.
-//because user can call recv_msg() at any time, it's your responsibility to keep the recv buffer not overflowed, please pay special attention.
+// so you need to manually call recv_msg(), if you need to change the unpacker, do it before recv_msg() invocation, please note.
+//during async message receiving, calling recv_msg() will fail, this is by design to avoid asio::io_context using up all virtual memory.
+//because user can greedily call recv_msg(), it's your responsibility to keep the recv buffer from overflowed, please pay special attention.
+//this macro also makes you to be able to pause message receiving, then, if there's no other tasks (like timers), service_pump will stop itself,
+// to avoid this, please define macro ST_ASIO_AVOID_AUTO_STOP_SERVICE.
 
 //#define ST_ASIO_DISPATCH_BATCH_MSG
 //all messages will be dispatched via on_handle_msg with a variable-length container, this will change the signature of function on_msg_handle,
@@ -738,6 +771,23 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //returned at (xx:xx:xx + 11), then the interval will be temporarily changed to 9 seconds to make the next callback to be called at (xx:xx:xx + 20),
 //if you don't define this macro, the next callback will be called at (xx:xx:xx + 21), plase note.
 
+//#define ST_ASIO_SYNC_SEND
+//#ifndef ST_ASIO_SYNC_RECV
+//define these macro to gain additional series of sync message sending and receiving, they are:
+// sync_send_msg
+// sync_send_native_msg
+// sync_safe_send_msg
+// sync_safe_send_native_msg
+// sync_recv_msg
+//please note that:
+// this feature will slightly impact efficiency even if you always use async message sending and receiving, so only open this feature
+//  when realy needed, and DO NOT call pop_first_pending_send_msg and pop_all_pending_send_msg during sync message sending.
+// we must avoid to do sync message sending and receiving in service threads.
+// if prior sync_recv_msg() not returned, the second sync_recv_msg() will return false immediately.
+// with macro ST_ASIO_PASSIVE_RECV, in sync_recv_msg(), recv_msg() will be automatically called.
+
+//Sync message sending and receiving are not tracked by tracked_executor, please note.
+//No matter you're doing sync message sending or async message sending, you can do sync message receiving or async message receiving concurrently.
 //configurations
 
 #endif /* ST_ASIO_CONFIG_H_ */
