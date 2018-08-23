@@ -30,7 +30,6 @@ public:
 	virtual void reset() {clear(); client_socket::reset();}
 
 	bool is_idle() const {return TRANS_IDLE == state;}
-	void wait_idle() const {while (!is_idle()) boost::this_thread::sleep_for(boost::chrono::milliseconds(10));}
 	void set_index(int index_) {index = index_;}
 
 	bool get_file(const std::string& file_name)
@@ -243,6 +242,7 @@ private:
 
 			change_timer_status(id, timer_info::TIMER_CANCELED);
 			get_file();
+
 			return false;
 		}
 		else if (file_size > 0)
@@ -264,6 +264,7 @@ private:
 
 			change_timer_status(id, timer_info::TIMER_CANCELED);
 			get_file();
+
 			return false;
 		}
 
@@ -272,7 +273,7 @@ private:
 		change_timer_status(id, timer_info::TIMER_CANCELED);
 
 		//wait all file_socket to clean up themselves
-		do_something_to_all(boost::mem_fn(&file_socket::wait_idle));
+		while (!is_end()) boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
 		get_file();
 
 		return false;
