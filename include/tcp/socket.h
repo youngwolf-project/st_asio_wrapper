@@ -20,7 +20,7 @@ namespace st_asio_wrapper { namespace tcp {
 template <typename Socket, typename Packer, typename Unpacker,
 	template<typename, typename> class InQueue, template<typename> class InContainer,
 	template<typename, typename> class OutQueue, template<typename> class OutContainer>
-class socket_base : public socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
+class socket_base : public socket<Socket, Packer, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -29,7 +29,7 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 private:
-	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket<Socket, Packer, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 protected:
 	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN};
@@ -122,12 +122,21 @@ public:
 
 	///////////////////////////////////////////////////
 	//msg sending interface
-	TCP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
-	TCP_SEND_MSG(send_native_msg, true) //use the packer with native = true to pack the msgs
+	TCP_SEND_MSG(send_msg, false, do_direct_send_msg) //use the packer with native = false to pack the msgs
+	TCP_SEND_MSG(send_native_msg, true, do_direct_send_msg) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
 	//success at here just means put the msg into tcp::socket_base's send buffer
 	TCP_SAFE_SEND_MSG(safe_send_msg, send_msg)
 	TCP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
+
+#ifdef ST_ASIO_SYNC_SEND
+	TCP_SEND_MSG(sync_send_msg, false, do_direct_sync_send_msg) //use the packer with native = false to pack the msgs
+	TCP_SEND_MSG(sync_send_native_msg, true, do_direct_sync_send_msg) //use the packer with native = true to pack the msgs
+	//guarantee send msg successfully even if can_overflow equal to false
+	//success at here just means put the msg into tcp::socket_base's send buffer
+	TCP_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
+	TCP_SAFE_SEND_MSG(sync_safe_send_native_msg, sync_send_native_msg)
+#endif
 	//msg sending interface
 	///////////////////////////////////////////////////
 
@@ -152,7 +161,7 @@ protected:
 			{
 				int loop_num = ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100; //seconds to 10 milliseconds
 				while (--loop_num >= 0 && GRACEFUL_SHUTTING_DOWN == status)
-					boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
+					boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
 				if (loop_num < 0) //graceful shutdown is impossible
 				{
 					unified_out::info_out("failed to graceful shutdown within %d seconds", ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
@@ -219,30 +228,33 @@ private:
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
-#ifdef ST_ASIO_PASSIVE_RECV
-		ST_THIS reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
-#endif
-		if (ec)
-			ST_THIS on_recv_error(ec);
-		else if (bytes_transferred > 0)
+		if (!ec && bytes_transferred > 0)
 		{
 			ST_THIS stat.last_recv_time = time(NULL);
 
-			typename Unpacker::container_type temp_msg_can;
 			auto_duration dur(ST_THIS stat.unpack_time_sum);
-			bool unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
+			bool unpack_ok = unpacker_->parse_msg(bytes_transferred, ST_THIS temp_msg_can);
 			dur.end();
 
 			if (!unpack_ok)
 				on_unpack_error(); //the user will decide whether to reset the unpacker or not in this callback
 
-			if (ST_THIS handle_msg(temp_msg_can)) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
+#ifdef ST_ASIO_PASSIVE_RECV
+			ST_THIS reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
+#endif
+			if (ST_THIS handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
-#ifndef ST_ASIO_PASSIVE_RECV
 		else
-			do_recv_msg(); //receive msg in sequence
+		{
+#ifdef ST_ASIO_PASSIVE_RECV
+			ST_THIS reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
+			if (ec)
+				ST_THIS on_recv_error(ec);
+			else if (ST_THIS handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
+				do_recv_msg(); //receive msg in sequence
+		}
 	}
 
 	bool do_send_msg(bool in_strand)
@@ -259,7 +271,7 @@ private:
 #endif
 			size_t size = 0;
 			typename super::in_msg msg;
-			BOOST_AUTO(end_time, statistic::local_time());
+			BOOST_AUTO(end_time, statistic::now());
 
 			typename super::in_queue_type::lock_guard lock(ST_THIS send_msg_buffer);
 			while (ST_THIS send_msg_buffer.try_dequeue_(msg))
@@ -292,8 +304,13 @@ private:
 			ST_THIS stat.last_send_time = time(NULL);
 
 			ST_THIS stat.send_byte_sum += bytes_transferred;
-			ST_THIS stat.send_time_sum += statistic::local_time() - last_send_msg.front().begin_time;
+			ST_THIS stat.send_time_sum += statistic::now() - last_send_msg.front().begin_time;
 			ST_THIS stat.send_msg_sum += last_send_msg.size();
+#ifdef ST_ASIO_SYNC_SEND
+			for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
+				if (iter->cv)
+					iter->cv->notify_one();
+#endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(last_send_msg.front());
 #endif

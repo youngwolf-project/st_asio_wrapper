@@ -74,7 +74,9 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::getline(std::cin, str);
-		if (QUIT_COMMAND == str)
+		if (str.empty())
+			;
+		else if (QUIT_COMMAND == str)
 			sp.stop_service();
 		else if (STATISTIC == str)
 		{

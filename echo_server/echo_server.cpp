@@ -8,7 +8,7 @@
 #define ST_ASIO_DISPATCH_BATCH_MSG
 #define ST_ASIO_ENHANCED_STABILITY
 #define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
-//#define ST_ASIO_USE_STEADY_TIMER
+#define ST_ASIO_USE_STEADY_TIMER
 //#define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
@@ -107,7 +107,7 @@ protected:
 
 		out_container_type tmp_can;
 		//this manner requires the container used by the message queue can be spliced (such as std::list, but not std::vector,
-		// ascs doesn't require this characteristic).
+		// st_asio_wrapper doesn't require this characteristic).
 		//these code can be compiled because we used list as the container of the message queue, see macro ST_ASIO_OUTPUT_CONTAINER for more details
 		//to consume all of messages in can, see echo_client.
 		can.lock();
@@ -196,7 +196,9 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::getline(std::cin, str);
-		if (QUIT_COMMAND == str)
+		if (str.empty())
+			;
+		else if (QUIT_COMMAND == str)
 			sp.stop_service();
 		else if (RESTART_COMMAND == str)
 		{

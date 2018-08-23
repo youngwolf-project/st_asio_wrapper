@@ -70,4 +70,3 @@
 //udp
 
 #endif /* ST_ASIO_OLD_CLASS_NAMES_H_ */
-

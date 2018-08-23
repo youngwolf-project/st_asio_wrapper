@@ -37,12 +37,18 @@ template<typename Executor>
 class timer : public Executor
 {
 public:
-#ifdef ST_ASIO_USE_STEADY_TIMER
-	typedef boost::chrono::milliseconds milliseconds;
-	typedef boost::asio::steady_timer timer_type;
-#elif defined(ST_ASIO_USE_SYSTEM_TIMER)
-	typedef boost::chrono::milliseconds milliseconds;
-	typedef boost::asio::system_timer timer_type;
+#if defined(ST_ASIO_USE_STEADY_TIMER) || defined(ST_ASIO_USE_SYSTEM_TIMER)
+	#ifdef BOOST_ASIO_HAS_STD_CHRONO
+		typedef std::chrono::milliseconds milliseconds;
+	#else
+		typedef boost::chrono::milliseconds milliseconds;
+	#endif
+
+	#ifdef ST_ASIO_USE_STEADY_TIMER
+		typedef boost::asio::steady_timer timer_type;
+	#else
+		typedef boost::asio::system_timer timer_type;
+	#endif
 #else
 	typedef boost::posix_time::milliseconds milliseconds;
 	typedef boost::asio::deadline_timer timer_type;
@@ -103,7 +109,7 @@ public:
 	bool change_timer_interval(tid id, size_t interval) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->interval_ms = interval, true : false;}
 
 	//after this call, call_back cannot be used again, please note.
-	bool change_timer_call_back(tid id, boost::function<bool(tid)>& call_back) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->call_back.swap(call_back), true : false; }
+	bool change_timer_call_back(tid id, boost::function<bool(tid)>& call_back) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->call_back.swap(call_back), true : false;}
 	bool change_timer_call_back(tid id, const boost::function<bool(tid)>& call_back) {BOOST_AUTO(unused, call_back); return change_timer_call_back(id, unused);}
 
 	//after this call, call_back cannot be used again, please note.
@@ -134,24 +140,26 @@ public:
 	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex)
 
 protected:
-	bool start_timer(timer_info& ti)
+	bool start_timer(timer_info& ti, unsigned interval_ms)
 	{
 		if (!ti.call_back)
 			return false;
 
 		ti.status = timer_info::TIMER_STARTED;
 #if BOOST_ASIO_VERSION >= 101100 && (defined(ST_ASIO_USE_STEADY_TIMER) || defined(ST_ASIO_USE_SYSTEM_TIMER))
-		ti.timer.expires_after(milliseconds(ti.interval_ms));
+		ti.timer.expires_after(milliseconds(interval_ms));
 #else
-		ti.timer.expires_from_now(milliseconds(ti.interval_ms));
+		ti.timer.expires_from_now(milliseconds(interval_ms));
 #endif
+
+		//if timer already started, this will cancel it first
 		ti.timer.async_wait(ST_THIS make_handler_error(boost::bind(&timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti), ++ti.seq)));
 		return true;
 	}
+	bool start_timer(timer_info& ti) {return start_timer(ti, ti.interval_ms);}
 
 	void timer_handler(const boost::system::error_code& ec, timer_info& ti, unsigned char prev_seq)
 	{
-		//return true from call_back to continue the timer, or the timer will stop
 #ifdef ST_ASIO_ALIGNED_TIMER
 		BOOST_AUTO(begin_time, boost::chrono::system_clock::now());
 		if (!ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)
@@ -160,9 +168,7 @@ protected:
 			if (elapsed_ms > ti.interval_ms)
 				elapsed_ms %= ti.interval_ms;
 
-			ti.interval_ms -= elapsed_ms;
-			start_timer(ti);
-			ti.interval_ms += elapsed_ms;
+			start_timer(ti, ti.interval_ms - elapsed_ms);
 		}
 #else
 		if (!ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)
@@ -193,4 +199,3 @@ private:
 } //namespace
 
 #endif /* ST_ASIO_TIMER_H_ */
-

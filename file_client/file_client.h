@@ -29,7 +29,9 @@ public:
 	//reset all, be ensure that there's no any operations performed on this file_socket when invoke it
 	virtual void reset() {clear(); client_socket::reset();}
 
+	bool is_idle() const {return TRANS_IDLE == state;}
 	void set_index(int index_) {index = index_;}
+
 	bool get_file(const std::string& file_name)
 	{
 		assert(!file_name.empty());
@@ -190,6 +192,13 @@ public:
 		get_file();
 	}
 
+	bool is_end()
+	{
+		size_t idle_num = 0;
+		do_something_to_all(boost::lambda::if_then(boost::lambda::bind(&file_socket::is_idle, *boost::lambda::_1), ++boost::lambda::var(idle_num)));
+		return idle_num == size();
+	}
+
 private:
 	void get_file()
 	{
@@ -227,7 +236,15 @@ private:
 		assert(UPDATE_PROGRESS == id);
 
 		if (file_size < 0)
-			return true;
+		{
+			if (!is_end())
+				return true;
+
+			change_timer_status(id, timer_info::TIMER_CANCELED);
+			get_file();
+
+			return false;
+		}
 		else if (file_size > 0)
 		{
 			unsigned new_percent = (unsigned) (received_size * 100 / file_size);
@@ -241,11 +258,22 @@ private:
 		}
 
 		if (received_size < file_size)
-			return true;
+		{
+			if (!is_end())
+				return true;
+
+			change_timer_status(id, timer_info::TIMER_CANCELED);
+			get_file();
+
+			return false;
+		}
 
 		double used_time = (double) begin_time.elapsed().wall / 1000000000;
-		printf("\r100%%\nend, speed: %f MBps.\n", file_size / used_time / 1024 / 1024);
+		printf("\r100%%\nend, speed: %f MBps.\n\n", file_size / used_time / 1024 / 1024);
 		change_timer_status(id, timer_info::TIMER_CANCELED);
+
+		//wait all file_socket to clean up themselves
+		while (!is_end()) boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
 		get_file();
 
 		return false;

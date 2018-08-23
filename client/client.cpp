@@ -6,6 +6,10 @@
 #define ST_ASIO_DELAY_CLOSE		1 //this demo not used object pool and doesn't need life cycle management,
 								  //so, define this to avoid hooks for async call (and slightly improve efficiency),
 								  //any value which is bigger than zero is okay.
+#define ST_ASIO_SYNC_RECV
+//#define ST_ASIO_PASSIVE_RECV //because we not defined this macro, this demo will use mix model to receive messages, which means
+							   //some messages will be dispatched via on_msg_handle(), some messages will be returned via sync_recv_msg(),
+							   //if the server send messages quickly enough, you will see them cross together.
 #define ST_ASIO_DISPATCH_BATCH_MSG
 #define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_CUSTOM_LOG
@@ -46,11 +50,29 @@ public:
 };
 
 #include "../include/ext/tcp.h"
+using namespace st_asio_wrapper;
+using namespace st_asio_wrapper::ext;
 using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define RECONNECT		"reconnect"
+
+void sync_recv_thread(single_client& client)
+{
+	ST_ASIO_DEFAULT_UNPACKER::container_type msg_can;
+	while (client.sync_recv_msg(msg_can))
+	{
+		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
+#ifdef ST_ASIO_PASSIVE_RECV
+			if (!iter->empty())
+#else
+			printf("sync recv(" ST_ASIO_SF ") : %s\n", iter->size(), iter->data());
+#endif
+		msg_can.clear();
+	}
+	puts("sync recv end.");
+}
 
 int main(int argc, const char* argv[])
 {
@@ -73,15 +95,23 @@ int main(int argc, const char* argv[])
 		client.set_server_addr(ST_ASIO_SERVER_PORT + 100, ST_ASIO_SERVER_IP);
 
 	sp.start_service();
+	boost::this_thread::sleep_for(boost::chrono::milliseconds(500)); //to be more efficiently, start the worker thread in tcp::socket_base::on_connect().
+	boost::thread t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(client)));
 	while(sp.is_running())
 	{
 		std::string str;
 		std::cin >> str;
 		if (QUIT_COMMAND == str)
+		{
 			sp.stop_service();
+			t.join();
+		}
 		else if (RESTART_COMMAND == str)
 		{
 			sp.stop_service();
+			t.join();
+
+			t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(client)));
 			sp.start_service();
 		}
 		else if (RECONNECT == str)

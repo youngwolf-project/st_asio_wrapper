@@ -139,7 +139,9 @@ int main(int argc, const char* argv[])
 	{
 		std::string str;
 		std::getline(std::cin, str);
-		if (QUIT_COMMAND == str)
+		if (str.empty())
+			;
+		else if (QUIT_COMMAND == str)
 			sp.stop_service();
 		else if (STATISTIC == str)
 		{
@@ -155,7 +157,7 @@ int main(int argc, const char* argv[])
 			sp.add_service_thread(1);
 		else if (DECREASE_THREAD == str)
 			sp.del_service_thread(1);
-		else if (!str.empty())
+		else
 		{
 			size_t msg_num = 1024;
 			size_t msg_len = 1024; //must greater than or equal to sizeof(size_t)
@@ -178,7 +180,7 @@ int main(int argc, const char* argv[])
 			begin_time.start();
 
 			while (0 != completed_session_num)
-				boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(50));
+				boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
 
 			boost::uint64_t total_msg_bytes = link_num; total_msg_bytes *= msg_len; total_msg_bytes *= msg_num;
 			double used_time = (double) begin_time.elapsed().wall / 1000000000;
