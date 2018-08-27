@@ -641,7 +641,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #endif
 
 //IO thread number
-//listening, msg sending and receiving, msg handling (on_msg_handle() and on_msg()), all timers(include user timers) and other asynchronous calls (object::post())
+//listening, msg sending and receiving, msg handling (on_msg_handle()), all timers (include user timers) and other asynchronous calls (from executor)
 //keep big enough, no empirical value I can suggest, you must try to find it out in your own environment
 #ifndef ST_ASIO_SERVICE_THREAD_NUM
 #define ST_ASIO_SERVICE_THREAD_NUM	8
