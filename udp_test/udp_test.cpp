@@ -29,11 +29,8 @@ void sync_recv_thread(single_service& service)
 	while (service.sync_recv_msg(msg_can))
 	{
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
-#ifdef ST_ASIO_PASSIVE_RECV
-			if (!iter->empty())
-#endif
 			printf("sync recv(" ST_ASIO_SF ") : %s\n", iter->size(), iter->data());
-		msg_can.clear();
+		msg_can.clear(); //sync_recv_msg just append new messages(s) to msg_can, please note.
 	}
 	puts("sync recv end.");
 }
