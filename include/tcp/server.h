@@ -180,7 +180,7 @@ protected:
 			start_next_accept();
 	}
 
-protected:
+private:
 	boost::asio::ip::tcp::endpoint server_addr;
 	boost::asio::ip::tcp::acceptor acceptor;
 };

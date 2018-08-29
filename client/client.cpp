@@ -61,7 +61,7 @@ using namespace st_asio_wrapper::ext::tcp;
 void sync_recv_thread(single_client& client)
 {
 	ST_ASIO_DEFAULT_UNPACKER::container_type msg_can;
-	while (client.sync_recv_msg(msg_can))
+	while (client.sync_recv_msg(msg_can)) //st_asio_wrapper will not maintain messages in msg_can anymore after sync_recv_msg return, please note.
 	{
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 			printf("sync recv(" ST_ASIO_SF ") : %s\n", iter->size(), iter->data());

@@ -263,7 +263,7 @@
  * Not use sending buffer (send_msg_buffer) if possible.
  * Reduced stopped() invocation (because it needs locks).
  * Introduced boost::asio::io_service::work (boost::asio::executor_work_guard) by defining ST_ASIO_AVOID_AUTO_STOP_SERVICE macro.
- * Add function service_pump::service_thread_num to fetch the real number of service thread (must define ST_ASIO__DECREASE_THREAD_AT_RUNTIME macro).
+ * Add function service_pump::service_thread_num to fetch the real number of service thread (must define ST_ASIO_DECREASE_THREAD_AT_RUNTIME macro).
  *
  * DELETION:
  *
@@ -453,7 +453,7 @@
  * 2018.8.22	version 2.1.2
  *
  * SPECIAL ATTENTION (incompatible with old editions):
- * If macro ST_ASIO_PASSIVE_RECV been defined, you may receive empty messages in on_msg_handle() and sync_recv_msg(), this makes you always having
+ * If macro ST_ASIO_PASSIVE_RECV been defined, you may receive empty messages in on_msg() or on_msg_handle() and sync_recv_msg(), this makes you always having
  *  the chance to call recv_msg().
  * i_unpacker has been moved from namespace st_asio_wrapper::tcp and st_asio_wrapper::udp to namespace st_asio_wrapper, and the signature of
  *  st_asio_wrapper::udp::i_unpacker::parse_msg has been changed to obey st_asio_wrapper::tcp::i_unpacker::parse_msg.
@@ -479,6 +479,27 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2018.9.x		version 1.3.3
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ *
+ * HIGHLIGHT:
+ * Support sync message dispatching, it's like previous on_msg() callback but with a message container instead of a message (and many other
+ *  differences, see macro ST_ASIO_SYNC_DISPATCH for more details), and we also name it on_msg().
+ *
+ * FIX:
+ * Fix statistics for batch message dispatching.
+ *
+ * ENHANCEMENTS:
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ * Hide as many as possible member variables for developers.
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -488,8 +509,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20102	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.1.2"
+#define ST_ASIO_VER		20103	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.1.3"
 
 //boost and compiler check
 #ifdef _MSC_VER
@@ -641,7 +662,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #endif
 
 //IO thread number
-//listening, msg sending and receiving, msg handling (on_msg_handle()), all timers (include user timers) and other asynchronous calls (from executor)
+//listening, msg sending and receiving, msg handling (on_msg() and on_msg_handle()), all timers (include user timers) and other asynchronous calls (from executor)
 //keep big enough, no empirical value I can suggest, you must try to find it out in your own environment
 #ifndef ST_ASIO_SERVICE_THREAD_NUM
 #define ST_ASIO_SERVICE_THREAD_NUM	8
@@ -729,7 +750,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 // this seems not a normal procedure, but it works, I believe that asio's defect caused this problem.
 
 //#define ST_ASIO_AVOID_AUTO_STOP_SERVICE
-//wrap service_pump with asio::io_service::work (asio::executor_work_guard), then it will never run out
+//wrap service_pump with boost::asio::io_service::work (boost::asio::executor_work_guard), then it will never run out until you explicitly call stop_service().
 
 //#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //enable decreasing service thread at runtime.
@@ -751,7 +772,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #endif
 //msg handling
 //call on_msg_handle, if failed, retry it after ST_ASIO_MSG_HANDLING_INTERVAL milliseconds later.
-//this value can be changed via msg_handling_interval(size_t) at runtime.
+//this value can be changed via st_asio_wrapper::socket::msg_handling_interval(size_t) at runtime.
 
 //#define ST_ASIO_PASSIVE_RECV
 //to gain the ability of changing the unpacker at runtime, with this mcro, st_asio_wrapper will not do message receiving automatically (except the firt one),
@@ -764,7 +785,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //#define ST_ASIO_DISPATCH_BATCH_MSG
 //all messages will be dispatched via on_handle_msg with a variable-length container, this will change the signature of function on_msg_handle,
 //it's very useful if you want to re-dispatch message in your own logic or with very simple message handling (such as echo server).
-//it's your responsibility to remove handled messages from the container (can be part of them).
+//it's your responsibility to remove handled messages from the container (can be a part of them).
 
 //#define ST_ASIO_ALIGNED_TIMER
 //for example, start a timer at xx:xx:xx, interval is 10 seconds, the callback will be called at (xx:xx:xx + 10), and suppose that the callback
@@ -785,9 +806,21 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 // we must avoid to do sync message sending and receiving in service threads.
 // if prior sync_recv_msg() not returned, the second sync_recv_msg() will return false immediately.
 // with macro ST_ASIO_PASSIVE_RECV, in sync_recv_msg(), recv_msg() will be automatically called.
+// after returned from sync_recv_msg(), st_asio_wrapper will not maintain those messages that have been output.
 
 //Sync message sending and receiving are not tracked by tracked_executor, please note.
 //No matter you're doing sync message sending or async message sending, you can do sync message receiving or async message receiving concurrently.
+
+//#define ST_ASIO_SYNC_DISPATCH
+//with this macro, virtual size_t on_msg(boost::container::list<OutMsgType>& msg_can) will be provided, you can rewrite it and handle all or a part of the
+// messages like virtual function on_msg_handle (with macro ST_ASIO_DISPATCH_BATCH_MSG), if your logic is simple enough (like echo or pingpong test),
+// this feature is recommended because it can slightly improve efficiency.
+//now we have three ways to handle messages (sync_recv_msg, on_msg and on_msg_handle), the order of handling is the same as listed, if messages been successfully
+// dispatched to sync_recv_msg, then the second two will do nothing, otherwise messages will be dispatched to on_msg, if on_msg only handled a part of (include
+// zero) the messages, then on_msg_handle will continue to dispatch the rest of them (asynchronously, this will disorder messages, please note).
+// as before, on_msg will block the next receiving but only on current socket.
+//if you cannot handle all of the messages in on_msg (like echo_server), you should not use sync message dispatching except you can bear message disordering.
+
 //configurations
 
 #endif /* ST_ASIO_CONFIG_H_ */

@@ -282,14 +282,24 @@ private:
 		return true;
 	}
 
-protected:
+private:
+	using super::stat;
+	using super::packer_;
+	using super::temp_msg_can;
+
+	using super::send_msg_buffer;
+	using super::sending;
+
+#ifdef ST_ASIO_PASSIVE_RECV
+	using super::reading;
+#endif
+
 	typename super::in_msg last_send_msg;
 	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker_;
 	boost::asio::ip::udp::endpoint local_addr;
 	boost::asio::ip::udp::endpoint temp_addr; //used when receiving messages
 	boost::asio::ip::udp::endpoint peer_addr;
 
-private:
 	boost::asio::io_context::strand strand;
 };
 

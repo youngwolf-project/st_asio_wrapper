@@ -7,6 +7,7 @@
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
+#define ST_ASIO_SYNC_DISPATCH
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_MSG_BUFFER_SIZE	65536
 #define ST_ASIO_INPUT_QUEUE non_lock_queue //we will never operate sending buffer concurrently, so need no locks.
@@ -52,7 +53,17 @@ protected:
 	virtual void on_connect() {boost::asio::ip::tcp::no_delay option(true); lowest_layer().set_option(option); client_socket::on_connect();}
 
 	//msg handling
-	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}
+	virtual size_t on_msg(std::list<out_msg_type>& msg_can) //must define macro ST_ASIO_SYNC_DISPATCH
+	{
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
+		BOOST_AUTO(re, msg_can.size());
+		msg_can.clear(); //if we left behind some messages in msg_can, they will be dispatched via on_msg_handle and disorder messages
+		//here we always consumed all messages, so we can use sync message dispatching, otherwise, we should not use sync message dispatching
+		//except we can bear message disordering.
+
+		return re;
+	}
+	//msg handling end
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	virtual void on_msg_send(in_msg_type& msg)
@@ -113,7 +124,7 @@ int main(int argc, const char* argv[])
 	if (argc > 4)
 		link_num = std::min(ST_ASIO_MAX_OBJECT_NUM, std::max(atoi(argv[4]), 1));
 
-	printf("exec: echo_client with " ST_ASIO_SF " links\n", link_num);
+	printf("exec: pingpong_client with " ST_ASIO_SF " links\n", link_num);
 	///////////////////////////////////////////////////////////
 
 	service_pump sp;

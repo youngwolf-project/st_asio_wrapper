@@ -8,6 +8,7 @@
 //#define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 #define ST_ASIO_CLEAR_OBJECT_INTERVAL 1
+#define ST_ASIO_SYNC_DISPATCH
 #define ST_ASIO_DISPATCH_BATCH_MSG
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
@@ -107,12 +108,24 @@ public:
 
 protected:
 	//msg handling
-#ifdef ST_ASIO_DISPATCH_BATCH_MSG
-	virtual size_t on_msg_handle(out_queue_type& can)
+#ifdef ST_ASIO_SYNC_DISPATCH
+	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
 	{
-		//to consume part of messages in can, see echo_server.
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
+		BOOST_AUTO(re, msg_can.size());
+		msg_can.clear(); //if we left behind some messages in msg_can, they will be dispatched via on_msg_handle and disorder messages
+		//here we always consumed all messages, so we can use sync message dispatching, otherwise, we should not use sync message dispatching
+		//except we can bear message disordering.
+
+		return re;
+	}
+#endif
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	virtual size_t on_msg_handle(out_queue_type& msg_can)
+	{
+		//to consume a part of the messages in msg_can, see echo_server.
 		out_container_type tmp_can;
-		can.swap(tmp_can);
+		msg_can.swap(tmp_can); //must be thread safe
 
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&echo_socket::handle_msg, this, _1));
 		return tmp_can.size();

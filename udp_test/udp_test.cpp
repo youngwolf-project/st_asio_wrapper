@@ -26,7 +26,7 @@ using namespace st_asio_wrapper::ext::udp;
 void sync_recv_thread(single_service& service)
 {
 	boost::container::list<single_service::out_msg_type> msg_can;
-	while (service.sync_recv_msg(msg_can))
+	while (service.sync_recv_msg(msg_can)) //st_asio_wrapper will not maintain messages in msg_can anymore after sync_recv_msg return, please note.
 	{
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 			printf("sync recv(" ST_ASIO_SF ") : %s\n", iter->size(), iter->data());

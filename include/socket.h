@@ -49,7 +49,7 @@ protected:
 		reading = false;
 #endif
 #ifdef ST_ASIO_SYNC_RECV
-		status = NOT_REQUESTED;
+		sr_status = NOT_REQUESTED;
 #endif
 		started_ = false;
 		dispatching = false;
@@ -79,7 +79,7 @@ protected:
 		reading = false;
 #endif
 #ifdef ST_ASIO_SYNC_RECV
-		status = NOT_REQUESTED;
+		sr_status = NOT_REQUESTED;
 #endif
 		dispatching = false;
 #ifndef ST_ASIO_DISPATCH_BATCH_MSG
@@ -192,7 +192,7 @@ public:
 	bool is_send_buffer_available() const {return send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
 
 	//if you define macro ST_ASIO_PASSIVE_RECV and call recv_msg greedily, the receiving buffer may overflow, this can exhaust all virtual memory,
-	//to avoid this problem, call recv_msg only if is_recv_buffer_available returns true.
+	//to avoid this problem, call recv_msg only if is_recv_buffer_available() returns true.
 	bool is_recv_buffer_available() const {return recv_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
 
 	//don't use the packer but insert into send buffer directly
@@ -216,17 +216,17 @@ public:
 			return false;
 
 		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
-		if (NOT_REQUESTED != status)
+		if (NOT_REQUESTED != sr_status)
 			return false;
 
 #ifdef ST_ASIO_PASSIVE_RECV
 		recv_msg();
 #endif
-		status = REQUESTED;
+		sr_status = REQUESTED;
 		sync_recv_cv.wait(lock);
 
-		bool re = RESPONDED == status;
-		status = NOT_REQUESTED;
+		bool re = RESPONDED == sr_status;
+		sr_status = NOT_REQUESTED;
 		if (re)
 			msg_can.splice(msg_can.end(), temp_msg_can);
 		sync_recv_cv.notify_one();
@@ -272,13 +272,27 @@ protected:
 	virtual void on_close() {unified_out::info_out("on_close()");}
 	virtual void after_close() {} //a good case for using this is to reconnect to the server, please refer to client_socket_base.
 
-	//return true (or > 0) means msg been handled, false (or 0) means msg cannot be handled right now, and socket will re-dispatch it asynchronously
+#ifdef ST_ASIO_SYNC_DISPATCH
+	//return the number of handled msg, if some msg left behind, socket will re-dispatch them asynchronously
 	//notice: using inconstant is for the convenience of swapping
+	virtual size_t on_msg(boost::container::list<OutMsgType>& msg_can)
+	{
+		//it's always thread safe in this virtual function, because it blocks message receiving
+		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
+			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
+		BOOST_AUTO(re, msg_can.size());
+		msg_can.clear(); //have handled all messages
+
+		return re;
+	}
+#endif
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
-	virtual size_t on_msg_handle(out_queue_type& can)
+	//return the number of handled msg, if some msg left behind, socket will re-dispatch them asynchronously
+	//notice: using inconstant is for the convenience of swapping
+	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		out_container_type tmp_can;
-		can.swap(tmp_can);
+		msg_can.swap(tmp_can); //must be thread safe
 
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
 			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
@@ -286,6 +300,7 @@ protected:
 		return tmp_can.size();
 	}
 #else
+	//return true means msg been handled, false means msg cannot be handled right now, and socket will re-dispatch it asynchronously
 	virtual bool on_msg_handle(OutMsgType& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
 #endif
 
@@ -342,20 +357,31 @@ protected:
 	{
 #ifdef ST_ASIO_SYNC_RECV
 		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
-		if (REQUESTED == status)
+		if (REQUESTED == sr_status)
 		{
-			status = RESPONDED;
+			sr_status = RESPONDED;
 			sync_recv_cv.notify_one();
 
 			sync_recv_cv.wait(lock);
-			if (RESPONDED != status) //sync_recv_msg() has consumed temp_msg_can
+			if (RESPONDED != sr_status) //sync_recv_msg() has consumed temp_msg_can
 				return handled_msg();
 		}
 		lock.unlock();
 #endif
 		size_t msg_num = temp_msg_can.size();
 		stat.recv_msg_sum += msg_num;
-#ifdef ST_ASIO_PASSIVE_RECV
+
+#ifdef ST_ASIO_SYNC_DISPATCH
+#ifndef ST_ASIO_PASSIVE_RECV
+		if (msg_num > 0)
+		{
+#endif
+			on_msg(temp_msg_can);
+			msg_num = temp_msg_can.size();
+#ifndef ST_ASIO_PASSIVE_RECV
+		}
+#endif
+#elif defined(ST_ASIO_PASSIVE_RECV)
 		if (0 == msg_num)
 		{
 			msg_num = 1;
@@ -474,14 +500,24 @@ private:
 		if ((dispatching = !recv_msg_buffer.empty()))
 		{
 			BOOST_AUTO(begin_time, statistic::now());
-			stat.dispatch_dealy_sum += begin_time - recv_msg_buffer.front().begin_time;
+#ifdef ST_ASIO_FULL_STATISTIC
+			recv_msg_buffer.lock();
+			for (BOOST_AUTO(iter, recv_msg_buffer.begin()); iter != recv_msg_buffer.end(); ++iter)
+				stat.dispatch_dealy_sum += begin_time - iter->begin_time;
+			recv_msg_buffer.unlock();
+#endif
 			size_t re = on_msg_handle(recv_msg_buffer);
 			BOOST_AUTO(end_time, statistic::now());
 			stat.handle_time_sum += end_time - begin_time;
 
 			if (0 == re) //dispatch failed, re-dispatch
 			{
-				recv_msg_buffer.front().restart(end_time);
+#ifdef ST_ASIO_FULL_STATISTIC
+				recv_msg_buffer.lock();
+				for (BOOST_AUTO(iter, recv_msg_buffer.begin()); iter != recv_msg_buffer.end(); ++iter)
+					iter->restart(end_time);
+				recv_msg_buffer.unlock();
+#endif
 				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
 			}
 			else
@@ -587,7 +623,7 @@ private:
 
 #ifdef ST_ASIO_SYNC_RECV
 	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED};
-	volatile sync_recv_status status;
+	volatile sync_recv_status sr_status;
 
 	boost::mutex sync_recv_mutex;
 	boost::condition_variable sync_recv_cv;

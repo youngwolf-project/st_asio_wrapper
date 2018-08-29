@@ -37,9 +37,9 @@ public:
 protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
+#ifndef ST_ASIO_REUSE_SSL_STREAM
 		if (ST_THIS is_ready())
 		{
-#ifndef ST_ASIO_REUSE_SSL_STREAM
 			ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN;
 			ST_THIS show_info("ssl link:", "been shut down.");
 			boost::system::error_code ec;
@@ -47,8 +47,8 @@ protected:
 
 			if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
 				unified_out::info_out("shutdown ssl link failed (maybe intentionally because of reusing)");
-#endif
 		}
+#endif
 
 		Socket::on_recv_error(ec);
 	}
