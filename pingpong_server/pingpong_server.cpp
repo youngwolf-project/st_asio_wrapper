@@ -37,7 +37,7 @@ public:
 
 protected:
 	//msg handling: send the original msg back(echo server)
-	virtual size_t on_msg(std::list<out_msg_type>& msg_can) //must define macro ST_ASIO_SYNC_DISPATCH
+	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can) //must define macro ST_ASIO_SYNC_DISPATCH
 	{
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(out_msg_type&, bool)) &echo_socket::direct_send_msg, this, _1, false));
 		BOOST_AUTO(re, msg_can.size());

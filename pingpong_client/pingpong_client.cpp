@@ -53,7 +53,7 @@ protected:
 	virtual void on_connect() {boost::asio::ip::tcp::no_delay option(true); lowest_layer().set_option(option); client_socket::on_connect();}
 
 	//msg handling
-	virtual size_t on_msg(std::list<out_msg_type>& msg_can) //must define macro ST_ASIO_SYNC_DISPATCH
+	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can) //must define macro ST_ASIO_SYNC_DISPATCH
 	{
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
 		BOOST_AUTO(re, msg_can.size());

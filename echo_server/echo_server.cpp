@@ -102,7 +102,7 @@ protected:
 	//msg handling: send the original msg back(echo server)
 /*
 #ifdef ST_ASIO_SYNC_DISPATCH //do not open this feature
-	virtual size_t on_msg(std::list<out_msg_type>& msg_can)
+	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
 	{
 		if (!is_send_buffer_available())
 			return 0; //congestion control
