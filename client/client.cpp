@@ -10,7 +10,6 @@
 //#define ST_ASIO_PASSIVE_RECV //because we not defined this macro, this demo will use mix model to receive messages, which means
 							   //some messages will be dispatched via on_msg_handle(), some messages will be returned via sync_recv_msg(),
 							   //if the server send messages quickly enough, you will see them cross together.
-#define ST_ASIO_DISPATCH_BATCH_MSG
 #define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_CUSTOM_LOG
 #define ST_ASIO_DEFAULT_UNPACKER non_copy_unpacker

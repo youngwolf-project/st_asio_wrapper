@@ -109,6 +109,7 @@ public:
 protected:
 	//msg handling
 #ifdef ST_ASIO_SYNC_DISPATCH
+	//do not hold msg_can for further using, return from on_msg as quickly as possible
 	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
 	{
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
@@ -121,6 +122,7 @@ protected:
 	}
 #endif
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
 	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		//to consume a part of the messages in msg_can, see echo_server.

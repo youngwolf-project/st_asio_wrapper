@@ -514,8 +514,7 @@ private:
 			{
 #ifdef ST_ASIO_FULL_STATISTIC
 				recv_msg_buffer.lock();
-				for (BOOST_AUTO(iter, recv_msg_buffer.begin()); iter != recv_msg_buffer.end(); ++iter)
-					iter->restart(end_time);
+				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&out_msg::restart, _1, boost::cref(end_time)));
 				recv_msg_buffer.unlock();
 #endif
 				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching

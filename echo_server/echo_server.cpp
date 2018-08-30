@@ -102,6 +102,7 @@ protected:
 	//msg handling: send the original msg back(echo server)
 /*
 #ifdef ST_ASIO_SYNC_DISPATCH //do not open this feature
+	//do not hold msg_can for further using, return from on_msg as quickly as possible
 	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
 	{
 		if (!is_send_buffer_available())
@@ -121,6 +122,7 @@ protected:
 #endif
 */
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
 	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		if (!is_send_buffer_available())
