@@ -85,6 +85,7 @@ public:
 
 		return false;
 	}
+	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return find(id);}
 
 	///////////////////////////////////////////////////
 	//msg sending interface
