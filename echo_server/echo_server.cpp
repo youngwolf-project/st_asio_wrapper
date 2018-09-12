@@ -108,14 +108,14 @@ protected:
 		if (!is_send_buffer_available())
 			return 0; //congestion control
 		//here if we cannot handle all messages in msg_can, do not use sync message dispatching except we can bear message disordering,
-		//this is because on_msg_handle will be invoked asynchronously, then disorder messages. and do not try to handle all messages
-		//here (just for echo_server's business logic) because:
+		//this is because on_msg_handle can be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
+		//and do not try to handle all messages here (just for echo_server's business logic) because:
 		//1. we can not use safe_send_msg as i said many times, we should not block service threads.
 		//2. if we use true can_overflow to call send_msg, then buffer usage will be out of control, we should not take this risk.
 
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(out_msg_ctype&, bool)) &echo_socket::send_msg, this, _1, true));
 		BOOST_AUTO(re, msg_can.size());
-		msg_can.clear(); //if we left behind some messages in msg_can, they will be dispatched via on_msg_handle and disorder messages
+		msg_can.clear();
 
 		return re;
 	}
