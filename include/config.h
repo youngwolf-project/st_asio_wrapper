@@ -480,24 +480,32 @@
  * REPLACEMENTS:
  *
  * ===============================================================
- * 2018.9.x		version 1.3.3
+ * 2018.9.x		version 2.1.3
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  *
  * HIGHLIGHT:
  * Support sync message dispatching, it's like previous on_msg() callback but with a message container instead of a message (and many other
  *  differences, see macro ST_ASIO_SYNC_DISPATCH for more details), and we also name it on_msg().
+ * Support timed waiting when doing sync message sending and receiving.
  *
  * FIX:
+ * Fix spurious awakenings when doing sync message sending and receiving.
  * Fix statistics for batch message dispatching.
  *
  * ENHANCEMENTS:
  * Add virtual function find_socket to interface i_server.
+ * Support timed waiting when doing sync message sending.
+ *  please note that after timeout, the sending can succeed in the future because ascs uses async sending to simulate sync sending,
+ *  and on_msg_send (if macro ST_ASIO_WANT_MSG_SEND_NOTIFY been defined) will not be affected, which means it can be called in the future too. 
+ * Support timed waiting when doing sync message receiving.
+ *  please note that after timeout, the receiving can succeed in the future because ascs uses async receiving to simulate sync receiving,
+ *  and messages will be dispatched via on_msg (if macro ST_ASIO_SYNC_DISPATCH been defined) and / or on_msg_handle.
  *
  * DELETION:
  *
  * REFACTORING:
- * Hide as many as possible member variables for developers.
+ * Hide member variables as many as possible for developers.
  *
  * REPLACEMENTS:
  *

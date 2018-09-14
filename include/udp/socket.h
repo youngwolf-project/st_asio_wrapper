@@ -39,7 +39,7 @@ public:
 	virtual void send_heartbeat()
 	{
 		in_msg_type msg(peer_addr);
-		ST_THIS packer_->pack_heartbeat(msg);
+		packer_->pack_heartbeat(msg);
 		ST_THIS do_direct_send_msg(msg);
 	}
 
@@ -99,7 +99,7 @@ public:
 #ifdef ST_ASIO_PASSIVE_RECV
 	//changing unpacker must before calling st_asio_wrapper::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
 	void unpacker(const boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
-	virtual void recv_msg() {if (!ST_THIS reading && is_ready()) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
+	virtual void recv_msg() {if (!reading && is_ready()) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
 #endif
 
 	///////////////////////////////////////////////////
@@ -112,12 +112,12 @@ public:
 	UDP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
 
 #ifdef ST_ASIO_SYNC_SEND
-	UDP_SEND_MSG(sync_send_msg, false, do_direct_sync_send_msg) //use the packer with native = false to pack the msgs
-	UDP_SEND_MSG(sync_send_native_msg, true, do_direct_sync_send_msg) //use the packer with native = true to pack the msgs
+	UDP_SYNC_SEND_MSG(sync_send_msg, false, do_direct_sync_send_msg) //use the packer with native = false to pack the msgs
+	UDP_SYNC_SEND_MSG(sync_send_native_msg, true, do_direct_sync_send_msg) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
 	//success at here just means put the msg into tcp::socket_base's send buffer
-	UDP_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
-	UDP_SAFE_SEND_MSG(sync_safe_send_native_msg, sync_send_native_msg)
+	UDP_SYNC_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
+	UDP_SYNC_SAFE_SEND_MSG(sync_safe_send_native_msg, sync_send_native_msg)
 #endif
 	//msg sending interface
 	///////////////////////////////////////////////////
@@ -131,7 +131,7 @@ protected:
 
 	virtual bool on_heartbeat_error()
 	{
-		ST_THIS stat.last_recv_time = time(NULL); //avoid repetitive warnings
+		stat.last_recv_time = time(NULL); //avoid repetitive warnings
 		unified_out::warning_out("%s:%hu is not available", peer_addr.address().to_string().data(), peer_addr.port());
 		return true;
 	}
@@ -158,7 +158,7 @@ private:
 	void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (ST_THIS reading)
+		if (reading)
 			return;
 #endif
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
@@ -168,7 +168,7 @@ private:
 		else
 		{
 #ifdef ST_ASIO_PASSIVE_RECV
-			ST_THIS reading = true;
+			reading = true;
 #endif
 			ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
@@ -179,23 +179,23 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			ST_THIS stat.last_recv_time = time(NULL);
+			stat.last_recv_time = time(NULL);
 
 			typename Unpacker::container_type msg_can;
 			unpacker_->parse_msg(bytes_transferred, msg_can);
 
 #ifdef ST_ASIO_PASSIVE_RECV
-		ST_THIS reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
+			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
 			for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
-				ST_THIS temp_msg_can.emplace_back(temp_addr, boost::ref(*iter));
+				temp_msg_can.emplace_back(temp_addr, boost::ref(*iter));
 			if (ST_THIS handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
 		else
 		{
 #ifdef ST_ASIO_PASSIVE_RECV
-		ST_THIS reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
+			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
 #if defined(_MSC_VER) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__MINGW64__)
 			if (ec && boost::asio::error::connection_refused != ec && boost::asio::error::connection_reset != ec)
@@ -210,12 +210,12 @@ private:
 
 	bool do_send_msg(bool in_strand)
 	{
-		if (!in_strand && ST_THIS sending)
+		if (!in_strand && sending)
 			return true;
 
-		if ((ST_THIS sending = ST_THIS send_msg_buffer.try_dequeue(last_send_msg)))
+		if ((sending = send_msg_buffer.try_dequeue(last_send_msg)))
 		{
-			ST_THIS stat.send_delay_sum += statistic::now() - last_send_msg.begin_time;
+			stat.send_delay_sum += statistic::now() - last_send_msg.begin_time;
 
 			last_send_msg.restart();
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr, make_strand_handler(strand,
@@ -230,20 +230,23 @@ private:
 	{
 		if (!ec)
 		{
-			ST_THIS stat.last_send_time = time(NULL);
+			stat.last_send_time = time(NULL);
 
-			ST_THIS stat.send_byte_sum += bytes_transferred;
-			ST_THIS stat.send_time_sum += statistic::now() - last_send_msg.begin_time;
-			++ST_THIS stat.send_msg_sum;
+			stat.send_byte_sum += bytes_transferred;
+			stat.send_time_sum += statistic::now() - last_send_msg.begin_time;
+			++stat.send_msg_sum;
 #ifdef ST_ASIO_SYNC_SEND
 			if (last_send_msg.cv)
+			{
+				last_send_msg.cv->signaled = true;
 				last_send_msg.cv->notify_one();
+			}
 #endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(last_send_msg);
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-			if (ST_THIS send_msg_buffer.empty())
+			if (send_msg_buffer.empty())
 				ST_THIS on_all_msg_send(last_send_msg);
 #endif
 		}
@@ -257,7 +260,7 @@ private:
 		//send msg in sequence
 		//on windows, sending a msg to addr_any may cause errors, please note
 		//for UDP, sending error will not stop subsequent sendings.
-		if (!do_send_msg(true) && !ST_THIS send_msg_buffer.empty())
+		if (!do_send_msg(true) && !send_msg_buffer.empty())
 			do_send_msg(true); //just make sure no pending msgs
 	}
 

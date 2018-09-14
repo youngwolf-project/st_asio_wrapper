@@ -148,7 +148,7 @@ int main(int argc, const char* argv[])
 //			client_.graceful_shutdown(false, false); //if you used single_client
 #endif
 		else
-			server_.broadcast_msg(str, false);
+			server_.broadcast_msg(str);
 	}
 
 	return 0;

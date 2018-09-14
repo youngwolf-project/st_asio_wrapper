@@ -91,7 +91,6 @@ protected:
 private:
 	void clear()
 	{
-		state = TRANS_IDLE;
 		if (NULL != file)
 		{
 			fclose(file);
@@ -99,6 +98,7 @@ private:
 		}
 
 		unpacker(boost::make_shared<ST_ASIO_DEFAULT_UNPACKER>());
+		state = TRANS_IDLE;
 	}
 	void trans_end() {clear();}
 

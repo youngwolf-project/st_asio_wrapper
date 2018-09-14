@@ -78,7 +78,7 @@ int main(int argc, const char* argv[])
 			t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(service)));
 		}
 		else
-			service.sync_safe_send_native_msg(str, false); //to send to different endpoints, use overloads that take a const boost::asio::ip::udp::endpoint& parameter
+			service.sync_safe_send_native_msg(str); //to send to different endpoints, use overloads that take a const boost::asio::ip::udp::endpoint& parameter
 	}
 
 	return 0;

@@ -130,12 +130,12 @@ public:
 	TCP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
 
 #ifdef ST_ASIO_SYNC_SEND
-	TCP_SEND_MSG(sync_send_msg, false, do_direct_sync_send_msg) //use the packer with native = false to pack the msgs
-	TCP_SEND_MSG(sync_send_native_msg, true, do_direct_sync_send_msg) //use the packer with native = true to pack the msgs
+	TCP_SYNC_SEND_MSG(sync_send_msg, false, do_direct_sync_send_msg) //use the packer with native = false to pack the msgs
+	TCP_SYNC_SEND_MSG(sync_send_native_msg, true, do_direct_sync_send_msg) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
 	//success at here just means put the msg into tcp::socket_base's send buffer
-	TCP_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
-	TCP_SAFE_SEND_MSG(sync_safe_send_native_msg, sync_send_native_msg)
+	TCP_SYNC_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
+	TCP_SYNC_SAFE_SEND_MSG(sync_safe_send_native_msg, sync_send_native_msg)
 #endif
 	//msg sending interface
 	///////////////////////////////////////////////////
@@ -309,7 +309,10 @@ private:
 #ifdef ST_ASIO_SYNC_SEND
 			for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
 				if (iter->cv)
+				{
+					iter->cv->signaled = true;
 					iter->cv->notify_one();
+				}
 #endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(last_send_msg.front());

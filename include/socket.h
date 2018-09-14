@@ -203,14 +203,15 @@ public:
 
 #ifdef ST_ASIO_SYNC_SEND
 	//don't use the packer but insert into send buffer directly, then wait for the sending to finish.
-	bool direct_sync_send_msg(const InMsgType& msg, bool can_overflow = false)
-		{if (!can_overflow && !is_send_buffer_available()) return false; InMsgType unused(msg); do_direct_sync_send_msg(unused);}
+	bool direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
+		{if (!can_overflow && !is_send_buffer_available()) return false; InMsgType unused(msg); do_direct_sync_send_msg(unused, duration);}
 	//after this call, msg becomes empty, please note.
-	bool direct_sync_send_msg(InMsgType& msg, bool can_overflow = false) {return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg) : false;}
+	bool direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
+		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : false;}
 #endif
 
 #ifdef ST_ASIO_SYNC_RECV
-	bool sync_recv_msg(boost::container::list<OutMsgType>& msg_can)
+	bool sync_recv_msg(boost::container::list<OutMsgType>& msg_can, unsigned duration = 0) //unit is millisecond, 0 means wait infinitely
 	{
 		if (stopped())
 			return false;
@@ -223,12 +224,11 @@ public:
 		recv_msg();
 #endif
 		sr_status = REQUESTED;
-		sync_recv_cv.wait(lock);
-
-		bool re = RESPONDED == sr_status;
-		sr_status = NOT_REQUESTED;
+		bool re = sync_recv_waiting(lock, duration);
 		if (re)
 			msg_can.splice(msg_can.end(), temp_msg_can);
+
+		sr_status = NOT_REQUESTED;
 		sync_recv_cv.notify_one();
 
 		return re;
@@ -339,7 +339,7 @@ protected:
 		if (stopped())
 		{
 #ifdef ST_ASIO_SYNC_RECV
-			sync_recv_cv.notify_one();
+			sync_recv_cv.notify_all();
 #endif
 			on_close();
 			after_close();
@@ -362,9 +362,13 @@ protected:
 			sr_status = RESPONDED;
 			sync_recv_cv.notify_one();
 
-			sync_recv_cv.wait(lock);
-			if (RESPONDED != sr_status) //sync_recv_msg() has consumed temp_msg_can
-				return handled_msg();
+			sync_recv_status* pstatus = &sr_status;
+			sync_recv_cv.wait(lock,
+				boost::lambda::if_then_else_return(!boost::lambda::bind(&socket::started, this) || RESPONDED != *boost::lambda::var(pstatus), true, false));
+			if (RESPONDED == sr_status) //eliminate race condition on temp_msg_can with sync_recv_msg
+				return false;
+			else if (temp_msg_can.empty())
+				return handled_msg(); //sync_recv_msg() has consumed temp_msg_can
 		}
 		lock.unlock();
 #endif
@@ -425,7 +429,7 @@ protected:
 	}
 
 #ifdef ST_ASIO_SYNC_SEND
-	bool do_direct_sync_send_msg(InMsgType& msg)
+	bool do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0)
 	{
 		if (stopped())
 			return false;
@@ -442,9 +446,7 @@ protected:
 			send_msg();
 
 		boost::unique_lock<boost::mutex> lock(sync_send_mutex);
-		cv->wait(lock);
-
-		return true;
+		return sync_send_waiting(lock, cv, duration);
 	}
 #endif
 
@@ -456,6 +458,34 @@ private:
 	//it should only be used by object_pool when reusing or creating new socket.
 	template<typename Object> friend class object_pool;
 	void id(boost::uint_fast64_t id) {_id = id;}
+
+#ifdef ST_ASIO_SYNC_RECV
+	bool sync_recv_waiting(boost::unique_lock<boost::mutex>& lock, unsigned duration)
+	{
+		sync_recv_status* pstatus = &sr_status;
+		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::bind(&socket::started, this) || REQUESTED != *boost::lambda::var(pstatus), true, false));
+		if (0 == duration)
+			sync_recv_cv.wait(lock, pred);
+		else if (!sync_recv_cv.wait_for(lock, boost::chrono::milliseconds(duration), pred))
+			return false;
+
+		return sync_recv_status::RESPONDED == sr_status;
+	}
+#endif
+
+#ifdef ST_ASIO_SYNC_SEND
+	bool sync_send_waiting(boost::unique_lock<boost::mutex>& lock, boost::shared_ptr<condition_variable>& cv, unsigned duration)
+	{
+		bool* psignaled = &cv->signaled;
+		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::bind(&socket::started, this) || *boost::lambda::var(psignaled), true, false));
+		if (0 == duration)
+			cv->wait(lock, pred);
+		else if (!sync_recv_cv.wait_for(lock, boost::chrono::milliseconds(duration), pred))
+			return false;
+
+		return cv->signaled;
+	}
+#endif
 
 	bool check_receiving(bool raise_recv)
 	{
@@ -572,7 +602,7 @@ private:
 			}
 			change_timer_status(TIMER_DELAY_CLOSE, timer_info::TIMER_CANCELED);
 #ifdef ST_ASIO_SYNC_RECV
-			sync_recv_cv.notify_one();
+			sync_recv_cv.notify_all();
 #endif
 			on_close();
 			after_close();
@@ -622,7 +652,7 @@ private:
 
 #ifdef ST_ASIO_SYNC_RECV
 	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED};
-	volatile sync_recv_status sr_status;
+	sync_recv_status sr_status;
 
 	boost::mutex sync_recv_mutex;
 	boost::condition_variable sync_recv_cv;

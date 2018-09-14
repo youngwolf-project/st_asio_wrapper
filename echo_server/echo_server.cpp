@@ -144,7 +144,7 @@ protected:
 		return tmp_can.size();
 	}
 #else
-	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg, false);}
+	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg);}
 #endif
 	//msg handling end
 };
