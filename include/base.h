@@ -386,10 +386,22 @@ private:
 };
 
 #ifdef ST_ASIO_SYNC_SEND
-struct condition_variable : public boost::condition_variable
+#if BOOST_VERSION > 104900
+typedef boost::condition_variable condition_variable;
+#else
+class condition_variable : public boost::condition_variable
+{
+public:
+	template <typename Predicate>
+	bool wait_for(boost::unique_lock<boost::mutex>& lock, const boost::chrono::milliseconds& duration, Predicate pred)
+		{return timed_wait(lock, boost::posix_time::milliseconds(duration.count()), pred);}
+};
+#endif
+
+struct condition_variable_i : public condition_variable
 {
 	bool signaled;
-	condition_variable() : signaled(false) {}
+	condition_variable_i() : signaled(false) {}
 };
 
 template<typename T>
@@ -402,14 +414,14 @@ struct obj_with_begin_time : public T
 	void restart() {restart(statistic::now());}
 	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
 
-	void check_and_create_cv(bool need_cv) {if (!need_cv) cv.reset(); else if (!cv) cv = boost::make_shared<condition_variable>();}
+	void check_and_create_cv(bool need_cv) {if (!need_cv) cv.reset(); else if (!cv) cv = boost::make_shared<condition_variable_i>();}
 
 	void swap(T& obj, bool need_cv = false) {T::swap(obj); restart(); check_and_create_cv(need_cv);}
 	void swap(obj_with_begin_time& other) {T::swap(other); std::swap(begin_time, other.begin_time); cv.swap(other.cv);}
 	void clear() {cv.reset(); T::clear();}
 
 	typename statistic::stat_time begin_time;
-	boost::shared_ptr<condition_variable> cv;
+	boost::shared_ptr<condition_variable_i> cv;
 };
 #else
 template<typename T>

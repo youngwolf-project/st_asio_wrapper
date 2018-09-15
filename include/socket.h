@@ -362,9 +362,7 @@ protected:
 			sr_status = RESPONDED;
 			sync_recv_cv.notify_one();
 
-			sync_recv_status* pstatus = &sr_status;
-			sync_recv_cv.wait(lock,
-				boost::lambda::if_then_else_return(!boost::lambda::bind(&socket::started, this) || RESPONDED != *boost::lambda::var(pstatus), true, false));
+			sync_recv_cv.wait(lock, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || RESPONDED != boost::lambda::var(sr_status), true, false));
 			if (RESPONDED == sr_status) //eliminate race condition on temp_msg_can with sync_recv_msg
 				return false;
 			else if (temp_msg_can.empty())
@@ -462,25 +460,23 @@ private:
 #ifdef ST_ASIO_SYNC_RECV
 	bool sync_recv_waiting(boost::unique_lock<boost::mutex>& lock, unsigned duration)
 	{
-		sync_recv_status* pstatus = &sr_status;
-		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::bind(&socket::started, this) || REQUESTED != *boost::lambda::var(pstatus), true, false));
+		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || REQUESTED != boost::lambda::var(sr_status), true, false));
 		if (0 == duration)
 			sync_recv_cv.wait(lock, pred);
 		else if (!sync_recv_cv.wait_for(lock, boost::chrono::milliseconds(duration), pred))
 			return false;
 
-		return sync_recv_status::RESPONDED == sr_status;
+		return RESPONDED == sr_status;
 	}
 #endif
 
 #ifdef ST_ASIO_SYNC_SEND
-	bool sync_send_waiting(boost::unique_lock<boost::mutex>& lock, boost::shared_ptr<condition_variable>& cv, unsigned duration)
+	bool sync_send_waiting(boost::unique_lock<boost::mutex>& lock, boost::shared_ptr<condition_variable_i>& cv, unsigned duration)
 	{
-		bool* psignaled = &cv->signaled;
-		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::bind(&socket::started, this) || *boost::lambda::var(psignaled), true, false));
+		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || boost::lambda::var(cv->signaled), true, false));
 		if (0 == duration)
 			cv->wait(lock, pred);
-		else if (!sync_recv_cv.wait_for(lock, boost::chrono::milliseconds(duration), pred))
+		else if (!cv->wait_for(lock, boost::chrono::milliseconds(duration), pred))
 			return false;
 
 		return cv->signaled;
@@ -655,7 +651,7 @@ private:
 	sync_recv_status sr_status;
 
 	boost::mutex sync_recv_mutex;
-	boost::condition_variable sync_recv_cv;
+	condition_variable_i sync_recv_cv;
 #endif
 
 	unsigned msg_resuming_interval_, msg_handling_interval_;
