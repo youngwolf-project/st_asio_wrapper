@@ -651,7 +651,7 @@ private:
 	sync_recv_status sr_status;
 
 	boost::mutex sync_recv_mutex;
-	condition_variable_i sync_recv_cv;
+	condition_variable sync_recv_cv;
 #endif
 
 	unsigned msg_resuming_interval_, msg_handling_interval_;
