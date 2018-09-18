@@ -106,6 +106,8 @@ public:
 	typedef InQueue<in_msg, in_container_type> in_queue_type;
 	typedef OutQueue<out_msg, out_container_type> out_queue_type;
 
+	enum sync_call_result {SUCCESS, NOT_APPLICABLE, DUPLICATE, TIMEOUT};
+
 	boost::uint_fast64_t id() const {return _id;}
 	bool is_equal_to(boost::uint_fast64_t id) const {return _id == id;}
 
@@ -203,29 +205,29 @@ public:
 
 #ifdef ST_ASIO_SYNC_SEND
 	//don't use the packer but insert into send buffer directly, then wait for the sending to finish.
-	bool direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
-		{if (!can_overflow && !is_send_buffer_available()) return false; InMsgType unused(msg); do_direct_sync_send_msg(unused, duration);}
+	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
+		{if (!can_overflow && !is_send_buffer_available()) return NOT_APPLICABLE; InMsgType unused(msg); return do_direct_sync_send_msg(unused, duration);}
 	//after this call, msg becomes empty, please note.
-	bool direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
-		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : false;}
+	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
+		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
 #endif
 
 #ifdef ST_ASIO_SYNC_RECV
-	bool sync_recv_msg(boost::container::list<OutMsgType>& msg_can, unsigned duration = 0) //unit is millisecond, 0 means wait infinitely
+	sync_call_result sync_recv_msg(boost::container::list<OutMsgType>& msg_can, unsigned duration = 0) //unit is millisecond, 0 means wait infinitely
 	{
 		if (stopped())
-			return false;
+			return NOT_APPLICABLE;
 
 		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
 		if (NOT_REQUESTED != sr_status)
-			return false;
+			return DUPLICATE;
 
 #ifdef ST_ASIO_PASSIVE_RECV
 		recv_msg();
 #endif
 		sr_status = REQUESTED;
-		bool re = sync_recv_waiting(lock, duration);
-		if (re)
+		BOOST_AUTO(re, sync_recv_waiting(lock, duration));
+		if (SUCCESS == re)
 			msg_can.splice(msg_can.end(), temp_msg_can);
 
 		sr_status = NOT_REQUESTED;
@@ -427,14 +429,14 @@ protected:
 	}
 
 #ifdef ST_ASIO_SYNC_SEND
-	bool do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0)
+	sync_call_result do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0)
 	{
 		if (stopped())
-			return false;
+			return NOT_APPLICABLE;
 		else if (msg.empty())
 		{
 			unified_out::error_out("found an empty message, please check your packer.");
-			return false;
+			return SUCCESS;
 		}
 
 		in_msg unused(msg, true);
@@ -458,28 +460,28 @@ private:
 	void id(boost::uint_fast64_t id) {_id = id;}
 
 #ifdef ST_ASIO_SYNC_RECV
-	bool sync_recv_waiting(boost::unique_lock<boost::mutex>& lock, unsigned duration)
+	sync_call_result sync_recv_waiting(boost::unique_lock<boost::mutex>& lock, unsigned duration)
 	{
 		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || REQUESTED != boost::lambda::var(sr_status), true, false));
 		if (0 == duration)
 			sync_recv_cv.wait(lock, pred);
 		else if (!sync_recv_cv.wait_for(lock, boost::chrono::milliseconds(duration), pred))
-			return false;
+			return TIMEOUT;
 
-		return RESPONDED == sr_status;
+		return RESPONDED == sr_status ? SUCCESS : NOT_APPLICABLE;
 	}
 #endif
 
 #ifdef ST_ASIO_SYNC_SEND
-	bool sync_send_waiting(boost::unique_lock<boost::mutex>& lock, boost::shared_ptr<condition_variable_i>& cv, unsigned duration)
+	sync_call_result sync_send_waiting(boost::unique_lock<boost::mutex>& lock, boost::shared_ptr<condition_variable_i>& cv, unsigned duration)
 	{
 		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || boost::lambda::var(cv->signaled), true, false));
 		if (0 == duration)
 			cv->wait(lock, pred);
 		else if (!cv->wait_for(lock, boost::chrono::milliseconds(duration), pred))
-			return false;
+			return TIMEOUT;
 
-		return cv->signaled;
+		return cv->signaled ? SUCCESS : NOT_APPLICABLE;
 	}
 #endif
 

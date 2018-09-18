@@ -404,8 +404,7 @@ struct condition_variable_i : public condition_variable
 	condition_variable_i() : signaled(false) {}
 };
 
-template<typename T>
-struct obj_with_begin_time : public T
+template<typename T> struct obj_with_begin_time : public T
 {
 	obj_with_begin_time(bool need_cv = false) {check_and_create_cv(need_cv);}
 	obj_with_begin_time(T& obj, bool need_cv = false) {T::swap(obj); restart(); check_and_create_cv(need_cv);} //after this call, obj becomes empty, please note.
@@ -424,8 +423,7 @@ struct obj_with_begin_time : public T
 	boost::shared_ptr<condition_variable_i> cv;
 };
 #else
-template<typename T>
-struct obj_with_begin_time : public T
+template<typename T> struct obj_with_begin_time : public T
 {
 	obj_with_begin_time() {}
 	obj_with_begin_time(T& obj) {T::swap(obj); restart();} //after this call, obj becomes empty, please note.
@@ -484,9 +482,9 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) {for (BOOST_AU
 template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;}
 
 //used by both TCP and UDP
-#define SAFE_SEND_MSG_CHECK \
+#define SAFE_SEND_MSG_CHECK(F_VALUE) \
 { \
-	if (!is_ready()) return false; \
+	if (!is_ready()) return F_VALUE; \
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(50)); \
 }
 
@@ -517,11 +515,11 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define TCP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-	{while (!SEND_FUNNAME(pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK return true;} \
+	{while (!SEND_FUNNAME(pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
 #define TCP_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
-void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow) \
+void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 	{ST_THIS do_something_to_all(boost::bind((bool (Socket::*)(const char* const[], const size_t[], size_t, bool)) &Socket::SEND_FUNNAME, _1, pstr, len, num, can_overflow));} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //TCP msg sending interface
@@ -536,24 +534,25 @@ template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration =
 	{return FUNNAME(buffer.data(), buffer.size(), duration, can_overflow);}
 
 #define TCP_SYNC_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
-bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
+typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
-		return false; \
+		return super::sync_call_result::NOT_APPLICABLE; \
 	auto_duration dur(ST_THIS stat.pack_time_sum); \
 	in_msg_type msg; \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
 	return ST_THIS SEND_FUNNAME(msg, duration); \
 } \
-TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into tcp::socket_base's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define TCP_SYNC_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
-bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
-	{while (!SEND_FUNNAME(pstr, len, num, duration, can_overflow)) SAFE_SEND_MSG_CHECK return true;} \
-TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
+	{while (super::sync_call_result::SUCCESS != SEND_FUNNAME(pstr, len, num, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(super::sync_call_result::NOT_APPLICABLE) return super::sync_call_result::SUCCESS;} \
+TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
 //TCP sync msg sending interface
 ///////////////////////////////////////////////////
 #endif
@@ -584,7 +583,7 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 #define UDP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false)  {return FUNNAME(peer_addr, pstr, len, num, can_overflow);} \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-	{while (!SEND_FUNNAME(peer_addr, pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK return true;} \
+	{while (!SEND_FUNNAME(peer_addr, pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //UDP msg sending interface
 ///////////////////////////////////////////////////
@@ -601,26 +600,29 @@ template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& pee
 	{return FUNNAME(peer_addr, buffer.data(), buffer.size(), duration, can_overflow);}
 
 #define UDP_SYNC_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
-bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
+typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, pstr, len, num, duration, can_overflow);} \
-bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
+typename super::sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
+	unsigned duration = 0, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
-		return false; \
+		return super::sync_call_result::NOT_APPLICABLE; \
 	in_msg_type msg(peer_addr); \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	return ST_THIS SEND_FUNNAME(msg, duration); \
 } \
-UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into udp::socket_base's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define UDP_SYNC_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
-bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
+typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, pstr, len, num, duration, can_overflow);} \
-bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
-	{while (!SEND_FUNNAME(peer_addr, pstr, len, num, duration, can_overflow)) SAFE_SEND_MSG_CHECK return true;} \
-UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
+typename super::sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
+	unsigned duration = 0, bool can_overflow = false) \
+	{while (super::sync_call_result::SUCCESS != SEND_FUNNAME(peer_addr, pstr, len, num, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(super::sync_call_result::NOT_APPLICABLE) return super::sync_call_result::SUCCESS;} \
+UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
 //UDP sync msg sending interface
 ///////////////////////////////////////////////////
 #endif
