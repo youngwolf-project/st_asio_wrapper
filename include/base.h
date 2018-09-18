@@ -537,7 +537,7 @@ template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration =
 typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
-		return super::sync_call_result::NOT_APPLICABLE; \
+		return super::NOT_APPLICABLE; \
 	auto_duration dur(ST_THIS stat.pack_time_sum); \
 	in_msg_type msg; \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
@@ -550,8 +550,8 @@ TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define TCP_SYNC_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
-	{while (super::sync_call_result::SUCCESS != SEND_FUNNAME(pstr, len, num, duration, can_overflow)) \
-		SAFE_SEND_MSG_CHECK(super::sync_call_result::NOT_APPLICABLE) return super::sync_call_result::SUCCESS;} \
+	{while (super::SUCCESS != SEND_FUNNAME(pstr, len, num, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(super::NOT_APPLICABLE) return super::SUCCESS;} \
 TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
 //TCP sync msg sending interface
 ///////////////////////////////////////////////////
@@ -606,7 +606,7 @@ typename super::sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& p
 	unsigned duration = 0, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
-		return super::sync_call_result::NOT_APPLICABLE; \
+		return super::NOT_APPLICABLE; \
 	in_msg_type msg(peer_addr); \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	return ST_THIS SEND_FUNNAME(msg, duration); \
@@ -620,8 +620,8 @@ typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t 
 	{return FUNNAME(peer_addr, pstr, len, num, duration, can_overflow);} \
 typename super::sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
 	unsigned duration = 0, bool can_overflow = false) \
-	{while (super::sync_call_result::SUCCESS != SEND_FUNNAME(peer_addr, pstr, len, num, duration, can_overflow)) \
-		SAFE_SEND_MSG_CHECK(super::sync_call_result::NOT_APPLICABLE) return super::sync_call_result::SUCCESS;} \
+	{while (super::SUCCESS != SEND_FUNNAME(peer_addr, pstr, len, num, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(super::NOT_APPLICABLE) return super::SUCCESS;} \
 UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
 //UDP sync msg sending interface
 ///////////////////////////////////////////////////
