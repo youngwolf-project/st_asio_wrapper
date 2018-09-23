@@ -414,10 +414,10 @@ template<typename T> struct obj_with_begin_time : public T
 template<typename T> struct obj_with_begin_time_cv : public obj_with_begin_time<T>
 {
 	obj_with_begin_time_cv(bool need_cv = false) {check_and_create_cv(need_cv);}
-	obj_with_begin_time_cv(T& obj, bool need_cv = false) : obj_with_begin_time(obj) {check_and_create_cv(need_cv);} //after this call, obj becomes empty, please note.
+	obj_with_begin_time_cv(T& obj, bool need_cv = false) : obj_with_begin_time<T>(obj) {check_and_create_cv(need_cv);} //after this call, obj becomes empty, please note.
 
-	void swap(T& obj, bool need_cv = false) {obj_with_begin_time::swap(obj); check_and_create_cv(need_cv);}
-	void swap(obj_with_begin_time_cv& other) {obj_with_begin_time::swap(other); cv.swap(other.cv);}
+	void swap(T& obj, bool need_cv = false) {obj_with_begin_time<T>::swap(obj); check_and_create_cv(need_cv);}
+	void swap(obj_with_begin_time_cv& other) {obj_with_begin_time<T>::swap(other); cv.swap(other.cv);}
 
 	void clear() {cv.reset(); T::clear();}
 	void check_and_create_cv(bool need_cv) {if (!need_cv) cv.reset(); else if (!cv) cv = boost::make_shared<condition_variable>();}
