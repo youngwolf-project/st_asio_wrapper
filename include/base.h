@@ -385,44 +385,18 @@ private:
 	statistic::stat_duration& duration;
 };
 
-#ifdef ST_ASIO_SYNC_SEND
-#if BOOST_VERSION > 104900
-typedef boost::condition_variable condition_variable;
-#else
-class condition_variable : public boost::condition_variable
+struct condition_variable : public boost::condition_variable
 {
-public:
+	bool signaled;
+	condition_variable() : signaled(false) {}
+
+#if BOOST_VERSION <= 104900
 	template <typename Predicate>
 	bool wait_for(boost::unique_lock<boost::mutex>& lock, const boost::chrono::milliseconds& duration, Predicate pred)
 		{return timed_wait(lock, boost::posix_time::milliseconds(duration.count()), pred);}
-};
 #endif
-
-struct condition_variable_i : public condition_variable
-{
-	bool signaled;
-	condition_variable_i() : signaled(false) {}
 };
 
-template<typename T> struct obj_with_begin_time : public T
-{
-	obj_with_begin_time(bool need_cv = false) {check_and_create_cv(need_cv);}
-	obj_with_begin_time(T& obj, bool need_cv = false) {T::swap(obj); restart(); check_and_create_cv(need_cv);} //after this call, obj becomes empty, please note.
-	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, msg becomes empty, please note.
-
-	void restart() {restart(statistic::now());}
-	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
-
-	void check_and_create_cv(bool need_cv) {if (!need_cv) cv.reset(); else if (!cv) cv = boost::make_shared<condition_variable_i>();}
-
-	void swap(T& obj, bool need_cv = false) {T::swap(obj); restart(); check_and_create_cv(need_cv);}
-	void swap(obj_with_begin_time& other) {T::swap(other); std::swap(begin_time, other.begin_time); cv.swap(other.cv);}
-	void clear() {cv.reset(); T::clear();}
-
-	typename statistic::stat_time begin_time;
-	boost::shared_ptr<condition_variable_i> cv;
-};
-#else
 template<typename T> struct obj_with_begin_time : public T
 {
 	obj_with_begin_time() {}
@@ -436,7 +410,20 @@ template<typename T> struct obj_with_begin_time : public T
 
 	typename statistic::stat_time begin_time;
 };
-#endif
+
+template<typename T> struct obj_with_begin_time_cv : public obj_with_begin_time<T>
+{
+	obj_with_begin_time_cv(bool need_cv = false) {check_and_create_cv(need_cv);}
+	obj_with_begin_time_cv(T& obj, bool need_cv = false) : obj_with_begin_time(obj) {check_and_create_cv(need_cv);} //after this call, obj becomes empty, please note.
+
+	void swap(T& obj, bool need_cv = false) {obj_with_begin_time::swap(obj); check_and_create_cv(need_cv);}
+	void swap(obj_with_begin_time_cv& other) {obj_with_begin_time::swap(other); cv.swap(other.cv);}
+
+	void clear() {cv.reset(); T::clear();}
+	void check_and_create_cv(bool need_cv) {if (!need_cv) cv.reset(); else if (!cv) cv = boost::make_shared<condition_variable>();}
+
+	boost::shared_ptr<condition_variable> cv;
+};
 
 //free functions, used to do something to any container(except map and multimap) optionally with any mutex
 template<typename _Can, typename _Mutex, typename _Predicate>
@@ -490,7 +477,10 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 
 #define GET_PENDING_MSG_NUM(FUNNAME, CAN) size_t FUNNAME() const {return CAN.size();}
 #define POP_FIRST_PENDING_MSG(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) {msg.clear(); CAN.try_dequeue(msg);}
+#define POP_FIRST_PENDING_MSG_CV(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) {msg.clear(); if (CAN.try_dequeue(msg) && msg.cv) msg.cv->notify_all();}
 #define POP_ALL_PENDING_MSG(FUNNAME, CAN, CANTYPE) void FUNNAME(CANTYPE& can) {can.clear(); CAN.swap(can);}
+#define POP_ALL_PENDING_MSG_CV(FUNNAME, CAN, CANTYPE) void FUNNAME(CANTYPE& can) { \
+	can.clear(); CAN.swap(can); for (BOOST_AUTO(iter, can.begin()); iter != can.end(); ++iter) if (iter->cv) iter->cv->notify_all();}
 
 ///////////////////////////////////////////////////
 //TCP msg sending interface

@@ -480,9 +480,10 @@
  * REPLACEMENTS:
  *
  * ===============================================================
- * 2018.9.x		version 2.1.3
+ * 2018.10.x	version 2.1.3
  *
  * SPECIAL ATTENTION (incompatible with old editions):
+ * With sync message sending, if you rewrite virtual function on_close, you must also call super class' on_close.
  *
  * HIGHLIGHT:
  * Support sync message dispatching, it's like previous on_msg() callback but with a message container instead of a message (and many other
@@ -810,8 +811,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 // sync_safe_send_native_msg
 // sync_recv_msg
 //please note that:
-// this feature will slightly impact efficiency even if you always use async message sending and receiving, so only open this feature
-//  when realy needed, and DO NOT call pop_first_pending_send_msg and pop_all_pending_send_msg during sync message sending.
+// this feature will slightly impact efficiency even if you always use async message sending and receiving, so only open this feature when realy needed.
 // we must avoid to do sync message sending and receiving in service threads.
 // if prior sync_recv_msg() not returned, the second sync_recv_msg() will return false immediately.
 // with macro ST_ASIO_PASSIVE_RECV, in sync_recv_msg(), recv_msg() will be automatically called.

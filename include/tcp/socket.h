@@ -180,6 +180,10 @@ protected:
 		return super::do_start();
 	}
 
+#ifdef ST_ASIO_SYNC_SEND
+	virtual void on_close() {for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter) if (iter->cv) iter->cv->notify_all(); super::on_close();}
+#endif
+
 	virtual void on_connect() {}
 	//msg can not be unpacked
 	//the socket is still available, so don't need to shutdown this tcp::socket_base

@@ -94,12 +94,17 @@ protected:
 #ifndef ST_ASIO_DISPATCH_BATCH_MSG
 		last_dispatch_msg.clear();
 #endif
-		send_msg_buffer.clear();
+		in_container_type can;
+		pop_all_pending_send_msg(can);
 		recv_msg_buffer.clear();
 	}
 
 public:
+#ifdef ST_ASIO_SYNC_SEND
+	typedef obj_with_begin_time_cv<InMsgType> in_msg;
+#else
 	typedef obj_with_begin_time<InMsgType> in_msg;
+#endif
 	typedef obj_with_begin_time<OutMsgType> out_msg;
 	typedef InContainer<in_msg> in_container_type;
 	typedef OutContainer<out_msg> out_container_type;
@@ -241,11 +246,15 @@ public:
 	GET_PENDING_MSG_NUM(get_pending_send_msg_num, send_msg_buffer)
 	GET_PENDING_MSG_NUM(get_pending_recv_msg_num, recv_msg_buffer)
 
+#ifdef ST_ASIO_SYNC_SEND
+	POP_FIRST_PENDING_MSG_CV(pop_first_pending_send_msg, send_msg_buffer, in_msg)
+	POP_ALL_PENDING_MSG_CV(pop_all_pending_send_msg, send_msg_buffer, in_container_type)
+#else
 	POP_FIRST_PENDING_MSG(pop_first_pending_send_msg, send_msg_buffer, in_msg)
-	POP_FIRST_PENDING_MSG(pop_first_pending_recv_msg, recv_msg_buffer, out_msg)
-
-	//clear all pending msgs
 	POP_ALL_PENDING_MSG(pop_all_pending_send_msg, send_msg_buffer, in_container_type)
+#endif
+
+	POP_FIRST_PENDING_MSG(pop_first_pending_recv_msg, recv_msg_buffer, out_msg)
 	POP_ALL_PENDING_MSG(pop_all_pending_recv_msg, recv_msg_buffer, out_container_type)
 
 protected:
@@ -328,6 +337,9 @@ protected:
 			return false;
 
 		started_ = false;
+#ifdef ST_ASIO_SYNC_RECV
+		sync_recv_cv.notify_all();
+#endif
 		stop_all_timer();
 
 		if (lowest_layer().is_open())
@@ -340,9 +352,6 @@ protected:
 
 		if (stopped())
 		{
-#ifdef ST_ASIO_SYNC_RECV
-			sync_recv_cv.notify_all();
-#endif
 			on_close();
 			after_close();
 		}
@@ -473,7 +482,7 @@ private:
 #endif
 
 #ifdef ST_ASIO_SYNC_SEND
-	sync_call_result sync_send_waiting(boost::unique_lock<boost::mutex>& lock, boost::shared_ptr<condition_variable_i>& cv, unsigned duration)
+	sync_call_result sync_send_waiting(boost::unique_lock<boost::mutex>& lock, boost::shared_ptr<condition_variable>& cv, unsigned duration)
 	{
 		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || boost::lambda::var(cv->signaled), true, false));
 		if (0 == duration)
@@ -599,9 +608,6 @@ private:
 				lowest_layer().close(ec);
 			}
 			change_timer_status(TIMER_DELAY_CLOSE, timer_info::TIMER_CANCELED);
-#ifdef ST_ASIO_SYNC_RECV
-			sync_recv_cv.notify_all();
-#endif
 			on_close();
 			after_close();
 			set_async_calling(false);

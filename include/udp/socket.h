@@ -136,6 +136,10 @@ protected:
 		return true;
 	}
 
+#ifdef ST_ASIO_SYNC_SEND
+	virtual void on_close() {if (last_send_msg.cv) last_send_msg.cv->notify_all(); super::on_close();}
+#endif
+
 private:
 #ifndef ST_ASIO_PASSIVE_RECV
 	virtual void recv_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
