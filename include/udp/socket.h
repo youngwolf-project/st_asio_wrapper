@@ -137,7 +137,7 @@ protected:
 	}
 
 #ifdef ST_ASIO_SYNC_SEND
-	virtual void on_close() {if (last_send_msg.cv) last_send_msg.cv->notify_all(); super::on_close();}
+	virtual void on_close() {if (last_send_msg.p) last_send_msg.p->set_value(NOT_APPLICABLE); super::on_close();}
 #endif
 
 private:
@@ -240,11 +240,8 @@ private:
 			stat.send_time_sum += statistic::now() - last_send_msg.begin_time;
 			++stat.send_msg_sum;
 #ifdef ST_ASIO_SYNC_SEND
-			if (last_send_msg.cv)
-			{
-				last_send_msg.cv->signaled = true;
-				last_send_msg.cv->notify_one();
-			}
+			if (last_send_msg.p)
+				last_send_msg.p->set_value(SUCCESS);
 #endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(last_send_msg);

@@ -385,23 +385,13 @@ private:
 	statistic::stat_duration& duration;
 };
 
-struct condition_variable : public boost::condition_variable
-{
-	bool signaled;
-	condition_variable() : signaled(false) {}
-
-#if BOOST_VERSION <= 104900
-	template <typename Predicate>
-	bool wait_for(boost::unique_lock<boost::mutex>& lock, const boost::chrono::milliseconds& duration, Predicate pred)
-		{return timed_wait(lock, boost::posix_time::milliseconds(duration.count()), pred);}
-#endif
-};
+enum sync_call_result {SUCCESS, NOT_APPLICABLE, DUPLICATE, TIMEOUT};
 
 template<typename T> struct obj_with_begin_time : public T
 {
 	obj_with_begin_time() {}
 	obj_with_begin_time(T& obj) {T::swap(obj); restart();} //after this call, obj becomes empty, please note.
-	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, msg becomes empty, please note.
+	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, obj becomes empty, please note.
 
 	void restart() {restart(statistic::now());}
 	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
@@ -411,19 +401,34 @@ template<typename T> struct obj_with_begin_time : public T
 	typename statistic::stat_time begin_time;
 };
 
-template<typename T> struct obj_with_begin_time_cv : public obj_with_begin_time<T>
+#ifdef ST_ASIO_SYNC_SEND
+template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_time<T>
 {
-	obj_with_begin_time_cv(bool need_cv = false) {check_and_create_cv(need_cv);}
-	obj_with_begin_time_cv(T& obj, bool need_cv = false) : obj_with_begin_time<T>(obj) {check_and_create_cv(need_cv);} //after this call, obj becomes empty, please note.
+	obj_with_begin_time_promise(bool need_promise = false) {check_and_create_promise(need_promise);}
+	obj_with_begin_time_promise(T& obj, bool need_promise = false) : obj_with_begin_time<T>(obj) {check_and_create_promise(need_promise);}
+	//after this call, obj becomes empty, please note.
 
-	void swap(T& obj, bool need_cv = false) {obj_with_begin_time<T>::swap(obj); check_and_create_cv(need_cv);}
-	void swap(obj_with_begin_time_cv& other) {obj_with_begin_time<T>::swap(other); cv.swap(other.cv);}
+	void swap(T& obj, bool need_promise = false) {obj_with_begin_time<T>::swap(obj); check_and_create_promise(need_promise);}
+	void swap(obj_with_begin_time_promise& other) {obj_with_begin_time<T>::swap(other); p.swap(other.p);}
 
-	void clear() {cv.reset(); T::clear();}
-	void check_and_create_cv(bool need_cv) {if (!need_cv) cv.reset(); else if (!cv) cv = boost::make_shared<condition_variable>();}
+	void clear() {p.reset(); T::clear();}
+	void check_and_create_promise(bool need_promise) {if (!need_promise) p.reset(); else if (!p) p = boost::make_shared<boost::promise<sync_call_result> >();}
 
-	boost::shared_ptr<condition_variable> cv;
+	boost::shared_ptr<boost::promise<sync_call_result> > p;
 };
+#endif
+
+#ifdef ST_ASIO_SYNC_RECV
+#ifdef BOOST_THREAD_USES_CHRONO
+typedef boost::condition_variable condition_variable;
+#else
+struct condition_variable : public boost::condition_variable
+{
+	template <typename Predicate> bool wait_for(boost::unique_lock<boost::mutex>& lock, const boost::chrono::milliseconds& duration, Predicate pred)
+		{return timed_wait(lock, boost::posix_time::milliseconds(duration.count()), pred);}
+};
+#endif
+#endif
 
 //free functions, used to do something to any container(except map and multimap) optionally with any mutex
 template<typename _Can, typename _Mutex, typename _Predicate>
@@ -477,10 +482,11 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 
 #define GET_PENDING_MSG_NUM(FUNNAME, CAN) size_t FUNNAME() const {return CAN.size();}
 #define POP_FIRST_PENDING_MSG(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) {msg.clear(); CAN.try_dequeue(msg);}
-#define POP_FIRST_PENDING_MSG_CV(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) {msg.clear(); if (CAN.try_dequeue(msg) && msg.cv) msg.cv->notify_all();}
+#define POP_FIRST_PENDING_MSG_NOTIFY(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) \
+	{msg.clear(); if (CAN.try_dequeue(msg) && msg.p) msg.p->set_value(NOT_APPLICABLE);}
 #define POP_ALL_PENDING_MSG(FUNNAME, CAN, CANTYPE) void FUNNAME(CANTYPE& can) {can.clear(); CAN.swap(can);}
-#define POP_ALL_PENDING_MSG_CV(FUNNAME, CAN, CANTYPE) void FUNNAME(CANTYPE& can) { \
-	can.clear(); CAN.swap(can); for (BOOST_AUTO(iter, can.begin()); iter != can.end(); ++iter) if (iter->cv) iter->cv->notify_all();}
+#define POP_ALL_PENDING_MSG_NOTIFY(FUNNAME, CAN, CANTYPE) void FUNNAME(CANTYPE& can) { \
+	can.clear(); CAN.swap(can); for (BOOST_AUTO(iter, can.begin()); iter != can.end(); ++iter) if (iter->p) iter->p->set_value(NOT_APPLICABLE);}
 
 ///////////////////////////////////////////////////
 //TCP msg sending interface
@@ -524,25 +530,25 @@ template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration =
 	{return FUNNAME(buffer.data(), buffer.size(), duration, can_overflow);}
 
 #define TCP_SYNC_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
-typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
+sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
-		return super::NOT_APPLICABLE; \
+		return NOT_APPLICABLE; \
 	auto_duration dur(ST_THIS stat.pack_time_sum); \
 	in_msg_type msg; \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
 	return ST_THIS SEND_FUNNAME(msg, duration); \
 } \
-TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
+TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into tcp::socket_base's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define TCP_SYNC_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
-typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
-	{while (super::SUCCESS != SEND_FUNNAME(pstr, len, num, duration, can_overflow)) \
-		SAFE_SEND_MSG_CHECK(super::NOT_APPLICABLE) return super::SUCCESS;} \
-TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
+sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
+	{while (SUCCESS != SEND_FUNNAME(pstr, len, num, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
+TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 //TCP sync msg sending interface
 ///////////////////////////////////////////////////
 #endif
@@ -590,29 +596,29 @@ template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& pee
 	{return FUNNAME(peer_addr, buffer.data(), buffer.size(), duration, can_overflow);}
 
 #define UDP_SYNC_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
-typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
+sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, pstr, len, num, duration, can_overflow);} \
-typename super::sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
+sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
 	unsigned duration = 0, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
-		return super::NOT_APPLICABLE; \
+		return NOT_APPLICABLE; \
 	in_msg_type msg(peer_addr); \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	return ST_THIS SEND_FUNNAME(msg, duration); \
 } \
-UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
+UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into udp::socket_base's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define UDP_SYNC_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
-typename super::sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
+sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, pstr, len, num, duration, can_overflow);} \
-typename super::sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
+sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
 	unsigned duration = 0, bool can_overflow = false) \
-	{while (super::SUCCESS != SEND_FUNNAME(peer_addr, pstr, len, num, duration, can_overflow)) \
-		SAFE_SEND_MSG_CHECK(super::NOT_APPLICABLE) return super::SUCCESS;} \
-UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, typename super::sync_call_result)
+	{while (SUCCESS != SEND_FUNNAME(peer_addr, pstr, len, num, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
+UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 //UDP sync msg sending interface
 ///////////////////////////////////////////////////
 #endif
