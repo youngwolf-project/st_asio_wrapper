@@ -61,17 +61,17 @@ using namespace st_asio_wrapper::ext::tcp;
 void sync_recv_thread(single_client& client)
 {
 	ST_ASIO_DEFAULT_UNPACKER::container_type msg_can;
-	sync_call_result re = SUCCESS;
+	single_client::sync_call_result re = single_client::SUCCESS;
 	do
 	{
 		re = client.sync_recv_msg(msg_can, 50); //st_asio_wrapper will not maintain messages in msg_can anymore after sync_recv_msg return, please note.
-		if (SUCCESS == re)
+		if (single_client::SUCCESS == re)
 		{
 			for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 				printf("sync recv(" ST_ASIO_SF ") : %s\n", iter->size(), iter->data());
 			msg_can.clear(); //sync_recv_msg just append new message(s) to msg_can, please note.
 		}
-	} while (SUCCESS == re || TIMEOUT == re);
+	} while (single_client::SUCCESS == re || single_client::TIMEOUT == re);
 	puts("sync recv end.");
 }
 
@@ -117,8 +117,13 @@ int main(int argc, const char* argv[])
 		else if (RECONNECT == str)
 			client.graceful_shutdown(true);
 		else
-			client.sync_safe_send_msg(str, 100);
+		{
+			single_client::sync_call_result re = client.sync_send_msg(str, 100);
+			if (single_client::SUCCESS != re)
+				printf("sync send result: %d", re);
+			//client.sync_safe_send_msg(str, 100);
 			//client.safe_send_msg(str);
+		}
 	}
 
 	return 0;
