@@ -471,7 +471,8 @@ private:
 #ifdef ST_ASIO_SYNC_RECV
 	sync_call_result sync_recv_waiting(boost::unique_lock<boost::mutex>& lock, unsigned duration)
 	{
-		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || REQUESTED != boost::lambda::var(sr_status), true, false));
+		//BOOST_AUTO cannot deduce the return type from lambda expressions in Clang
+		boost::function<bool ()> pred = boost::lambda::if_then_else_return(!boost::lambda::var(started_) || REQUESTED != boost::lambda::var(sr_status), true, false);
 		if (0 == duration)
 			sync_recv_cv.wait(lock, pred);
 		else if (!sync_recv_cv.wait_for(lock, boost::chrono::milliseconds(duration), pred))
@@ -482,9 +483,10 @@ private:
 #endif
 
 #ifdef ST_ASIO_SYNC_SEND
-	sync_call_result sync_send_waiting(boost::unique_lock<boost::mutex>& lock, boost::shared_ptr<condition_variable_i>& cv, unsigned duration)
+	sync_call_result sync_send_waiting(boost::unique_lock<boost::mutex>& lock, const boost::shared_ptr<condition_variable_i>& cv, unsigned duration)
 	{
-		BOOST_AUTO(pred, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || boost::lambda::var(cv->signaled), true, false));
+		//BOOST_AUTO cannot deduce the return type from lambda expressions in Clang
+		boost::function<bool ()> pred = boost::lambda::if_then_else_return(!boost::lambda::var(started_) || boost::lambda::var(cv->signaled), true, false);
 		if (0 == duration)
 			cv->wait(lock, pred);
 		else if (!cv->wait_for(lock, boost::chrono::milliseconds(duration), pred))
