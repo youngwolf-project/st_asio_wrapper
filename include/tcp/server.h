@@ -85,6 +85,7 @@ public:
 
 		return false;
 	}
+	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return ST_THIS find(id);}
 
 	///////////////////////////////////////////////////
 	//msg sending interface
@@ -180,7 +181,7 @@ protected:
 			start_next_accept();
 	}
 
-protected:
+private:
 	boost::asio::ip::tcp::endpoint server_addr;
 	boost::asio::ip::tcp::acceptor acceptor;
 };

@@ -6,11 +6,11 @@
 #define ST_ASIO_DELAY_CLOSE		1 //this demo not used object pool and doesn't need life cycle management,
 								  //so, define this to avoid hooks for async call (and slightly improve efficiency),
 								  //any value which is bigger than zero is okay.
+#define ST_ASIO_SYNC_SEND
 #define ST_ASIO_SYNC_RECV
 //#define ST_ASIO_PASSIVE_RECV //because we not defined this macro, this demo will use mix model to receive messages, which means
 							   //some messages will be dispatched via on_msg_handle(), some messages will be returned via sync_recv_msg(),
 							   //if the server send messages quickly enough, you will see them cross together.
-#define ST_ASIO_DISPATCH_BATCH_MSG
 #define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_CUSTOM_LOG
 #define ST_ASIO_DEFAULT_UNPACKER non_copy_unpacker
@@ -61,16 +61,17 @@ using namespace st_asio_wrapper::ext::tcp;
 void sync_recv_thread(single_client& client)
 {
 	ST_ASIO_DEFAULT_UNPACKER::container_type msg_can;
-	while (client.sync_recv_msg(msg_can))
+	single_client::sync_call_result re = single_client::SUCCESS;
+	do
 	{
-		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
-#ifdef ST_ASIO_PASSIVE_RECV
-			if (!iter->empty())
-#else
-			printf("sync recv(" ST_ASIO_SF ") : %s\n", iter->size(), iter->data());
-#endif
-		msg_can.clear();
-	}
+		re = client.sync_recv_msg(msg_can, 50); //st_asio_wrapper will not maintain messages in msg_can anymore after sync_recv_msg return, please note.
+		if (single_client::SUCCESS == re)
+		{
+			for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
+				printf("sync recv(" ST_ASIO_SF ") : %s\n", iter->size(), iter->data());
+			msg_can.clear(); //sync_recv_msg just append new message(s) to msg_can, please note.
+		}
+	} while (single_client::SUCCESS == re || single_client::TIMEOUT == re);
 	puts("sync recv end.");
 }
 
@@ -95,7 +96,6 @@ int main(int argc, const char* argv[])
 		client.set_server_addr(ST_ASIO_SERVER_PORT + 100, ST_ASIO_SERVER_IP);
 
 	sp.start_service();
-	boost::this_thread::sleep_for(boost::chrono::milliseconds(500)); //to be more efficiently, start the worker thread in tcp::socket_base::on_connect().
 	boost::thread t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(client)));
 	while(sp.is_running())
 	{
@@ -117,7 +117,13 @@ int main(int argc, const char* argv[])
 		else if (RECONNECT == str)
 			client.graceful_shutdown(true);
 		else
-			client.safe_send_msg(str, false);
+		{
+			single_client::sync_call_result re = client.sync_send_msg(str, 100);
+			if (single_client::SUCCESS != re)
+				printf("sync send result: %d", re);
+			//client.sync_safe_send_msg(str, 100);
+			//client.safe_send_msg(str);
+		}
 	}
 
 	return 0;

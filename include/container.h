@@ -58,8 +58,13 @@ private:
 // front
 // back
 // pop_front
+// end
 template<typename T, typename Container, typename Lockable> //thread safety depends on Container or Lockable
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
 class queue : public Container, public Lockable
+#else
+class queue : protected Container, public Lockable
+#endif
 {
 public:
 	typedef T data_type;

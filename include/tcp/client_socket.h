@@ -147,8 +147,10 @@ protected:
 	}
 
 protected:
-	boost::asio::ip::tcp::endpoint server_addr;
 	bool need_reconnect;
+
+private:
+	boost::asio::ip::tcp::endpoint server_addr;
 };
 
 }} //namespace

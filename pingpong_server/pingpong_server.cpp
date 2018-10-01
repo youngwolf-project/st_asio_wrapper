@@ -5,6 +5,7 @@
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
+#define ST_ASIO_SYNC_DISPATCH
 #define ST_ASIO_MSG_BUFFER_SIZE	65536
 #define ST_ASIO_INPUT_QUEUE non_lock_queue
 //if pingpong_client only send message in on_msg_handle(), which means a responsive system, a real pingpong test,
@@ -35,8 +36,19 @@ public:
 	echo_socket(i_server& server_) : server_socket(server_) {}
 
 protected:
-	//msg handling: send the original msg back(echo server)
-	virtual bool on_msg_handle(out_msg_type& msg) {return direct_send_msg(msg);}
+	//msg handling: send the original msg back(echo server), must define macro ST_ASIO_SYNC_DISPATCH
+	//do not hold msg_can for further using, access msg_can and return from on_msg as quickly as possible
+	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
+	{
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(out_msg_type&, bool)) &echo_socket::direct_send_msg, this, _1, false));
+		BOOST_AUTO(re, msg_can.size());
+		msg_can.clear(); //if we left behind some messages in msg_can, they will be dispatched via on_msg_handle asynchronously, which means it's
+		//possible that on_msg_handle be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
+		//here we always consumed all messages, so we can use sync message dispatching, otherwise, we should not use sync message dispatching
+		//except we can bear message disordering.
+
+		return re;
+	}
 	//msg handling end
 };
 

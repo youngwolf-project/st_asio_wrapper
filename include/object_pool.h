@@ -299,7 +299,7 @@ public:
 	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred)
 		{boost::lock_guard<boost::mutex> lock(object_can_mutex); for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter) if (__pred(iter->second)) break;}
 
-protected:
+private:
 	atomic_uint_fast64 cur_id;
 
 	container_type object_can;

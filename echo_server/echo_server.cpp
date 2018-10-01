@@ -5,6 +5,7 @@
 #define ST_ASIO_SERVER_PORT		9528
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 //#define ST_ASIO_FREE_OBJECT_INTERVAL 60 //it's useless if ST_ASIO_REUSE_OBJECT macro been defined
+//#define ST_ASIO_SYNC_DISPATCH //do not open this feature, see below for more details
 #define ST_ASIO_DISPATCH_BATCH_MSG
 #define ST_ASIO_ENHANCED_STABILITY
 #define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
@@ -99,8 +100,30 @@ protected:
 	}
 
 	//msg handling: send the original msg back(echo server)
+/*
+#ifdef ST_ASIO_SYNC_DISPATCH //do not open this feature
+	//do not hold msg_can for further using, return from on_msg as quickly as possible
+	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
+	{
+		if (!is_send_buffer_available())
+			return 0; //congestion control
+		//here if we cannot handle all messages in msg_can, do not use sync message dispatching except we can bear message disordering,
+		//this is because on_msg_handle can be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
+		//and do not try to handle all messages here (just for echo_server's business logic) because:
+		//1. we can not use safe_send_msg as i said many times, we should not block service threads.
+		//2. if we use true can_overflow to call send_msg, then buffer usage will be out of control, we should not take this risk.
+
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(out_msg_ctype&, bool)) &echo_socket::send_msg, this, _1, true));
+		BOOST_AUTO(re, msg_can.size());
+		msg_can.clear();
+
+		return re;
+	}
+#endif
+*/
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
-	virtual size_t on_msg_handle(out_queue_type& can)
+	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
+	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		if (!is_send_buffer_available())
 			return 0;
@@ -109,19 +132,19 @@ protected:
 		//this manner requires the container used by the message queue can be spliced (such as std::list, but not std::vector,
 		// st_asio_wrapper doesn't require this characteristic).
 		//these code can be compiled because we used list as the container of the message queue, see macro ST_ASIO_OUTPUT_CONTAINER for more details
-		//to consume all of messages in can, see echo_client.
-		can.lock();
-		BOOST_AUTO(begin_iter, can.begin());
+		//to consume all messages in msg_can, see echo_client
+		msg_can.lock();
+		BOOST_AUTO(begin_iter, msg_can.begin());
 		//don't be too greedy, here is in a service thread, we should not block this thread for a long time
-		BOOST_AUTO(end_iter, can.size() > 10 ? boost::next(begin_iter, 10) : can.end());
-		tmp_can.splice(tmp_can.end(), can, begin_iter, end_iter);
-		can.unlock();
+		BOOST_AUTO(end_iter, msg_can.size() > 10 ? boost::next(begin_iter, 10) : msg_can.end());
+		tmp_can.splice(tmp_can.end(), msg_can, begin_iter, end_iter); //the rest messages will be dispatched via the next on_msg_handle
+		msg_can.unlock();
 
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(out_msg_ctype&, bool)) &echo_socket::send_msg, this, _1, true));
 		return tmp_can.size();
 	}
 #else
-	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg, false);}
+	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg);}
 #endif
 	//msg handling end
 };

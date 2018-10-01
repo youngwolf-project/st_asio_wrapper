@@ -49,9 +49,9 @@ public:
 	virtual bool is_ready() {return is_connected();}
 	virtual void send_heartbeat()
 	{
-		auto_duration dur(ST_THIS stat.pack_time_sum);
+		auto_duration dur(stat.pack_time_sum);
 		in_msg_type msg;
-		ST_THIS packer_->pack_heartbeat(msg);
+		packer_->pack_heartbeat(msg);
 		dur.end();
 		ST_THIS do_direct_send_msg(msg);
 	}
@@ -117,7 +117,7 @@ public:
 #ifdef ST_ASIO_PASSIVE_RECV
 	//changing unpacker must before calling st_asio_wrapper::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
 	void unpacker(const boost::shared_ptr<i_unpacker<out_msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
-	virtual void recv_msg() {if (!ST_THIS reading && is_ready()) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
+	virtual void recv_msg() {if (!reading && is_ready()) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
 #endif
 
 	///////////////////////////////////////////////////
@@ -130,12 +130,12 @@ public:
 	TCP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
 
 #ifdef ST_ASIO_SYNC_SEND
-	TCP_SEND_MSG(sync_send_msg, false, do_direct_sync_send_msg) //use the packer with native = false to pack the msgs
-	TCP_SEND_MSG(sync_send_native_msg, true, do_direct_sync_send_msg) //use the packer with native = true to pack the msgs
+	TCP_SYNC_SEND_MSG(sync_send_msg, false, do_direct_sync_send_msg) //use the packer with native = false to pack the msgs
+	TCP_SYNC_SEND_MSG(sync_send_native_msg, true, do_direct_sync_send_msg) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
 	//success at here just means put the msg into tcp::socket_base's send buffer
-	TCP_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
-	TCP_SAFE_SEND_MSG(sync_safe_send_native_msg, sync_send_native_msg)
+	TCP_SYNC_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
+	TCP_SYNC_SAFE_SEND_MSG(sync_safe_send_native_msg, sync_send_native_msg)
 #endif
 	//msg sending interface
 	///////////////////////////////////////////////////
@@ -174,11 +174,15 @@ protected:
 	virtual bool do_start()
 	{
 		status = CONNECTED;
-		ST_THIS stat.establish_time = time(NULL);
+		stat.establish_time = time(NULL);
 
-		on_connect(); //in this virtual function, ST_THIS stat.last_recv_time has not been updated (super::do_start will update it), please note
+		on_connect(); //in this virtual function, stat.last_recv_time has not been updated (super::do_start will update it), please note
 		return super::do_start();
 	}
+
+#ifdef ST_ASIO_SYNC_SEND
+	virtual void on_close() {for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter) if (iter->cv) iter->cv->notify_all(); super::on_close();}
+#endif
 
 	virtual void on_connect() {}
 	//msg can not be unpacked
@@ -201,14 +205,14 @@ private:
 
 	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
-		auto_duration dur(ST_THIS stat.unpack_time_sum);
+		auto_duration dur(stat.unpack_time_sum);
 		return ST_THIS unpacker_->completion_condition(ec, bytes_transferred);
 	}
 
 	void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (ST_THIS reading)
+		if (reading)
 			return;
 #endif
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
@@ -218,7 +222,7 @@ private:
 		else
 		{
 #ifdef ST_ASIO_PASSIVE_RECV
-			ST_THIS reading = true;
+			reading = true;
 #endif
 			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
 				boost::bind(&socket_base::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), make_strand_handler(strand,
@@ -230,17 +234,17 @@ private:
 	{
 		if (!ec && bytes_transferred > 0)
 		{
-			ST_THIS stat.last_recv_time = time(NULL);
+			stat.last_recv_time = time(NULL);
 
-			auto_duration dur(ST_THIS stat.unpack_time_sum);
-			bool unpack_ok = unpacker_->parse_msg(bytes_transferred, ST_THIS temp_msg_can);
+			auto_duration dur(stat.unpack_time_sum);
+			bool unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
 			dur.end();
 
 			if (!unpack_ok)
 				on_unpack_error(); //the user will decide whether to reset the unpacker or not in this callback
 
 #ifdef ST_ASIO_PASSIVE_RECV
-			ST_THIS reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
+			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
 			if (ST_THIS handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
@@ -248,7 +252,7 @@ private:
 		else
 		{
 #ifdef ST_ASIO_PASSIVE_RECV
-			ST_THIS reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
+			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
 			if (ec)
 				ST_THIS on_recv_error(ec);
@@ -259,7 +263,7 @@ private:
 
 	bool do_send_msg(bool in_strand)
 	{
-		if (!in_strand && ST_THIS sending)
+		if (!in_strand && sending)
 			return true;
 
 		boost::container::list<boost::asio::const_buffer> bufs;
@@ -273,10 +277,10 @@ private:
 			typename super::in_msg msg;
 			BOOST_AUTO(end_time, statistic::now());
 
-			typename super::in_queue_type::lock_guard lock(ST_THIS send_msg_buffer);
-			while (ST_THIS send_msg_buffer.try_dequeue_(msg))
+			typename super::in_queue_type::lock_guard lock(send_msg_buffer);
+			while (send_msg_buffer.try_dequeue_(msg))
 			{
-				ST_THIS stat.send_delay_sum += end_time - msg.begin_time;
+				stat.send_delay_sum += end_time - msg.begin_time;
 				size += msg.size();
 				last_send_msg.emplace_back();
 				last_send_msg.back().swap(msg);
@@ -286,7 +290,7 @@ private:
 			}
 		}
 
-		if ((ST_THIS sending = !bufs.empty()))
+		if ((sending = !bufs.empty()))
 		{
 			last_send_msg.front().restart();
 			boost::asio::async_write(ST_THIS next_layer(), bufs, make_strand_handler(strand,
@@ -301,25 +305,28 @@ private:
 	{
 		if (!ec)
 		{
-			ST_THIS stat.last_send_time = time(NULL);
+			stat.last_send_time = time(NULL);
 
-			ST_THIS stat.send_byte_sum += bytes_transferred;
-			ST_THIS stat.send_time_sum += statistic::now() - last_send_msg.front().begin_time;
-			ST_THIS stat.send_msg_sum += last_send_msg.size();
+			stat.send_byte_sum += bytes_transferred;
+			stat.send_time_sum += statistic::now() - last_send_msg.front().begin_time;
+			stat.send_msg_sum += last_send_msg.size();
 #ifdef ST_ASIO_SYNC_SEND
 			for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
 				if (iter->cv)
+				{
+					iter->cv->signaled = true;
 					iter->cv->notify_one();
+				}
 #endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(last_send_msg.front());
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-			if (ST_THIS send_msg_buffer.empty())
+			if (send_msg_buffer.empty())
 				ST_THIS on_all_msg_send(last_send_msg.back());
 #endif
 			last_send_msg.clear();
-			if (!do_send_msg(true) && !ST_THIS send_msg_buffer.empty()) //send msg in sequence
+			if (!do_send_msg(true) && !send_msg_buffer.empty()) //send msg in sequence
 				do_send_msg(true); //just make sure no pending msgs
 		}
 		else
@@ -327,7 +334,7 @@ private:
 			ST_THIS on_send_error(ec);
 			last_send_msg.clear(); //clear sending messages after on_send_error, then user can decide how to deal with them in on_send_error
 
-			ST_THIS sending = false;
+			sending = false;
 		}
 	}
 
@@ -353,12 +360,22 @@ private:
 	}
 
 protected:
-	boost::container::list<typename super::in_msg> last_send_msg;
-	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker_;
-
 	volatile link_status status;
 
 private:
+	using super::stat;
+	using super::packer_;
+	using super::temp_msg_can;
+
+	using super::send_msg_buffer;
+	using super::sending;
+
+#ifdef ST_ASIO_PASSIVE_RECV
+	using super::reading;
+#endif
+
+	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker_;
+	boost::container::list<typename super::in_msg> last_send_msg;
 	boost::asio::io_context::strand strand;
 };
 

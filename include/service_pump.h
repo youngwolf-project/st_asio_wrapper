@@ -281,7 +281,7 @@ private:
 		service_can.emplace_back(i_service_);
 	}
 
-protected:
+private:
 	bool started;
 	container_type service_can;
 	boost::mutex service_can_mutex;
