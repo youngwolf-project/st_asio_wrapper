@@ -280,7 +280,7 @@
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Function object_pool::invalid_object_pop only pop obsoleted objects with no additional reference.
- * socket::stat.last_recv_time will not be updated before tcp::socket_base::on_connect anymore.
+ * socket::stat.last_recv_time will not be updated before tcp::socket_base::on_connect any more.
  * For ssl socket, on_handshake will be invoked before on_connect (before, on_connect is before on_handshake).
  *
  * HIGHLIGHT:
@@ -380,10 +380,10 @@
  * 2018.5.20	version 2.1.0
  *
  * SPECIAL ATTENTION (incompatible with old editions):
- * Not support sync sending mode anymore.
+ * Not support sync sending mode any more.
  * Explicitly need macro ST_ASIO_PASSIVE_RECV to gain the ability of changing the unpacker at runtime.
  * Function disconnect, force_shutdown and graceful_shutdown in udp::socket_base will now be performed asynchronously.
- * Not support macro ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER anymore, which means now we have the behavior as this macro always defined,
+ * Not support macro ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER any more, which means now we have the behavior as this macro always defined,
  *  thus, virtual function st_asio_wrapper::socket::on_msg() is useless and also has been deleted.
  * statistic.handle_time_2_sum has been renamed to handle_time_sum.
  * Macro ST_ASIO_MSG_HANDLING_INTERVAL_STEP1 has been renamed to ST_ASIO_MSG_RESUMING_INTERVAL.
@@ -402,7 +402,7 @@
  * Introduced macro ST_ASIO_DISPATCH_BATCH_MSG, then all messages will be dispatched via on_handle_msg with a variable-length contianer.
  *
  * FIX:
- * Wiped race condition between async_read and async_write on the same st_asio_wrapper::socket, so sync sending mode will not be supported anymore.
+ * Wiped race condition between async_read and async_write on the same st_asio_wrapper::socket, so sync sending mode will not be supported any more.
  *
  * ENHANCEMENTS:
  * Explicitly define macro ST_ASIO_PASSIVE_RECV to gain the ability of changing the unpacker at runtime.
@@ -416,7 +416,7 @@
  * DELETION:
  * Deleted macro ST_ASIO_SEND_BUFFER_TYPE.
  * Deleted virtual function bool st_asio_wrapper::socket::on_msg().
- * Not support sync sending mode anymore, so we reduced an atomic object in st_asio_wrapper::socket.
+ * Not support sync sending mode any more, so we reduced an atomic object in st_asio_wrapper::socket.
  *
  * REFACTORING:
  * If you want to change unpacker at runtime, first, you must define macro ST_ASIO_PASSIVE_RECV, second, you must call st_asio_wrapper::socket::recv_msg and
