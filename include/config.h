@@ -496,12 +496,9 @@
  *
  * ENHANCEMENTS:
  * Add virtual function find_socket to interface i_server.
- * Support timed waiting when doing sync message sending.
- *  please note that after timeout, the sending can succeed in the future because ascs uses async sending to simulate sync sending,
- *  and on_msg_send (if macro ST_ASIO_WANT_MSG_SEND_NOTIFY been defined) will not be affected, which means it can be called in the future too. 
- * Support timed waiting when doing sync message receiving.
- *  please note that after timeout, the receiving can succeed in the future because ascs uses async receiving to simulate sync receiving,
- *  and messages will be dispatched via on_msg (if macro ST_ASIO_SYNC_DISPATCH been defined) and / or on_msg_handle.
+ * Support timed waiting when doing sync message sending and receiving, please note that after timeout, sync operations can succeed in the future because
+ *  st_asio_wrapper uses async operations to simulate sync operations. for sync receiving, missed messages can be dispatched via the next sync receiving,
+ *  on_msg (if macro ST_ASIO_SYNC_DISPATCH been defined) and / or on_msg_handle.
  *
  * DELETION:
  *
@@ -815,10 +812,11 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 // we must avoid to do sync message sending and receiving in service threads.
 // if prior sync_recv_msg() not returned, the second sync_recv_msg() will return false immediately.
 // with macro ST_ASIO_PASSIVE_RECV, in sync_recv_msg(), recv_msg() will be automatically called.
-// after returned from sync_recv_msg(), st_asio_wrapper will not maintain those messages that have been output.
+// after returned from sync_recv_msg(), st_asio_wrapper will not maintain those messages any more.
 
-//Sync message sending and receiving are not tracked by tracked_executor, please note.
-//No matter you're doing sync message sending or async message sending, you can do sync message receiving or async message receiving concurrently.
+//Sync operations are not tracked by tracked_executor, please note.
+//Sync operations can be performed with async operations concurrently.
+//If both sync message receiving and async message receiving exist, sync receiving has the priority no matter it was initiated before async receiving or not.
 
 //#define ST_ASIO_SYNC_DISPATCH
 //with this macro, virtual size_t on_msg(boost::container::list<OutMsgType>& msg_can) will be provided, you can rewrite it and handle all or a part of the
