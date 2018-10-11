@@ -800,7 +800,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //if you don't define this macro, the next callback will be called at (xx:xx:xx + 21), plase note.
 
 //#define ST_ASIO_SYNC_SEND
-//#ifndef ST_ASIO_SYNC_RECV
+//#define ST_ASIO_SYNC_RECV
 //define these macro to gain additional series of sync message sending and receiving, they are:
 // sync_send_msg
 // sync_send_native_msg

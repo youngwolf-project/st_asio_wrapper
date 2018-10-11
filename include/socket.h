@@ -101,7 +101,7 @@ protected:
 
 public:
 #ifdef ST_ASIO_SYNC_SEND
-	typedef obj_with_begin_time_cv<InMsgType> in_msg;
+	typedef obj_with_begin_time_promise<InMsgType> in_msg;
 #else
 	typedef obj_with_begin_time<InMsgType> in_msg;
 #endif
@@ -110,8 +110,6 @@ public:
 	typedef OutContainer<out_msg> out_container_type;
 	typedef InQueue<in_msg, in_container_type> in_queue_type;
 	typedef OutQueue<out_msg, out_container_type> out_queue_type;
-
-	enum sync_call_result {SUCCESS, NOT_APPLICABLE, DUPLICATE, TIMEOUT};
 
 	boost::uint_fast64_t id() const {return _id;}
 	bool is_equal_to(boost::uint_fast64_t id) const {return _id == id;}
@@ -247,8 +245,8 @@ public:
 	GET_PENDING_MSG_NUM(get_pending_recv_msg_num, recv_msg_buffer)
 
 #ifdef ST_ASIO_SYNC_SEND
-	POP_FIRST_PENDING_MSG_CV(pop_first_pending_send_msg, send_msg_buffer, in_msg)
-	POP_ALL_PENDING_MSG_CV(pop_all_pending_send_msg, send_msg_buffer, in_container_type)
+	POP_FIRST_PENDING_MSG_NOTIFY(pop_first_pending_send_msg, send_msg_buffer, in_msg)
+	POP_ALL_PENDING_MSG_NOTIFY(pop_all_pending_send_msg, send_msg_buffer, in_container_type)
 #else
 	POP_FIRST_PENDING_MSG(pop_first_pending_send_msg, send_msg_buffer, in_msg)
 	POP_ALL_PENDING_MSG(pop_all_pending_send_msg, send_msg_buffer, in_container_type)
@@ -449,13 +447,16 @@ protected:
 		}
 
 		in_msg unused(msg, true);
-		BOOST_AUTO(cv, unused.cv);
+		BOOST_AUTO(f, unused.p->get_future());
 		send_msg_buffer.enqueue(unused);
 		if (!sending && is_ready())
 			send_msg();
 
-		boost::unique_lock<boost::mutex> lock(sync_send_mutex);
-		return sync_send_waiting(lock, cv, duration);
+#ifdef BOOST_THREAD_USES_CHRONO
+		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
+#else
+		return 0 == duration || boost::future_status::ready == f.timed_wait(boost::posix_time::milliseconds(duration.count())) ? f.get() : TIMEOUT;
+#endif
 	}
 #endif
 
@@ -479,20 +480,6 @@ private:
 			return TIMEOUT;
 
 		return RESPONDED == sr_status ? SUCCESS : NOT_APPLICABLE;
-	}
-#endif
-
-#ifdef ST_ASIO_SYNC_SEND
-	sync_call_result sync_send_waiting(boost::unique_lock<boost::mutex>& lock, const boost::shared_ptr<condition_variable_i>& cv, unsigned duration)
-	{
-		//BOOST_AUTO cannot deduce the return type from lambda expressions in Clang
-		boost::function<bool ()> pred = boost::lambda::if_then_else_return(!boost::lambda::var(started_) || boost::lambda::var(cv->signaled), true, false);
-		if (0 == duration)
-			cv->wait(lock, pred);
-		else if (!cv->wait_for(lock, boost::chrono::milliseconds(duration), pred))
-			return TIMEOUT;
-
-		return cv->signaled ? SUCCESS : NOT_APPLICABLE;
 	}
 #endif
 
@@ -651,10 +638,6 @@ private:
 
 	atomic_size_t start_atomic;
 	boost::asio::io_context::strand strand;
-
-#ifdef ST_ASIO_SYNC_SEND
-	boost::mutex sync_send_mutex;
-#endif
 
 #ifdef ST_ASIO_SYNC_RECV
 	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED};

@@ -181,7 +181,14 @@ protected:
 	}
 
 #ifdef ST_ASIO_SYNC_SEND
-	virtual void on_close() {for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter) if (iter->cv) iter->cv->notify_all(); super::on_close();}
+	virtual void on_close()
+	{
+		for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
+			if (iter->p)
+				iter->p->set_value(NOT_APPLICABLE);
+
+		super::on_close();
+	}
 #endif
 
 	virtual void on_connect() {}
@@ -312,11 +319,8 @@ private:
 			stat.send_msg_sum += last_send_msg.size();
 #ifdef ST_ASIO_SYNC_SEND
 			for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
-				if (iter->cv)
-				{
-					iter->cv->signaled = true;
-					iter->cv->notify_one();
-				}
+				if (iter->p)
+					iter->p->set_value(SUCCESS);
 #endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(last_send_msg.front());
