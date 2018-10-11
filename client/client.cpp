@@ -118,8 +118,8 @@ int main(int argc, const char* argv[])
 			client.graceful_shutdown(true);
 		else
 		{
-			single_client::sync_call_result re = client.sync_send_msg(str, 100);
-			if (single_client::SUCCESS != re)
+			sync_call_result re = client.sync_send_msg(str, 100);
+			if (SUCCESS != re)
 				printf("sync send result: %d", re);
 			//client.sync_safe_send_msg(str, 100);
 			//client.safe_send_msg(str);
