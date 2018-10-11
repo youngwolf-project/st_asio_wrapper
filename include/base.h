@@ -417,6 +417,11 @@ public:
 #ifdef ST_ASIO_SYNC_SEND
 template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_time<T>
 {
+#ifndef BOOST_THREAD_FUTURE
+#define BOOST_THREAD_FUTURE unique_future
+#endif
+	typedef boost::BOOST_THREAD_FUTURE<sync_call_result> future;
+
 	obj_with_begin_time_promise(bool need_promise = false) {check_and_create_promise(need_promise);}
 	obj_with_begin_time_promise(T& obj, bool need_promise = false) : obj_with_begin_time<T>(obj) {check_and_create_promise(need_promise);} //after this call, obj becomes empty, please note.
 

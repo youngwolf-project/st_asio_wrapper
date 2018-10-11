@@ -447,7 +447,8 @@ protected:
 		}
 
 		in_msg unused(msg, true);
-		BOOST_AUTO(f, unused.p->get_future());
+		typename in_msg::future f;
+		unused.p->get_future().swap(f);
 		send_msg_buffer.enqueue(unused);
 		if (!sending && is_ready())
 			send_msg();
