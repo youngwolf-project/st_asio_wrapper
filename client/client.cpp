@@ -120,7 +120,7 @@ int main(int argc, const char* argv[])
 		{
 			sync_call_result re = client.sync_send_msg(str, 100);
 			if (SUCCESS != re)
-				printf("sync send result: %d", re);
+				printf("sync send result: %d\n", re);
 			//client.sync_safe_send_msg(str, 100);
 			//client.safe_send_msg(str);
 		}
