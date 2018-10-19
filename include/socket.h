@@ -514,7 +514,7 @@ private:
 		if (check_receiving(false))
 			return true;
 
-		set_timer(TIMER_CHECK_RECV, msg_resuming_interval_, boost::bind(&socket::timer_handler, this, _1));
+		set_timer(TIMER_CHECK_RECV, msg_resuming_interval_, boost::lambda::if_then_else_return(boost::lambda::bind(&socket::check_receiving, this, true), false, true));
 #endif
 		return false;
 	}
@@ -579,9 +579,6 @@ private:
 	{
 		switch (id)
 		{
-		case TIMER_CHECK_RECV:
-			return !check_receiving(true);
-			break;
 		case TIMER_DISPATCH_MSG:
 			dispatching = false;
 			dispatch_msg();

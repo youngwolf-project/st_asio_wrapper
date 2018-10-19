@@ -423,7 +423,7 @@ template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_
 	typedef boost::BOOST_THREAD_FUTURE<sync_call_result> future;
 
 	obj_with_begin_time_promise(bool need_promise = false) {check_and_create_promise(need_promise);}
-	obj_with_begin_time_promise(T& obj, bool need_promise = false) : obj_with_begin_time<T>(obj) {check_and_create_promise(need_promise);} //after this call, obj becomes empty, please note.
+	obj_with_begin_time_promise(T& obj, bool need_promise = false) : obj_with_begin_time<T>(obj) {check_and_create_promise(need_promise);}
 
 	void swap(T& obj, bool need_promise = false) {obj_with_begin_time<T>::swap(obj); check_and_create_promise(need_promise);}
 	void swap(obj_with_begin_time_promise& other) {obj_with_begin_time<T>::swap(other); p.swap(other.p);}
