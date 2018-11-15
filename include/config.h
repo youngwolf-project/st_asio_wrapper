@@ -489,6 +489,7 @@
  * Support sync message dispatching, it's like previous on_msg() callback but with a message container instead of a message (and many other
  *  differences, see macro ST_ASIO_SYNC_DISPATCH for more details), and we also name it on_msg().
  * Support timed waiting when doing sync message sending and receiving.
+ * Support pre-creating server sockets in server_base (before accepting connections), this is very useful if creating server socket is very expensive.
  *
  * FIX:
  * Fix spurious awakenings when doing sync message sending and receiving.
@@ -499,6 +500,8 @@
  * Support timed waiting when doing sync message sending and receiving, please note that after timeout, sync operations can succeed in the future because
  *  st_asio_wrapper uses async operations to simulate sync operations. for sync receiving, missed messages can be dispatched via the next sync receiving,
  *  on_msg (if macro ST_ASIO_SYNC_DISPATCH been defined) and / or on_msg_handle.
+ * Add virtual function server_socket_base::async_accept_num() to support pre-creating server sockets at runtime, by default, it returns ST_ASIO_ASYNC_ACCEPT_NUM,
+ *  see demo concurrent_server and macro ST_ASIO_ASYNC_ACCEPT_NUM for more details.
  *
  * DELETION:
  *
@@ -690,7 +693,20 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #define ST_ASIO_RECONNECT_INTERVAL	500 //millisecond(s)
 #endif
 
-//how many async_accept delivery concurrently
+//how many async_accept delivery concurrently, an equivalent way is to rewrite virtual function server_socket_base::async_accept_num().
+//server_base will pre-create ST_ASIO_ASYNC_ACCEPT_NUM server sockets before starting accepting connections, but we may don't want so many
+// async_accept delivery all the time, what should we do?
+//the answer is, we can rewrite virtual function server_socket_base::start_next_accept() and decide whether to continue the async accepting or not,
+// for example, you normally have about 1000 connections, so you define ST_ASIO_ASYNC_ACCEPT_NUM as 1000, and:
+// 1. rewrite virtual function server_socket_base::on_accept() and count how many connections already established;
+// 2. rewrite virtual function server_socket_base::start_next_accept(), if we have already established 990 connections (or even more),
+//    then call server_socket_base::start_next_accept() to continue the async accepting, otherwise, just return (to stop the async accepting).
+// after doing that, the server will not create server sockets during accepting the 1st to 990th connections, and after the 990th connection,
+// the server will always keep 10 async accepting (which also means after accepted a new connection, a new server socket will be created),
+// see demo concurrent_server for more details.
+//this feature is very useful if creating server socket is very expensive (which means creating server socket may affect the process or even
+// the system seriously) and the total number of connections is basically stable (or you have a limitation for the number of connections).
+//even creating server socket is very cheap, augmenting this macro can speed up connection accepting especially when many connecting request flood in.
 #ifndef ST_ASIO_ASYNC_ACCEPT_NUM
 #define ST_ASIO_ASYNC_ACCEPT_NUM	16
 #elif ST_ASIO_SERVER_PORT <= 0
