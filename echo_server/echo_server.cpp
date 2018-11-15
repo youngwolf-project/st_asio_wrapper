@@ -270,8 +270,7 @@ int main(int argc, const char* argv[])
 			*/
 			/*
 			//if demo client is using stream_unpacker
-			if (!str.empty())
-				server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
+			server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
 			*/
 		}
 	}
