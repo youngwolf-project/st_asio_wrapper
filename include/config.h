@@ -510,6 +510,25 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2019.1.1		version 2.1.4
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * The virtual function socket::on_send_error has been moved to tcp::socket_base and udp::socket_base.
+ * The signature of virtual function socket::on_send_error has been changed, a container holding messages that were failed to send will be provided.
+ *
+ * HIGHLIGHT:
+ *
+ * FIX:
+ *
+ * ENHANCEMENTS:
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -519,8 +538,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20103	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.1.3"
+#define ST_ASIO_VER		20104	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.1.4"
 
 //boost and compiler check
 #ifdef _MSC_VER

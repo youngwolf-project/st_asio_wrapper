@@ -180,6 +180,13 @@ protected:
 		return super::do_start();
 	}
 
+	//generally, you don't have to rewrite this to maintain the status of connections
+	//msg_can contains messages that were failed to send and tcp::socket_base will not hold them any more, if you want to re-send them in the future,
+	// you must take over them and re-send (at any time) them via direct_send_msg.
+	//DO NOT hold msg_can for future using, just swap its content with your own container in this virtual function.
+	virtual void on_send_error(const boost::system::error_code& ec, boost::container::list<typename super::in_msg>& msg_can)
+		{unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
+
 #ifdef ST_ASIO_SYNC_SEND
 	virtual void on_close()
 	{
@@ -335,7 +342,7 @@ private:
 		}
 		else
 		{
-			ST_THIS on_send_error(ec);
+			on_send_error(ec, last_send_msg);
 			last_send_msg.clear(); //clear sending messages after on_send_error, then user can decide how to deal with them in on_send_error
 
 			sending = false;

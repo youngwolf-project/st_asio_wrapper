@@ -123,6 +123,12 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
+	//msg was failed to send and udp::socket_base will not hold it any more, if you want to re-send it in the future,
+	// you must take over it and re-send (at any time) it via direct_send_msg.
+	//DO NOT hold msg for future using, just swap its content with your own message in this virtual function.
+	virtual void on_send_error(const boost::system::error_code& ec, typename super::in_msg& msg)
+		{unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
+
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 		if (boost::asio::error::operation_aborted != ec)
@@ -252,7 +258,7 @@ private:
 #endif
 		}
 		else
-			ST_THIS on_send_error(ec);
+			on_send_error(ec, last_send_msg);
 		last_send_msg.clear(); //clear sending message after on_send_error, then user can decide how to deal with it in on_send_error
 
 		if (ec && (boost::asio::error::not_socket == ec || boost::asio::error::bad_descriptor == ec))
