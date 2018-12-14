@@ -153,7 +153,7 @@ protected:
 	virtual void uninit() {ST_THIS stop(); stop_listen(); force_shutdown();} //if you wanna graceful shutdown, call graceful_shutdown before service_pump::stop_service invocation.
 
 	virtual bool on_accept(typename Pool::object_ctype& socket_ptr) {return true;}
-	virtual void start_next_accept() {do_async_accept(this->create_object(boost::ref(*this)));}
+	virtual void start_next_accept() {do_async_accept(ST_THIS create_object(boost::ref(*this)));}
 
 	//if you want to ignore this error and continue to accept new connections immediately, return true in this virtual function;
 	//if you want to ignore this error and continue to accept new connections after a specific delay, start a timer immediately and return false (don't call stop_listen()),
