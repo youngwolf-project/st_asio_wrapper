@@ -525,11 +525,15 @@
 //boost and compiler check
 #ifdef _MSC_VER
 	#define ST_ASIO_SF "%Iu" //format used to print 'size_t'
-	#define ST_THIS //workaround to make up the BOOST_AUTO's defect under vc2008 and compiler bugs before vc2012
 	#define ST_ASIO_LLF "%I64u" //format used to print 'uint_fast64_t'
 
-	#if _MSC_VER >= 1800
-		#pragma message("Your compiler is Visual C++ 12.0 (2013) or higher, you can use ascs to gain some performance improvement.")
+	#if _MSC_VER < 1700
+		#define ST_THIS //workaround to make up the BOOST_AUTO's defect on vc2008 and compiler crush before vc2012
+	#else
+		#define ST_THIS this->
+		#if _MSC_VER >= 1800
+			#pragma message("Your compiler is Visual C++ 12.0 (2013) or higher, you can use ascs to gain some performance improvement.")
+		#endif
 	#endif
 #elif defined(__GNUC__)
 	#define ST_ASIO_SF "%zu" //format used to print 'size_t'
