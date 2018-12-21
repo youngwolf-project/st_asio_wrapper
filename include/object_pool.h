@@ -274,7 +274,7 @@ public:
 		for (BOOST_AUTO(iter, invalid_object_can.begin()); num > 0 && iter != invalid_object_can.end();)
 			//checking unique() is essential, consider following situation:
 			//{
-			//	auto socket_ptr = server.find(id);
+			//	BOOST_AUTO(socket_ptr, server.find(id));
 			//	//between these two sentences, the socket_ptr can be shut down and moved from object_can to invalid_object_can, then removed from invalid_object_can
 			//	//in this function without unique() checking.
 			//	socket_ptr->set_timer(...);
