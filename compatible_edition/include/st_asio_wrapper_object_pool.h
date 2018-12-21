@@ -268,7 +268,15 @@ public:
 
 		boost::unique_lock<boost::shared_mutex> lock(object_can_mutex);
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
-			if ((*iter)->obsoleted())
+			//checking unique() is essential, consider following situation:
+			//{
+			//	BOOST_AUTO(socket_ptr, server.find(id));
+			//	//between these two sentences, the socket_ptr can be shut down and moved from object_can to invalid_object_can, then removed from invalid_object_can
+			//	//in this function without unique() checking.
+			//	socket_ptr->set_timer(...);
+			//}
+			//then in the future, when invoking the timer handler, the socket has been freed and it's this pointer already became wild.
+			if ((*iter).unique() && (*iter)->obsoleted())
 			{
 				objects.emplace_back(*iter);
 				iter = object_can.erase(iter);
