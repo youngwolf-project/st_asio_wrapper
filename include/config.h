@@ -522,6 +522,8 @@
  * FIX:
  *
  * ENHANCEMENTS:
+ * Expose server_base's acceptor via next_layer().
+ * Failure of binding or listening in server_base will not stop the service_pump any more.
  *
  * DELETION:
  *

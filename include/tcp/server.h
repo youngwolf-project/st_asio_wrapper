@@ -50,6 +50,9 @@ public:
 	void stop_listen() {boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
 	bool is_listening() const {return acceptor.is_open();}
 
+	boost::asio::ip::tcp::acceptor& next_layer() {return acceptor;}
+	const boost::asio::ip::tcp::acceptor& next_layer() const {return acceptor;}
+
 	//implement i_server's pure virtual functions
 	virtual service_pump& get_service_pump() {return Pool::get_service_pump();}
 	virtual const service_pump& get_service_pump() const {return Pool::get_service_pump();}
@@ -116,7 +119,7 @@ protected:
 		acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true), ec); assert(!ec);
 #endif
 		acceptor.bind(server_addr, ec); assert(!ec);
-		if (ec) {get_service_pump().stop(); unified_out::error_out("bind failed."); return false;}
+		if (ec) {unified_out::error_out("bind failed."); return false;}
 
 		int num = async_accept_num();
 		assert(num > 0);
@@ -143,7 +146,7 @@ protected:
 #else
 		acceptor.listen(boost::asio::ip::tcp::acceptor::max_connections, ec); assert(!ec);
 #endif
-		if (ec) {get_service_pump().stop(); unified_out::error_out("listen failed."); return false;}
+		if (ec) {unified_out::error_out("listen failed."); return false;}
 
 		st_asio_wrapper::do_something_to_all(sockets, boost::bind(&server_base::do_async_accept, this, _1));
 		ST_THIS start();
