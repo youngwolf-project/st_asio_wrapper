@@ -186,9 +186,8 @@ public:
 
 		return true;
 	}
-	//not support heartbeat because prefix_suffix_unpacker cannot recognize heartbeat message, but it's possible to make
-	//prefix_suffix_unpacker to be able to recognize heartbeat message, just need some changes.
 
+	virtual bool pack_heartbeat(msg_type& msg) {msg = "\n"; return true;}
 	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), _prefix.size()));}
 	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), _prefix.size());}
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - _prefix.size() - _suffix.size();}

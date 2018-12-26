@@ -42,7 +42,7 @@ public:
 				else if (remain_len >= cur_msg_len) //one msg received
 				{
 					if (stripped())
-					msg_can.emplace_back(boost::next(pnext, ST_ASIO_HEAD_LEN), cur_msg_len - ST_ASIO_HEAD_LEN);
+						msg_can.emplace_back(boost::next(pnext, ST_ASIO_HEAD_LEN), cur_msg_len - ST_ASIO_HEAD_LEN);
 					else
 						msg_can.emplace_back(pnext, cur_msg_len);
 					remain_len -= cur_msg_len;
@@ -398,11 +398,14 @@ public:
 		size_t min_len = _prefix.size() + _suffix.size();
 		while (0 == peek_msg(remain_len, pnext) && (size_t) -1 != cur_msg_len && 0 != cur_msg_len)
 		{
-			assert(cur_msg_len > min_len);
-			if (stripped())
-				msg_can.emplace_back(boost::next(pnext, _prefix.size()), cur_msg_len - min_len);
-			else
-				msg_can.emplace_back(pnext, cur_msg_len);
+			assert(cur_msg_len >= min_len);
+			if (cur_msg_len > min_len) //exclude heartbeat
+			{
+				if (stripped())
+					msg_can.emplace_back(boost::next(pnext, _prefix.size()), cur_msg_len - min_len);
+				else
+					msg_can.emplace_back(pnext, cur_msg_len);
+			}
 			remain_len -= cur_msg_len;
 			std::advance(pnext, cur_msg_len);
 			cur_msg_len = -1;
