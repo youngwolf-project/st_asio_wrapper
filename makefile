@@ -19,6 +19,7 @@ release debug clean :
 	cd pingpong_client && ${ST_MAKE}
 	cd concurrent_server && ${ST_MAKE}
 	cd concurrent_client && ${ST_MAKE}
+	cd socket_management && ${ST_MAKE}
 	cd udp_test && ${ST_MAKE}
 	cd ssl_test && ${ST_MAKE}
 
