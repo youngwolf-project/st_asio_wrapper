@@ -266,7 +266,7 @@ private:
 
 		//send msg in sequence
 		//on windows, sending a msg to addr_any may cause errors, please note
-		//for UDP, sending error will not stop subsequent sendings.
+		//for UDP, sending error will not stop subsequent sending.
 		if (!do_send_msg(true) && !send_msg_buffer.empty())
 			do_send_msg(true); //just make sure no pending msgs
 	}

@@ -230,7 +230,7 @@ protected:
 
 public:
 	virtual void reset() {}
-	//heartbeat must not be included in msg_can, otherwise you must handle heartbeat at where you handle normal messges.
+	//heartbeat must not be included in msg_can, otherwise you must handle heartbeat at where you handle normal messages.
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return 0;}
 	virtual buffer_type prepare_next_recv() = 0;

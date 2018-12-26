@@ -66,7 +66,7 @@ public:
 		return ST_THIS del_object(raw_socket_ptr);
 	}
 	//restore the invalid socket whose id is equal to id, if successful, socket_ptr's take_over function will be invoked,
-	//you can restore the invalid socket to socket_ptr, everything is restorable except socket::next_layer_ (on the other
+	//you can restore the invalid socket to socket_ptr, everything can be restored except socket::next_layer_ (on the other
 	//hand, restore socket::next_layer_ doesn't make any sense).
 	virtual bool restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id)
 	{
