@@ -277,8 +277,12 @@ private:
 	{
 		assert(NULL != i_service_);
 
-		boost::lock_guard<boost::mutex> lock(service_can_mutex);
+		boost::unique_lock<boost::mutex> lock(service_can_mutex);
 		service_can.emplace_back(i_service_);
+		lock.unlock();
+
+		if (is_service_started())
+			unified_out::warning_out("service been added, please remember to call start_service for it!");
 	}
 
 private:
