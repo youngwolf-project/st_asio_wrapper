@@ -95,8 +95,8 @@ protected:
 
 	//change object_ptr's id to id, and reinsert it into object_can.
 	//there MUST exist an object in invalid_object_can whose id is equal to id to guarantee the id has been abandoned
-	// (checking existence of such object in object_can is NOT enough, because there're some sockets used by async
-	// acception, they don't exist in object_can nor invalid_object_can), further more, the invalid object MUST be
+	// (checking existence of such object in object_can is NOT enough, because there are some sockets used by async
+	// acceptance, they don't exist in object_can nor invalid_object_can), further more, the invalid object MUST be
 	//obsoleted and has no additional reference.
 	//return the invalid object (null means failure), please note that the invalid object has been removed from invalid_object_can.
 	object_type change_object_id(object_ctype& object_ptr, boost::uint_fast64_t id)
@@ -274,10 +274,10 @@ public:
 		for (BOOST_AUTO(iter, invalid_object_can.begin()); num > 0 && iter != invalid_object_can.end();)
 			//checking unique() is essential, consider following situation:
 			//{
-			//      BOOST_AUTO(socket_ptr, server.find(id));
-			//      //between these two sentences, the socket_ptr can be shut down and moved from object_can to invalid_object_can, then removed from invalid_object_can
-			//      //in this function without unique() checking.
-			//      socket_ptr->set_timer(...);
+			//	BOOST_AUTO(socket_ptr, server.find(id));
+			//	//between these two sentences, the socket_ptr can be shut down and moved from object_can to invalid_object_can, then removed from invalid_object_can
+			//	//in this function without unique() checking.
+			//	socket_ptr->set_timer(...);
 			//}
 			//then in the future, when invoking the timer handler, the socket has been freed and it's this pointer already became wild.
 			if ((*iter).unique() && (*iter)->obsoleted())

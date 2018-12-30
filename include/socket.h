@@ -269,9 +269,7 @@ protected:
 		return true;
 	}
 
-	//generally, you don't have to rewrite this to maintain the status of connections (TCP)
-	virtual void on_send_error(const boost::system::error_code& ec) {unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
-	virtual void on_recv_error(const boost::system::error_code& ec) = 0; //receiving error or peer endpoint quit(false ec means ok)
+	virtual void on_recv_error(const boost::system::error_code& ec) = 0; //receiving error or peer endpoint quit(false ec means okay)
 	virtual bool on_heartbeat_error() = 0; //heartbeat timed out, return true to continue heartbeat function (useful for UDP)
 
 	//if ST_ASIO_DELAY_CLOSE is equal to zero, in this callback, socket guarantee that there's no any other async call associated it,
@@ -279,7 +277,7 @@ protected:
 	// in this socket except this socket itself, because this socket maybe is being maintained by object_pool.
 	//otherwise (bigger than zero), socket simply call this callback ST_ASIO_DELAY_CLOSE seconds later after link down, no any guarantees.
 	virtual void on_close() {unified_out::info_out("on_close()");}
-	virtual void after_close() {} //a good case for using this is to reconnect to the server, please refer to client_socket_base.
+	virtual void after_close() {} //a good case for using this is to reconnect the server, please refer to client_socket_base.
 
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//return the number of handled msg, if some msg left behind, socket will re-dispatch them asynchronously
