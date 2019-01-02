@@ -187,7 +187,7 @@ public:
 		return true;
 	}
 
-	virtual bool pack_heartbeat(msg_type& msg) {msg = "\n"; return true;}
+	virtual bool pack_heartbeat(msg_type& msg) {msg_type hb = _prefix + _suffix; msg.swap(hb); return true;}
 	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), _prefix.size()));}
 	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), _prefix.size());}
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - _prefix.size() - _suffix.size();}
