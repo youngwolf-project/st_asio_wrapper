@@ -33,7 +33,7 @@ private:
 	typedef socket<Socket, Packer, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	socket_base(boost::asio::io_context& io_context_) : super(io_context_), unpacker_(boost::make_shared<Unpacker>()), strand(io_context_), has_bound(false) {}
+	socket_base(boost::asio::io_context& io_context_) : super(io_context_), unpacker_(boost::make_shared<Unpacker>()), has_bound(false), strand(io_context_) {}
 
 	virtual bool is_ready() {return has_bound;}
 	virtual void send_heartbeat()
