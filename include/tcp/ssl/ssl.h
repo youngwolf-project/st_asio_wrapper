@@ -119,9 +119,15 @@ public:
 
 		shutdown_ssl(sync);
 	}
-#endif
 
 protected:
+	virtual int prepare_reconnect(const boost::system::error_code& ec) {return -1;}
+#else
+protected:
+#endif
+	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); ST_THIS force_shutdown();}
+
+private:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
 	{
 		if (!ec)
@@ -130,14 +136,6 @@ protected:
 		else
 			super::connect_handler(ec);
 	}
-
-#ifndef ST_ASIO_REUSE_SSL_STREAM
-	virtual int prepare_reconnect(const boost::system::error_code& ec) {return -1;}
-#endif
-	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); ST_THIS force_shutdown();}
-
-private:
-	using super::shutdown_ssl;
 
 	void handle_handshake(const boost::system::error_code& ec)
 	{
@@ -152,6 +150,8 @@ private:
 		else
 			ST_THIS force_shutdown();
 	}
+
+	using super::shutdown_ssl;
 };
 
 template<typename Object>
@@ -191,16 +191,14 @@ public:
 protected:
 	virtual bool do_start() //intercept tcp::server_socket_base::do_start (to add handshake)
 	{
-			ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::server,
-				ST_THIS make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+		ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::server,
+			ST_THIS make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
 		return true;
 	}
 
 	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); ST_THIS force_shutdown();}
 
 private:
-	using super::shutdown_ssl;
-
 	void handle_handshake(const boost::system::error_code& ec)
 	{
 		ST_THIS on_handshake(ec);
@@ -210,6 +208,8 @@ private:
 		else
 			ST_THIS get_server().del_socket(ST_THIS shared_from_this());
 	}
+
+	using super::shutdown_ssl;
 };
 
 template<typename Socket, typename Pool = object_pool<Socket>, typename Server = tcp::i_server> class server_base : public tcp::server_base<Socket, Pool, Server>
