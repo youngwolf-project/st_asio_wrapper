@@ -162,7 +162,7 @@ private:
 	using super::close;
 	using super::handle_msg;
 	using super::do_direct_send_msg;
-#ifdef ASCS_SYNC_SEND
+#ifdef ST_ASIO_SYNC_SEND
 	using super::do_direct_sync_send_msg;
 #endif
 
