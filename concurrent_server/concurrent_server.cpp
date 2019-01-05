@@ -84,8 +84,7 @@ int main(int argc, const char* argv[])
 			sp.stop_service();
 		else if (STATISTIC == str)
 		{
-			printf("link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
-			puts("");
+			printf("link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n\n", echo_server_.size(), echo_server_.invalid_object_size());
 			puts(echo_server_.get_statistic().to_string().data());
 		}
 		else if (STATUS == str)

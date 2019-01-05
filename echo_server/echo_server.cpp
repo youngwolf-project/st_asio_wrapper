@@ -231,8 +231,7 @@ int main(int argc, const char* argv[])
 		else if (STATISTIC == str)
 		{
 			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
-			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", echo_server_.size(), echo_server_.invalid_object_size());
-			puts("");
+			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n\n", echo_server_.size(), echo_server_.invalid_object_size());
 			puts(echo_server_.get_statistic().to_string().data());
 		}
 		else if (STATUS == str)

@@ -53,7 +53,7 @@ public:
 		in_msg_type msg;
 		packer_->pack_heartbeat(msg);
 		dur.end();
-		ST_THIS do_direct_send_msg(msg);
+		do_direct_send_msg(msg);
 	}
 
 	//reset all, be ensure that there's no any operations performed on this tcp::socket_base when invoke it
@@ -210,17 +210,24 @@ private:
 #endif
 	virtual void send_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
 
+	using super::close;
+	using super::handle_msg;
+	using super::do_direct_send_msg;
+#ifdef ASCS_SYNC_SEND
+	using super::do_direct_sync_send_msg;
+#endif
+
 	void shutdown()
 	{
 		if (!is_broken())
 			status = FORCE_SHUTTING_DOWN; //not thread safe because of this assignment
-		ST_THIS close();
+		close();
 	}
 
 	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		auto_duration dur(stat.unpack_time_sum);
-		return ST_THIS unpacker_->completion_condition(ec, bytes_transferred);
+		return unpacker_->completion_condition(ec, bytes_transferred);
 	}
 
 	void do_recv_msg()
@@ -260,7 +267,7 @@ private:
 #ifdef ST_ASIO_PASSIVE_RECV
 			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
-			if (ST_THIS handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
+			if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
 		else
@@ -270,7 +277,7 @@ private:
 #endif
 			if (ec)
 				ST_THIS on_recv_error(ec);
-			else if (ST_THIS handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
+			else if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
 	}

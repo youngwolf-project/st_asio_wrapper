@@ -33,14 +33,14 @@ private:
 	typedef socket<Socket, Packer, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	socket_base(boost::asio::io_context& io_context_) : super(io_context_), unpacker_(boost::make_shared<Unpacker>()), strand(io_context_) {}
+	socket_base(boost::asio::io_context& io_context_) : super(io_context_), unpacker_(boost::make_shared<Unpacker>()), strand(io_context_), has_bound(false) {}
 
-	virtual bool is_ready() {return ST_THIS lowest_layer().is_open();}
+	virtual bool is_ready() {return has_bound;}
 	virtual void send_heartbeat()
 	{
 		in_msg_type msg(peer_addr);
 		packer_->pack_heartbeat(msg);
-		ST_THIS do_direct_send_msg(msg);
+		do_direct_send_msg(msg);
 	}
 
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
@@ -48,14 +48,19 @@ public:
 	//notice, when reusing this socket, object_pool will invoke this function
 	virtual void reset()
 	{
+		has_bound = false;
+
 		boost::system::error_code ec;
 		if (!ST_THIS lowest_layer().is_open()) {ST_THIS lowest_layer().open(local_addr.protocol(), ec); assert(!ec);} //user maybe has opened this socket (to set options for example)
+		if (ST_THIS lowest_layer().is_open())
+		{
 #ifndef ST_ASIO_NOT_REUSE_ADDRESS
-		ST_THIS lowest_layer().set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
+			ST_THIS lowest_layer().set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
 #endif
-		ST_THIS lowest_layer().bind(local_addr, ec); assert(!ec);
-		if (ec)
-			unified_out::error_out("bind failed.");
+			ST_THIS lowest_layer().bind(local_addr, ec); assert(!ec);
+			if (!(has_bound = !ec))
+				unified_out::error_out("bind failed.");
+		}
 
 		last_send_msg.clear();
 		unpacker_->reset();
@@ -123,6 +128,8 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
+	virtual bool do_start() {return has_bound ? super::do_start() : false;}
+
 	//msg was failed to send and udp::socket_base will not hold it any more, if you want to re-send it in the future,
 	// you must take over it and re-send (at any time) it via direct_send_msg.
 	//DO NOT hold msg for future using, just swap its content with your own message in this virtual function.
@@ -152,10 +159,17 @@ private:
 #endif
 	virtual void send_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
 
+	using super::close;
+	using super::handle_msg;
+	using super::do_direct_send_msg;
+#ifdef ASCS_SYNC_SEND
+	using super::do_direct_sync_send_msg;
+#endif
+
 	void shutdown()
 	{
 		ST_THIS stop_all_timer();
-		ST_THIS close();
+		close();
 
 		if (ST_THIS lowest_layer().is_open())
 		{
@@ -199,7 +213,7 @@ private:
 #endif
 			for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 				temp_msg_can.emplace_back(temp_addr, boost::ref(*iter));
-			if (ST_THIS handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
+			if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
 		else
@@ -213,7 +227,7 @@ private:
 			if (ec)
 #endif
 				on_recv_error(ec);
-			else if (ST_THIS handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
+			else if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
 	}
@@ -304,6 +318,7 @@ private:
 	using super::reading;
 #endif
 
+	bool has_bound;
 	typename super::in_msg last_send_msg;
 	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker_;
 	boost::asio::ip::udp::endpoint local_addr;

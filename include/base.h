@@ -508,7 +508,7 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 	in_msg_type msg; \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
-	return ST_THIS SEND_FUNNAME(msg); \
+	return SEND_FUNNAME(msg); \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
@@ -543,7 +543,7 @@ sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t nu
 	in_msg_type msg; \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
-	return ST_THIS SEND_FUNNAME(msg, duration); \
+	return SEND_FUNNAME(msg, duration); \
 } \
 TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 
@@ -575,7 +575,7 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const 
 		return false; \
 	in_msg_type msg(peer_addr); \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
-	return ST_THIS SEND_FUNNAME(msg); \
+	return SEND_FUNNAME(msg); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
@@ -610,7 +610,7 @@ sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const 
 		return NOT_APPLICABLE; \
 	in_msg_type msg(peer_addr); \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
-	return ST_THIS SEND_FUNNAME(msg, duration); \
+	return SEND_FUNNAME(msg, duration); \
 } \
 UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 
