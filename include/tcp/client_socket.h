@@ -131,6 +131,7 @@ protected:
 	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
 	virtual void after_close() {if (need_reconnect) ST_THIS start();}
 
+private:
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
 	{
 		if (ST_THIS started() && !ST_THIS stopped())
@@ -154,10 +155,8 @@ protected:
 		return false;
 	}
 
-protected:
-	bool need_reconnect;
-
 private:
+	bool need_reconnect;
 	boost::asio::ip::tcp::endpoint server_addr;
 };
 

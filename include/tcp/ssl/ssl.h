@@ -40,7 +40,7 @@ protected:
 #ifndef ST_ASIO_REUSE_SSL_STREAM
 		if (ST_THIS is_ready())
 		{
-			ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN;
+			status = Socket::GRACEFUL_SHUTTING_DOWN;
 			ST_THIS show_info("ssl link:", "been shut down.");
 			boost::system::error_code ec;
 			ST_THIS next_layer().shutdown(ec);
@@ -69,7 +69,7 @@ protected:
 			return;
 		}
 
-		ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN;
+		status = Socket::GRACEFUL_SHUTTING_DOWN;
 
 		if (!sync)
 		{
@@ -93,6 +93,9 @@ private:
 		if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
 			unified_out::info_out("async shutdown ssl link failed (maybe intentionally because of reusing)");
 	}
+
+private:
+	using Socket::status;
 };
 
 template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
@@ -114,12 +117,17 @@ public:
 		if (reconnect)
 			unified_out::error_out("reconnecting mechanism is not available, please define macro ST_ASIO_REUSE_SSL_STREAM");
 
-		ST_THIS need_reconnect = false; //ignore reconnect parameter
-		ST_THIS shutdown_ssl(sync);
+		shutdown_ssl(sync);
 	}
-#endif
 
 protected:
+	virtual int prepare_reconnect(const boost::system::error_code& ec) {return -1;}
+#else
+protected:
+#endif
+	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); ST_THIS force_shutdown();}
+
+private:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
 	{
 		if (!ec)
@@ -129,22 +137,21 @@ protected:
 			super::connect_handler(ec);
 	}
 
-#ifndef ST_ASIO_REUSE_SSL_STREAM
-	virtual int prepare_reconnect(const boost::system::error_code& ec) {return -1;}
-	virtual void on_recv_error(const boost::system::error_code& ec) {ST_THIS need_reconnect = false; super::on_recv_error(ec);}
-#endif
-	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); ST_THIS force_shutdown();}
-
-private:
 	void handle_handshake(const boost::system::error_code& ec)
 	{
 		ST_THIS on_handshake(ec);
+
+#ifndef ST_ASIO_REUSE_SSL_STREAM
+		ST_THIS close_reconnect();
+#endif
 
 		if (!ec)
 			super::connect_handler(ec); //return to tcp::client_socket_base::connect_handler
 		else
 			ST_THIS force_shutdown();
 	}
+
+	using super::shutdown_ssl;
 };
 
 template<typename Object>
@@ -160,7 +167,7 @@ public:
 	typename object_pool::object_type create_object() {return create_object(boost::ref(ST_THIS get_service_pump()));}
 	template<typename Arg> typename object_pool::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
 
-protected:
+private:
 	boost::asio::ssl::context ctx;
 };
 
@@ -178,14 +185,14 @@ public:
 #ifndef ST_ASIO_REUSE_SSL_STREAM
 	void disconnect() {force_shutdown();}
 	void force_shutdown() {graceful_shutdown();} //must with async mode (the default value), because server_base::uninit will call this function
-	void graceful_shutdown(bool sync = false) {ST_THIS shutdown_ssl(sync);}
+	void graceful_shutdown(bool sync = false) {shutdown_ssl(sync);}
 #endif
 
 protected:
 	virtual bool do_start() //intercept tcp::server_socket_base::do_start (to add handshake)
 	{
-			ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::server,
-				ST_THIS make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+		ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::server,
+			ST_THIS make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
 		return true;
 	}
 
@@ -201,6 +208,8 @@ private:
 		else
 			ST_THIS get_server().del_socket(ST_THIS shared_from_this());
 	}
+
+	using super::shutdown_ssl;
 };
 
 template<typename Socket, typename Pool = object_pool<Socket>, typename Server = tcp::i_server> class server_base : public tcp::server_base<Socket, Pool, Server>
