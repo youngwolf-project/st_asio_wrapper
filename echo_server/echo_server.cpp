@@ -170,11 +170,32 @@ public:
 	normal_socket(i_server& server_) : normal_socket_base(server_) {}
 
 protected:
-	//demo client needs heartbeat (macro ST_ASIO_HEARTBEAT_INTERVAL been defined), pleae note that the interval (here is 5) must be equal to
+	//demo client needs heartbeat (macro ST_ASIO_HEARTBEAT_INTERVAL been defined), please note that the interval (here is 5) must be equal to
 	//macro ST_ASIO_HEARTBEAT_INTERVAL defined in demo client, and macro ST_ASIO_HEARTBEAT_MAX_ABSENCE must has the same value as demo client's.
 	virtual void on_connect() {start_heartbeat(5);}
 };
 #endif
+
+class short_connection : public server_socket_base<packer, unpacker>
+{
+public:
+	short_connection(i_server& server_) : server_socket_base(server_) {}
+
+protected:
+	//msg handling
+#ifdef ST_ASIO_SYNC_DISPATCH
+	//do not hold msg_can for further using, return from on_msg as quickly as possible
+	virtual size_t on_msg(std::list<out_msg_type>& msg_can) {bool re = server_socket_base::on_msg(msg_can); force_shutdown(); return re;}
+#endif
+
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
+	virtual size_t on_msg_handle(out_queue_type& msg_can) {bool re = server_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
+#else
+	virtual bool on_msg_handle(out_msg_type& msg) {bool re = server_socket_base::on_msg_handle(msg); force_shutdown(); return re;}
+#endif
+	//msg handling end
+};
 
 int main(int argc, const char* argv[])
 {
@@ -190,21 +211,20 @@ int main(int argc, const char* argv[])
 	//this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
 	//the reason is these packer and unpacker need additional initializations that normal_socket not implemented,
 	//see echo_socket's constructor for more details.
-	server_base<normal_socket> server_(sp);
+	server_base<normal_socket> normal_server(sp);
+	server_base<short_connection> short_server(sp);
 	echo_server echo_server_(sp); //echo server
 
+	unsigned short port = ST_ASIO_SERVER_PORT;
+	std::string ip;
+	if (argc > 2)
+		port = (unsigned short) atoi(argv[2]);
 	if (argc > 3)
-	{
-		server_.set_server_addr(atoi(argv[2]) + 100, argv[3]);
-		echo_server_.set_server_addr(atoi(argv[2]), argv[3]);
-	}
-	else if (argc > 2)
-	{
-		server_.set_server_addr(atoi(argv[2]) + 100);
-		echo_server_.set_server_addr(atoi(argv[2]));
-	}
-	else
-		server_.set_server_addr(ST_ASIO_SERVER_PORT + 100);
+		ip = argv[3];
+
+	normal_server.set_server_addr(port + 100, ip);
+	short_server.set_server_addr(port + 101, ip);
+	echo_server_.set_server_addr(port, ip);
 
 	int thread_num = 1;
 	if (argc > 1)
@@ -230,19 +250,19 @@ int main(int argc, const char* argv[])
 		}
 		else if (STATISTIC == str)
 		{
-			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", server_.size(), server_.invalid_object_size());
+			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", normal_server.size(), normal_server.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n\n", echo_server_.size(), echo_server_.invalid_object_size());
 			puts(echo_server_.get_statistic().to_string().data());
 		}
 		else if (STATUS == str)
 		{
-			server_.list_all_status();
+			normal_server.list_all_status();
 			echo_server_.list_all_status();
 		}
 		else if (LIST_ALL_CLIENT == str)
 		{
 			puts("clients from normal server:");
-			server_.list_all_object();
+			normal_server.list_all_object();
 			puts("clients from echo server:");
 			echo_server_.list_all_object();
 		}
@@ -254,7 +274,7 @@ int main(int argc, const char* argv[])
 		{
 //			/*
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
-			server_.broadcast_msg(str.data(), str.size() + 1, false);
+			normal_server.broadcast_msg(str.data(), str.size() + 1, false);
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 //			*/
@@ -265,11 +285,11 @@ int main(int argc, const char* argv[])
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
-				server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(msg), false));
+				normal_server.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(msg), false));
 			*/
 			/*
 			//if demo client is using stream_unpacker
-			server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
+			normal_server.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
 			*/
 		}
 	}
