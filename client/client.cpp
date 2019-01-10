@@ -93,7 +93,9 @@ public:
 	short_client(service_pump& service_pump_) : multi_client_base(service_pump_) {}
 
 	void set_server_addr(unsigned short _port, const std::string& _ip = ST_ASIO_SERVER_IP) {port = _port; ip = _ip;}
-	bool send_msg(const std::string& msg)
+
+	bool send_msg(const std::string& msg) {return send_msg(msg, port, ip);}
+	bool send_msg(const std::string& msg, unsigned short port, const std::string& ip)
 	{
 		BOOST_AUTO(socket_ptr, add_socket(port, ip));
 		return socket_ptr ? socket_ptr->set_controller(this), socket_ptr->send_msg(msg) : false;
