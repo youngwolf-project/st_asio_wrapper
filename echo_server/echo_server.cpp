@@ -176,23 +176,24 @@ protected:
 };
 #endif
 
-class short_connection : public server_socket_base<packer, unpacker>
+typedef server_socket_base<packer, unpacker> short_socket_base;
+class short_connection : public short_socket_base
 {
 public:
-	short_connection(i_server& server_) : server_socket_base(server_) {}
+	short_connection(i_server& server_) : short_socket_base(server_) {}
 
 protected:
 	//msg handling
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//do not hold msg_can for further using, return from on_msg as quickly as possible
-	virtual size_t on_msg(std::list<out_msg_type>& msg_can) {bool re = server_socket_base::on_msg(msg_can); force_shutdown(); return re;}
+	virtual size_t on_msg(std::list<out_msg_type>& msg_can) {bool re = short_socket_base::on_msg(msg_can); force_shutdown(); return re;}
 #endif
 
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
-	virtual size_t on_msg_handle(out_queue_type& msg_can) {bool re = server_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
+	virtual size_t on_msg_handle(out_queue_type& msg_can) {bool re = short_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
 #else
-	virtual bool on_msg_handle(out_msg_type& msg) {bool re = server_socket_base::on_msg_handle(msg); force_shutdown(); return re;}
+	virtual bool on_msg_handle(out_msg_type& msg) {bool re = short_socket_base::on_msg_handle(msg); force_shutdown(); return re;}
 #endif
 	//msg handling end
 };

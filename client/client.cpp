@@ -90,7 +90,7 @@ private:
 class short_client : public multi_client_base<short_connection>, protected i_controller
 {
 public:
-	short_client(service_pump& service_pump_) : multi_client_base(service_pump_) {}
+	short_client(service_pump& service_pump_) : multi_client_base<short_connection>(service_pump_) {}
 
 	void set_server_addr(unsigned short _port, const std::string& _ip = ST_ASIO_SERVER_IP) {port = _port; ip = _ip;}
 
