@@ -33,9 +33,9 @@ private:
 	typedef socket<Socket, Packer, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	socket_base(boost::asio::io_context& io_context_) : super(io_context_), has_bound(false), unpacker_(boost::make_shared<Unpacker>()), strand(io_context_) {}
+	socket_base(boost::asio::io_context& io_context_) : super(io_context_), unpacker_(boost::make_shared<Unpacker>()), strand(io_context_) {}
 
-	virtual bool is_ready() {return has_bound;}
+	virtual bool is_ready() {return ST_THIS lowest_layer().is_open();}
 	virtual void send_heartbeat()
 	{
 		in_msg_type msg(peer_addr);
@@ -48,20 +48,6 @@ public:
 	//notice, when reusing this socket, object_pool will invoke this function
 	virtual void reset()
 	{
-		has_bound = false;
-
-		boost::system::error_code ec;
-		if (!ST_THIS lowest_layer().is_open()) {ST_THIS lowest_layer().open(local_addr.protocol(), ec); assert(!ec);} //user maybe has opened this socket (to set options for example)
-		if (ST_THIS lowest_layer().is_open())
-		{
-#ifndef ST_ASIO_NOT_REUSE_ADDRESS
-			ST_THIS lowest_layer().set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
-#endif
-			ST_THIS lowest_layer().bind(local_addr, ec); assert(!ec);
-			if (!(has_bound = !ec))
-				unified_out::error_out("bind failed.");
-		}
-
 		last_send_msg.clear();
 		unpacker_->reset();
 		super::reset();
@@ -128,7 +114,35 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
-	virtual bool do_start() {return has_bound ? super::do_start() : false;}
+	virtual bool do_start()
+	{
+		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
+
+		boost::system::error_code ec;
+		if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
+		{
+			lowest_object.open(local_addr.protocol(), ec); assert(!ec);
+			if (ec) return false;
+
+#ifndef ST_ASIO_NOT_REUSE_ADDRESS
+			lowest_object.set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
+#endif
+		}
+
+		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
+		{
+			lowest_object.bind(local_addr, ec); assert(!ec);
+			if (ec)
+			{
+				unified_out::error_out("bind failed.");
+				lowest_object.close(ec); assert(!ec);
+
+				return false;
+			}
+		}
+
+		return super::do_start();
+	}
 
 	//msg was failed to send and udp::socket_base will not hold it any more, if you want to re-send it in the future,
 	// you must take over it and re-send (at any time) it via direct_send_msg.
@@ -293,12 +307,15 @@ private:
 		{
 			boost::system::error_code ec;
 #if BOOST_ASIO_VERSION >= 101100
-			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec));
+			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec)); assert(!ec);
 #else
-			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec));
+			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec)); assert(!ec);
 #endif
 			if (ec)
+			{
+				unified_out::error_out("invalid IP address %s.", ip.data());
 				return false;
+			}
 
 			endpoint = boost::asio::ip::udp::endpoint(addr, port);
 		}
@@ -318,7 +335,6 @@ private:
 	using super::reading;
 #endif
 
-	bool has_bound;
 	typename super::in_msg last_send_msg;
 	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker_;
 	boost::asio::ip::udp::endpoint local_addr;

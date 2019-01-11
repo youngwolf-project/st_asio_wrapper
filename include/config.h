@@ -528,6 +528,7 @@
  * Prefix suffix packer and unpacker support heartbeat.
  * New demo socket_management demonstrates how to manage sockets if you use other keys rather than the original id.
  * Control reconnecting more flexibly, see function client_socket_base::open_reconnect and client_socket_base::close_reconnect for more details.
+ * client_socket_base support binding to a specific local address.
  *
  * DELETION:
  *
@@ -742,8 +743,9 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 	#error async accept number must be bigger than zero.
 #endif
 
-//in set_server_addr, if the IP is empty, ST_ASIO_TCP_DEFAULT_IP_VERSION will define the IP version, or the IP version will be deduced by the IP address.
-//boost::asio::ip::tcp::v4() means ipv4 and boost::asio::ip::tcp::v6() means ipv6.
+//in server_base::set_server_addr and set_local_addr, if the IP is empty, ST_ASIO_(TCP/UDP)_DEFAULT_IP_VERSION will define the IP version,
+// or the IP version will be deduced by the IP address.
+//boost::asio::ip::(tcp/udp)::v4() means ipv4 and boost::asio::ip::(tcp/udp)::v6() means ipv6.
 #ifndef ST_ASIO_TCP_DEFAULT_IP_VERSION
 #define ST_ASIO_TCP_DEFAULT_IP_VERSION boost::asio::ip::tcp::v4()
 #endif
