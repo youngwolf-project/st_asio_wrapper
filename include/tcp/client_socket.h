@@ -82,7 +82,7 @@ protected:
 	{
 		assert(!ST_THIS is_connected());
 
-		BOOST_AUTO(&lowest_object, this->lowest_layer());
+		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
 		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
 		{
 			boost::system::error_code ec;
