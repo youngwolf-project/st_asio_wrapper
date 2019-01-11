@@ -89,13 +89,17 @@ protected:
 			if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
 			{
 				lowest_object.open(local_addr.protocol(), ec); assert(!ec);
-				if (ec) return false;
+				if (ec)
+				{
+					unified_out::error_out("cannot create socket: %s", ec.message().data());
+					return false;
+				}
 			}
 
 			lowest_object.bind(local_addr, ec); assert(!ec);
 			if (ec)
 			{
-				unified_out::error_out("bind failed.");
+				unified_out::error_out("cannot bind socket: %s", ec.message().data());
 				lowest_object.close(ec); assert(!ec);
 
 				return false;
