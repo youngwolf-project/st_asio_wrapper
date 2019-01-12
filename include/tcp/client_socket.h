@@ -39,21 +39,10 @@ public:
 	// call superclass' reset function, before reusing this socket, object_pool will invoke this function
 	virtual void reset() {need_reconnect = true; super::reset();}
 
-	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP)
-	{
-		boost::system::error_code ec;
-#if BOOST_ASIO_VERSION >= 101100
-		BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec));
-#else
-		BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec));
-#endif
-		if (ec)
-			return false;
-
-		server_addr = boost::asio::ip::tcp::endpoint(addr, port);
-		return true;
-	}
+	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip);}
 	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
+	bool set_local_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(local_addr, port, ip);}
+	const boost::asio::ip::tcp::endpoint& get_local_addr() const {return local_addr;}
 
 	//if you don't want to reconnect to the server after link broken, call close_reconnect() or rewrite after_close() virtual function and do nothing in it,
 	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
@@ -93,7 +82,29 @@ protected:
 	{
 		assert(!ST_THIS is_connected());
 
-		ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&client_socket_base::connect_handler, this, boost::asio::placeholders::error)));
+		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
+		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
+		{
+			boost::system::error_code ec;
+			if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
+			{
+				lowest_object.open(local_addr.protocol(), ec); assert(!ec);
+				if (ec)
+				{
+					unified_out::error_out("cannot create socket: %s", ec.message().data());
+					return false;
+				}
+			}
+
+			lowest_object.bind(local_addr, ec); assert(!ec);
+			if (ec)
+			{
+				unified_out::error_out("cannot bind socket: %s", ec.message().data());
+				return false;
+			}
+		}
+
+		lowest_object.async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&client_socket_base::connect_handler, this, boost::asio::placeholders::error)));
 		return true;
 	}
 
@@ -155,9 +166,34 @@ private:
 		return false;
 	}
 
+	bool set_addr(boost::asio::ip::tcp::endpoint& endpoint, unsigned short port, const std::string& ip)
+	{
+		if (ip.empty())
+			endpoint = boost::asio::ip::tcp::endpoint(ST_ASIO_TCP_DEFAULT_IP_VERSION, port);
+		else
+		{
+			boost::system::error_code ec;
+#if BOOST_ASIO_VERSION >= 101100
+			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec)); assert(!ec);
+#else
+			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec)); assert(!ec);
+#endif
+			if (ec)
+			{
+				unified_out::error_out("invalid IP address %s.", ip.data());
+				return false;
+			}
+
+			endpoint = boost::asio::ip::tcp::endpoint(addr, port);
+		}
+
+		return true;
+	}
+
 private:
 	bool need_reconnect;
 	boost::asio::ip::tcp::endpoint server_addr;
+	boost::asio::ip::tcp::endpoint local_addr;
 };
 
 }} //namespace

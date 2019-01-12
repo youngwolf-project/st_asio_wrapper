@@ -50,18 +50,6 @@ public:
 	{
 		has_bound = false;
 
-		boost::system::error_code ec;
-		if (!ST_THIS lowest_layer().is_open()) {ST_THIS lowest_layer().open(local_addr.protocol(), ec); assert(!ec);} //user maybe has opened this socket (to set options for example)
-		if (ST_THIS lowest_layer().is_open())
-		{
-#ifndef ST_ASIO_NOT_REUSE_ADDRESS
-			ST_THIS lowest_layer().set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
-#endif
-			ST_THIS lowest_layer().bind(local_addr, ec); assert(!ec);
-			if (!(has_bound = !ec))
-				unified_out::error_out("bind failed.");
-		}
-
 		last_send_msg.clear();
 		unpacker_->reset();
 		super::reset();
@@ -128,7 +116,37 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
-	virtual bool do_start() {return has_bound ? super::do_start() : false;}
+	virtual bool do_start()
+	{
+		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
+		if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
+		{
+			boost::system::error_code ec;
+			lowest_object.open(local_addr.protocol(), ec); assert(!ec);
+			if (ec)
+			{
+				unified_out::error_out("cannot create socket: %s", ec.message().data());
+				return (has_bound = false);
+			}
+
+#ifndef ST_ASIO_NOT_REUSE_ADDRESS
+			lowest_object.set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
+#endif
+		}
+
+		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
+		{
+			boost::system::error_code ec;
+			lowest_object.bind(local_addr, ec); assert(!ec);
+			if (ec)
+			{
+				unified_out::error_out("cannot bind socket: %s", ec.message().data());
+				return (has_bound = false);
+			}
+		}
+
+		return (has_bound = true) && super::do_start();
+	}
 
 	//msg was failed to send and udp::socket_base will not hold it any more, if you want to re-send it in the future,
 	// you must take over it and re-send (at any time) it via direct_send_msg.
@@ -293,12 +311,15 @@ private:
 		{
 			boost::system::error_code ec;
 #if BOOST_ASIO_VERSION >= 101100
-			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec));
+			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec)); assert(!ec);
 #else
-			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec));
+			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec)); assert(!ec);
 #endif
 			if (ec)
+			{
+				unified_out::error_out("invalid IP address %s.", ip.data());
 				return false;
+			}
 
 			endpoint = boost::asio::ip::udp::endpoint(addr, port);
 		}
