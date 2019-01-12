@@ -33,9 +33,9 @@ private:
 	typedef socket<Socket, Packer, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	socket_base(boost::asio::io_context& io_context_) : super(io_context_), unpacker_(boost::make_shared<Unpacker>()), strand(io_context_) {}
+	socket_base(boost::asio::io_context& io_context_) : super(io_context_), has_bound(false), unpacker_(boost::make_shared<Unpacker>()), strand(io_context_) {}
 
-	virtual bool is_ready() {return ST_THIS lowest_layer().is_open();}
+	virtual bool is_ready() {return has_bound;}
 	virtual void send_heartbeat()
 	{
 		in_msg_type msg(peer_addr);
@@ -48,6 +48,8 @@ public:
 	//notice, when reusing this socket, object_pool will invoke this function
 	virtual void reset()
 	{
+		has_bound = false;
+
 		last_send_msg.clear();
 		unpacker_->reset();
 		super::reset();
@@ -117,15 +119,14 @@ protected:
 	virtual bool do_start()
 	{
 		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
-
-		boost::system::error_code ec;
 		if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
 		{
+			boost::system::error_code ec;
 			lowest_object.open(local_addr.protocol(), ec); assert(!ec);
 			if (ec)
 			{
 				unified_out::error_out("cannot create socket: %s", ec.message().data());
-				return false;
+				return (has_bound = false);
 			}
 
 #ifndef ST_ASIO_NOT_REUSE_ADDRESS
@@ -135,17 +136,16 @@ protected:
 
 		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
 		{
+			boost::system::error_code ec;
 			lowest_object.bind(local_addr, ec); assert(!ec);
 			if (ec)
 			{
 				unified_out::error_out("cannot bind socket: %s", ec.message().data());
-				lowest_object.close(ec); assert(!ec);
-
-				return false;
+				return (has_bound = false);
 			}
 		}
 
-		return super::do_start();
+		return (has_bound = true) && super::do_start();
 	}
 
 	//msg was failed to send and udp::socket_base will not hold it any more, if you want to re-send it in the future,
@@ -339,6 +339,7 @@ private:
 	using super::reading;
 #endif
 
+	bool has_bound;
 	typename super::in_msg last_send_msg;
 	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker_;
 	boost::asio::ip::udp::endpoint local_addr;

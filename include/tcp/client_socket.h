@@ -100,8 +100,6 @@ protected:
 			if (ec)
 			{
 				unified_out::error_out("cannot bind socket: %s", ec.message().data());
-				lowest_object.close(ec); assert(!ec);
-
 				return false;
 			}
 		}
