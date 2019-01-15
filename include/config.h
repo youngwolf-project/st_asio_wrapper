@@ -27,6 +27,7 @@
  * 4. since 1.3.5 until 1.4, SSL doesn't support heartbeat because SSL doesn't support OOB data.
  * 5. with old openssl (at least 0.9.7), ssl::client_socket_base and ssl_server_socket_base are not reusable, I'm not sure in which version,
  *    they became available, seems it's 1.0.0.
+ * 6. since 1.0.0 until 2.1.0, async_write and async_read are not mutexed on the same socket, which is a violation of asio threading model.
  *
  * change log:
  * 2012.7.7
@@ -522,6 +523,7 @@
  * HIGHLIGHT:
  *
  * FIX:
+ * If give up connecting (prepare_reconnect returns -1 or call close_reconnect), st_asio_wrapper::socket::started() still returns true (should be false).
  *
  * ENHANCEMENTS:
  * Expose server_base's acceptor via next_layer().

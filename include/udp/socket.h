@@ -137,8 +137,8 @@ protected:
 		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
 		{
 			boost::system::error_code ec;
-			lowest_object.bind(local_addr, ec); assert(!ec);
-			if (ec)
+			lowest_object.bind(local_addr, ec);
+			if (ec && boost::asio::error::invalid_argument != ec)
 			{
 				unified_out::error_out("cannot bind socket: %s", ec.message().data());
 				return (has_bound = false);
@@ -189,11 +189,12 @@ private:
 		ST_THIS stop_all_timer();
 		close();
 
-		if (ST_THIS lowest_layer().is_open())
+		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
+		if (lowest_object.is_open())
 		{
 			boost::system::error_code ec;
-			ST_THIS lowest_layer().shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
-			ST_THIS lowest_layer().close(ec);
+			lowest_object.shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
+			lowest_object.close(ec);
 		}
 	}
 

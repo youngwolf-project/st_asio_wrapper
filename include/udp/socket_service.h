@@ -37,12 +37,20 @@ public:
 	{
 		BOOST_AUTO(socket_ptr, ST_THIS create_object());
 		if (!socket_ptr)
-			return typename Pool::object_type();
-		else
-		{
-			socket_ptr->set_local_addr(port, ip);
-			return ST_THIS add_socket(socket_ptr) ? socket_ptr : typename Pool::object_type();
-		}
+			return socket_ptr;
+
+		socket_ptr->set_local_addr(port, ip);
+		return ST_THIS add_socket(socket_ptr) ? socket_ptr : typename Pool::object_type();
+	}
+	typename Pool::object_type add_socket(unsigned short port, unsigned short peer_port, const std::string& ip = std::string(), const std::string& peer_ip = std::string())
+	{
+		BOOST_AUTO(socket_ptr, ST_THIS create_object());
+		if (!socket_ptr)
+			return socket_ptr;
+
+		socket_ptr->set_local_addr(port, ip);
+		socket_ptr->set_peer_addr(peer_port, peer_ip);
+		return ST_THIS add_socket(socket_ptr) ? socket_ptr : typename Pool::object_type();
 	}
 
 	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function
