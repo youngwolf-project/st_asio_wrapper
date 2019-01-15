@@ -187,16 +187,16 @@ protected:
 	virtual void on_send_error(const boost::system::error_code& ec, boost::container::list<typename super::in_msg>& msg_can)
 		{unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
 
-#ifdef ST_ASIO_SYNC_SEND
 	virtual void on_close()
 	{
+#ifdef ST_ASIO_SYNC_SEND
 		for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
 			if (iter->p)
 				iter->p->set_value(NOT_APPLICABLE);
-
+#endif
+		status = BROKEN;
 		super::on_close();
 	}
-#endif
 
 	virtual void on_connect() {}
 	//msg can not be unpacked
