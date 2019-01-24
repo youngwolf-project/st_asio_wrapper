@@ -175,7 +175,7 @@ public:
 	boost::asio::ssl::context& context() {return ctx;}
 
 	template<typename Arg> typename object_pool::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
-	template<typename Arg> typename object_pool::object_type create_object(Arg* arg) {return super::create_object(arg, ctx);}
+	template<typename Arg> typename object_pool::object_type create_object(Arg* arg) {return super::create_object(arg, boost::ref(ctx));}
 
 private:
 	boost::asio::ssl::context ctx;
