@@ -143,12 +143,16 @@ return object_ptr;
 
 	template<typename Arg> object_type create_object(Arg& arg) {CREATE_OBJECT_1_ARG(reuse_object);}
 	template<typename Arg1, typename Arg2> object_type create_object(Arg1& arg1, Arg2& arg2) {CREATE_OBJECT_2_ARG(reuse_object);}
+
+	template<typename Arg> object_type create_object(Arg* arg) {CREATE_OBJECT_1_ARG(reuse_object);}
+	template<typename Arg1, typename Arg2> object_type create_object(Arg1* arg1, Arg2& arg2) {CREATE_OBJECT_2_ARG(reuse_object);}
 #else
 	template<typename Arg> object_type create_object(Arg& arg) {CREATE_OBJECT_1_ARG(object_type);}
 	template<typename Arg1, typename Arg2> object_type create_object(Arg1& arg1, Arg2& arg2) {CREATE_OBJECT_2_ARG(object_type);}
-#endif
 
-	object_type create_object() {return create_object(boost::ref(get_service_pump()));}
+	template<typename Arg> object_type create_object(Arg* arg) {CREATE_OBJECT_1_ARG(object_type);}
+	template<typename Arg1, typename Arg2> object_type create_object(Arg1* arg1, Arg2& arg2) {CREATE_OBJECT_2_ARG(object_type);}
+#endif
 
 public:
 	//to configure unordered_set(for example, set factor or reserved size), not thread safe, so must be called before service_pump startup.

@@ -26,13 +26,22 @@ namespace st_asio_wrapper { namespace ssl {
 template <typename Socket>
 class socket : public Socket
 {
-#if defined(ST_ASIO_REUSE_OBJECT) && !defined(ST_ASIO_REUSE_SSL_STREAM)
-	#error please define ST_ASIO_REUSE_SSL_STREAM macro explicitly if you need boost::asio::ssl::stream to be reusable!
+#ifndef ST_ASIO_REUSE_SSL_STREAM
+	#ifdef ST_ASIO_REUSE_OBJECT
+		#error please define ST_ASIO_REUSE_SSL_STREAM macro explicitly if you need boost::asio::ssl::stream to be reusable!
+	#endif
+	#if ST_ASIO_RECONNECT
+		#ifdef _MSC_VER
+			#pragma message("without macro ST_ASIO_REUSE_SSL_STREAM, ssl::client_socket_base is not able to reconnect the server.")
+		#else
+			#warning without macro ST_ASIO_REUSE_SSL_STREAM, ssl::client_socket_base is not able to reconnect the server.
+		#endif
+	#endif
 #endif
 
 public:
-	template<typename Arg>
-	socket(Arg& arg, boost::asio::ssl::context& ctx) : Socket(arg, ctx) {}
+	template<typename Arg> socket(Arg& arg, boost::asio::ssl::context& ctx) : Socket(arg, ctx) {}
+	template<typename Arg> socket(Arg* arg, boost::asio::ssl::context& ctx) : Socket(arg, ctx) {}
 
 protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
@@ -98,16 +107,17 @@ private:
 	using Socket::status;
 };
 
-template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
 	template<typename, typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename, typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class client_socket_base : public socket<tcp::client_socket_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer> >
+class client_socket_base : public socket<tcp::client_socket_base<Packer, Unpacker, Matrix, Socket, InQueue, InContainer, OutQueue, OutContainer> >
 {
 private:
-	typedef socket<tcp::client_socket_base<Packer, Unpacker, Socket, InQueue, InContainer, OutQueue, OutContainer> > super;
+	typedef socket<tcp::client_socket_base<Packer, Unpacker, Matrix, Socket, InQueue, InContainer, OutQueue, OutContainer> > super;
 
 public:
 	client_socket_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx) : super(io_context_, ctx) {}
+	client_socket_base(Matrix* matrix_, boost::asio::ssl::context& ctx) : super(matrix_, ctx) {}
 
 #ifndef ST_ASIO_REUSE_SSL_STREAM
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
@@ -141,7 +151,7 @@ private:
 	{
 		ST_THIS on_handshake(ec);
 
-#ifndef ST_ASIO_REUSE_SSL_STREAM
+#if ST_ASIO_RECONNECT && !defined(ST_ASIO_REUSE_SSL_STREAM)
 		ST_THIS close_reconnect();
 #endif
 
@@ -164,8 +174,8 @@ public:
 	object_pool(service_pump& service_pump_, boost::asio::ssl::context::method m) : super(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& context() {return ctx;}
 
-	typename object_pool::object_type create_object() {return create_object(boost::ref(ST_THIS get_service_pump()));}
 	template<typename Arg> typename object_pool::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
+	template<typename Arg> typename object_pool::object_type create_object(Arg* arg) {return super::create_object(arg, ctx);}
 
 private:
 	boost::asio::ssl::context ctx;

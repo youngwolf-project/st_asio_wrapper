@@ -32,8 +32,8 @@ protected:
 	virtual void uninit() {ST_THIS graceful_shutdown();} //if you wanna force shutdown, call force_shutdown before service_pump::stop_service invocation.
 };
 
-template<typename Socket, typename Pool>
-class multi_socket_service : public Pool
+template<typename Socket, typename Pool, typename Matrix>
+class multi_socket_service : public Matrix, public Pool
 {
 protected:
 	multi_socket_service(service_pump& service_pump_) : Pool(service_pump_) {}
@@ -48,6 +48,12 @@ protected:
 	}
 
 public:
+	//implement i_matrix's pure virtual functions
+	virtual bool started() const {return ST_THIS is_started();}
+	virtual service_pump& get_service_pump() {return Pool::get_service_pump();}
+	virtual const service_pump& get_service_pump() const {return Pool::get_service_pump();}
+	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return ST_THIS find(id);}
+
 	//parameter reset valid only if the service pump already started, or service pump will call object pool's init function before start service pump
 	bool add_socket(typename Pool::object_ctype& socket_ptr, bool reset = true)
 	{
@@ -65,9 +71,6 @@ public:
 
 		return false;
 	}
-
-	//unseal object creation.
-	using Pool::create_object;
 };
 
 } //namespace

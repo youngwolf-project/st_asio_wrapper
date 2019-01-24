@@ -90,7 +90,7 @@ public:
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
-	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
+	//of bytes to be read on the next call to the stream's async_read_some function. ！boost::asio::async_read
 	//read as many as possible to reduce asynchronous call-back, and don't forget to handle sticky package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
@@ -248,7 +248,7 @@ public:
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
-	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
+	//of bytes to be read on the next call to the stream's async_read_some function. ！boost::asio::async_read
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		if (ec)
@@ -312,7 +312,7 @@ public:
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
-	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
+	//of bytes to be read on the next call to the stream's async_read_some function. ！boost::asio::async_read
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 		{return ec || bytes_transferred == raw_buff.size() ? 0 : boost::asio::detail::default_max_transfer_size;}
 
@@ -420,7 +420,7 @@ public:
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
-	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
+	//of bytes to be read on the next call to the stream's async_read_some function. ！boost::asio::async_read
 	//read as many as possible to reduce asynchronous call-back, and don't forget to handle sticky package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{

@@ -13,7 +13,6 @@
 							   //if the server send messages quickly enough, you will see them cross together.
 #define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_CUSTOM_LOG
-#define ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 #define ST_ASIO_DEFAULT_UNPACKER non_copy_unpacker
 //#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 
@@ -60,49 +59,28 @@ using namespace st_asio_wrapper::ext::tcp;
 #define RESTART_COMMAND	"restart"
 #define RECONNECT		"reconnect"
 
-//demonstrates how to access client in client_socket (just like access server in server_socket)
-class i_controller
-{
-public:
-	virtual void on_all_msg_send(boost::uint_fast64_t id) = 0;
-	//add more interfaces if needed
-};
-
+//we only want close reconnecting mechanism on this socket, so we don't define macro ST_ASIO_RECONNECT
 class short_connection : public client_socket
 {
 public:
-	short_connection(boost::asio::io_context& io_context_) : client_socket(io_context_), controller(NULL) {}
-
-	void set_controller(i_controller* _controller) {controller = _controller;}
-	i_controller* get_controller() const {return controller;}
+	short_connection(i_matrix* matrix_) : client_socket(matrix_) {}
 
 protected:
-	virtual void on_connect() {close_reconnect();}
-
-#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-	virtual void on_all_msg_send(in_msg_type& msg) {controller->on_all_msg_send(id());}
-#endif
-
-private:
-	i_controller* controller;
+	virtual void on_connect() {close_reconnect();} //close reconnecting mechanism
 };
 
-class short_client : public multi_client_base<short_connection>, protected i_controller
+class short_client : public multi_client_base<short_connection>
 {
 public:
 	short_client(service_pump& service_pump_) : multi_client_base<short_connection>(service_pump_) {}
 
 	void set_server_addr(unsigned short _port, const std::string& _ip = ST_ASIO_SERVER_IP) {port = _port; ip = _ip;}
-
 	bool send_msg(const std::string& msg) {return send_msg(msg, port, ip);}
 	bool send_msg(const std::string& msg, unsigned short port, const std::string& ip)
 	{
 		BOOST_AUTO(socket_ptr, add_socket(port, ip));
-		return socket_ptr ? socket_ptr->set_controller(this), socket_ptr->send_msg(msg) : false;
+		return socket_ptr ? socket_ptr->send_msg(msg) : false;
 	}
-
-protected:
-	virtual void on_all_msg_send(uint_fast64_t id) {}
 
 private:
 	unsigned short port;

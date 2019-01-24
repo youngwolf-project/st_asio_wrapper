@@ -155,6 +155,7 @@ class echo_server : public echo_server_base
 public:
 	echo_server(service_pump& service_pump_) : echo_server_base(service_pump_) {}
 
+protected:
 	//from i_echo_server, pure virtual function, we must implement it.
 	virtual void test() {/*puts("in echo_server::test()");*/}
 };

@@ -38,7 +38,7 @@ atomic<unsigned short> completed_session_num;
 class echo_socket : public client_socket
 {
 public:
-	echo_socket(boost::asio::io_context& io_context_) : client_socket(io_context_) {}
+	echo_socket(i_matrix* matrix_) : client_socket(matrix_) {}
 
 	void begin(size_t msg_num, const char* msg, size_t msg_len)
 	{

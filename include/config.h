@@ -109,7 +109,7 @@
  * Use ST_ASIO_DELAY_CLOSE instead of ST_ASIO_ENHANCED_STABILITY macro to control delay close duration,
  *  0 is an equivalent of defining ST_ASIO_ENHANCED_STABILITY, other values keep the same meanings as before.
  * Move st_socket::closing related logic to st_object.
- * Make st_socket::id(uint_fast64_t) private to avoid changing IDs by users.
+ * Make st_socket::id(boost::uint_fast64_t) private to avoid changing IDs by users.
  * Call close at the end of shutdown function, just for safety.
  * Introduce lock-free mechanism for some appropriate logics (many requesters, only one can succeed, others will fail rather than wait).
  * Remove all mutex (except mutex in st_object_pool, st_service_pump, lock_queue and st_udp_socket).
@@ -538,6 +538,28 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2019.3.x		version 2.1.5
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * Socket used by tcp::multi_client_base, ssl::multi_client_base and udp::multi_socket_service needs to provide a constructor which accept
+ *  a raw pointer of i_matrix instead of a reference of asio::io_context.
+ *
+ * HIGHLIGHT:
+ * Make client_socket_base be able to call multi_client_base (via i_matrix) like server_socket_base call server_base (via i_server),
+ *  and so does ssl::client_socket_base and udp::socket_base.
+ *
+ * FIX:
+ *
+ * ENHANCEMENTS:
+ * Introduce macro ST_ASIO_RECONNECT to control the reconnecting mechanism.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -547,13 +569,13 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20104	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.1.4"
+#define ST_ASIO_VER		20105	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.1.5"
 
 //boost and compiler check
 #ifdef _MSC_VER
 	#define ST_ASIO_SF "%Iu" //format used to print 'size_t'
-	#define ST_ASIO_LLF "%I64u" //format used to print 'uint_fast64_t'
+	#define ST_ASIO_LLF "%I64u" //format used to print 'boost::uint_fast64_t'
 
 	#if _MSC_VER < 1700
 		#define ST_THIS //workaround to make up the BOOST_AUTO's defect on vc2008 and compiler crush before vc2012
@@ -567,9 +589,9 @@
 	#define ST_ASIO_SF "%zu" //format used to print 'size_t'
 	#define ST_THIS this->
 	#ifdef __x86_64__
-		#define ST_ASIO_LLF "%lu" //format used to print 'uint_fast64_t'
+		#define ST_ASIO_LLF "%lu" //format used to print 'boost::uint_fast64_t'
 	#else
-		#define ST_ASIO_LLF "%llu" //format used to print 'uint_fast64_t'
+		#define ST_ASIO_LLF "%llu" //format used to print 'boost::uint_fast64_t'
 	#endif
 	#ifdef __clang__
 		#if __clang_major__ > 3 || __clang_major__ == 3 && __clang_minor__ >= 1
@@ -723,6 +745,12 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //you can also rewrite tcp::client_socket_base::prepare_reconnect(), and return a negative value.
 #ifndef ST_ASIO_RECONNECT_INTERVAL
 #define ST_ASIO_RECONNECT_INTERVAL	500 //millisecond(s)
+#endif
+
+//define ST_ASIO_RECONNECT macro as false, then no reconnecting will be performed after the link broken passively.
+//if proactively shutdown the link, reconnect or not depends on the reconnect parameter passed via disconnect, force_shutdown and graceful_shutdown.
+#ifndef ST_ASIO_RECONNECT
+#define ST_ASIO_RECONNECT	true
 #endif
 
 //how many async_accept delivery concurrently, an equivalent way is to rewrite virtual function server_socket_base::async_accept_num().

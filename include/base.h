@@ -96,16 +96,23 @@ private:
 
 class tracked_executor;
 class service_pump;
+class i_matrix
+{
+public:
+	virtual bool started() const = 0;
+	virtual service_pump& get_service_pump() = 0;
+	virtual const service_pump& get_service_pump() const = 0;
+
+	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) = 0;
+};
+
 namespace tcp
 {
-	class i_server
+	class i_server : public i_matrix
 	{
 	public:
-		virtual service_pump& get_service_pump() = 0;
-		virtual const service_pump& get_service_pump() const = 0;
 		virtual bool del_socket(const boost::shared_ptr<tracked_executor>& socket_ptr) = 0;
 		virtual bool restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id) = 0;
-		virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) = 0;
 	};
 } //namespace
 
