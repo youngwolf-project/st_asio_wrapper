@@ -41,7 +41,6 @@ class socket : public Socket
 
 public:
 	template<typename Arg> socket(Arg& arg, boost::asio::ssl::context& ctx) : Socket(arg, ctx) {}
-	template<typename Arg> socket(Arg* arg, boost::asio::ssl::context& ctx) : Socket(arg, ctx) {}
 
 protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
@@ -171,7 +170,7 @@ private:
 	typedef st_asio_wrapper::object_pool<Object> super;
 
 public:
-	object_pool(service_pump& service_pump_, boost::asio::ssl::context::method m) : super(service_pump_), ctx(m) {}
+	object_pool(service_pump& service_pump_, const boost::asio::ssl::context::method& m) : super(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& context() {return ctx;}
 
 protected:
