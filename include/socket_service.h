@@ -30,6 +30,9 @@ public:
 protected:
 	virtual bool init() {ST_THIS reset(); ST_THIS start(); return Socket::started();}
 	virtual void uninit() {ST_THIS graceful_shutdown();} //if you wanna force shutdown, call force_shutdown before service_pump::stop_service invocation.
+
+private:
+	using Socket::get_matrix;
 };
 
 template<typename Socket, typename Pool, typename Matrix>

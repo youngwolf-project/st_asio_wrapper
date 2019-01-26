@@ -12,7 +12,7 @@ typedef client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, my_
 class my_client_socket : public my_client_socket_base
 {
 public:
-	my_client_socket(my_matrix* matrix_) : my_client_socket_base(matrix_)
+	my_client_socket(my_matrix& matrix_) : my_client_socket_base(matrix_)
 	{
 		boost::dynamic_pointer_cast<prefix_suffix_packer>(packer())->prefix_suffix("", "\n");
 		boost::dynamic_pointer_cast<prefix_suffix_unpacker>(unpacker())->prefix_suffix("", "\n");

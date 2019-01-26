@@ -34,7 +34,7 @@ private:
 
 public:
 	socket_base(boost::asio::io_context& io_context_) : super(io_context_), strand(io_context_) {first_init();}
-	socket_base(Matrix* matrix_) : super(matrix_->get_service_pump()), strand(matrix_->get_service_pump()) {first_init(matrix_);}
+	socket_base(Matrix& matrix_) : super(matrix_.get_service_pump()), strand(matrix_.get_service_pump()) {first_init(&matrix_);}
 
 	virtual bool is_ready() {return has_bound;}
 	virtual void send_heartbeat()

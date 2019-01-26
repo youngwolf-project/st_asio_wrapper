@@ -177,6 +177,7 @@ protected:
 
 protected:
 	typename Pool::object_type create_object() {return Pool::create_object(boost::ref(*this));}
+	template<typename Arg> typename Pool::object_type create_object(Arg& arg) {return Pool::create_object(boost::ref(*this), arg);}
 
 	bool add_socket(typename Pool::object_ctype& socket_ptr)
 	{

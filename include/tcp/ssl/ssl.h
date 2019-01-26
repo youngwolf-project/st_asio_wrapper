@@ -117,7 +117,7 @@ private:
 
 public:
 	client_socket_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx) : super(io_context_, ctx) {}
-	client_socket_base(Matrix* matrix_, boost::asio::ssl::context& ctx) : super(matrix_, ctx) {}
+	client_socket_base(Matrix& matrix_, boost::asio::ssl::context& ctx) : super(matrix_, ctx) {}
 
 #ifndef ST_ASIO_REUSE_SSL_STREAM
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
@@ -174,8 +174,8 @@ public:
 	object_pool(service_pump& service_pump_, boost::asio::ssl::context::method m) : super(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& context() {return ctx;}
 
+protected:
 	template<typename Arg> typename object_pool::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
-	template<typename Arg> typename object_pool::object_type create_object(Arg* arg) {return super::create_object(arg, boost::ref(ctx));}
 
 private:
 	boost::asio::ssl::context ctx;

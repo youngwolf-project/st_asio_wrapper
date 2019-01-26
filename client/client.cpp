@@ -63,7 +63,7 @@ using namespace st_asio_wrapper::ext::tcp;
 class short_connection : public client_socket
 {
 public:
-	short_connection(i_matrix* matrix_) : client_socket(matrix_) {}
+	short_connection(i_matrix& matrix_) : client_socket(matrix_) {}
 
 protected:
 	virtual void on_connect() {close_reconnect();} //close reconnecting mechanism

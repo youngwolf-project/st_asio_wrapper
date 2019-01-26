@@ -543,7 +543,7 @@
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Socket used by tcp::multi_client_base, ssl::multi_client_base and udp::multi_socket_service needs to provide a constructor which accept
- *  a raw pointer of i_matrix instead of a reference of asio::io_context.
+ *  a reference of i_matrix instead of a reference of asio::io_context.
  *
  * HIGHLIGHT:
  * Make client_socket_base be able to call multi_client_base (via i_matrix) like server_socket_base call server_base (via i_server),
