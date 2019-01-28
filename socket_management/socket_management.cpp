@@ -7,6 +7,8 @@
 #define ST_ASIO_HEARTBEAT_INTERVAL	5
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
 #define ST_ASIO_RECONNECT			false
+#define ST_ASIO_SHARED_MUTEX_TYPE	boost::shared_mutex	//we search objects frequently, defining this can promote performance, otherwise,
+#define ST_ASIO_SHARED_LOCK_TYPE	boost::shared_lock	//you should not define these two macro and st_asio_wrapper will use boost::mutex instead.
 #define ST_ASIO_DEFAULT_PACKER		prefix_suffix_packer
 #define ST_ASIO_DEFAULT_UNPACKER	prefix_suffix_unpacker
 //configuration

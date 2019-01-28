@@ -553,6 +553,9 @@
  *
  * ENHANCEMENTS:
  * Introduce macro ST_ASIO_RECONNECT to control the reconnecting mechanism.
+ * Introduce macro ST_ASIO_SHARED_MUTEX_TYPE and ST_ASIO_SHARED_LOCK_TYPE, they're used during searching or traversing (via do_something_to_all or
+ *  do_something_to_one) objects in object_pool, if you search or traverse objects frequently, use shared_mutex and shared_lock instead of mutex
+ *  and unique_lock will promote performance, otherwise, do not define these two macros (so they will be mutex and unique_lock by default).
  *
  * DELETION:
  *
@@ -904,6 +907,15 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 // zero) the messages, then on_msg_handle will continue to dispatch the rest of them asynchronously, this will disorder messages because on_msg_handle and the next
 // on_msg (new messages arrived) can be invoked concurrently, please note. as before, on_msg will block the next receiving but only on current socket.
 //if you cannot handle all of the messages in on_msg (like echo_server), you should not use sync message dispatching except you can bear message disordering.
+
+//if you search or traverse (via do_something_to_all or do_something_to_one) objects in object_pool frequently, use shared_mutex and shared_lock instead of
+// mutex and unique_lock will promote performance, otherwise, do not define these two macros(so they will be mutex and unique_lock by default).
+#ifndef ST_ASIO_SHARED_MUTEX_TYPE
+#define ST_ASIO_SHARED_MUTEX_TYPE	boost::mutex
+#endif
+#ifndef ST_ASIO_SHARED_LOCK_TYPE
+#define ST_ASIO_SHARED_LOCK_TYPE	boost::unique_lock
+#endif
 
 //configurations
 
