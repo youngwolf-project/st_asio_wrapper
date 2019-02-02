@@ -362,6 +362,11 @@ protected:
 
 	bool handle_msg()
 	{
+		for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++iter)
+			stat.recv_byte_sum += iter->size();
+
+		size_t msg_num = temp_msg_can.size();
+		stat.recv_msg_sum += msg_num;
 #ifdef ST_ASIO_SYNC_RECV
 		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
 		if (REQUESTED == sr_status)
@@ -376,10 +381,8 @@ protected:
 				return handled_msg(); //sync_recv_msg() has consumed temp_msg_can
 		}
 		lock.unlock();
+		msg_num = temp_msg_can.size();
 #endif
-		size_t msg_num = temp_msg_can.size();
-		stat.recv_msg_sum += msg_num;
-
 #ifdef ST_ASIO_SYNC_DISPATCH
 #ifndef ST_ASIO_PASSIVE_RECV
 		if (msg_num > 0)
@@ -402,10 +405,7 @@ protected:
 			boost::container::list<out_msg> temp_buffer(msg_num);
 			BOOST_AUTO(op_iter, temp_buffer.begin());
 			for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++op_iter, ++iter)
-			{
-				stat.recv_byte_sum += iter->size();
 				op_iter->swap(*iter);
-			}
 			temp_msg_can.clear();
 
 			recv_msg_buffer.move_items_in(temp_buffer);
