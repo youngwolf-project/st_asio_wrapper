@@ -128,7 +128,7 @@ protected:
 		if (num <= 0)
 			num = 16;
 
-		std::list<typename Pool::object_type> sockets;
+		boost::container::list<typename Pool::object_type> sockets;
 		unified_out::info_out("begin to pre-create %d server socket...", num);
 		while (--num >= 0)
 		{

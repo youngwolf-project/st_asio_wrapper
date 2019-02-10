@@ -122,16 +122,18 @@ public:
 
 	///////////////////////////////////////////////////
 	//msg sending interface
-	TCP_SEND_MSG(send_msg, false, do_direct_send_msg) //use the packer with native = false to pack the msgs
-	TCP_SEND_MSG(send_native_msg, true, do_direct_send_msg) //use the packer with native = true to pack the msgs
+	//if the message already packed, do call direct_send_msg or direct_sync_send_msg to reduce unnecessary memory replication, if you will not
+	// use it any more, call the one that accepts reference of a message.
+	TCP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
+	TCP_SEND_MSG(send_native_msg, true) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
 	//success at here just means put the msg into tcp::socket_base's send buffer
 	TCP_SAFE_SEND_MSG(safe_send_msg, send_msg)
 	TCP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
 
 #ifdef ST_ASIO_SYNC_SEND
-	TCP_SYNC_SEND_MSG(sync_send_msg, false, do_direct_sync_send_msg) //use the packer with native = false to pack the msgs
-	TCP_SYNC_SEND_MSG(sync_send_native_msg, true, do_direct_sync_send_msg) //use the packer with native = true to pack the msgs
+	TCP_SYNC_SEND_MSG(sync_send_msg, false) //use the packer with native = false to pack the msgs
+	TCP_SYNC_SEND_MSG(sync_send_native_msg, true) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
 	//success at here just means put the msg into tcp::socket_base's send buffer
 	TCP_SYNC_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
@@ -303,8 +305,7 @@ private:
 			{
 				stat.send_delay_sum += end_time - msg.begin_time;
 				size += msg.size();
-				last_send_msg.emplace_back();
-				last_send_msg.back().swap(msg);
+				last_send_msg.emplace_back().swap(msg);
 				bufs.emplace_back(last_send_msg.back().data(), last_send_msg.back().size());
 				if (size >= max_send_size)
 					break;

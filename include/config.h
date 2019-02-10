@@ -539,15 +539,21 @@
  * REPLACEMENTS:
  *
  * ===============================================================
- * 2019.3.x		version 2.1.5
+ * 2019.3.x		version 2.2.0
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Socket used by tcp::multi_client_base, ssl::multi_client_base and udp::multi_socket_service needs to provide a constructor which accept
  *  a reference of i_matrix instead of a reference of asio::io_context.
+ * Limit send and recv buffers by acctual utilization (in byte) rather than message number before, so macro ST_ASIO_MAX_MSG_NUM been renamed to
+ *  ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF, and unit been changed to byte.
+ * statistic.send_msg_sum may be bigger than before (but statistic.send_byte_sum will be the same), see ENHANCEMENTS section for more details.
+ * Return value from on_msg_handle(out_queue_type&) been changed from size_t to bool.
  *
  * HIGHLIGHT:
  * Make client_socket_base be able to call multi_client_base (via i_matrix) like server_socket_base call server_base (via i_server),
  *  and so does ssl::client_socket_base and udp::socket_base.
+ * Promote performance by reducing memory replications if you already generated the message body and it can be swapped into st_asio_wrapper.
+ * Introduce shared_mutex, it can promote performance if you find or traverse (via do_something_to_all or do_something_to_one) objects frequently.
  *
  * FIX:
  *
@@ -556,6 +562,14 @@
  * Introduce macro ST_ASIO_SHARED_MUTEX_TYPE and ST_ASIO_SHARED_LOCK_TYPE, they're used during searching or traversing (via do_something_to_all or
  *  do_something_to_one) objects in object_pool, if you search or traverse objects frequently, use shared_mutex and shared_lock instead of mutex
  *  and unique_lock will promote performance, otherwise, do not define these two macros (so they will be mutex and unique_lock by default).
+ * Introduce three additional overloads of pack_msg virtual function to i_packer, they accept one or more than one i_packer::msg_type (not packed) that belong to
+ *  the same message.
+ * Add three overloads to send_(native_)msg, safe_send_(native_)msg, sync_send_(native_)msg and sync_safe_send_(native_)msg respectively (just on TCP),
+ *  they accept one or more than one rvalue reference of in_msg_type, this will reduce one memory replication, and the statistic.send_msg_sum will be one bigger
+ *  than before because the packer will add an additional message just represent the header to avoid copying the message bodies.
+ * Control send and recv buffer accurately rather than just message number before, see macro ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF for more details.
+ * direct_send_msg and direct_sync_send_msg support batch operation.
+ * Introduce virtual function type_name() and type_id() to st_asio_wrapper::socket, they can identify whether a given two st_asio_wrapper::socket has the same type.
  *
  * DELETION:
  *
@@ -572,8 +586,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20105	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.1.5"
+#define ST_ASIO_VER		20200	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.2.0"
 
 //boost and compiler check
 #ifdef _MSC_VER
@@ -636,10 +650,17 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 	#error server port must be bigger than zero.
 #endif
 
-//msg send and recv buffer's maximum size (list::size()), corresponding buffers are expanded dynamically, which means only allocate memory when needed.
-#ifndef ST_ASIO_MAX_MSG_NUM
-#define ST_ASIO_MAX_MSG_NUM		1024
-#elif ST_ASIO_MAX_MSG_NUM <= 0
+//send buffer's maximum size (bytes), it will be expanded dynamically (not fixed) within this range.
+#ifndef ST_ASIO_MAX_SEND_BUF
+#define ST_ASIO_MAX_SEND_BUF		1048576 //1M
+#elif ST_ASIO_MAX_SEND_BUF <= 15
+	#error message capacity must be bigger than zero.
+#endif
+
+//recv buffer's maximum size (bytes), it will be expanded dynamically (not fixed) within this range.
+#ifndef ST_ASIO_MAX_RECV_BUF
+#define ST_ASIO_MAX_RECV_BUF		1048576 //1M
+#elif ST_ASIO_MAX_RECV_BUF <= 15
 	#error message capacity must be bigger than zero.
 #endif
 
@@ -908,8 +929,8 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 // on_msg (new messages arrived) can be invoked concurrently, please note. as before, on_msg will block the next receiving but only on current socket.
 //if you cannot handle all of the messages in on_msg (like echo_server), you should not use sync message dispatching except you can bear message disordering.
 
-//if you search or traverse (via do_something_to_all or do_something_to_one) objects in object_pool frequently, use shared_mutex and shared_lock instead of
-// mutex and unique_lock will promote performance, otherwise, do not define these two macros(so they will be mutex and unique_lock by default).
+//if you search or traverse (via do_something_to_all or do_something_to_one) objects in object_pool frequently,
+// use shared_mutex with shared_lock instead of mutex with unique_lock will promote performance, otherwise, do not define these two macros.
 #ifndef ST_ASIO_SHARED_MUTEX_TYPE
 #define ST_ASIO_SHARED_MUTEX_TYPE	boost::mutex
 #endif

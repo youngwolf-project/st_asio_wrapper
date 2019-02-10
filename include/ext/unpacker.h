@@ -210,8 +210,9 @@ protected:
 };
 
 //protocol: length + body
-//this unpacker demonstrate how to forbid memory replication while parsing msgs (let asio write msg directly).
-//not support unstripped messages, please note (you can fix this defect if you like).
+//let asio write msg directly (no temporary memory needed), not support unstripped messages, please note (you can fix this defect if you like).
+//acctually, this unpacker has the worst performance, because it needs 2 read for one message, other unpackers are able to get many messages from just one read.
+//so this unpacker just demonstrates a way to avoid memory replications and temporary memory utilization, it can provide better performance for huge messages.
 class non_copy_unpacker : public i_unpacker<basic_buffer>
 {
 public:
@@ -239,8 +240,7 @@ public:
 		{
 			assert(!raw_buff.empty() && bytes_transferred == raw_buff.size());
 
-			msg_can.emplace_back();
-			msg_can.back().swap(raw_buff);
+			msg_can.emplace_back().swap(raw_buff);
 			step = 0;
 		}
 
@@ -290,7 +290,9 @@ private:
 };
 
 //protocol: fixed length
-//non-copy
+//non-copy, let asio write msg directly (no temporary memory needed), acctually, this unpacker has poor performance, because it needs one read for one message, other unpackers
+//are able to get many messages from just one read, so this unpacker just demonstrates a way to avoid memory replications and temporary memory utilization, it can provide better
+//performance for huge messages.
 class fixed_length_unpacker : public i_unpacker<basic_buffer>
 {
 public:
@@ -306,8 +308,7 @@ public:
 		if (bytes_transferred != raw_buff.size())
 			return false;
 
-		msg_can.emplace_back();
-		msg_can.back().swap(raw_buff);
+		msg_can.emplace_back().swap(raw_buff);
 		return true;
 	}
 

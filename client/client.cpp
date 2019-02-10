@@ -16,18 +16,9 @@
 #define ST_ASIO_DEFAULT_UNPACKER non_copy_unpacker
 //#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 
-//the following three macros demonstrate how to support huge msg(exceed 65535 - 2).
-//huge msg will consume huge memory, for example, if we want to support 1M msg size, because every tcp::socket has a
-//private unpacker which has a fixed buffer with at lest 1M size, so just for unpackers, 1K tcp::socket will consume 1G memory.
-//if we consider the send buffer and recv buffer, the buffer's default max size is 1K, so, every tcp::socket
-//can consume 2G(2 * 1M * 1K) memory when performance testing(both send buffer and recv buffer are full).
-//generally speaking, if there are 1K clients connected to the server, the server can consume
-//1G(occupied by unpackers) + 2G(occupied by msg buffer) * 1K = 2049G memory theoretically.
-//please note that the server also need to define at least ST_ASIO_HUGE_MSG and ST_ASIO_MSG_BUFFER_SIZE macros too.
-
+//the following two macros demonstrate how to support huge msg(exceed 65535 - 2).
 //#define ST_ASIO_HUGE_MSG
-//#define ST_ASIO_MSG_BUFFER_SIZE (1024 * 1024)
-//#define ST_ASIO_MAX_MSG_NUM 8 //reduce msg buffer size to reduce memory occupation
+//#define ST_ASIO_MSG_BUFFER_SIZE (1024 * 1024) //should not bigger than ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF, please note
 #define ST_ASIO_HEARTBEAT_INTERVAL 5 //if use stream_unpacker, heartbeat messages will be treated as normal messages,
 									 //because stream_unpacker doesn't support heartbeat
 //configuration
@@ -58,6 +49,7 @@ using namespace st_asio_wrapper::ext::tcp;
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 #define RECONNECT		"reconnect"
+#define STATISTIC		"statistic"
 
 //we only want close reconnecting mechanism on this socket, so we don't define macro ST_ASIO_RECONNECT
 class short_connection : public client_socket
@@ -76,7 +68,9 @@ public:
 
 	void set_server_addr(unsigned short _port, const std::string& _ip = ST_ASIO_SERVER_IP) {port = _port; ip = _ip;}
 	bool send_msg(const std::string& msg) {return send_msg(msg, port, ip);}
-	bool send_msg(const std::string& msg, unsigned short port, const std::string& ip)
+	bool send_msg(std::string& msg) {return send_msg(msg, port, ip);}
+	bool send_msg(const std::string& msg, unsigned short port, const std::string& ip) {std::string unused(msg); return send_msg(unused, port, ip);}
+	bool send_msg(std::string& msg, unsigned short port, const std::string& ip)
 	{
 		BOOST_AUTO(socket_ptr, add_socket(port, ip));
 		return socket_ptr ? socket_ptr->send_msg(msg) : false;
@@ -149,13 +143,16 @@ int main(int argc, const char* argv[])
 		}
 		else if (RECONNECT == str)
 			client.graceful_shutdown(true);
+		else if (STATISTIC == str)
+			puts(client.get_statistic().to_string().data());
 		else
 		{
-			sync_call_result re = client.sync_send_msg(str + " (from normal client)", 100);
+			std::string msg2(" (from normal client)");
+			sync_call_result re = client.sync_send_msg(str, msg2, 100); //new feature introduced in 2.2.0
 			if (SUCCESS != re)
 				printf("sync send result: %d\n", re);
-			//client.sync_safe_send_msg(str + " (from normal client)", 100);
-			//client.safe_send_msg(str + " (from normal client)");
+			//client.sync_safe_send_msg(str, msg2, 100); //new feature introduced in 2.2.0
+			//client.safe_send_msg(str, msg2); //new feature introduced in 2.2.0
 
 			client2.send_msg(str + " (from short client)");
 		}

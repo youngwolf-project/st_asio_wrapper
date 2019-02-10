@@ -122,6 +122,8 @@ public:
 	virtual bool obsoleted() {return !started_ && !is_async_calling();}
 	virtual bool is_ready() = 0; //is ready for sending and receiving messages
 	virtual void send_heartbeat() = 0;
+	virtual const char* type_name() const = 0;
+	virtual int type_id() const = 0;
 
 	bool started() const {return started_;}
 	void start()
@@ -194,17 +196,20 @@ public:
 
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is overflow or not,
 	//this can exhaust all virtual memory, please pay special attentions.
-	bool is_send_buffer_available() const {return send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
+	bool is_send_buffer_available() const {return send_msg_buffer.size() < ST_ASIO_MAX_SEND_BUF;}
 
 	//if you define macro ST_ASIO_PASSIVE_RECV and call recv_msg greedily, the receiving buffer may overflow, this can exhaust all virtual memory,
 	//to avoid this problem, call recv_msg only if is_recv_buffer_available() returns true.
-	bool is_recv_buffer_available() const {return recv_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
+	bool is_recv_buffer_available() const {return recv_msg_buffer.size() < ST_ASIO_MAX_RECV_BUF;}
 
 	//don't use the packer but insert into send buffer directly
 	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false)
 		{if (!can_overflow && !is_send_buffer_available()) return false; InMsgType unused(msg); return do_direct_send_msg(unused);}
 	//after this call, msg becomes empty, please note.
-	bool direct_send_msg(InMsgType& msg, bool can_overflow = false) {return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
+	bool direct_send_msg(InMsgType& msg, bool can_overflow = false)
+		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
+	bool direct_send_msg(boost::container::list<InMsgType>& msg_can, bool can_overflow = false)
+		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg_can) : false;}
 
 #ifdef ST_ASIO_SYNC_SEND
 	//don't use the packer but insert into send buffer directly, then wait for the sending to finish.
@@ -213,6 +218,8 @@ public:
 	//after this call, msg becomes empty, please note.
 	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
 		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
+	sync_call_result direct_sync_send_msg(boost::container::list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false)
+		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg_can, duration) : NOT_APPLICABLE;}
 #endif
 
 #ifdef ST_ASIO_SYNC_RECV
@@ -296,7 +303,7 @@ protected:
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//return the number of handled msg, if some msg left behind, socket will re-dispatch them asynchronously
 	//notice: using inconstant is for the convenience of swapping
-	virtual size_t on_msg_handle(out_queue_type& msg_can)
+	virtual bool on_msg_handle(out_queue_type& msg_can)
 	{
 		out_container_type tmp_can;
 		msg_can.swap(tmp_can); //must be thread safe
@@ -304,7 +311,7 @@ protected:
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
 			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
 
-		return tmp_can.size();
+		return true;
 	}
 #else
 	//return true means msg been handled, false means msg cannot be handled right now, and socket will re-dispatch it asynchronously
@@ -362,6 +369,13 @@ protected:
 
 	bool handle_msg()
 	{
+		size_t size_in_byte = 0;
+		for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++iter)
+			size_in_byte += iter->size();
+
+		size_t msg_num = temp_msg_can.size();
+		stat.recv_msg_sum += msg_num;
+		stat.recv_byte_sum += size_in_byte;
 #ifdef ST_ASIO_SYNC_RECV
 		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
 		if (REQUESTED == sr_status)
@@ -376,10 +390,8 @@ protected:
 				return handled_msg(); //sync_recv_msg() has consumed temp_msg_can
 		}
 		lock.unlock();
+		msg_num = temp_msg_can.size();
 #endif
-		size_t msg_num = temp_msg_can.size();
-		stat.recv_msg_sum += msg_num;
-
 #ifdef ST_ASIO_SYNC_DISPATCH
 #ifndef ST_ASIO_PASSIVE_RECV
 		if (msg_num > 0)
@@ -402,13 +414,10 @@ protected:
 			boost::container::list<out_msg> temp_buffer(msg_num);
 			BOOST_AUTO(op_iter, temp_buffer.begin());
 			for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++op_iter, ++iter)
-			{
-				stat.recv_byte_sum += iter->size();
 				op_iter->swap(*iter);
-			}
 			temp_msg_can.clear();
 
-			recv_msg_buffer.move_items_in(temp_buffer);
+			recv_msg_buffer.move_items_in(temp_buffer, size_in_byte);
 			dispatch_msg();
 		}
 
@@ -433,6 +442,22 @@ protected:
 		return true;
 	}
 
+	bool do_direct_send_msg(boost::container::list<InMsgType>& msg_can)
+	{
+		size_t size_in_byte = 0;
+		boost::container::list<in_msg> temp_buffer;
+		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
+		{
+			size_in_byte += iter->size();
+			temp_buffer.emplace_back().swap(*iter);
+		}
+		send_msg_buffer.move_items_in(temp_buffer, size_in_byte);
+		if (!sending && is_ready())
+			send_msg();
+
+		return true;
+	}
+
 #ifdef ST_ASIO_SYNC_SEND
 	sync_call_result do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0)
 	{
@@ -448,6 +473,35 @@ protected:
 		typename in_msg::future f;
 		unused.p->get_future().swap(f);
 		send_msg_buffer.enqueue(unused);
+		if (!sending && is_ready())
+			send_msg();
+
+#ifdef BOOST_THREAD_USES_CHRONO
+		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
+#else
+		return 0 == duration || f.timed_wait(boost::posix_time::milliseconds(duration)) ? f.get() : TIMEOUT;
+#endif
+	}
+
+	sync_call_result do_direct_sync_send_msg(boost::container::list<InMsgType>& msg_can, unsigned duration = 0)
+	{
+		if (stopped())
+			return NOT_APPLICABLE;
+		else if (msg_can.empty())
+			return SUCCESS;
+
+		size_t size_in_byte = 0;
+		boost::container::list<in_msg> temp_buffer;
+		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
+		{
+			size_in_byte += iter->size();
+			temp_buffer.emplace_back().swap(*iter);
+		}
+
+		temp_buffer.back().check_and_create_promise(true);
+		typename in_msg::future f;
+		temp_buffer.back().p->get_future().swap(f);
+		send_msg_buffer.move_items_in(temp_buffer, size_in_byte);
 		if (!sending && is_ready())
 			send_msg();
 

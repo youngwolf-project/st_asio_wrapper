@@ -37,6 +37,9 @@ public:
 	client_socket_base(Matrix& matrix_) : super(matrix_.get_service_pump()) {first_init(&matrix_);}
 	template<typename Arg> client_socket_base(Matrix& matrix_, Arg& arg) : super(matrix_.get_service_pump(), arg) {first_init(&matrix_);}
 
+	virtual const char* type_name() const {return "TCP (client endpoint)";}
+	virtual int type_id() const {return 1;}
+
 	//reset all, be ensure that no operations performed on this socket when invoke it, subclass must rewrite this function to initialize itself, and then
 	// call superclass' reset function, before reusing this socket, object_pool will invoke this function
 	virtual void reset() {need_reconnect = ST_ASIO_RECONNECT; super::reset();}

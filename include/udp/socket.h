@@ -43,6 +43,8 @@ public:
 		packer_->pack_heartbeat(msg);
 		do_direct_send_msg(msg);
 	}
+	virtual const char* type_name() const {return "UDP";}
+	virtual int type_id() const {return 0;}
 
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
 	//subclass must re-write this function to initialize itself, and then do not forget to invoke superclass' reset function too
@@ -98,16 +100,18 @@ public:
 
 	///////////////////////////////////////////////////
 	//msg sending interface
-	UDP_SEND_MSG(send_msg, false, do_direct_send_msg) //use the packer with native = false to pack the msgs
-	UDP_SEND_MSG(send_native_msg, true, do_direct_send_msg) //use the packer with native = true to pack the msgs
+	//if the message already packed, do call direct_send_msg or direct_sync_send_msg to reduce unnecessary memory replication, if you will not
+	// use it any more, call the one that accepts reference of a message.
+	UDP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
+	UDP_SEND_MSG(send_native_msg, true) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
 	//success at here just means put the msg into udp::socket_base's send buffer
 	UDP_SAFE_SEND_MSG(safe_send_msg, send_msg)
 	UDP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
 
 #ifdef ST_ASIO_SYNC_SEND
-	UDP_SYNC_SEND_MSG(sync_send_msg, false, do_direct_sync_send_msg) //use the packer with native = false to pack the msgs
-	UDP_SYNC_SEND_MSG(sync_send_native_msg, true, do_direct_sync_send_msg) //use the packer with native = true to pack the msgs
+	UDP_SYNC_SEND_MSG(sync_send_msg, false) //use the packer with native = false to pack the msgs
+	UDP_SYNC_SEND_MSG(sync_send_native_msg, true) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
 	//success at here just means put the msg into udp::socket_base's send buffer
 	UDP_SYNC_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)

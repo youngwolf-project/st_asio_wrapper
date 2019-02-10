@@ -118,6 +118,9 @@ public:
 	client_socket_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx) : super(io_context_, ctx) {}
 	client_socket_base(Matrix& matrix_, boost::asio::ssl::context& ctx) : super(matrix_, ctx) {}
 
+	virtual const char* type_name() const {return "SSL (client endpoint)";}
+	virtual int type_id() const {return 3;}
+
 #ifndef ST_ASIO_REUSE_SSL_STREAM
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false) {graceful_shutdown(reconnect);}
@@ -190,6 +193,9 @@ private:
 
 public:
 	server_socket_base(Server& server_, boost::asio::ssl::context& ctx) : super(server_, ctx) {}
+
+	virtual const char* type_name() const {return "SSL (server endpoint)";}
+	virtual int type_id() const {return 4;}
 
 #ifndef ST_ASIO_REUSE_SSL_STREAM
 	void disconnect() {force_shutdown();}

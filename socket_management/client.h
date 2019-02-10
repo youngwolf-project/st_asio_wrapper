@@ -14,8 +14,10 @@ class my_client_socket : public my_client_socket_base
 public:
 	my_client_socket(my_matrix& matrix_) : my_client_socket_base(matrix_)
 	{
-		boost::dynamic_pointer_cast<prefix_suffix_packer>(packer())->prefix_suffix("", "\n");
-		boost::dynamic_pointer_cast<prefix_suffix_unpacker>(unpacker())->prefix_suffix("", "\n");
+#if 3 == PACKER_UNPACKER_TYPE
+		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_PACKER>(packer())->prefix_suffix("", "\n");
+		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(unpacker())->prefix_suffix("", "\n");
+#endif
 	}
 
 	void name(const std::string& name_) {_name = name_;}
@@ -23,7 +25,13 @@ public:
 
 protected:
 	//msg handling
+#if 2 == PACKER_UNPACKER_TYPE
+	//fixed_length_unpacker uses basic_buffer as its message type, it doesn't append additional \0 to the end of the message as std::string does,
+	//so it cannot be printed by printf.
+	virtual bool on_msg_handle(out_msg_type& msg) {printf("received: " ST_ASIO_SF ", I'm %s\n", msg.size(), _name.data()); return true;}
+#else
 	virtual bool on_msg_handle(out_msg_type& msg) {printf("received: %s, I'm %s\n", msg.data(), _name.data()); return true;}
+#endif
 	//msg handling end
 
 	virtual void on_recv_error(const boost::system::error_code& ec) {get_matrix()->del_link(_name); my_client_socket_base::on_recv_error(ec);}
@@ -91,7 +99,8 @@ public:
 		return socket_ptr ? (socket_ptr->force_shutdown(), true) : false;
 	}
 
-	bool send_msg(const std::string& name, const std::string& msg)
+	bool send_msg(const std::string& name, const std::string& msg) {std::string unused(msg); return send_msg(name, unused);}
+	bool send_msg(const std::string& name, std::string& msg)
 	{
 		BOOST_AUTO(socket_ptr, find(find_link(name)));
 		return socket_ptr ?  socket_ptr->send_msg(msg) : false;

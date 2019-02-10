@@ -18,9 +18,6 @@
 namespace st_asio_wrapper
 {
 
-//st_asio_wrapper requires that container must take one and only one template argument.
-template<typename T> class list : public boost::container::list<T> {};
-
 class dummy_lockable
 {
 public:
@@ -46,51 +43,126 @@ private:
 	boost::mutex mutex; //boost::mutex is more efficient than boost::shared_mutex
 };
 
+template<typename T> class list : public boost::container::list<T> {};
+
 //Container must at least has the following functions (like list):
 // Container() and Container(size_t) constructor
-// size (must be thread safe, but doesn't have to be consistent, std::list before gcc 5 doesn't meet this requirement, boost::container::list does)
-// empty (must be thread safe, but doesn't have to be consistent)
 // clear
 // swap
 // emplace_back(const T& item)
-// emplace_back()
-// splice(decltype(Container::end()), boost::container::list<T>&), after this, boost::container::list<T> must be empty
+// emplace_back(), must return a reference of the new item.
+// splice(iter, boost::container::list<T>&), after this, boost::container::list<T> must be empty
+// splice(iter, boost::container::list<T>&, iter, iter), if macro ST_ASIO_DISPATCH_BATCH_MSG been defined
 // front
-// back
 // pop_front
+// back
+// begin
 // end
 template<typename T, typename Container, typename Lockable> //thread safety depends on Container or Lockable
-#ifdef ST_ASIO_DISPATCH_BATCH_MSG
-class queue : public Container, public Lockable
-#else
 class queue : protected Container, public Lockable
-#endif
 {
 public:
 	typedef T data_type;
 
-	queue() {}
-	queue(size_t capacity) : Container(capacity) {}
+	queue() : buff_size(0) {}
+	queue(size_t capacity) : Container(capacity), buff_size(0) {}
 
 	bool is_thread_safe() const {return Lockable::is_lockable();}
-	using Container::size;
-	using Container::empty;
-	void clear() {typename Lockable::lock_guard lock(*this); Container::clear();}
-	void swap(Container& other) {typename Lockable::lock_guard lock(*this); Container::swap(other);}
+	size_t size() const {return buff_size;} //must be thread safe, but doesn't have to be consistent
+	bool empty() const {return 0 == size();} //must be thread safe, but doesn't have to be consistent
+	void clear() {typename Lockable::lock_guard lock(*this); Container::clear(); buff_size = 0;}
+	void swap(Container& other)
+	{
+		size_t s = 0;
+		for (BOOST_AUTO(iter, other.begin()); iter != other.end(); ++iter)
+			s += iter->size();
+
+		typename Lockable::lock_guard lock(*this);
+		Container::swap(other);
+		buff_size = s;
+	}
 
 	//thread safe
 	bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
-	void move_items_in(boost::container::list<T>& can) {typename Lockable::lock_guard lock(*this); move_items_in_(can);}
+	void move_items_in(boost::container::list<T>& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
 	bool try_dequeue(T& item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
+	//thread safe
 
 	//not thread safe
 	bool enqueue_(const T& item)
-		{try {ST_THIS emplace_back(item);} catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what()); return false;} return true;}
+	{
+		try
+		{
+			ST_THIS emplace_back(item);
+			buff_size += item.size();
+		}
+		catch (const std::exception& e)
+		{
+			unified_out::error_out("cannot hold more objects (%s)", e.what());
+			return false;
+		}
+
+		return true;
+	}
+
 	bool enqueue_(T& item) //after this, item will becomes empty, please note.
-		{try {ST_THIS emplace_back();} catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what()); return false;} ST_THIS back().swap(item); return true;}
-	void move_items_in_(boost::container::list<T>& can) {ST_THIS splice(ST_THIS end(), can);}
+	{
+		try
+		{
+			size_t s = item.size();
+			ST_THIS emplace_back().swap(item);
+			buff_size += s;
+		}
+		catch (const std::exception& e)
+		{
+			unified_out::error_out("cannot hold more objects (%s)", e.what());
+			return false;
+		}
+
+		return true;
+	}
+
+	void move_items_in_(boost::container::list<T>& src, size_t size_in_byte = 0)
+	{
+		if (0 == size_in_byte)
+			for (BOOST_AUTO(iter, src.begin()); iter != src.end(); ++iter)
+				size_in_byte += iter->size();
+
+		ST_THIS splice(ST_THIS end(), src);
+		buff_size += size_in_byte;
+	}
+
 	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); return true;}
+	//not thread safe
+
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	void move_items_out(Container& dest, size_t max_item_num = -1) {typename Lockable::lock_guard lock(*this); move_items_out_(dest, max_item_num);} //thread safe
+	void move_items_out_(Container& dest, size_t max_item_num = -1) //not thread safe
+	{
+		if ((size_t) -1 == max_item_num)
+		{
+			dest.splice(dest.end(), *this);
+			buff_size = 0;
+		}
+		else if (max_item_num > 0)
+		{
+			size_t s = 0, index = 0;
+			BOOST_AUTO(end_iter, ST_THIS begin());
+			for (; end_iter != ST_THIS end() && index++ < max_item_num; ++end_iter)
+				s += end_iter->size();
+
+			dest.splice(dest.end(), *this, ST_THIS begin(), end_iter);
+			buff_size -= s;
+		}
+	}
+
+	using Container::begin;
+	using Container::end;
+#endif
+
+private:
+	size_t buff_size; //in use
 };
 
 template<typename T, typename Container> class non_lock_queue : public queue<T, Container, dummy_lockable> //thread safety depends on Container

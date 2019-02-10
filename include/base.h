@@ -189,6 +189,7 @@ class i_packer
 public:
 	typedef MsgType msg_type;
 	typedef const msg_type msg_ctype;
+	typedef boost::container::list<msg_type> container_type;
 
 protected:
 	virtual ~i_packer() {}
@@ -196,6 +197,10 @@ protected:
 public:
 	virtual void reset() {}
 	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+	//no native parameter anymore, which means it's always false, if true, you should call direct_(sync_)send_msg instead
+	virtual bool pack_msg(msg_type& msg, container_type& msg_can) {return false;}
+	virtual bool pack_msg(msg_type& msg1, msg_type& msg2, container_type& msg_can) {return false;}
+	virtual bool pack_msg(container_type& in, container_type& out) {return false;}
 	virtual bool pack_heartbeat(msg_type& msg) {return false;}
 	virtual char* raw_data(msg_type& msg) const {return NULL;}
 	virtual const char* raw_data(msg_ctype& msg) const {return NULL;}
@@ -506,22 +511,68 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow) {return FUNNAME(&pstr, &len, 1, can_overflow);} \
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, bool can_overflow = false) {return FUNNAME(buffer.data(), buffer.size(), can_overflow);}
 
-#define TCP_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
+#define TCP_SEND_MSG(FUNNAME, NATIVE) \
+bool FUNNAME(in_msg_type& msg, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return false; \
+	else if (NATIVE) \
+		return do_direct_send_msg(msg); \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg, msg_can); \
+	dur.end(); \
+	return re ? do_direct_send_msg(msg_can) : FUNNAME(msg, can_overflow); \
+} \
+bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return false; \
+	else if (NATIVE) \
+	{ \
+		do_direct_send_msg(msg1); \
+		do_direct_send_msg(msg2); \
+		return true; /*do_direct_send_msg will always succeed*/ \
+	} \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg1, msg2, msg_can); \
+	dur.end(); \
+	return re && do_direct_send_msg(msg_can); \
+} \
+bool FUNNAME(typename Packer::container_type& msg_can, bool can_overflow = false)  \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return false; \
+	else if (NATIVE) \
+		return do_direct_send_msg(msg_can); \
+	typename Packer::container_type out; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg_can, out); \
+	dur.end(); \
+	return re && do_direct_send_msg(out); \
+} \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
 		return false; \
-	auto_duration dur(ST_THIS stat.pack_time_sum); \
+	auto_duration dur(stat.pack_time_sum); \
 	in_msg_type msg; \
-	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
-	return SEND_FUNNAME(msg); \
+	return do_direct_send_msg(msg); \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into tcp::socket_base's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define TCP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
+bool FUNNAME(in_msg_type& msg, bool can_overflow = false) \
+	{while (!SEND_FUNNAME(msg, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
+bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false) \
+	{while (!SEND_FUNNAME(msg1, msg2, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
+bool FUNNAME(typename Packer::container_type& msg_can, bool can_overflow = false) \
+	{while (!SEND_FUNNAME(msg_can, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 	{while (!SEND_FUNNAME(pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
@@ -541,22 +592,71 @@ TYPE FUNNAME(const char* pstr, size_t len, unsigned duration, bool can_overflow)
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(buffer.data(), buffer.size(), duration, can_overflow);}
 
-#define TCP_SYNC_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
+#define TCP_SYNC_SEND_MSG(FUNNAME, NATIVE) \
+sync_call_result FUNNAME(in_msg_type& msg, unsigned duration = 0, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return sync_call_result::NOT_APPLICABLE; \
+	else if (NATIVE) \
+		return do_direct_sync_send_msg(msg, duration); \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg, msg_can); \
+	dur.end(); \
+	return re ? do_direct_sync_send_msg(msg_can, duration) : FUNNAME(msg, duration, can_overflow); \
+} \
+sync_call_result FUNNAME(in_msg_type& msg1, in_msg_type& msg2, unsigned duration = 0, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return sync_call_result::NOT_APPLICABLE; \
+	else if (NATIVE) \
+	{ \
+		do_direct_sync_send_msg(msg1, duration); \
+		do_direct_sync_send_msg(msg2, duration); \
+		return sync_call_result::SUCCESS; /*do_direct_sync_send_msg will always succeed*/ \
+	} \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg1, msg2, msg_can); \
+	dur.end(); \
+	return re ? do_direct_sync_send_msg(msg_can, duration) : sync_call_result::NOT_APPLICABLE; \
+} \
+sync_call_result FUNNAME(typename Packer::container_type& msg_can, unsigned duration = 0, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return sync_call_result::NOT_APPLICABLE; \
+	else if (NATIVE) \
+		return do_direct_sync_send_msg(msg_can, duration); \
+	typename Packer::container_type out; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg_can, out); \
+	dur.end(); \
+	return re ? do_direct_sync_send_msg(out, duration) : sync_call_result::NOT_APPLICABLE; \
+} \
 sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
 		return NOT_APPLICABLE; \
-	auto_duration dur(ST_THIS stat.pack_time_sum); \
+	auto_duration dur(stat.pack_time_sum); \
 	in_msg_type msg; \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
-	return SEND_FUNNAME(msg, duration); \
+	return do_direct_sync_send_msg(msg, duration); \
 } \
 TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into tcp::socket_base's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define TCP_SYNC_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
+sync_call_result FUNNAME(in_msg_type& msg, unsigned duration = 0, bool can_overflow = false) \
+	{while (sync_call_result::SUCCESS != SEND_FUNNAME(msg, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(sync_call_result::NOT_APPLICABLE) return sync_call_result::SUCCESS;} \
+sync_call_result FUNNAME(in_msg_type& msg1, in_msg_type& msg2, unsigned duration = 0, bool can_overflow = false) \
+	{while (sync_call_result::SUCCESS != SEND_FUNNAME(msg1, msg2, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(sync_call_result::NOT_APPLICABLE) return sync_call_result::SUCCESS;} \
+sync_call_result FUNNAME(typename Packer::container_type& msg_can, unsigned duration = 0, bool can_overflow = false) \
+	{while (sync_call_result::SUCCESS != SEND_FUNNAME(msg_can, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(sync_call_result::NOT_APPLICABLE) return sync_call_result::SUCCESS;} \
 sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 	{while (SUCCESS != SEND_FUNNAME(pstr, len, num, duration, can_overflow)) \
 		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
@@ -574,15 +674,15 @@ template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, bool can_overflow =
 template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const Buffer& buffer, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, buffer.data(), buffer.size(), can_overflow);}
 
-#define UDP_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
+#define UDP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) {return FUNNAME(peer_addr, pstr, len, num, can_overflow);} \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
 		return false; \
 	in_msg_type msg(peer_addr); \
-	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
-	return SEND_FUNNAME(msg); \
+	packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	return do_direct_send_msg(msg); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
@@ -607,7 +707,7 @@ template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration =
 template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const Buffer& buffer, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, buffer.data(), buffer.size(), duration, can_overflow);}
 
-#define UDP_SYNC_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
+#define UDP_SYNC_SEND_MSG(FUNNAME, NATIVE) \
 sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, pstr, len, num, duration, can_overflow);} \
 sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
@@ -616,8 +716,8 @@ sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const 
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
 		return NOT_APPLICABLE; \
 	in_msg_type msg(peer_addr); \
-	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
-	return SEND_FUNNAME(msg, duration); \
+	packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	return do_direct_sync_send_msg(msg, duration); \
 } \
 UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 

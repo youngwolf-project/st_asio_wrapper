@@ -32,6 +32,9 @@ public:
 	template<typename Arg>
 	server_socket_base(Server& server_, Arg& arg) : super(server_.get_service_pump(), arg), server(server_) {}
 
+	virtual const char* type_name() const {return "TCP (server endpoint)";}
+	virtual int type_id() const {return 2;}
+
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
 	//subclass must re-write this function to initialize itself, and then do not forget to invoke superclass' reset function too
 	//notice, when reusing this socket, object_pool will invoke this function
