@@ -109,9 +109,14 @@ protected:
 		//1. we can not use safe_send_msg as i said many times, we should not block service threads.
 		//2. if we use true can_overflow to call send_msg, then buffer usage will be out of control, we should not take this risk.
 
-		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
+#if 2 == PACKER_UNPACKER_TYPE //the type of out_msg_type and in_msg_type are not identical
+		for (BOOST_AUTO(iter, msg_can.end()); iter != msg_can.end(); ++iter)
+			send_msg(*iter, true);
+#else
+		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
-		BOOST_AUTO(re, msg_can.size());
+#endif
+		size_t re = msg_can.size();
 		msg_can.clear();
 
 		return re;
@@ -128,8 +133,13 @@ protected:
 		out_container_type tmp_can;
 		msg_can.move_items_out(tmp_can, 10); //don't be too greedy, here is in a service thread, we should not block this thread for a long time
 
-		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
+#if 2 == PACKER_UNPACKER_TYPE //the type of out_msg_type and in_msg_type are not identical
+		for (BOOST_AUTO(iter, tmp_can.end()); iter != tmp_can.end(); ++iter)
+			send_msg(*iter, true);
+#else
+		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
+#endif
 		return true;
 	}
 #else

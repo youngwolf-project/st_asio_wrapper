@@ -98,6 +98,7 @@ private:
 		}
 		else
 			direct_send_msg(msg, true);
+		//if the type of out_msg_type and in_msg_type are not identical, the compilation will fail, then you should use send_native_msg instead.
 	}
 #endif
 
