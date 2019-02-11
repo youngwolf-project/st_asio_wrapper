@@ -548,6 +548,9 @@
  *  ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF, and unit been changed to byte.
  * statistic.send_msg_sum may be bigger than before (but statistic.send_byte_sum will be the same), see ENHANCEMENTS section for more details.
  * Return value from on_msg_handle(out_queue_type&) been changed from size_t to bool.
+ * Use st_asio_wrapper::list instead of boost::container::list, the former guarantee that emplace_back function always return the reference of
+ *  the newly added item.
+ * Rename header file container.h to queue.h, and add new header file list.h
  *
  * HIGHLIGHT:
  * Make client_socket_base be able to call multi_client_base (via i_matrix) like server_socket_base call server_base (via i_server),
@@ -576,6 +579,7 @@
  * REFACTORING:
  *
  * REPLACEMENTS:
+ * Use st_asio_wrapper::list instead of boost::container::list.
  *
  */
 
@@ -920,7 +924,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //If both sync message receiving and async message receiving exist, sync receiving has the priority no matter it was initiated before async receiving or not.
 
 //#define ST_ASIO_SYNC_DISPATCH
-//with this macro, virtual size_t on_msg(boost::container::list<OutMsgType>& msg_can) will be provided, you can rewrite it and handle all or a part of the
+//with this macro, virtual size_t on_msg(list<OutMsgType>& msg_can) will be provided, you can rewrite it and handle all or a part of the
 // messages like virtual function on_msg_handle (with macro ST_ASIO_DISPATCH_BATCH_MSG), if your logic is simple enough (like echo or pingpong test),
 // this feature is recommended because it can slightly improve efficiency.
 //now we have three ways to handle messages (sync_recv_msg, on_msg and on_msg_handle), the invocation order is the same as listed, if messages been successfully

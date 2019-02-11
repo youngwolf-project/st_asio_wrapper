@@ -54,7 +54,7 @@ protected:
 
 	//msg handling, must define macro ST_ASIO_SYNC_DISPATCH
 	//do not hold msg_can for further using, access msg_can and return from on_msg as quickly as possible
-	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
+	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
 		BOOST_AUTO(re, msg_can.size());

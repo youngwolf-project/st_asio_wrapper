@@ -25,7 +25,7 @@ using namespace st_asio_wrapper::ext::udp;
 
 void sync_recv_thread(single_service& service)
 {
-	boost::container::list<single_service::out_msg_type> msg_can;
+	list<single_service::out_msg_type> msg_can;
 	sync_call_result re = SUCCESS;
 	do
 	{

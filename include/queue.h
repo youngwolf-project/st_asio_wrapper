@@ -1,5 +1,5 @@
 /*
- * container.h
+ * queue.h
  *
  *  Created on: 2016-10-12
  *      Author: youngwolf
@@ -7,11 +7,11 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * containers.
+ * queue.
  */
 
-#ifndef ST_ASIO_CONTAINER_H_
-#define ST_ASIO_CONTAINER_H_
+#ifndef ST_ASIO_QUEUE_H_
+#define ST_ASIO_QUEUE_H_
 
 #include "base.h"
 
@@ -43,16 +43,14 @@ private:
 	boost::mutex mutex; //boost::mutex is more efficient than boost::shared_mutex
 };
 
-template<typename T> class list : public boost::container::list<T> {};
-
 //Container must at least has the following functions (like list):
 // Container() and Container(size_t) constructor
 // clear
 // swap
 // emplace_back(const T& item)
 // emplace_back(), must return a reference of the new item.
-// splice(iter, boost::container::list<T>&), after this, boost::container::list<T> must be empty
-// splice(iter, boost::container::list<T>&, iter, iter), if macro ST_ASIO_DISPATCH_BATCH_MSG been defined
+// splice(iter, list<T>&), after this, list<T> must be empty
+// splice(iter, list<T>&, iter, iter), if macro ST_ASIO_DISPATCH_BATCH_MSG been defined
 // front
 // pop_front
 // back
@@ -85,7 +83,7 @@ public:
 	//thread safe
 	bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
-	void move_items_in(boost::container::list<T>& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
+	void move_items_in(list<T>& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
 	bool try_dequeue(T& item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
 	//thread safe
 
@@ -123,7 +121,7 @@ public:
 		return true;
 	}
 
-	void move_items_in_(boost::container::list<T>& src, size_t size_in_byte = 0)
+	void move_items_in_(list<T>& src, size_t size_in_byte = 0)
 	{
 		if (0 == size_in_byte)
 			for (BOOST_AUTO(iter, src.begin()); iter != src.end(); ++iter)
@@ -180,4 +178,4 @@ public:
 
 } //namespace
 
-#endif /* ST_ASIO_CONTAINER_H_ */
+#endif /* ST_ASIO_QUEUE_H_ */

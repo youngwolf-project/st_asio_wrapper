@@ -14,7 +14,6 @@
 #define ST_ASIO_SERVER_SOCKET_H_
 
 #include "socket.h"
-#include "../container.h"
 
 namespace st_asio_wrapper { namespace tcp {
 

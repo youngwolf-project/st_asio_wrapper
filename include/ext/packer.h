@@ -122,13 +122,14 @@ public:
 	virtual bool pack_msg(container_type& in, container_type& out)
 	{
 		size_t len = 0;
-		do_something_to_all(in, [&len](msg_ctype& msg) {len += msg.size();});
+		for (BOOST_AUTO(iter, in.begin()); iter != in.end(); ++iter)
+			len += iter->size();
 		if (len > packer::get_max_msg_size()) //not considered overflow
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
 		out.emplace_back((const char*) &head_len, ST_ASIO_HEAD_LEN);
-		out.splice(std::end(out), in);
+		out.splice(out.end(), in);
 
 		return true;
 	}
@@ -174,8 +175,7 @@ public:
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
 		BOOST_AUTO(raw_msg, new string_buffer());
 		raw_msg->assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
-		typename super::msg_type msg1(raw_msg);
-		msg_can.emplace_back().swap(msg1);
+		msg_can.emplace_back(raw_msg);
 		msg_can.emplace_back().swap(msg);
 
 		return true;
@@ -189,8 +189,7 @@ public:
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
 		BOOST_AUTO(raw_msg, new string_buffer());
 		raw_msg->assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
-		typename super::msg_type msg0(raw_msg);
-		msg_can.emplace_back().swap(msg0);
+		msg_can.emplace_back(raw_msg);
 		msg_can.emplace_back().swap(msg1);
 		msg_can.emplace_back().swap(msg2);
 
@@ -199,16 +198,16 @@ public:
 	virtual bool pack_msg(typename super::container_type& in, typename super::container_type& out)
 	{
 		size_t len = 0;
-		do_something_to_all(in, [&len](typename super::msg_ctype& msg) {len += msg.size();});
+		for (BOOST_AUTO(iter, in.begin()); iter != in.end(); ++iter)
+			len += iter->size();
 		if (len > packer::get_max_msg_size()) //not considered overflow
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
 		BOOST_AUTO(raw_msg, new string_buffer());
 		raw_msg->assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
-		typename super::msg_type msg(raw_msg);
-		out.emplace_back().swap(msg);
-		out.splice(std::end(out), in);
+		out.emplace_back(raw_msg);
+		out.splice(out.end(), in);
 
 		return true;
 	}
@@ -319,7 +318,7 @@ public:
 
 		if (!_prefix.empty())
 			out.emplace_back(_prefix);
-		out.splice(std::end(out), in);
+		out.splice(out.end(), in);
 		if (!_suffix.empty())
 			out.emplace_back(_suffix);
 

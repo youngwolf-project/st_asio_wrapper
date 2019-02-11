@@ -109,7 +109,7 @@ protected:
 	//msg handling
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//do not hold msg_can for further using, return from on_msg as quickly as possible
-	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
+	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
 		BOOST_AUTO(re, msg_can.size());
@@ -289,7 +289,8 @@ void send_msg_randomly(echo_client& client, size_t msg_num, size_t msg_len, char
 	printf(" finished in %f seconds, TPS: %f(*2), speed: %f(*2) MBps.\n", used_time, msg_num / used_time, total_msg_bytes / used_time / 1024 / 1024);
 }
 
-void thread_runtine(boost::container::list<echo_client::object_type>& link_group, size_t msg_num, size_t msg_len, char msg_fill)
+typedef boost::container::list<echo_client::object_type> link_container;
+void thread_runtine(link_container& link_group, size_t msg_num, size_t msg_len, char msg_fill)
 {
 	char* buff = new char[msg_len];
 	memset(buff, msg_fill, msg_len);
@@ -302,7 +303,6 @@ void thread_runtine(boost::container::list<echo_client::object_type>& link_group
 	delete[] buff;
 }
 
-typedef boost::container::list<echo_client::object_type> link_container;
 void group_links(echo_client::object_ctype& link, std::vector<link_container>& link_groups, size_t group_link_num,
 	size_t& group_index, size_t& this_group_link_num, size_t& left_link_num)
 {

@@ -15,6 +15,7 @@
 
 #include "tracked_executor.h"
 #include "timer.h"
+#include "queue.h"
 
 namespace st_asio_wrapper
 {
@@ -208,7 +209,7 @@ public:
 	//after this call, msg becomes empty, please note.
 	bool direct_send_msg(InMsgType& msg, bool can_overflow = false)
 		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
-	bool direct_send_msg(boost::container::list<InMsgType>& msg_can, bool can_overflow = false)
+	bool direct_send_msg(list<InMsgType>& msg_can, bool can_overflow = false)
 		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg_can) : false;}
 
 #ifdef ST_ASIO_SYNC_SEND
@@ -218,12 +219,12 @@ public:
 	//after this call, msg becomes empty, please note.
 	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
 		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
-	sync_call_result direct_sync_send_msg(boost::container::list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false)
+	sync_call_result direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false)
 		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg_can, duration) : NOT_APPLICABLE;}
 #endif
 
 #ifdef ST_ASIO_SYNC_RECV
-	sync_call_result sync_recv_msg(boost::container::list<OutMsgType>& msg_can, unsigned duration = 0) //unit is millisecond, 0 means wait infinitely
+	sync_call_result sync_recv_msg(list<OutMsgType>& msg_can, unsigned duration = 0) //unit is millisecond, 0 means wait infinitely
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
@@ -289,7 +290,7 @@ protected:
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//return the number of handled msg, if some msg left behind, socket will re-dispatch them asynchronously
 	//notice: using inconstant is for the convenience of swapping
-	virtual size_t on_msg(boost::container::list<OutMsgType>& msg_can)
+	virtual size_t on_msg(list<OutMsgType>& msg_can)
 	{
 		//it's always thread safe in this virtual function, because it blocks message receiving
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
@@ -411,7 +412,7 @@ protected:
 #endif
 		if (msg_num > 0)
 		{
-			boost::container::list<out_msg> temp_buffer(msg_num);
+			list<out_msg> temp_buffer(msg_num);
 			BOOST_AUTO(op_iter, temp_buffer.begin());
 			for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++op_iter, ++iter)
 				op_iter->swap(*iter);
@@ -442,10 +443,10 @@ protected:
 		return true;
 	}
 
-	bool do_direct_send_msg(boost::container::list<InMsgType>& msg_can)
+	bool do_direct_send_msg(list<InMsgType>& msg_can)
 	{
 		size_t size_in_byte = 0;
-		boost::container::list<in_msg> temp_buffer;
+		list<in_msg> temp_buffer;
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();
@@ -483,7 +484,7 @@ protected:
 #endif
 	}
 
-	sync_call_result do_direct_sync_send_msg(boost::container::list<InMsgType>& msg_can, unsigned duration = 0)
+	sync_call_result do_direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0)
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
@@ -491,7 +492,7 @@ protected:
 			return SUCCESS;
 
 		size_t size_in_byte = 0;
-		boost::container::list<in_msg> temp_buffer;
+		list<in_msg> temp_buffer;
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();
@@ -662,7 +663,7 @@ private:
 protected:
 	struct statistic stat;
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer_;
-	boost::container::list<OutMsgType> temp_msg_can;
+	list<OutMsgType> temp_msg_can;
 
 	in_queue_type send_msg_buffer;
 	volatile bool sending;

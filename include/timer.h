@@ -189,7 +189,7 @@ protected:
 	}
 
 private:
-	typedef boost::container::list<timer_info> container_type;
+	typedef list<timer_info> container_type;
 	container_type timer_can;
 	boost::mutex timer_can_mutex;
 
