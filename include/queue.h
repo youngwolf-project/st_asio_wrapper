@@ -131,7 +131,7 @@ public:
 		buff_size += size_in_byte;
 	}
 
-	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); return true;}
+	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); buff_size -= item.size(); return true;}
 	//not thread safe
 
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG

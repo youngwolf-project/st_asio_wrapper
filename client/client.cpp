@@ -120,7 +120,7 @@ int main(int argc, const char* argv[])
 		ip = argv[2];
 
 	client.set_server_addr(port, ip);
-	client2.set_server_addr(port + 1, ip);
+	client2.set_server_addr(port + 100, ip);
 
 	sp.start_service();
 	boost::thread t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(client)));
@@ -147,14 +147,24 @@ int main(int argc, const char* argv[])
 			puts(client.get_statistic().to_string().data());
 		else
 		{
+			std::string tmp_str = str + " (from short client)"; //backup str, because it will be swapped into client
+
+			//each of following 4 tests is exclusive from other 3, because str will be swapped into client (to reduce one memory replication)
+			//to avoid this, call other overloads that don't accept rvalue references.
+			//we also have another 4 tests that send native messages not listed, you can try to complete them.
+			//test #1
 			std::string msg2(" (from normal client)");
-			sync_call_result re = client.sync_send_msg(str, msg2, 100); //new feature introduced in 2.2.0
+			sync_call_result re = client.sync_safe_send_msg(str, msg2, 100); //new feature introduced in 2.2.0
 			if (SUCCESS != re)
 				printf("sync send result: %d\n", re);
-			//client.sync_safe_send_msg(str, msg2, 100); //new feature introduced in 2.2.0
+			//test #2
+			//client.sync_send_msg(str, msg2, 100); //new feature introduced in 2.2.0
+			//test #3
 			//client.safe_send_msg(str, msg2); //new feature introduced in 2.2.0
+			//test #4
+			//client.send_msg(str, msg2); //new feature introduced in 2.2.0
 
-			client2.send_msg(str + " (from short client)");
+			client2.send_msg(tmp_str);
 		}
 	}
 

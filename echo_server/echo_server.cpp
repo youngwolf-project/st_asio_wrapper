@@ -225,7 +225,7 @@ int main(int argc, const char* argv[])
 		ip = argv[3];
 
 	normal_server.set_server_addr(port + 100, ip);
-	short_server.set_server_addr(port + 101, ip);
+	short_server.set_server_addr(port + 200, ip);
 	echo_server_.set_server_addr(port, ip);
 
 	int thread_num = 1;

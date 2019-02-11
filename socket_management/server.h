@@ -21,8 +21,7 @@ protected:
 		BOOST_AUTO(raw_msg, new string_buffer());
 		raw_msg->assign(" (from the server)");
 
-		ST_ASIO_DEFAULT_PACKER::msg_type msg2;
-		msg2.raw_buffer(raw_msg);
+		ST_ASIO_DEFAULT_PACKER::msg_type msg2(raw_msg);
 		return send_msg(msg, msg2); //new feature introduced in 2.2.0
 	}
 #elif 2 == PACKER_UNPACKER_TYPE
