@@ -328,7 +328,7 @@ struct statistic
 	{
 		send_delay_sum = send_time_sum = pack_time_sum = stat_duration();
 
-		dispatch_dealy_sum = recv_idle_sum = stat_duration();
+		dispatch_delay_sum = recv_idle_sum = stat_duration();
 		handle_time_sum = stat_duration();
 		unpack_time_sum = stat_duration();
 	}
@@ -346,7 +346,7 @@ struct statistic
 
 		recv_msg_sum += other.recv_msg_sum;
 		recv_byte_sum += other.recv_byte_sum;
-		dispatch_dealy_sum += other.dispatch_dealy_sum;
+		dispatch_delay_sum += other.dispatch_delay_sum;
 		recv_idle_sum += other.recv_idle_sum;
 		handle_time_sum += other.handle_time_sum;
 		unpack_time_sum += other.unpack_time_sum;
@@ -369,7 +369,7 @@ struct statistic
 			<< "message sum: " << recv_msg_sum << std::endl
 			<< "size in bytes: " << recv_byte_sum
 #ifdef ST_ASIO_FULL_STATISTIC
-			<< "\ndispatch delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(dispatch_dealy_sum).count() << std::endl
+			<< "\ndispatch delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(dispatch_delay_sum).count() << std::endl
 			<< "recv idle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(recv_idle_sum).count() << std::endl
 			<< "on_msg_handle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(handle_time_sum).count() << std::endl
 			<< "unpack duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(unpack_time_sum).count()
@@ -388,7 +388,7 @@ struct statistic
 	//recv corresponding statistic
 	boost::uint_fast64_t recv_msg_sum; //msgs returned by i_unpacker::parse_msg
 	boost::uint_fast64_t recv_byte_sum; //msgs (in bytes) returned by i_unpacker::parse_msg
-	stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
+	stat_duration dispatch_delay_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
 	stat_duration recv_idle_sum; //during this duration, socket suspended msg reception (receiving buffer overflow)
 	stat_duration handle_time_sum; //on_msg_handle (and on_msg) consumed time, this indicate the efficiency of msg handling
 	stat_duration unpack_time_sum; //udp::socket_base will not gather this item
@@ -469,11 +469,11 @@ template<typename _Can, typename _Mutex, typename _Predicate>
 void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 {
 	boost::lock_guard<boost::mutex> lock(__mutex);
-	for(BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);
+	for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);
 }
 
 template<typename _Can, typename _Predicate>
-void do_something_to_all(_Can& __can, const _Predicate& __pred) {for(BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);}
+void do_something_to_all(_Can& __can, const _Predicate& __pred) {for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);}
 
 template<typename _Can, typename _Mutex, typename _Predicate>
 void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)

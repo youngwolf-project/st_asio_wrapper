@@ -59,7 +59,7 @@ private:
 // begin
 // end
 template<typename T, typename Container, typename Lockable> //thread safety depends on Container or Lockable
-class queue : protected Container, public Lockable
+class queue : private Container, public Lockable
 {
 public:
 	typedef T data_type;
@@ -87,6 +87,10 @@ public:
 	bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	void move_items_in(Container& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
 	bool try_dequeue(T& item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
+	void move_items_out(Container& dest, size_t max_item_num = -1) {typename Lockable::lock_guard lock(*this); move_items_out_(dest, max_item_num);}
+	void move_items_out(size_t max_size_in_byte, Container& dest) {typename Lockable::lock_guard lock(*this); move_items_out_(max_size_in_byte, dest);}
+	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred) {typename Lockable::lock_guard lock(*this); do_something_to_all_(__pred);}
+	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred) {typename Lockable::lock_guard lock(*this); do_something_to_one_(__pred);}
 	//thread safe
 
 	//not thread safe
@@ -134,10 +138,6 @@ public:
 	}
 
 	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); buff_size -= item.size(); return true;}
-	//not thread safe
-
-	void move_items_out(Container& dest, size_t max_item_num = -1) {typename Lockable::lock_guard lock(*this); move_items_out_(dest, max_item_num);} //thread safe
-	void move_items_out(size_t max_size_in_byte, Container& dest) {typename Lockable::lock_guard lock(*this); move_items_out_(max_size_in_byte, dest);} //thread safe
 
 	void move_items_out_(Container& dest, size_t max_item_num = -1) //not thread safe
 	{
@@ -187,8 +187,12 @@ public:
 		}
 	}
 
-	using Container::begin;
-	using Container::end;
+	template<typename _Predicate>
+	void do_something_to_all_(const _Predicate& __pred) {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) __pred(*iter);}
+
+	template<typename _Predicate>
+	void do_something_to_one_(const _Predicate& __pred) {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) if (__pred(*iter)) break;}
+	//not thread safe
 
 private:
 	size_t buff_size; //in use

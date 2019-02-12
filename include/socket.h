@@ -574,6 +574,7 @@ private:
 
 	//do not use dispatch_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
 	void dispatch_msg() {if (!dispatching) post_strand(strand, boost::bind(&socket::do_dispatch_msg, this));}
+	void accumulate_dispatch_delay(const statistic::stat_time& begin_time, const out_msg& msg) {stat.dispatch_delay_sum += begin_time - msg.begin_time;}
 	void do_dispatch_msg()
 	{
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
@@ -581,10 +582,7 @@ private:
 		{
 			BOOST_AUTO(begin_time, statistic::now());
 #ifdef ST_ASIO_FULL_STATISTIC
-			recv_msg_buffer.lock();
-			for (BOOST_AUTO(iter, recv_msg_buffer.begin()); iter != recv_msg_buffer.end(); ++iter)
-				stat.dispatch_dealy_sum += begin_time - iter->begin_time;
-			recv_msg_buffer.unlock();
+			recv_msg_buffer.do_something_to_all(boost::bind(&socket::accumulate_dispatch_delay, this, boost::cref(begin_time), _1));
 #endif
 			size_t re = on_msg_handle(recv_msg_buffer);
 			BOOST_AUTO(end_time, statistic::now());
@@ -593,9 +591,7 @@ private:
 			if (0 == re) //dispatch failed, re-dispatch
 			{
 #ifdef ST_ASIO_FULL_STATISTIC
-				recv_msg_buffer.lock();
-				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&out_msg::restart, _1, boost::cref(end_time)));
-				recv_msg_buffer.unlock();
+				recv_msg_buffer.do_something_to_all(boost::bind(&out_msg::restart, _1, boost::cref(end_time)));
 #endif
 				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
 			}
@@ -605,7 +601,7 @@ private:
 		if ((dispatching = !dispatched || recv_msg_buffer.try_dequeue(last_dispatch_msg)))
 		{
 			BOOST_AUTO(begin_time, statistic::now());
-			stat.dispatch_dealy_sum += begin_time - last_dispatch_msg.begin_time;
+			stat.dispatch_delay_sum += begin_time - last_dispatch_msg.begin_time;
 			bool re = on_msg_handle(last_dispatch_msg); //must before next msg dispatching to keep sequence
 			BOOST_AUTO(end_time, statistic::now());
 			stat.handle_time_sum += end_time - begin_time;
