@@ -550,7 +550,6 @@
  * Return value from on_msg_handle(out_queue_type&) been changed from size_t to bool.
  * Use st_asio_wrapper::list instead of boost::container::list, the former guarantee that emplace_back function always return the reference of
  *  the newly added item.
- * Rename header file container.h to queue.h, and add new header file list.h
  *
  * HIGHLIGHT:
  * Make client_socket_base be able to call multi_client_base (via i_matrix) like server_socket_base call server_base (via i_server),
@@ -577,9 +576,9 @@
  * DELETION:
  *
  * REFACTORING:
+ * Unify all container to st_asio_wrapper::list (before, some of them were boost::container::list).
  *
  * REPLACEMENTS:
- * Use st_asio_wrapper::list instead of boost::container::list.
  *
  */
 

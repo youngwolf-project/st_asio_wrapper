@@ -36,7 +36,6 @@
 #include <boost/atomic.hpp>
 #endif
 
-#include "list.h"
 #include "config.h"
 
 namespace st_asio_wrapper
@@ -182,6 +181,23 @@ protected:
 };
 //not like auto_buffer, shared_buffer is copyable, but auto_buffer is a bit more efficient.
 //packer or/and unpacker who used auto_buffer or shared_buffer as its msg type will be replaceable.
+
+template<typename T> class list : public boost::container::list<T>
+{
+private:
+	typedef boost::container::list<T> super;
+
+public:
+	list() {}
+	list(size_t n) : super(n) {}
+
+#if BOOST_VERSION < 106200
+	typename super::reference emplace_back() {super::emplace_back(); return super::back();}
+	template<typename Arg> typename super::reference emplace_back(const Arg& arg) {super::emplace_back(arg); return super::back();}
+	template<typename Arg1, typename Arg2>
+	typename super::reference emplace_back(const Arg1& arg1, const Arg2& arg2) {super::emplace_back(arg1, arg2); return super::back();}
+#endif
+};
 
 //packer concept
 template<typename MsgType>

@@ -1,5 +1,5 @@
 /*
- * queue.h
+ * container.h
  *
  *  Created on: 2016-10-12
  *      Author: youngwolf
@@ -7,11 +7,11 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * queue.
+ * containers.
  */
 
-#ifndef ST_ASIO_QUEUE_H_
-#define ST_ASIO_QUEUE_H_
+#ifndef ST_ASIO_CONTAINER_H_
+#define ST_ASIO_CONTAINER_H_
 
 #include "base.h"
 
@@ -43,7 +43,7 @@ private:
 	boost::mutex mutex; //boost::mutex is more efficient than boost::shared_mutex
 };
 
-//Container must at least has the following functions (like list):
+//Container must at least has the following functions (like boost::container::list):
 // Container() and Container(size_t) constructor
 // clear
 // swap
@@ -150,7 +150,10 @@ public:
 			for (; end_iter != ST_THIS end() && index++ < max_item_num; ++end_iter)
 				s += end_iter->size();
 
-			dest.splice(dest.end(), *this, ST_THIS begin(), end_iter);
+			if (end_iter == ST_THIS end())
+				dest.splice(dest.end(), *this);
+			else
+				dest.splice(dest.end(), *this, ST_THIS begin(), end_iter);
 			buff_size -= s;
 		}
 	}
@@ -178,4 +181,4 @@ public:
 
 } //namespace
 
-#endif /* ST_ASIO_QUEUE_H_ */
+#endif /* ST_ASIO_CONTAINER_H_ */
