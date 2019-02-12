@@ -147,11 +147,11 @@ int main(int argc, const char* argv[])
 			puts(client.get_statistic().to_string().data());
 		else
 		{
-			std::string tmp_str = str + " (from short client)"; //backup str, because it will be swapped into client
+			std::string tmp_str = str + " (from short client)"; //make a backup of str first, because it will be moved into client
 
-			//each of following 4 tests is exclusive from other 3, because str will be swapped into client (to reduce one memory replication)
-			//to avoid this, call other overloads that don't accept rvalue references.
-			//we also have another 4 tests that send native messages not listed, you can try to complete them.
+			//each of following 4 tests is exclusive from other 3, because str will be moved into client (to reduce one memory replication)
+			//to avoid this, call other overloads that accept const references.
+			//we also have another 4 tests that send native messages (if the server used stream_unpacker) not listed, you can try to complete them.
 			//test #1
 			std::string msg2(" (from normal client)");
 			sync_call_result re = client.sync_safe_send_msg(str, msg2, 100); //new feature introduced in 2.2.0
