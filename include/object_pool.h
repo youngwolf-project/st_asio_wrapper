@@ -321,7 +321,7 @@ private:
 	//we must guarantee these objects not be freed from the heap or reused, so we move these objects from object_can to invalid_object_can, and free them
 	//from the heap or reuse them in the near future. if ST_ASIO_CLEAR_OBJECT_INTERVAL been defined, clear_obsoleted_object() will be invoked automatically and
 	//periodically to move all invalid objects into invalid_object_can.
-	list<object_type> invalid_object_can;
+	boost::container::list<object_type> invalid_object_can;
 	boost::mutex invalid_object_can_mutex;
 };
 

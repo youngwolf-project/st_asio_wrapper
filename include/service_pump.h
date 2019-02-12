@@ -59,7 +59,7 @@ public:
 public:
 	typedef i_service* object_type;
 	typedef const object_type object_ctype;
-	typedef list<object_type> container_type;
+	typedef boost::container::list<object_type> container_type;
 
 	service_pump() : started(false)
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME

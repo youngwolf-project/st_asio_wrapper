@@ -412,7 +412,7 @@ protected:
 #endif
 		if (msg_num > 0)
 		{
-			list<out_msg> temp_buffer(msg_num);
+			out_container_type temp_buffer(msg_num);
 			BOOST_AUTO(op_iter, temp_buffer.begin());
 			for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++op_iter, ++iter)
 				op_iter->swap(*iter);
@@ -446,7 +446,7 @@ protected:
 	bool do_direct_send_msg(list<InMsgType>& msg_can)
 	{
 		size_t size_in_byte = 0;
-		list<in_msg> temp_buffer;
+		in_container_type temp_buffer;
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();
@@ -492,7 +492,7 @@ protected:
 			return SUCCESS;
 
 		size_t size_in_byte = 0;
-		list<in_msg> temp_buffer;
+		in_container_type temp_buffer;
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();

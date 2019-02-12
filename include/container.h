@@ -45,12 +45,14 @@ private:
 
 //Container must at least has the following functions (like boost::container::list):
 // Container() and Container(size_t) constructor
+// size
+// empty
 // clear
 // swap
 // emplace_back(const T& item)
-// emplace_back(), must return a reference of the new item.
-// splice(iter, list<T>&), after this, list<T> must be empty
-// splice(iter, list<T>&, iter, iter), if macro ST_ASIO_DISPATCH_BATCH_MSG been defined
+// emplace_back(), must return the reference of the new item
+// splice(iter, Container&), after this, the source container must be empty
+// splice(iter, Container&, iter, iter)
 // front
 // pop_front
 // back
@@ -83,7 +85,7 @@ public:
 	//thread safe
 	bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
-	void move_items_in(list<T>& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
+	void move_items_in(Container& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
 	bool try_dequeue(T& item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
 	//thread safe
 
@@ -121,7 +123,7 @@ public:
 		return true;
 	}
 
-	void move_items_in_(list<T>& src, size_t size_in_byte = 0)
+	void move_items_in_(Container& src, size_t size_in_byte = 0)
 	{
 		if (0 == size_in_byte)
 			for (BOOST_AUTO(iter, src.begin()); iter != src.end(); ++iter)
@@ -134,8 +136,9 @@ public:
 	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); buff_size -= item.size(); return true;}
 	//not thread safe
 
-#ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	void move_items_out(Container& dest, size_t max_item_num = -1) {typename Lockable::lock_guard lock(*this); move_items_out_(dest, max_item_num);} //thread safe
+	void move_items_out(size_t max_size_in_byte, Container& dest) {typename Lockable::lock_guard lock(*this); move_items_out_(max_size_in_byte, dest);} //thread safe
+
 	void move_items_out_(Container& dest, size_t max_item_num = -1) //not thread safe
 	{
 		if ((size_t) -1 == max_item_num)
@@ -158,9 +161,34 @@ public:
 		}
 	}
 
+	void move_items_out_(size_t max_size_in_byte, Container& dest) //not thread safe
+	{
+		if ((size_t) -1 == max_size_in_byte)
+		{
+			dest.splice(dest.end(), *this);
+			buff_size = 0;
+		}
+		else
+		{
+			size_t s = 0;
+			BOOST_AUTO(end_iter, ST_THIS begin());
+			for (; end_iter != ST_THIS end(); ++end_iter)
+			{
+				s += end_iter->size();
+				if (s >= max_size_in_byte)
+					break;
+			}
+
+			if (end_iter == ST_THIS end())
+				dest.splice(dest.end(), *this);
+			else
+				dest.splice(dest.end(), *this, ST_THIS begin(), end_iter);
+			buff_size -= s;
+		}
+	}
+
 	using Container::begin;
 	using Container::end;
-#endif
 
 private:
 	size_t buff_size; //in use

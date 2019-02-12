@@ -186,7 +186,7 @@ protected:
 	//msg_can contains messages that were failed to send and tcp::socket_base will not hold them any more, if you want to re-send them in the future,
 	// you must take over them and re-send (at any time) them via direct_send_msg.
 	//DO NOT hold msg_can for future using, just swap its content with your own container in this virtual function.
-	virtual void on_send_error(const boost::system::error_code& ec, list<typename super::in_msg>& msg_can)
+	virtual void on_send_error(const boost::system::error_code& ec, typename super::in_container_type& msg_can)
 		{unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
 
 	virtual void on_close()
@@ -289,27 +289,18 @@ private:
 		if (!in_strand && sending)
 			return true;
 
-		list<boost::asio::const_buffer> bufs;
-		{
+		BOOST_AUTO(end_time, statistic::now());
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-			const size_t max_send_size = 1;
+		send_msg_buffer.move_items_out(0, last_send_msg);
 #else
-			const size_t max_send_size = boost::asio::detail::default_max_transfer_size;
+		send_msg_buffer.move_items_out(boost::asio::detail::default_max_transfer_size, last_send_msg);
 #endif
-			size_t size = 0;
-			typename super::in_msg msg;
-			BOOST_AUTO(end_time, statistic::now());
-
-			typename super::in_queue_type::lock_guard lock(send_msg_buffer);
-			while (send_msg_buffer.try_dequeue_(msg))
-			{
-				stat.send_delay_sum += end_time - msg.begin_time;
-				size += msg.size();
-				last_send_msg.emplace_back().swap(msg);
-				bufs.emplace_back(last_send_msg.back().data(), last_send_msg.back().size());
-				if (size >= max_send_size)
-					break;
-			}
+		std::vector<boost::asio::const_buffer> bufs;
+		bufs.reserve(last_send_msg.size());
+		for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
+		{
+			stat.send_delay_sum += end_time - iter->begin_time;
+			bufs.push_back(boost::asio::const_buffer(iter->data(), iter->size()));
 		}
 
 		if ((sending = !bufs.empty()))
@@ -394,7 +385,7 @@ private:
 #endif
 
 	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker_;
-	list<typename super::in_msg> last_send_msg;
+	typename super::in_container_type last_send_msg;
 	boost::asio::io_context::strand strand;
 };
 
