@@ -99,10 +99,11 @@ protected:
 	//msg handling: send the original msg back(echo server)
 #ifdef ST_ASIO_SYNC_DISPATCH //do not open this feature
 	//do not hold msg_can for further using, return from on_msg as quickly as possible
+	//access msg_can freely within this callback, it's always thread safe.
 	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
 		if (!is_send_buffer_available())
-			return 0; //congestion control
+			return 0;
 		//here if we cannot handle all messages in msg_can, do not use sync message dispatching except we can bear message disordering,
 		//this is because on_msg_handle can be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
 		//and do not try to handle all messages here (just for echo_server's business logic) because:
@@ -125,6 +126,8 @@ protected:
 
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
+	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
+	// that new messages will not come until we returned from this callback (for example, pingpong test).
 	virtual bool on_msg_handle(out_queue_type& msg_can)
 	{
 		if (!is_send_buffer_available())
@@ -187,11 +190,14 @@ protected:
 	//msg handling
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//do not hold msg_can for further using, return from on_msg as quickly as possible
+	//access msg_can freely within this callback, it's always thread safe.
 	virtual size_t on_msg(list<out_msg_type>& msg_can) {bool re = short_socket_base::on_msg(msg_can); force_shutdown(); return re;}
 #endif
 
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
+	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
+	// that new messages will not come until we returned from this callback (for example, pingpong test).
 	virtual bool on_msg_handle(out_queue_type& msg_can) {bool re = short_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
 #else
 	virtual bool on_msg_handle(out_msg_type& msg) {bool re = short_socket_base::on_msg_handle(msg); force_shutdown(); return re;}
