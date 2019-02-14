@@ -450,12 +450,13 @@ template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_
 #define BOOST_THREAD_FUTURE unique_future
 #endif
 	typedef boost::BOOST_THREAD_FUTURE<sync_call_result> future;
+	typedef obj_with_begin_time<T> super;
 
 	obj_with_begin_time_promise(bool need_promise = false) {check_and_create_promise(need_promise);}
-	obj_with_begin_time_promise(T& obj, bool need_promise = false) : obj_with_begin_time<T>(obj) {check_and_create_promise(need_promise);}
+	obj_with_begin_time_promise(T& obj, bool need_promise = false) : super(obj) {check_and_create_promise(need_promise);}
 
-	void swap(T& obj, bool need_promise = false) {obj_with_begin_time<T>::swap(obj); check_and_create_promise(need_promise);}
-	void swap(obj_with_begin_time_promise& other) {obj_with_begin_time<T>::swap(other); p.swap(other.p);}
+	void swap(T& obj, bool need_promise = false) {super::swap(obj); check_and_create_promise(need_promise);}
+	void swap(obj_with_begin_time_promise& other) {super::swap(other); p.swap(other.p);}
 
 	void clear() {p.reset(); T::clear();}
 	void check_and_create_promise(bool need_promise) {if (!need_promise) p.reset(); else if (!p) p = boost::make_shared<boost::promise<sync_call_result> >();}
@@ -484,6 +485,14 @@ void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 
 template<typename _Can, typename _Predicate>
 void do_something_to_one(_Can& __can, const _Predicate& __pred) {for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) if (__pred(*iter)) break;}
+
+template<typename _Can>
+size_t get_size_in_byte(const _Can& __can)
+{
+	size_t size_in_byte = 0;
+	do_something_to_all(__can, size_in_byte += boost::lambda::bind(&_Can::value_type::size, boost::lambda::_1));
+	return size_in_byte;
+}
 
 //member functions, used to do something to any member container(except map and multimap) optionally with any member mutex
 #define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)

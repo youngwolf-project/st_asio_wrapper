@@ -121,9 +121,7 @@ public:
 	}
 	virtual bool pack_msg(container_type& in, container_type& out)
 	{
-		size_t len = 0;
-		for (BOOST_AUTO(iter, in.begin()); iter != in.end(); ++iter)
-			len += iter->size();
+		size_t len = st_asio_wrapper::get_size_in_byte(in);
 		if (len > packer::get_max_msg_size()) //not considered overflow
 			return false;
 
@@ -197,9 +195,7 @@ public:
 	}
 	virtual bool pack_msg(typename super::container_type& in, typename super::container_type& out)
 	{
-		size_t len = 0;
-		for (BOOST_AUTO(iter, in.begin()); iter != in.end(); ++iter)
-			len += iter->size();
+		size_t len = st_asio_wrapper::get_size_in_byte(in);
 		if (len > packer::get_max_msg_size()) //not considered overflow
 			return false;
 
@@ -310,9 +306,7 @@ public:
 	}
 	virtual bool pack_msg(container_type& in, container_type& out)
 	{
-		size_t len = _prefix.size() + _suffix.size();
-		for (BOOST_AUTO(iter, in.begin()); iter != in.end(); ++iter)
-			len += iter->size();
+		size_t len = _prefix.size() + _suffix.size() + st_asio_wrapper::get_size_in_byte(in);
 		if (len > ST_ASIO_MSG_BUFFER_SIZE) //not considered overflow
 			return false;
 

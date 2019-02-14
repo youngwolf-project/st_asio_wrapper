@@ -370,10 +370,7 @@ protected:
 
 	bool handle_msg()
 	{
-		size_t size_in_byte = 0;
-		for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++iter)
-			size_in_byte += iter->size();
-
+		size_t size_in_byte = st_asio_wrapper::get_size_in_byte(temp_msg_can);
 		size_t msg_num = temp_msg_can.size();
 		stat.recv_msg_sum += msg_num;
 		stat.recv_byte_sum += size_in_byte;
