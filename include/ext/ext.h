@@ -70,7 +70,7 @@ public:
 
 	//functions needed by packer and unpacker
 	char* data() {return buff;}
-	bool size(size_t _len) {assert(_len <= buff_len); return (_len <= buff_len) ? (len = _len, true) : false;}
+	bool shrink_size(size_t _len) {assert(_len <= buff_len); return (_len <= buff_len) ? (len = _len, true) : false;}
 	size_t buffer_size() const {return NULL == buff ? 0 : buff_len;}
 
 protected:
