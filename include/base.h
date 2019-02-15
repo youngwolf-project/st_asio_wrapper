@@ -182,6 +182,7 @@ protected:
 //not like auto_buffer, shared_buffer is copyable, but auto_buffer is a bit more efficient.
 //packer or/and unpacker who used auto_buffer or shared_buffer as its msg type will be replaceable.
 
+//st_asio_wrapper requires that container must take one and only one template argument
 template<typename T> class list : public boost::container::list<T>
 {
 private:

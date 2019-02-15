@@ -49,23 +49,23 @@ private:
 // empty
 // clear
 // swap
-// emplace_back(const T& item)
+// emplace_back(typename Container::const_reference item)
 // emplace_back(), must return the reference of the new item
-// splice(iter, Container&), after this, the source container must be empty
+// splice(iter, Container&)
 // splice(iter, Container&, iter, iter)
 // front
 // pop_front
 // back
 // begin
 // end
-template<typename T, typename Container, typename Lockable> //thread safety depends on Container or Lockable
+template<typename Container, typename Lockable> //thread safety depends on Container or Lockable
 class queue : private Container, public Lockable
 {
 public:
-	using typename Container::value_type;
-	using typename Container::size_type;
-	using typename Container::reference;
-	using typename Container::const_reference;
+	typedef typename Container::value_type value_type;
+	typedef typename Container::size_type size_type;
+	typedef typename Container::reference reference;
+	typedef typename Container::const_reference const_reference;
 
 	queue() : buff_size(0) {}
 	queue(size_t capacity) : Container(capacity), buff_size(0) {}
@@ -86,10 +86,10 @@ public:
 
 	size_t get_size_in_byte() {typename Lockable::lock_guard lock(*this); return get_size_in_byte_();}
 
-	bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
-	bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
+	bool enqueue(const_reference item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
+	bool enqueue(reference item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	void move_items_in(Container& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
-	bool try_dequeue(T& item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
+	bool try_dequeue(reference item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
 	void move_items_out(Container& dest, size_t max_item_num = -1) {typename Lockable::lock_guard lock(*this); move_items_out_(dest, max_item_num);}
 	void move_items_out(size_t max_size_in_byte, Container& dest) {typename Lockable::lock_guard lock(*this); move_items_out_(max_size_in_byte, dest);}
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred) {typename Lockable::lock_guard lock(*this); do_something_to_all_(__pred);}
@@ -97,7 +97,7 @@ public:
 	//thread safe
 
 	//not thread safe
-	bool enqueue_(const T& item)
+	bool enqueue_(const_reference item)
 	{
 		try
 		{
@@ -113,7 +113,7 @@ public:
 		return true;
 	}
 
-	bool enqueue_(T& item) //after this, item will becomes empty, please note.
+	bool enqueue_(reference item) //after this, item will becomes empty, please note.
 	{
 		try
 		{
@@ -139,7 +139,7 @@ public:
 		buff_size += size_in_byte;
 	}
 
-	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); buff_size -= item.size(); return true;}
+	bool try_dequeue_(reference item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); buff_size -= item.size(); return true;}
 
 	void move_items_out_(Container& dest, size_t max_item_num = -1)
 	{
@@ -211,17 +211,18 @@ private:
 	size_t buff_size; //in use
 };
 
-template<typename T, typename Container> class non_lock_queue : public queue<T, Container, dummy_lockable> //thread safety depends on Container
+//st_asio_wrapper requires that queue must take one and only one template argument
+template<typename Container> class non_lock_queue : public queue<Container, dummy_lockable> //thread safety depends on Container
 {
 public:
 	non_lock_queue() {}
-	non_lock_queue(size_t capacity) : queue<T, Container, dummy_lockable>(capacity) {}
+	non_lock_queue(size_t capacity) : queue<Container, dummy_lockable>(capacity) {}
 };
-template<typename T, typename Container> class lock_queue : public queue<T, Container, lockable>
+template<typename Container> class lock_queue : public queue<Container, lockable>
 {
 public:
 	lock_queue() {}
-	lock_queue(size_t capacity) : queue<T, Container, lockable>(capacity) {}
+	lock_queue(size_t capacity) : queue<Container, lockable>(capacity) {}
 };
 
 } //namespace

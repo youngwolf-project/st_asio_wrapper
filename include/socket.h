@@ -21,8 +21,7 @@ namespace st_asio_wrapper
 {
 
 template<typename Socket, typename Packer, typename InMsgType, typename OutMsgType,
-	template<typename, typename> class InQueue, template<typename> class InContainer,
-	template<typename, typename> class OutQueue, template<typename> class OutContainer>
+	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
 class socket : public timer<tracked_executor>
 {
 private:
@@ -109,8 +108,8 @@ public:
 	typedef obj_with_begin_time<OutMsgType> out_msg;
 	typedef InContainer<in_msg> in_container_type;
 	typedef OutContainer<out_msg> out_container_type;
-	typedef InQueue<in_msg, in_container_type> in_queue_type;
-	typedef OutQueue<out_msg, out_container_type> out_queue_type;
+	typedef InQueue<in_container_type> in_queue_type;
+	typedef OutQueue<out_container_type> out_queue_type;
 
 	boost::uint_fast64_t id() const {return _id;}
 	bool is_equal_to(boost::uint_fast64_t id) const {return _id == id;}
