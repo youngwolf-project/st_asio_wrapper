@@ -62,11 +62,15 @@ template<typename T, typename Container, typename Lockable> //thread safety depe
 class queue : private Container, public Lockable
 {
 public:
-	typedef T data_type;
+	using typename Container::value_type;
+	using typename Container::size_type;
+	using typename Container::reference;
+	using typename Container::const_reference;
 
 	queue() : buff_size(0) {}
 	queue(size_t capacity) : Container(capacity), buff_size(0) {}
 
+	//thread safe
 	bool is_thread_safe() const {return Lockable::is_lockable();}
 	size_t size() const {return buff_size;} //must be thread safe, but doesn't have to be consistent
 	bool empty() const {return 0 == size();} //must be thread safe, but doesn't have to be consistent
@@ -80,7 +84,8 @@ public:
 		buff_size = size_in_byte;
 	}
 
-	//thread safe
+	size_t get_size_in_byte() {typename Lockable::lock_guard lock(*this); return get_size_in_byte_();}
+
 	bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	void move_items_in(Container& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
@@ -186,9 +191,20 @@ public:
 
 	template<typename _Predicate>
 	void do_something_to_all_(const _Predicate& __pred) {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) __pred(*iter);}
+	template<typename _Predicate>
+	void do_something_to_all_(const _Predicate& __pred) const {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) __pred(*iter);}
 
 	template<typename _Predicate>
 	void do_something_to_one_(const _Predicate& __pred) {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) if (__pred(*iter)) break;}
+	template<typename _Predicate>
+	void do_something_to_one_(const _Predicate& __pred) const {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) if (__pred(*iter)) break;}
+
+	size_t get_size_in_byte_() const
+	{
+		size_t size_in_byte = 0;
+		do_something_to_all_(size_in_byte += boost::lambda::bind(&Container::value_type::size, boost::lambda::_1));
+		return size_in_byte;
+	}
 	//not thread safe
 
 private:
