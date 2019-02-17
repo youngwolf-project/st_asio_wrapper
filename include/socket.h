@@ -303,7 +303,7 @@ protected:
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//return the number of handled msg, if some msg left behind, socket will re-dispatch them asynchronously
 	//notice: using inconstant is for the convenience of swapping
-	virtual bool on_msg_handle(out_queue_type& msg_can)
+	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		out_container_type tmp_can;
 		msg_can.swap(tmp_can); //must be thread safe
@@ -311,7 +311,7 @@ protected:
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
 			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
 
-		return true;
+		return tmp_can.size();
 	}
 #else
 	//return true means msg been handled, false means msg cannot be handled right now, and socket will re-dispatch it asynchronously

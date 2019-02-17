@@ -128,10 +128,10 @@ protected:
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
 	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
 	// that new messages will not come until we returned from this callback (for example, pingpong test).
-	virtual bool on_msg_handle(out_queue_type& msg_can)
+	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		if (!is_send_buffer_available())
-			return false;
+			return 0;
 
 		out_container_type tmp_can;
 		msg_can.move_items_out(tmp_can, 10); //don't be too greedy, here is in a service thread, we should not block this thread for a long time
@@ -143,7 +143,7 @@ protected:
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
 #endif
-		return true;
+		return tmp_can.size();
 	}
 #else
 	//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
@@ -198,7 +198,7 @@ protected:
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
 	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
 	// that new messages will not come until we returned from this callback (for example, pingpong test).
-	virtual bool on_msg_handle(out_queue_type& msg_can) {bool re = short_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
+	virtual size_t on_msg_handle(out_queue_type& msg_can) {size_t re = short_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
 #else
 	virtual bool on_msg_handle(out_msg_type& msg) {bool re = short_socket_base::on_msg_handle(msg); force_shutdown(); return re;}
 #endif

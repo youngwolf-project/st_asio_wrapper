@@ -547,7 +547,6 @@
  * Limit send and recv buffers by acctual utilization (in byte) rather than message number before, so macro ST_ASIO_MAX_MSG_NUM been renamed to
  *  ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF, and unit been changed to byte.
  * statistic.send_msg_sum may be bigger than before (but statistic.send_byte_sum will be the same), see ENHANCEMENTS section for more details.
- * Return value from on_msg_handle(out_queue_type&) been changed from size_t to bool.
  * Use st_asio_wrapper::list instead of boost::container::list, the former guarantee that emplace_back function always return the reference of
  *  the newly added item.
  *
