@@ -204,26 +204,24 @@ public:
 
 	//don't use the packer but insert into send buffer directly
 	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false)
-		{if (!can_overflow && !is_send_buffer_available()) return false; InMsgType unused(msg); return do_direct_send_msg(unused);}
-	//after this call, msg becomes empty, please note.
-	bool direct_send_msg(InMsgType& msg, bool can_overflow = false)
+		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
+	bool direct_send_msg(InMsgType& msg, bool can_overflow = false) //after this call, msg becomes empty, please note.
 		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
 	bool direct_send_msg(list<InMsgType>& msg_can, bool can_overflow = false)
 		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg_can) : false;}
 
 #ifdef ST_ASIO_SYNC_SEND
-	//don't use the packer but insert into send buffer directly, then wait for the sending to finish.
-	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
-		{if (!can_overflow && !is_send_buffer_available()) return NOT_APPLICABLE; InMsgType unused(msg); return do_direct_sync_send_msg(unused, duration);}
-	//after this call, msg becomes empty, please note.
-	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
+	//don't use the packer but insert into send buffer directly, then wait for the sending to finish, unit of the duration is millisecond, 0 means wait infinitely
+	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false)
+		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg) : NOT_APPLICABLE;}
+	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //after this call, msg becomes empty, please note.
 		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
 	sync_call_result direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false)
 		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg_can, duration) : NOT_APPLICABLE;}
 #endif
 
 #ifdef ST_ASIO_SYNC_RECV
-	sync_call_result sync_recv_msg(list<OutMsgType>& msg_can, unsigned duration = 0) //unit is millisecond, 0 means wait infinitely
+	sync_call_result sync_recv_msg(list<OutMsgType>& msg_can, unsigned duration = 0) //unit of the duration is millisecond, 0 means wait infinitely
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
@@ -421,6 +419,23 @@ protected:
 		return handled_msg();
 	}
 
+	bool do_direct_send_msg(const InMsgType& msg)
+	{
+		if (msg.empty())
+			unified_out::error_out("found an empty message, please check your packer.");
+		else
+		{
+			in_msg unused(msg);
+			if (send_msg_buffer.enqueue(unused) && !sending && is_ready())
+				send_msg();
+		}
+
+		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
+		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
+		//the packer provider has the responsibility to write detailed reasons down when packing message failed.
+		return true;
+	}
+
 	bool do_direct_send_msg(InMsgType& msg)
 	{
 		if (msg.empty())
@@ -428,8 +443,7 @@ protected:
 		else
 		{
 			in_msg unused(msg);
-			send_msg_buffer.enqueue(unused);
-			if (!sending && is_ready())
+			if (send_msg_buffer.enqueue(unused) && !sending && is_ready())
 				send_msg();
 		}
 
@@ -456,6 +470,31 @@ protected:
 	}
 
 #ifdef ST_ASIO_SYNC_SEND
+	sync_call_result do_direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0)
+	{
+		if (stopped())
+			return NOT_APPLICABLE;
+		else if (msg.empty())
+		{
+			unified_out::error_out("found an empty message, please check your packer.");
+			return SUCCESS;
+		}
+
+		in_msg unused(msg, true);
+		typename in_msg::future f;
+		unused.p->get_future().swap(f);
+		if (!send_msg_buffer.enqueue(unused))
+			return NOT_APPLICABLE;
+		else if (!sending && is_ready())
+			send_msg();
+
+#ifdef BOOST_THREAD_USES_CHRONO
+		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
+#else
+		return 0 == duration || f.timed_wait(boost::posix_time::milliseconds(duration)) ? f.get() : TIMEOUT;
+#endif
+	}
+
 	sync_call_result do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0)
 	{
 		if (stopped())
@@ -469,8 +508,9 @@ protected:
 		in_msg unused(msg, true);
 		typename in_msg::future f;
 		unused.p->get_future().swap(f);
-		send_msg_buffer.enqueue(unused);
-		if (!sending && is_ready())
+		if (!send_msg_buffer.enqueue(unused))
+			return NOT_APPLICABLE;
+		else if (!sending && is_ready())
 			send_msg();
 
 #ifdef BOOST_THREAD_USES_CHRONO

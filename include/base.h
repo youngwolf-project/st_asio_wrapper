@@ -420,7 +420,9 @@ enum sync_call_result {SUCCESS, NOT_APPLICABLE, DUPLICATE, TIMEOUT};
 template<typename T> struct obj_with_begin_time : public T
 {
 	obj_with_begin_time() {}
+	obj_with_begin_time(const T& obj) : T(obj) {restart();}
 	obj_with_begin_time(T& obj) {T::swap(obj); restart();} //after this call, obj becomes empty, please note.
+	obj_with_begin_time& operator=(const T& obj) {T::operator=(obj); restart(); return *this;}
 	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, obj becomes empty, please note.
 
 	void restart() {restart(statistic::now());}
@@ -455,6 +457,7 @@ template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_
 
 	obj_with_begin_time_promise(bool need_promise = false) {check_and_create_promise(need_promise);}
 	obj_with_begin_time_promise(T& obj, bool need_promise = false) : super(obj) {check_and_create_promise(need_promise);}
+	obj_with_begin_time_promise(const T& obj, bool need_promise = false) : super(obj) {check_and_create_promise(need_promise);}
 
 	void swap(T& obj, bool need_promise = false) {super::swap(obj); check_and_create_promise(need_promise);}
 	void swap(obj_with_begin_time_promise& other) {super::swap(other); p.swap(other.p);}
