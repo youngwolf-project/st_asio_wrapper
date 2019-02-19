@@ -136,10 +136,12 @@ public:
 
 	auto_buffer() : buffer(NULL) {}
 	auto_buffer(buffer_type _buffer) : buffer(_buffer) {}
+	auto_buffer(auto_buffer& other) : buffer(other.buffer) {other.buffer = NULL;}
 	~auto_buffer() {clear();}
 
+	auto_buffer& operator=(auto_buffer& other) {clear(); swap(other); return *this;}
 	buffer_type raw_buffer() const {return buffer;}
-	void raw_buffer(buffer_type _buffer) {buffer = _buffer;}
+	void raw_buffer(buffer_type _buffer) {clear(); buffer = _buffer;}
 
 	//the following five functions are needed by st_asio_wrapper
 	bool empty() const {return NULL == buffer || buffer->empty();}
@@ -195,6 +197,7 @@ public:
 #if BOOST_VERSION < 106200
 	using super::emplace_back;
 	typename super::reference emplace_back() {super::emplace_back(); return super::back();}
+	typename super::reference emplace_back(T& val) {emplace_back().swap(val); return super::back();}
 #endif
 };
 
@@ -425,7 +428,7 @@ template<typename T> struct obj_with_begin_time : public T
 	obj_with_begin_time(const obj_with_begin_time& other) : T(other), begin_time(other.begin_time) {}
 	obj_with_begin_time(obj_with_begin_time& other) {swap(other);} //after this call, other becomes empty, please note.
 	obj_with_begin_time& operator=(const obj_with_begin_time& other) {T::operator=(other); begin_time = other.begin_time; return *this;}
-	obj_with_begin_time& operator=(obj_with_begin_time&& other) {clear(); swap(other);} //after this call, other becomes empty, please note.
+	obj_with_begin_time& operator=(obj_with_begin_time& other) {clear(); swap(other);} //after this call, other becomes empty, please note.
 
 	void restart() {restart(statistic::now());}
 	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}

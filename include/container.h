@@ -49,7 +49,7 @@ private:
 // empty
 // clear
 // swap
-// emplace_back(typename Container::const_reference item)
+// emplace_back(typename Container::const_reference item), if you call direct_(sync_)send_msg which accepts const InMsgType&
 // emplace_back(typename Container::reference item)
 // emplace_back(), must return the reference of the new item
 // splice(iter, Container&)
