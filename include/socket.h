@@ -213,7 +213,7 @@ public:
 #ifdef ST_ASIO_SYNC_SEND
 	//don't use the packer but insert into send buffer directly, then wait for the sending to finish, unit of the duration is millisecond, 0 means wait infinitely
 	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false)
-		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg) : NOT_APPLICABLE;}
+		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
 	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //after this call, msg becomes empty, please note.
 		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
 	sync_call_result direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false)
@@ -460,7 +460,7 @@ protected:
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();
-			temp_buffer.emplace_back().swap(*iter);
+			temp_buffer.emplace_back(*iter);
 		}
 		send_msg_buffer.move_items_in(temp_buffer, size_in_byte);
 		if (!sending && is_ready())
@@ -532,7 +532,7 @@ protected:
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();
-			temp_buffer.emplace_back().swap(*iter);
+			temp_buffer.emplace_back(*iter);
 		}
 
 		temp_buffer.back().check_and_create_promise(true);

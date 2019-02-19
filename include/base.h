@@ -193,10 +193,8 @@ public:
 	list(size_t n) : super(n) {}
 
 #if BOOST_VERSION < 106200
+	using super::emplace_back;
 	typename super::reference emplace_back() {super::emplace_back(); return super::back();}
-	template<typename Arg> typename super::reference emplace_back(const Arg& arg) {super::emplace_back(arg); return super::back();}
-	template<typename Arg1, typename Arg2>
-	typename super::reference emplace_back(const Arg1& arg1, const Arg2& arg2) {super::emplace_back(arg1, arg2); return super::back();}
 #endif
 };
 
@@ -424,11 +422,17 @@ template<typename T> struct obj_with_begin_time : public T
 	obj_with_begin_time(T& obj) {T::swap(obj); restart();} //after this call, obj becomes empty, please note.
 	obj_with_begin_time& operator=(const T& obj) {T::operator=(obj); restart(); return *this;}
 	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, obj becomes empty, please note.
+	obj_with_begin_time(const obj_with_begin_time& other) : T(other), begin_time(other.begin_time) {}
+	obj_with_begin_time(obj_with_begin_time& other) {swap(other);} //after this call, other becomes empty, please note.
+	obj_with_begin_time& operator=(const obj_with_begin_time& other) {T::operator=(other); begin_time = other.begin_time; return *this;}
+	obj_with_begin_time& operator=(obj_with_begin_time&& other) {clear(); swap(other);} //after this call, other becomes empty, please note.
 
 	void restart() {restart(statistic::now());}
 	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
 	void swap(T& obj) {T::swap(obj); restart();}
 	void swap(obj_with_begin_time& other) {T::swap(other); std::swap(begin_time, other.begin_time);}
+
+	void clear() {T::clear(); begin_time = typename statistic::stat_time();}
 
 	typename statistic::stat_time begin_time;
 };
@@ -458,11 +462,15 @@ template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_
 	obj_with_begin_time_promise(bool need_promise = false) {check_and_create_promise(need_promise);}
 	obj_with_begin_time_promise(T& obj, bool need_promise = false) : super(obj) {check_and_create_promise(need_promise);}
 	obj_with_begin_time_promise(const T& obj, bool need_promise = false) : super(obj) {check_and_create_promise(need_promise);}
+	obj_with_begin_time_promise(const obj_with_begin_time_promise& other) : super(other), p(other.p) {}
+	obj_with_begin_time_promise(obj_with_begin_time_promise& other) : super(other) {p.swap(other.p);}
+	obj_with_begin_time_promise& operator=(const obj_with_begin_time_promise& other) {super::operator=(other); p = other.p; return *this;}
+	obj_with_begin_time_promise& operator=(obj_with_begin_time_promise& other) {clear(); swap(other); return *this;}
 
 	void swap(T& obj, bool need_promise = false) {super::swap(obj); check_and_create_promise(need_promise);}
 	void swap(obj_with_begin_time_promise& other) {super::swap(other); p.swap(other.p);}
 
-	void clear() {p.reset(); T::clear();}
+	void clear() {super::clear(); p.reset();}
 	void check_and_create_promise(bool need_promise) {if (!need_promise) p.reset(); else if (!p) p = boost::make_shared<boost::promise<sync_call_result> >();}
 
 	boost::shared_ptr<boost::promise<sync_call_result> > p;

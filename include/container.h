@@ -50,6 +50,7 @@ private:
 // clear
 // swap
 // emplace_back(typename Container::const_reference item)
+// emplace_back(typename Container::reference item)
 // emplace_back(), must return the reference of the new item
 // splice(iter, Container&)
 // splice(iter, Container&, iter, iter)
@@ -118,7 +119,7 @@ public:
 		try
 		{
 			size_t s = item.size();
-			ST_THIS emplace_back().swap(item);
+			ST_THIS emplace_back(item);
 			buff_size += s;
 		}
 		catch (const std::exception& e)
