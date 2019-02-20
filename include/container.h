@@ -85,7 +85,7 @@ public:
 
 	size_t get_size_in_byte() {typename Lockable::lock_guard lock(*this); return get_size_in_byte_();}
 
-	bool enqueue(const_reference item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
+	template<typename T> bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	template<typename T> bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	void move_items_in(Container& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
 	bool try_dequeue(reference item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
@@ -96,7 +96,7 @@ public:
 	//thread safe
 
 	//not thread safe
-	bool enqueue_(const_reference item)
+	template<typename T> bool enqueue_(const T& item)
 	{
 		try
 		{
@@ -117,7 +117,7 @@ public:
 		try
 		{
 			size_t s = item.size();
-			ST_THIS emplace_back().swap(item); //old boost (at least 1.49) needs this, with newer boost (but I don't know which edition exactly), it can be emplace_back(item)
+			ST_THIS emplace_back().swap(item); //with c++0x, this can be emplace_back(item)
 			buff_size += s;
 		}
 		catch (const std::exception& e)

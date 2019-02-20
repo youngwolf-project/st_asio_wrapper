@@ -423,12 +423,8 @@ protected:
 	{
 		if (msg.empty())
 			unified_out::error_out("found an empty message, please check your packer.");
-		else
-		{
-			in_msg unused(msg);
-			if (send_msg_buffer.enqueue(unused) && !sending && is_ready())
-				send_msg();
-		}
+		else if (send_msg_buffer.enqueue(msg) && !sending && is_ready())
+			send_msg();
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
 		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
@@ -456,7 +452,7 @@ protected:
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();
-			temp_buffer.emplace_back().swap(*iter); //old boost (at least 1.49) needs this, with newer boost (but I don't know which edition exactly), it can be emplace_back(*iter)
+			temp_buffer.emplace_back().swap(*iter); //with c++0x, this can be emplace_back(*iter)
 		}
 		send_msg_buffer.move_items_in(temp_buffer, size_in_byte);
 		if (!sending && is_ready())
@@ -528,7 +524,7 @@ protected:
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();
-			temp_buffer.emplace_back().swap(*iter); //old boost (at least 1.49) needs this, with newer boost (but I don't know which edition exactly), it can be emplace_back(*iter)
+			temp_buffer.emplace_back().swap(*iter); //with c++0x, this can be emplace_back(*iter)
 		}
 
 		temp_buffer.back().check_and_create_promise(true);
