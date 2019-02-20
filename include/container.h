@@ -49,7 +49,6 @@ private:
 // empty
 // clear
 // swap
-// emplace_back(typename Container::const_reference item), if you call direct_(sync_)send_msg which accepts const InMsgType&
 // emplace_back(), must return the reference of the new item
 // splice(iter, Container&)
 // splice(iter, Container&, iter, iter)
@@ -118,7 +117,7 @@ public:
 		try
 		{
 			size_t s = item.size();
-			ST_THIS emplace_back().swap(item);
+			ST_THIS emplace_back().swap(item); //old boost (at least 1.49) needs this, with newer boost (but I don't know which edition exactly), it can be emplace_back(item)
 			buff_size += s;
 		}
 		catch (const std::exception& e)

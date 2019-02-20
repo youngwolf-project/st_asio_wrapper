@@ -456,8 +456,7 @@ protected:
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();
-			in_msg unused(*iter);
-			temp_buffer.emplace_back(unused);
+			temp_buffer.emplace_back().swap(*iter); //old boost (at least 1.49) needs this, with newer boost (but I don't know which edition exactly), it can be emplace_back(*iter)
 		}
 		send_msg_buffer.move_items_in(temp_buffer, size_in_byte);
 		if (!sending && is_ready())
@@ -529,8 +528,7 @@ protected:
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 		{
 			size_in_byte += iter->size();
-			in_msg unused(*iter);
-			temp_buffer.emplace_back(unused);
+			temp_buffer.emplace_back().swap(*iter); //old boost (at least 1.49) needs this, with newer boost (but I don't know which edition exactly), it can be emplace_back(*iter)
 		}
 
 		temp_buffer.back().check_and_create_promise(true);
