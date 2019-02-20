@@ -50,7 +50,6 @@ private:
 // clear
 // swap
 // emplace_back(typename Container::const_reference item), if you call direct_(sync_)send_msg which accepts const InMsgType&
-// emplace_back(typename Container::reference item)
 // emplace_back(), must return the reference of the new item
 // splice(iter, Container&)
 // splice(iter, Container&, iter, iter)
@@ -88,7 +87,7 @@ public:
 	size_t get_size_in_byte() {typename Lockable::lock_guard lock(*this); return get_size_in_byte_();}
 
 	bool enqueue(const_reference item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
-	bool enqueue(reference item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
+	template<typename T> bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	void move_items_in(Container& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
 	bool try_dequeue(reference item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
 	void move_items_out(Container& dest, size_t max_item_num = -1) {typename Lockable::lock_guard lock(*this); move_items_out_(dest, max_item_num);}
@@ -114,12 +113,12 @@ public:
 		return true;
 	}
 
-	bool enqueue_(reference item) //after this, item will becomes empty, please note.
+	template<typename T> bool enqueue_(T& item) //after this, item will becomes empty, please note.
 	{
 		try
 		{
 			size_t s = item.size();
-			ST_THIS emplace_back(item);
+			ST_THIS emplace_back().swap(item);
 			buff_size += s;
 		}
 		catch (const std::exception& e)

@@ -440,12 +440,8 @@ protected:
 	{
 		if (msg.empty())
 			unified_out::error_out("found an empty message, please check your packer.");
-		else
-		{
-			in_msg unused(msg);
-			if (send_msg_buffer.enqueue(unused) && !sending && is_ready())
-				send_msg();
-		}
+		else if (send_msg_buffer.enqueue(msg) && !sending && is_ready())
+			send_msg();
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
 		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
