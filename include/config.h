@@ -549,6 +549,7 @@
  * statistic.send_msg_sum may be bigger than before (but statistic.send_byte_sum will be the same), see ENHANCEMENTS section for more details.
  * Use st_asio_wrapper::list instead of boost::container::list, the former guarantee that emplace_back() function always return the reference of
  *  the newly added item.
+ * Virtual function on_create has been moved from object_pool to st_asio_wrapper::socket.
  *
  * HIGHLIGHT:
  * Make client_socket_base be able to call multi_client_base (via i_matrix) like server_socket_base call server_base (via i_server),
@@ -571,6 +572,10 @@
  * Control send and recv buffer accurately rather than just message number before, see macro ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF for more details.
  * direct_send_msg and direct_sync_send_msg support batch operation.
  * Introduce virtual function type_name() and type_id() to st_asio_wrapper::socket, they can identify whether a given two st_asio_wrapper::socket has the same type.
+ * force_shutdown and graceful_shutdown support reconnecting even if the link has broken.
+ * Virtual function on_create has been moved from object_pool to st_asio_wrapper::socket, if you want to do some initialization for this socket, do it in on_create
+ *  rather than the constructor, this is because if this socket is reused from the object pool, its constructor will not be called.
+ *  for tcp::single_client_base, ssl::single_client_base and udp::single_service_base, this virtual function will never be called, please note.
  *
  * DELETION:
  *
