@@ -60,10 +60,13 @@ public:
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false)
 	{
-		if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
+		need_reconnect = reconnect;
+
+		f (!ST_THIS started() && reconnect)
+			return ST_THIS start();
+		else if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
 			ST_THIS show_info("client link:", "been shut down.");
 
-		need_reconnect = reconnect;
 		super::force_shutdown();
 	}
 
@@ -73,12 +76,15 @@ public:
 	//this function is not thread safe, please note.
 	void graceful_shutdown(bool reconnect = false, bool sync = true)
 	{
-		if (ST_THIS is_broken())
+		need_reconnect = reconnect;
+
+		f (!ST_THIS started() && reconnect)
+			return ST_THIS start();
+		else if (ST_THIS is_broken())
 			return force_shutdown(reconnect);
 		else if (!ST_THIS is_shutting_down())
 			ST_THIS show_info("client link:", "being shut down gracefully.");
 
-		need_reconnect = reconnect;
 		super::graceful_shutdown(sync);
 	}
 
