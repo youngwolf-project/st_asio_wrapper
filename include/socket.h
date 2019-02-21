@@ -264,7 +264,7 @@ protected:
 	//if you want to do some initialization for this socket, do it at here rather than the constructor,
 	// this is because if this socket is reused from the object pool, the constructor will not be called.
 	//for tcp::single_client_base, ssl::single_client_base and udp::single_service_base, this virtual function will never be called, please note.
-	virtual void on_create(object_ctype& object_ptr) {}
+	virtual void on_create() {}
 
 	virtual bool do_start()
 	{
