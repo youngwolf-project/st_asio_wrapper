@@ -62,7 +62,7 @@ public:
 	{
 		need_reconnect = reconnect;
 
-		f (!ST_THIS started() && reconnect)
+		if (!ST_THIS started() && reconnect)
 			return ST_THIS start();
 		else if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
 			ST_THIS show_info("client link:", "been shut down.");
@@ -78,7 +78,7 @@ public:
 	{
 		need_reconnect = reconnect;
 
-		f (!ST_THIS started() && reconnect)
+		if (!ST_THIS started() && reconnect)
 			return ST_THIS start();
 		else if (ST_THIS is_broken())
 			return force_shutdown(reconnect);
