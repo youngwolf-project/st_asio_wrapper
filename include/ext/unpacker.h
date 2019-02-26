@@ -211,7 +211,7 @@ protected:
 
 //protocol: length + body
 //let asio write msg directly (no temporary memory needed), not support unstripped messages, please note (you can fix this defect if you like).
-//acctually, this unpacker has the worst performance, because it needs 2 read for one message, other unpackers are able to get many messages from just one read.
+//actually, this unpacker has the worst performance, because it needs 2 read for one message, other unpackers are able to get many messages from just one read.
 //so this unpacker just demonstrates a way to avoid memory replications and temporary memory utilization, it can provide better performance for huge messages.
 class non_copy_unpacker : public i_unpacker<basic_buffer>
 {
@@ -290,7 +290,7 @@ private:
 };
 
 //protocol: fixed length
-//non-copy, let asio write msg directly (no temporary memory needed), acctually, this unpacker has poor performance, because it needs one read for one message, other unpackers
+//non-copy, let asio write msg directly (no temporary memory needed), actually, this unpacker has poor performance, because it needs one read for one message, other unpackers
 //are able to get many messages from just one read, so this unpacker just demonstrates a way to avoid memory replications and temporary memory utilization, it can provide better
 //performance for huge messages.
 class fixed_length_unpacker : public i_unpacker<basic_buffer>

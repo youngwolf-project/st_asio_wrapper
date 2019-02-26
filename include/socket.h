@@ -261,11 +261,6 @@ public:
 	POP_ALL_PENDING_MSG(pop_all_pending_recv_msg, recv_msg_buffer, out_container_type)
 
 protected:
-	//if you want to do some initialization for this socket, do it at here rather than the constructor,
-	// this is because if this socket is reused from the object pool, its constructor will not be called.
-	//for tcp::single_client_base, ssl::single_client_base and udp::single_service_base, this virtual function will never be called, please note.
-	virtual void on_create() {}
-
 	virtual bool do_start()
 	{
 		stat.last_recv_time = time(NULL);

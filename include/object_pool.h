@@ -80,12 +80,15 @@ protected:
 		return exist;
 	}
 
+	//you can do some statistic about object creations at here
+	virtual void on_create(object_ctype& object_ptr) {}
+
 	void init_object(object_ctype& object_ptr)
 	{
 		if (object_ptr)
 		{
 			object_ptr->id(1 + cur_id.fetch_add(1, boost::memory_order_relaxed));
-			object_ptr->on_create();
+			on_create(object_ptr);
 		}
 		else
 			unified_out::error_out("create object failed!");

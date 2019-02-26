@@ -47,7 +47,9 @@ public:
 
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
 	//subclass must re-write this function to initialize itself, and then do not forget to invoke superclass' reset function too
-	//notice, when reusing this socket, object_pool will invoke this function
+	//notice, when reusing this socket, object_pool will invoke this function, so if you want to do some additional initialization
+	// for this socket, do it at here and in the constructor.
+	//for udp::single_service_base, this virtual function will never be called, please note.
 	virtual void reset()
 	{
 		has_bound = false;
