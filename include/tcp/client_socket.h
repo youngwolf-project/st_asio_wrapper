@@ -39,11 +39,6 @@ public:
 	virtual const char* type_name() const {return "TCP (client endpoint)";}
 	virtual int type_id() const {return 1;}
 
-	//reset all, be ensure that there's no any operations performed on this socket when invoke it
-	//subclass must re-write this function to initialize itself, and then do not forget to invoke superclass' reset function too
-	//notice, when reusing this socket, object_pool will invoke this function, so if you want to do some additional initialization
-	// for this socket, do it at here and in the constructor.
-	//for tcp::single_client_base and ssl::single_client_base, this virtual function will never be called, please note.
 	virtual void reset() {need_reconnect = ST_ASIO_RECONNECT; super::reset();}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip);}

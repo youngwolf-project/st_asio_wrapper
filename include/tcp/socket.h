@@ -55,8 +55,12 @@ public:
 		do_direct_send_msg(msg);
 	}
 
-	//reset all, be ensure that there's no any operations performed on this tcp::socket_base when invoke it
-	void reset() {status = BROKEN; last_send_msg.clear(); unpacker_->reset(); super::reset();}
+	//reset all, be ensure that there's no any operations performed on this socket when invoke it
+	//subclass must re-write this function to initialize itself, and then do not forget to invoke superclass' reset function too
+	//notice, when reusing this socket, object_pool will invoke this function, so if you want to do some additional initialization
+	// for this socket, do it at here and in the constructor.
+	//for tcp::single_client_base and ssl::single_client_base, this virtual function will never be called, please note.
+	virtual void reset() {status = BROKEN; last_send_msg.clear(); unpacker_->reset(); super::reset();}
 
 	//SOCKET status
 	bool is_broken() const {return BROKEN == status;}
