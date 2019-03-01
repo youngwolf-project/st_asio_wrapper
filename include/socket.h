@@ -196,11 +196,11 @@ public:
 
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is overflow or not,
 	//this can exhaust all virtual memory, please pay special attentions.
-	bool is_send_buffer_available() const {return send_msg_buffer.size() < ST_ASIO_MAX_SEND_BUF;}
+	bool is_send_buffer_available() const {return send_msg_buffer.size_in_byte() < ST_ASIO_MAX_SEND_BUF;}
 
 	//if you define macro ST_ASIO_PASSIVE_RECV and call recv_msg greedily, the receiving buffer may overflow, this can exhaust all virtual memory,
 	//to avoid this problem, call recv_msg only if is_recv_buffer_available() returns true.
-	bool is_recv_buffer_available() const {return recv_msg_buffer.size() < ST_ASIO_MAX_RECV_BUF;}
+	bool is_recv_buffer_available() const {return recv_msg_buffer.size_in_byte() < ST_ASIO_MAX_RECV_BUF;}
 
 	//don't use the packer but insert into send buffer directly
 	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false)
@@ -390,13 +390,12 @@ protected:
 #ifdef ST_ASIO_SYNC_DISPATCH
 #ifndef ST_ASIO_PASSIVE_RECV
 		if (msg_num > 0)
-		{
 #endif
+		{
+			auto_duration dur(stat.handle_time_sum);
 			on_msg(temp_msg_can);
 			msg_num = temp_msg_can.size();
-#ifndef ST_ASIO_PASSIVE_RECV
 		}
-#endif
 #elif defined(ST_ASIO_PASSIVE_RECV)
 		if (0 == msg_num)
 		{

@@ -45,8 +45,8 @@ private:
 
 //Container must at least has the following functions (like boost::container::list):
 // Container() and Container(size_t) constructor
-// size
-// empty
+// size, must be thread safe, but doesn't have to be consistent
+// empty, must be thread safe, but doesn't have to be consistent
 // clear
 // swap
 // emplace_back(), must return the reference of the new item
@@ -71,8 +71,9 @@ public:
 
 	//thread safe
 	bool is_thread_safe() const {return Lockable::is_lockable();}
-	size_t size() const {return buff_size;} //must be thread safe, but doesn't have to be consistent
-	bool empty() const {return 0 == size();} //must be thread safe, but doesn't have to be consistent
+	size_t size_in_byte() const {return buff_size;}
+	size_t size() const {return Container::size();}
+	bool empty() const {return Container::empty();}
 	void clear() {typename Lockable::lock_guard lock(*this); Container::clear(); buff_size = 0;}
 	void swap(Container& can)
 	{
@@ -82,8 +83,6 @@ public:
 		Container::swap(can);
 		buff_size = size_in_byte;
 	}
-
-	size_t get_size_in_byte() {typename Lockable::lock_guard lock(*this); return get_size_in_byte_();}
 
 	template<typename T> bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
 	template<typename T> bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
@@ -197,13 +196,6 @@ public:
 	void do_something_to_one_(const _Predicate& __pred) {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) if (__pred(*iter)) break;}
 	template<typename _Predicate>
 	void do_something_to_one_(const _Predicate& __pred) const {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) if (__pred(*iter)) break;}
-
-	size_t get_size_in_byte_() const
-	{
-		size_t size_in_byte = 0;
-		do_something_to_all_(size_in_byte += boost::lambda::bind(&Container::value_type::size, boost::lambda::_1));
-		return size_in_byte;
-	}
 	//not thread safe
 
 private:
