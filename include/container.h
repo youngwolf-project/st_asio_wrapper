@@ -65,6 +65,8 @@ public:
 	typedef typename Container::size_type size_type;
 	typedef typename Container::reference reference;
 	typedef typename Container::const_reference const_reference;
+	using Container::size;
+	using Container::empty;
 
 	queue() : buff_size(0) {}
 	queue(size_t capacity) : Container(capacity), buff_size(0) {}
@@ -72,8 +74,6 @@ public:
 	//thread safe
 	bool is_thread_safe() const {return Lockable::is_lockable();}
 	size_t size_in_byte() const {return buff_size;}
-	size_t size() const {return Container::size();}
-	bool empty() const {return Container::empty();}
 	void clear() {typename Lockable::lock_guard lock(*this); Container::clear(); buff_size = 0;}
 	void swap(Container& can)
 	{

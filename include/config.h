@@ -539,7 +539,7 @@
  * REPLACEMENTS:
  *
  * ===============================================================
- * 2019.3.x		version 2.2.0
+ * 2019.3.3		version 2.2.0
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Socket used by tcp::multi_client_base, ssl::multi_client_base and udp::multi_socket_service needs to provide a constructor which accept
