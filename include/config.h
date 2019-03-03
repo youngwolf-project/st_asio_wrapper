@@ -574,7 +574,6 @@
  * direct_send_msg and direct_sync_send_msg support batch operation.
  * Introduce virtual function type_name() and type_id() to st_asio_wrapper::socket, they can identify whether a given two st_asio_wrapper::socket has the same type.
  * force_shutdown and graceful_shutdown support reconnecting even if the link has broken.
- *  for tcp::single_client_base, ssl::single_client_base and udp::single_service_base, this virtual function will never be called, please note.
  *
  * DELETION:
  *
