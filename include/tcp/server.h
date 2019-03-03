@@ -54,8 +54,11 @@ public:
 	const boost::asio::ip::tcp::acceptor& next_layer() const {return acceptor;}
 
 	//implement i_server's pure virtual functions
+	virtual bool started() const {return ST_THIS is_started();}
 	virtual service_pump& get_service_pump() {return Pool::get_service_pump();}
 	virtual const service_pump& get_service_pump() const {return Pool::get_service_pump();}
+	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return ST_THIS find(id);}
+
 	virtual bool del_socket(const boost::shared_ptr<tracked_executor>& socket_ptr)
 	{
 		BOOST_AUTO(raw_socket_ptr, boost::dynamic_pointer_cast<Socket>(socket_ptr));
@@ -88,7 +91,6 @@ public:
 
 		return false;
 	}
-	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return ST_THIS find(id);}
 
 	///////////////////////////////////////////////////
 	//msg sending interface
@@ -126,11 +128,11 @@ protected:
 		if (num <= 0)
 			num = 16;
 
-		std::list<typename Pool::object_type> sockets;
+		boost::container::list<typename Pool::object_type> sockets;
 		unified_out::info_out("begin to pre-create %d server socket...", num);
 		while (--num >= 0)
 		{
-			BOOST_AUTO(socket_ptr, ST_THIS create_object(boost::ref(*this)));
+			BOOST_AUTO(socket_ptr, create_object());
 			if (!socket_ptr)
 				break;
 
@@ -156,7 +158,7 @@ protected:
 	virtual void uninit() {ST_THIS stop(); stop_listen(); force_shutdown();} //if you wanna graceful shutdown, call graceful_shutdown before service_pump::stop_service invocation.
 
 	virtual bool on_accept(typename Pool::object_ctype& socket_ptr) {return true;}
-	virtual void start_next_accept() {do_async_accept(ST_THIS create_object(boost::ref(*this)));}
+	virtual void start_next_accept() {do_async_accept(create_object());}
 
 	//if you want to ignore this error and continue to accept new connections immediately, return true in this virtual function;
 	//if you want to ignore this error and continue to accept new connections after a specific delay, start a timer immediately and return false (don't call stop_listen()),
@@ -174,6 +176,9 @@ protected:
 	}
 
 protected:
+	typename Pool::object_type create_object() {return Pool::create_object(boost::ref(*this));}
+	template<typename Arg> typename Pool::object_type create_object(Arg& arg) {return Pool::create_object(boost::ref(*this), arg);}
+
 	bool add_socket(typename Pool::object_ctype& socket_ptr)
 	{
 		if (ST_THIS add_object(socket_ptr))

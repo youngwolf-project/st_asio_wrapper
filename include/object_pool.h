@@ -57,7 +57,7 @@ protected:
 			return false;
 		assert(!object_ptr->is_equal_to(-1));
 
-		boost::lock_guard<boost::mutex> lock(object_can_mutex);
+		boost::lock_guard<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		return object_can.size() < max_size_ ? object_can.emplace(object_ptr->id(), object_ptr).second : false;
 	}
 
@@ -67,7 +67,7 @@ protected:
 	{
 		assert(object_ptr);
 
-		boost::unique_lock<boost::mutex> lock(object_can_mutex);
+		boost::unique_lock<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		bool exist = object_can.erase(object_ptr->id()) > 0;
 		lock.unlock();
 
@@ -80,6 +80,7 @@ protected:
 		return exist;
 	}
 
+	//you can do some statistic about object creations at here
 	virtual void on_create(object_ctype& object_ptr) {}
 
 	void init_object(object_ctype& object_ptr)
@@ -108,7 +109,7 @@ protected:
 		{
 			assert(!find(id));
 
-			boost::lock_guard<boost::mutex> lock(object_can_mutex);
+			boost::lock_guard<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 			object_can.erase(object_ptr->id());
 			object_ptr->id(id);
 			object_can.emplace(id, object_ptr); //must succeed
@@ -148,8 +149,6 @@ return object_ptr;
 	template<typename Arg1, typename Arg2> object_type create_object(Arg1& arg1, Arg2& arg2) {CREATE_OBJECT_2_ARG(object_type);}
 #endif
 
-	object_type create_object() {return create_object(boost::ref(get_service_pump()));}
-
 public:
 	//to configure unordered_set(for example, set factor or reserved size), not thread safe, so must be called before service_pump startup.
 	container_type& container() {return object_can;}
@@ -159,13 +158,13 @@ public:
 
 	size_t size()
 	{
-		boost::lock_guard<boost::mutex> lock(object_can_mutex);
+		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		return object_can.size();
 	}
 
 	object_type find(boost::uint_fast64_t id)
 	{
-		boost::lock_guard<boost::mutex> lock(object_can_mutex);
+		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		BOOST_AUTO(iter, object_can.find(id));
 		return iter != object_can.end() ? iter->second : object_type();
 	}
@@ -173,7 +172,7 @@ public:
 	//this method has linear complexity, please note.
 	object_type at(size_t index)
 	{
-		boost::lock_guard<boost::mutex> lock(object_can_mutex);
+		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		assert(index < object_can.size());
 		return index < object_can.size() ? boost::next(object_can.begin(), index)->second : object_type();
 	}
@@ -237,7 +236,7 @@ public:
 	{
 		BOOST_TYPEOF(invalid_object_can) objects;
 
-		boost::unique_lock<boost::mutex> lock(object_can_mutex);
+		boost::unique_lock<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
 			if (iter->second->obsoleted())
 			{
@@ -301,16 +300,21 @@ public:
 	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred)
-		{boost::lock_guard<boost::mutex> lock(object_can_mutex); for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter) __pred(iter->second);}
+		{ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex); for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter) __pred(iter->second);}
 
 	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred)
-		{boost::lock_guard<boost::mutex> lock(object_can_mutex); for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter) if (__pred(iter->second)) break;}
+	{
+		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
+		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter)
+			if (__pred(iter->second))
+				break;
+	}
 
 private:
 	atomic_uint_fast64 cur_id;
 
 	container_type object_can;
-	boost::mutex object_can_mutex;
+	ST_ASIO_SHARED_MUTEX_TYPE object_can_mutex;
 	size_t max_size_;
 
 	//because all objects are dynamic created and stored in object_can, after receiving error occurred (you are recommended to delete the object from object_can,

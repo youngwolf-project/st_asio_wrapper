@@ -23,19 +23,22 @@ public:
 	single_service_base(service_pump& service_pump_) : single_socket_service<Socket>(service_pump_) {}
 };
 
-template<typename Socket, typename Pool = object_pool<Socket> >
-class multi_service_base : public multi_socket_service<Socket, Pool>
+template<typename Socket, typename Pool = object_pool<Socket>, typename Matrix = i_matrix>
+class multi_service_base : public multi_socket_service<Socket, Pool, Matrix>
 {
 private:
-	typedef multi_socket_service<Socket, Pool> super;
+	typedef multi_socket_service<Socket, Pool, Matrix> super;
 
 public:
 	multi_service_base(service_pump& service_pump_) : super(service_pump_) {}
 
+	typename Pool::object_type create_object() {return Pool::create_object(boost::ref(*this));}
+	template<typename Arg> typename Pool::object_type create_object(Arg& arg) {return Pool::create_object(boost::ref(*this), arg);}
+
 	using super::add_socket;
 	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = std::string())
 	{
-		BOOST_AUTO(socket_ptr, ST_THIS create_object());
+		BOOST_AUTO(socket_ptr, create_object());
 		if (!socket_ptr)
 			return socket_ptr;
 
@@ -44,7 +47,7 @@ public:
 	}
 	typename Pool::object_type add_socket(unsigned short port, unsigned short peer_port, const std::string& ip = std::string(), const std::string& peer_ip = std::string())
 	{
-		BOOST_AUTO(socket_ptr, ST_THIS create_object());
+		BOOST_AUTO(socket_ptr, create_object());
 		if (!socket_ptr)
 			return socket_ptr;
 

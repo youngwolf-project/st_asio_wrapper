@@ -6,8 +6,29 @@
 #define ST_ASIO_REUSE_OBJECT		//use objects pool
 #define ST_ASIO_HEARTBEAT_INTERVAL	5
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
-#define ST_ASIO_DEFAULT_PACKER		prefix_suffix_packer
-#define ST_ASIO_DEFAULT_UNPACKER	prefix_suffix_unpacker
+#define ST_ASIO_RECONNECT			false
+#define ST_ASIO_SHARED_MUTEX_TYPE	boost::shared_mutex	//we search objects frequently, defining this can promote performance, otherwise,
+#define ST_ASIO_SHARED_LOCK_TYPE	boost::shared_lock	//you should not define these two macro and st_asio_wrapper will use boost::mutex instead.
+
+//use the following macro to control the type of packer and unpacker
+#define PACKER_UNPACKER_TYPE	0
+//0-default packer and unpacker, head(length) + body
+//1-replaceable packer and unpacker, head(length) + body
+//2-fixed length packer and unpacker
+//3-prefix and/or suffix packer and unpacker
+
+#if 1 == PACKER_UNPACKER_TYPE
+#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
+#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
+#elif 2 == PACKER_UNPACKER_TYPE
+#undef ST_ASIO_HEARTBEAT_INTERVAL
+#define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat
+#define ST_ASIO_DEFAULT_PACKER fixed_length_packer
+#define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
+#elif 3 == PACKER_UNPACKER_TYPE
+#define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
+#define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
+#endif
 //configuration
 
 #include "../include/ext/tcp.h"
@@ -18,51 +39,6 @@ using namespace st_asio_wrapper::ext::tcp;
 
 #include "server.h"
 #include "client.h"
-
-static std::map<std::string, boost::uint_fast64_t> link_map;
-static boost::mutex link_map_mutex;
-
-bool add_link(const std::string& name, boost::uint_fast64_t id)
-{
-	boost::lock_guard<boost::mutex> lock(link_map_mutex);
-	if (link_map.count(name) > 0)
-	{
-		printf("%s already exists.\n", name.data());
-		return false;
-	}
-
-	printf("add socket %s.\n", name.data());
-	link_map[name] = id;
-	return true;
-}
-
-bool del_link(const std::string& name)
-{
-	boost::lock_guard<boost::mutex> lock(link_map_mutex);
-	return link_map.erase(name) > 0;
-}
-
-boost::uint_fast64_t find_link(const std::string& name)
-{
-	boost::lock_guard<boost::mutex> lock(link_map_mutex);
-	BOOST_AUTO(iter, link_map.find(name));
-	return iter != link_map.end() ? iter->second : -1;
-}
-
-boost::uint_fast64_t find_and_del_link(const std::string& name)
-{
-	boost::uint_fast64_t id = -1;
-
-	boost::lock_guard<boost::mutex> lock(link_map_mutex);
-	BOOST_AUTO(iter, link_map.find(name));
-	if (iter != link_map.end())
-	{
-		id = iter->second;
-		link_map.erase(iter);
-	}
-
-	return id;
-}
 
 int main(int argc, const char* argv[])
 {
@@ -88,22 +64,23 @@ int main(int argc, const char* argv[])
 				continue;
 
 			if ("add" == *iter)
-			{
-				++iter;
-				if (iter != tok.end())
+				for (++iter; iter != tok.end(); ++iter)
 					client.add_link(*iter);
-			}
 			else if ("del" == *iter)
-			{
-				++iter;
-				if (iter != tok.end())
-					client.del_link(*iter);
-			}
+				for (++iter; iter != tok.end(); ++iter)
+					client.shutdown_link(*iter);
 			else
 			{
 				std::string name = *iter++;
 				for (; iter != tok.end(); ++iter)
+#if 2 == PACKER_UNPACKER_TYPE
+				{
+					std::string msg(1024, '$'); //the default fixed length is 1024
+					client.send_msg(name, msg);
+				}
+#else
 					client.send_msg(name, *iter);
+#endif
 			}
 		}
 	}

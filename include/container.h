@@ -18,9 +18,6 @@
 namespace st_asio_wrapper
 {
 
-//st_asio_wrapper requires that container must take one and only one template argument.
-template<typename T> class list : public boost::container::list<T> {};
-
 class dummy_lockable
 {
 public:
@@ -46,64 +43,177 @@ private:
 	boost::mutex mutex; //boost::mutex is more efficient than boost::shared_mutex
 };
 
-//Container must at least has the following functions (like list):
+//Container must at least has the following functions (like boost::container::list):
 // Container() and Container(size_t) constructor
-// size (must be thread safe, but doesn't have to be consistent, std::list before gcc 5 doesn't meet this requirement, boost::container::list does)
-// empty (must be thread safe, but doesn't have to be consistent)
+// size, must be thread safe, but doesn't have to be consistent
+// empty, must be thread safe, but doesn't have to be consistent
 // clear
 // swap
-// emplace_back(const T& item)
-// emplace_back()
-// splice(decltype(Container::end()), boost::container::list<T>&), after this, boost::container::list<T> must be empty
+// emplace_back(), must return the reference of the new item
+// splice(iter, Container&)
+// splice(iter, Container&, iter, iter)
 // front
-// back
 // pop_front
+// back
+// begin
 // end
-template<typename T, typename Container, typename Lockable> //thread safety depends on Container or Lockable
-#ifdef ST_ASIO_DISPATCH_BATCH_MSG
-class queue : public Container, public Lockable
-#else
-class queue : protected Container, public Lockable
-#endif
+template<typename Container, typename Lockable> //thread safety depends on Container or Lockable
+class queue : private Container, public Lockable
 {
 public:
-	typedef T data_type;
-
-	queue() {}
-	queue(size_t capacity) : Container(capacity) {}
-
-	bool is_thread_safe() const {return Lockable::is_lockable();}
+	typedef typename Container::value_type value_type;
+	typedef typename Container::size_type size_type;
+	typedef typename Container::reference reference;
+	typedef typename Container::const_reference const_reference;
 	using Container::size;
 	using Container::empty;
-	void clear() {typename Lockable::lock_guard lock(*this); Container::clear();}
-	void swap(Container& other) {typename Lockable::lock_guard lock(*this); Container::swap(other);}
+
+	queue() : buff_size(0) {}
+	queue(size_t capacity) : Container(capacity), buff_size(0) {}
 
 	//thread safe
-	bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
-	bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
-	void move_items_in(boost::container::list<T>& can) {typename Lockable::lock_guard lock(*this); move_items_in_(can);}
-	bool try_dequeue(T& item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
+	bool is_thread_safe() const {return Lockable::is_lockable();}
+	size_t size_in_byte() const {return buff_size;}
+	void clear() {typename Lockable::lock_guard lock(*this); Container::clear(); buff_size = 0;}
+	void swap(Container& can)
+	{
+		size_t size_in_byte = st_asio_wrapper::get_size_in_byte(can);
+
+		typename Lockable::lock_guard lock(*this);
+		Container::swap(can);
+		buff_size = size_in_byte;
+	}
+
+	template<typename T> bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
+	template<typename T> bool enqueue(T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
+	void move_items_in(Container& src, size_t size_in_byte = 0) {typename Lockable::lock_guard lock(*this); move_items_in_(src, size_in_byte);}
+	bool try_dequeue(reference item) {typename Lockable::lock_guard lock(*this); return try_dequeue_(item);}
+	void move_items_out(Container& dest, size_t max_item_num = -1) {typename Lockable::lock_guard lock(*this); move_items_out_(dest, max_item_num);}
+	void move_items_out(size_t max_size_in_byte, Container& dest) {typename Lockable::lock_guard lock(*this); move_items_out_(max_size_in_byte, dest);}
+	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred) {typename Lockable::lock_guard lock(*this); do_something_to_all_(__pred);}
+	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred) {typename Lockable::lock_guard lock(*this); do_something_to_one_(__pred);}
+	//thread safe
 
 	//not thread safe
-	bool enqueue_(const T& item)
-		{try {ST_THIS emplace_back(item);} catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what()); return false;} return true;}
-	bool enqueue_(T& item) //after this, item will becomes empty, please note.
-		{try {ST_THIS emplace_back();} catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what()); return false;} ST_THIS back().swap(item); return true;}
-	void move_items_in_(boost::container::list<T>& can) {ST_THIS splice(ST_THIS end(), can);}
-	bool try_dequeue_(T& item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); return true;}
+	template<typename T> bool enqueue_(const T& item)
+	{
+		try
+		{
+			ST_THIS emplace_back(item);
+			buff_size += item.size();
+		}
+		catch (const std::exception& e)
+		{
+			unified_out::error_out("cannot hold more objects (%s)", e.what());
+			return false;
+		}
+
+		return true;
+	}
+
+	template<typename T> bool enqueue_(T& item) //after this, item will becomes empty, please note.
+	{
+		try
+		{
+			size_t s = item.size();
+			ST_THIS emplace_back().swap(item); //with c++0x, this can be emplace_back(item)
+			buff_size += s;
+		}
+		catch (const std::exception& e)
+		{
+			unified_out::error_out("cannot hold more objects (%s)", e.what());
+			return false;
+		}
+
+		return true;
+	}
+
+	void move_items_in_(Container& src, size_t size_in_byte = 0)
+	{
+		if (0 == size_in_byte)
+			size_in_byte = st_asio_wrapper::get_size_in_byte(src);
+
+		ST_THIS splice(ST_THIS end(), src);
+		buff_size += size_in_byte;
+	}
+
+	bool try_dequeue_(reference item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); buff_size -= item.size(); return true;}
+
+	void move_items_out_(Container& dest, size_t max_item_num = -1)
+	{
+		if ((size_t) -1 == max_item_num)
+		{
+			dest.splice(dest.end(), *this);
+			buff_size = 0;
+		}
+		else if (max_item_num > 0)
+		{
+			size_t s = 0, index = 0;
+			BOOST_AUTO(end_iter, ST_THIS begin());
+			for (; end_iter != ST_THIS end() && index++ < max_item_num; ++end_iter)
+				s += end_iter->size();
+
+			if (end_iter == ST_THIS end())
+				dest.splice(dest.end(), *this);
+			else
+				dest.splice(dest.end(), *this, ST_THIS begin(), end_iter);
+			buff_size -= s;
+		}
+	}
+
+	void move_items_out_(size_t max_size_in_byte, Container& dest)
+	{
+		if ((size_t) -1 == max_size_in_byte)
+		{
+			dest.splice(dest.end(), *this);
+			buff_size = 0;
+		}
+		else
+		{
+			size_t s = 0;
+			BOOST_AUTO(end_iter, ST_THIS begin());
+			while (end_iter != ST_THIS end())
+			{
+				s += end_iter++->size();
+				if (s >= max_size_in_byte)
+					break;
+			}
+
+			if (end_iter == ST_THIS end())
+				dest.splice(dest.end(), *this);
+			else
+				dest.splice(dest.end(), *this, ST_THIS begin(), end_iter);
+			buff_size -= s;
+		}
+	}
+
+	template<typename _Predicate>
+	void do_something_to_all_(const _Predicate& __pred) {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) __pred(*iter);}
+	template<typename _Predicate>
+	void do_something_to_all_(const _Predicate& __pred) const {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) __pred(*iter);}
+
+	template<typename _Predicate>
+	void do_something_to_one_(const _Predicate& __pred) {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) if (__pred(*iter)) break;}
+	template<typename _Predicate>
+	void do_something_to_one_(const _Predicate& __pred) const {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) if (__pred(*iter)) break;}
+	//not thread safe
+
+private:
+	size_t buff_size; //in use
 };
 
-template<typename T, typename Container> class non_lock_queue : public queue<T, Container, dummy_lockable> //thread safety depends on Container
+//st_asio_wrapper requires that queue must take one and only one template argument
+template<typename Container> class non_lock_queue : public queue<Container, dummy_lockable> //thread safety depends on Container
 {
 public:
 	non_lock_queue() {}
-	non_lock_queue(size_t capacity) : queue<T, Container, dummy_lockable>(capacity) {}
+	non_lock_queue(size_t capacity) : queue<Container, dummy_lockable>(capacity) {}
 };
-template<typename T, typename Container> class lock_queue : public queue<T, Container, lockable>
+template<typename Container> class lock_queue : public queue<Container, lockable>
 {
 public:
 	lock_queue() {}
-	lock_queue(size_t capacity) : queue<T, Container, lockable>(capacity) {}
+	lock_queue(size_t capacity) : queue<Container, lockable>(capacity) {}
 };
 
 } //namespace

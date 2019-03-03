@@ -14,10 +14,11 @@
 #define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
 #define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-//#define ST_ASIO_MAX_MSG_NUM		16
-//if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_MSG_NUM macro.
-//please think about if we have 512 links, how much memory we can accupy at most with default ST_ASIO_MAX_MSG_NUM?
-//it's 2 * 1024 * 1024 * 512 = 1G
+//#define ST_ASIO_MAX_SEND_BUF	65536
+//#define ST_ASIO_MAX_RECV_BUF	65536
+//if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF macro.
+//please think about if we have 512 links, how much memory we can accupy at most with default ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF?
+//it's 2 * 1M * 512 = 1G
 
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	0
@@ -35,8 +36,6 @@
 #define ST_ASIO_DEFAULT_PACKER fixed_length_packer
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
-#undef ST_ASIO_HEARTBEAT_INTERVAL
-#define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat
 #define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
 #define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
@@ -77,9 +76,7 @@ public:
 	{
 		packer(global_packer);
 
-#if 2 == PACKER_UNPACKER_TYPE
-		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(unpacker())->fixed_length(1024);
-#elif 3 == PACKER_UNPACKER_TYPE
+#if 3 == PACKER_UNPACKER_TYPE
 		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(unpacker())->prefix_suffix("begin", "end");
 #endif
 	}
@@ -100,50 +97,56 @@ protected:
 	}
 
 	//msg handling: send the original msg back(echo server)
-/*
 #ifdef ST_ASIO_SYNC_DISPATCH //do not open this feature
 	//do not hold msg_can for further using, return from on_msg as quickly as possible
-	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
+	//access msg_can freely within this callback, it's always thread safe.
+	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
 		if (!is_send_buffer_available())
-			return 0; //congestion control
+			return 0;
 		//here if we cannot handle all messages in msg_can, do not use sync message dispatching except we can bear message disordering,
 		//this is because on_msg_handle can be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
 		//and do not try to handle all messages here (just for echo_server's business logic) because:
 		//1. we can not use safe_send_msg as i said many times, we should not block service threads.
 		//2. if we use true can_overflow to call send_msg, then buffer usage will be out of control, we should not take this risk.
 
-		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(out_msg_ctype&, bool)) &echo_socket::send_msg, this, _1, true));
-		BOOST_AUTO(re, msg_can.size());
+#if 2 == PACKER_UNPACKER_TYPE //the type of out_msg_type and in_msg_type are not identical
+		for (BOOST_AUTO(iter, msg_can.end()); iter != msg_can.end(); ++iter)
+			send_msg(*iter, true);
+#else
+		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
+#endif
+		size_t re = msg_can.size();
 		msg_can.clear();
 
 		return re;
 	}
 #endif
-*/
+
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
+	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
+	// that new messages will not come until we returned from this callback (for example, pingpong test).
 	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		if (!is_send_buffer_available())
 			return 0;
 
 		out_container_type tmp_can;
-		//this manner requires the container used by the message queue can be spliced (such as std::list, but not std::vector,
-		// st_asio_wrapper doesn't require this characteristic).
-		//these code can be compiled because we used list as the container of the message queue, see macro ST_ASIO_OUTPUT_CONTAINER for more details
-		//to consume all messages in msg_can, see echo_client
-		msg_can.lock();
-		BOOST_AUTO(begin_iter, msg_can.begin());
-		//don't be too greedy, here is in a service thread, we should not block this thread for a long time
-		BOOST_AUTO(end_iter, msg_can.size() > 10 ? boost::next(begin_iter, 10) : msg_can.end());
-		tmp_can.splice(tmp_can.end(), msg_can, begin_iter, end_iter); //the rest messages will be dispatched via the next on_msg_handle
-		msg_can.unlock();
+		msg_can.move_items_out(tmp_can, 10); //don't be too greedy, here is in a service thread, we should not block this thread for a long time
 
-		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(out_msg_ctype&, bool)) &echo_socket::send_msg, this, _1, true));
+#if 2 == PACKER_UNPACKER_TYPE //the type of out_msg_type and in_msg_type are not identical
+		for (BOOST_AUTO(iter, tmp_can.end()); iter != tmp_can.end(); ++iter)
+			send_msg(*iter, true);
+#else
+		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
+#endif
 		return tmp_can.size();
 	}
 #else
+	//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
 	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg);}
 #endif
 	//msg handling end
@@ -155,6 +158,7 @@ class echo_server : public echo_server_base
 public:
 	echo_server(service_pump& service_pump_) : echo_server_base(service_pump_) {}
 
+protected:
 	//from i_echo_server, pure virtual function, we must implement it.
 	virtual void test() {/*puts("in echo_server::test()");*/}
 };
@@ -186,12 +190,15 @@ protected:
 	//msg handling
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//do not hold msg_can for further using, return from on_msg as quickly as possible
-	virtual size_t on_msg(std::list<out_msg_type>& msg_can) {bool re = short_socket_base::on_msg(msg_can); force_shutdown(); return re;}
+	//access msg_can freely within this callback, it's always thread safe.
+	virtual size_t on_msg(list<out_msg_type>& msg_can) {bool re = short_socket_base::on_msg(msg_can); force_shutdown(); return re;}
 #endif
 
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
-	virtual size_t on_msg_handle(out_queue_type& msg_can) {bool re = short_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
+	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
+	// that new messages will not come until we returned from this callback (for example, pingpong test).
+	virtual size_t on_msg_handle(out_queue_type& msg_can) {size_t re = short_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
 #else
 	virtual bool on_msg_handle(out_msg_type& msg) {bool re = short_socket_base::on_msg_handle(msg); force_shutdown(); return re;}
 #endif
@@ -224,7 +231,7 @@ int main(int argc, const char* argv[])
 		ip = argv[3];
 
 	normal_server.set_server_addr(port + 100, ip);
-	short_server.set_server_addr(port + 101, ip);
+	short_server.set_server_addr(port + 200, ip);
 	echo_server_.set_server_addr(port, ip);
 
 	int thread_num = 1;

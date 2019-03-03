@@ -38,7 +38,7 @@ atomic<unsigned short> completed_session_num;
 class echo_socket : public client_socket
 {
 public:
-	echo_socket(boost::asio::io_context& io_context_) : client_socket(io_context_) {}
+	echo_socket(i_matrix& matrix_) : client_socket(matrix_) {}
 
 	void begin(size_t msg_num, const char* msg, size_t msg_len)
 	{
@@ -54,7 +54,8 @@ protected:
 
 	//msg handling, must define macro ST_ASIO_SYNC_DISPATCH
 	//do not hold msg_can for further using, access msg_can and return from on_msg as quickly as possible
-	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
+	//access msg_can freely within this callback, it's always thread safe.
+	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
 		BOOST_AUTO(re, msg_can.size());
@@ -98,6 +99,7 @@ private:
 		}
 		else
 			direct_send_msg(msg, true);
+		//if the type of out_msg_type and in_msg_type are not identical, the compilation will fail, then you should use send_native_msg instead.
 	}
 #endif
 

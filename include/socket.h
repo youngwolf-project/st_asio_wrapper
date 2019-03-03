@@ -15,13 +15,13 @@
 
 #include "tracked_executor.h"
 #include "timer.h"
+#include "container.h"
 
 namespace st_asio_wrapper
 {
 
 template<typename Socket, typename Packer, typename InMsgType, typename OutMsgType,
-	template<typename, typename> class InQueue, template<typename> class InContainer,
-	template<typename, typename> class OutQueue, template<typename> class OutContainer>
+	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
 class socket : public timer<tracked_executor>
 {
 private:
@@ -108,8 +108,8 @@ public:
 	typedef obj_with_begin_time<OutMsgType> out_msg;
 	typedef InContainer<in_msg> in_container_type;
 	typedef OutContainer<out_msg> out_container_type;
-	typedef InQueue<in_msg, in_container_type> in_queue_type;
-	typedef OutQueue<out_msg, out_container_type> out_queue_type;
+	typedef InQueue<in_container_type> in_queue_type;
+	typedef OutQueue<out_container_type> out_queue_type;
 
 	boost::uint_fast64_t id() const {return _id;}
 	bool is_equal_to(boost::uint_fast64_t id) const {return _id == id;}
@@ -122,6 +122,8 @@ public:
 	virtual bool obsoleted() {return !started_ && !is_async_calling();}
 	virtual bool is_ready() = 0; //is ready for sending and receiving messages
 	virtual void send_heartbeat() = 0;
+	virtual const char* type_name() const = 0;
+	virtual int type_id() const = 0;
 
 	bool started() const {return started_;}
 	void start()
@@ -194,29 +196,32 @@ public:
 
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is overflow or not,
 	//this can exhaust all virtual memory, please pay special attentions.
-	bool is_send_buffer_available() const {return send_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
+	bool is_send_buffer_available() const {return send_msg_buffer.size_in_byte() < ST_ASIO_MAX_SEND_BUF;}
 
 	//if you define macro ST_ASIO_PASSIVE_RECV and call recv_msg greedily, the receiving buffer may overflow, this can exhaust all virtual memory,
 	//to avoid this problem, call recv_msg only if is_recv_buffer_available() returns true.
-	bool is_recv_buffer_available() const {return recv_msg_buffer.size() < ST_ASIO_MAX_MSG_NUM;}
+	bool is_recv_buffer_available() const {return recv_msg_buffer.size_in_byte() < ST_ASIO_MAX_RECV_BUF;}
 
 	//don't use the packer but insert into send buffer directly
 	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false)
-		{if (!can_overflow && !is_send_buffer_available()) return false; InMsgType unused(msg); return do_direct_send_msg(unused);}
-	//after this call, msg becomes empty, please note.
-	bool direct_send_msg(InMsgType& msg, bool can_overflow = false) {return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
+		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
+	bool direct_send_msg(InMsgType& msg, bool can_overflow = false) //after this call, msg becomes empty, please note.
+		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
+	bool direct_send_msg(list<InMsgType>& msg_can, bool can_overflow = false)
+		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg_can) : false;}
 
 #ifdef ST_ASIO_SYNC_SEND
-	//don't use the packer but insert into send buffer directly, then wait for the sending to finish.
-	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
-		{if (!can_overflow && !is_send_buffer_available()) return NOT_APPLICABLE; InMsgType unused(msg); return do_direct_sync_send_msg(unused, duration);}
-	//after this call, msg becomes empty, please note.
-	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //unit is millisecond, 0 means wait infinitely
+	//don't use the packer but insert into send buffer directly, then wait for the sending to finish, unit of the duration is millisecond, 0 means wait infinitely
+	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false)
 		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
+	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //after this call, msg becomes empty, please note.
+		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
+	sync_call_result direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false)
+		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg_can, duration) : NOT_APPLICABLE;}
 #endif
 
 #ifdef ST_ASIO_SYNC_RECV
-	sync_call_result sync_recv_msg(boost::container::list<OutMsgType>& msg_can, unsigned duration = 0) //unit is millisecond, 0 means wait infinitely
+	sync_call_result sync_recv_msg(list<OutMsgType>& msg_can, unsigned duration = 0) //unit of the duration is millisecond, 0 means wait infinitely
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
@@ -282,7 +287,7 @@ protected:
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//return the number of handled msg, if some msg left behind, socket will re-dispatch them asynchronously
 	//notice: using inconstant is for the convenience of swapping
-	virtual size_t on_msg(boost::container::list<OutMsgType>& msg_can)
+	virtual size_t on_msg(list<OutMsgType>& msg_can)
 	{
 		//it's always thread safe in this virtual function, because it blocks message receiving
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
@@ -362,11 +367,10 @@ protected:
 
 	bool handle_msg()
 	{
-		for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++iter)
-			stat.recv_byte_sum += iter->size();
-
+		size_t size_in_byte = st_asio_wrapper::get_size_in_byte(temp_msg_can);
 		size_t msg_num = temp_msg_can.size();
 		stat.recv_msg_sum += msg_num;
+		stat.recv_byte_sum += size_in_byte;
 #ifdef ST_ASIO_SYNC_RECV
 		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
 		if (REQUESTED == sr_status)
@@ -386,13 +390,12 @@ protected:
 #ifdef ST_ASIO_SYNC_DISPATCH
 #ifndef ST_ASIO_PASSIVE_RECV
 		if (msg_num > 0)
-		{
 #endif
+		{
+			auto_duration dur(stat.handle_time_sum);
 			on_msg(temp_msg_can);
 			msg_num = temp_msg_can.size();
-#ifndef ST_ASIO_PASSIVE_RECV
 		}
-#endif
 #elif defined(ST_ASIO_PASSIVE_RECV)
 		if (0 == msg_num)
 		{
@@ -402,30 +405,25 @@ protected:
 #endif
 		if (msg_num > 0)
 		{
-			boost::container::list<out_msg> temp_buffer(msg_num);
+			out_container_type temp_buffer(msg_num);
 			BOOST_AUTO(op_iter, temp_buffer.begin());
 			for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++op_iter, ++iter)
 				op_iter->swap(*iter);
 			temp_msg_can.clear();
 
-			recv_msg_buffer.move_items_in(temp_buffer);
+			recv_msg_buffer.move_items_in(temp_buffer, size_in_byte);
 			dispatch_msg();
 		}
 
 		return handled_msg();
 	}
 
-	bool do_direct_send_msg(InMsgType& msg)
+	bool do_direct_send_msg(const InMsgType& msg)
 	{
 		if (msg.empty())
 			unified_out::error_out("found an empty message, please check your packer.");
-		else
-		{
-			in_msg unused(msg);
-			send_msg_buffer.enqueue(unused);
-			if (!sending && is_ready())
-				send_msg();
-		}
+		else if (send_msg_buffer.enqueue(msg) && !sending && is_ready())
+			send_msg();
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
 		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
@@ -433,7 +431,61 @@ protected:
 		return true;
 	}
 
+	bool do_direct_send_msg(InMsgType& msg)
+	{
+		if (msg.empty())
+			unified_out::error_out("found an empty message, please check your packer.");
+		else if (send_msg_buffer.enqueue(msg) && !sending && is_ready())
+			send_msg();
+
+		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
+		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
+		//the packer provider has the responsibility to write detailed reasons down when packing message failed.
+		return true;
+	}
+
+	bool do_direct_send_msg(list<InMsgType>& msg_can)
+	{
+		size_t size_in_byte = 0;
+		in_container_type temp_buffer;
+		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
+		{
+			size_in_byte += iter->size();
+			temp_buffer.emplace_back().swap(*iter); //with c++0x, this can be emplace_back(*iter)
+		}
+		send_msg_buffer.move_items_in(temp_buffer, size_in_byte);
+		if (!sending && is_ready())
+			send_msg();
+
+		return true;
+	}
+
 #ifdef ST_ASIO_SYNC_SEND
+	sync_call_result do_direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0)
+	{
+		if (stopped())
+			return NOT_APPLICABLE;
+		else if (msg.empty())
+		{
+			unified_out::error_out("found an empty message, please check your packer.");
+			return SUCCESS;
+		}
+
+		in_msg unused(msg, true);
+		typename in_msg::future f;
+		unused.p->get_future().swap(f);
+		if (!send_msg_buffer.enqueue(unused))
+			return NOT_APPLICABLE;
+		else if (!sending && is_ready())
+			send_msg();
+
+#ifdef BOOST_THREAD_USES_CHRONO
+		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
+#else
+		return 0 == duration || f.timed_wait(boost::posix_time::milliseconds(duration)) ? f.get() : TIMEOUT;
+#endif
+	}
+
 	sync_call_result do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0)
 	{
 		if (stopped())
@@ -447,7 +499,37 @@ protected:
 		in_msg unused(msg, true);
 		typename in_msg::future f;
 		unused.p->get_future().swap(f);
-		send_msg_buffer.enqueue(unused);
+		if (!send_msg_buffer.enqueue(unused))
+			return NOT_APPLICABLE;
+		else if (!sending && is_ready())
+			send_msg();
+
+#ifdef BOOST_THREAD_USES_CHRONO
+		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
+#else
+		return 0 == duration || f.timed_wait(boost::posix_time::milliseconds(duration)) ? f.get() : TIMEOUT;
+#endif
+	}
+
+	sync_call_result do_direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0)
+	{
+		if (stopped())
+			return NOT_APPLICABLE;
+		else if (msg_can.empty())
+			return SUCCESS;
+
+		size_t size_in_byte = 0;
+		in_container_type temp_buffer;
+		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
+		{
+			size_in_byte += iter->size();
+			temp_buffer.emplace_back().swap(*iter); //with c++0x, this can be emplace_back(*iter)
+		}
+
+		temp_buffer.back().check_and_create_promise(true);
+		typename in_msg::future f;
+		temp_buffer.back().p->get_future().swap(f);
+		send_msg_buffer.move_items_in(temp_buffer, size_in_byte);
 		if (!sending && is_ready())
 			send_msg();
 
@@ -519,6 +601,7 @@ private:
 
 	//do not use dispatch_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
 	void dispatch_msg() {if (!dispatching) post_strand(strand, boost::bind(&socket::do_dispatch_msg, this));}
+	void accumulate_dispatch_delay(const statistic::stat_time& begin_time, const out_msg& msg) {stat.dispatch_delay_sum += begin_time - msg.begin_time;}
 	void do_dispatch_msg()
 	{
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
@@ -526,10 +609,7 @@ private:
 		{
 			BOOST_AUTO(begin_time, statistic::now());
 #ifdef ST_ASIO_FULL_STATISTIC
-			recv_msg_buffer.lock();
-			for (BOOST_AUTO(iter, recv_msg_buffer.begin()); iter != recv_msg_buffer.end(); ++iter)
-				stat.dispatch_dealy_sum += begin_time - iter->begin_time;
-			recv_msg_buffer.unlock();
+			recv_msg_buffer.do_something_to_all(boost::bind(&socket::accumulate_dispatch_delay, this, boost::cref(begin_time), _1));
 #endif
 			size_t re = on_msg_handle(recv_msg_buffer);
 			BOOST_AUTO(end_time, statistic::now());
@@ -538,9 +618,7 @@ private:
 			if (0 == re) //dispatch failed, re-dispatch
 			{
 #ifdef ST_ASIO_FULL_STATISTIC
-				recv_msg_buffer.lock();
-				st_asio_wrapper::do_something_to_all(recv_msg_buffer, boost::bind(&out_msg::restart, _1, boost::cref(end_time)));
-				recv_msg_buffer.unlock();
+				recv_msg_buffer.do_something_to_all(boost::bind(&out_msg::restart, _1, boost::cref(end_time)));
 #endif
 				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
 			}
@@ -550,7 +628,7 @@ private:
 		if ((dispatching = !dispatched || recv_msg_buffer.try_dequeue(last_dispatch_msg)))
 		{
 			BOOST_AUTO(begin_time, statistic::now());
-			stat.dispatch_dealy_sum += begin_time - last_dispatch_msg.begin_time;
+			stat.dispatch_delay_sum += begin_time - last_dispatch_msg.begin_time;
 			bool re = on_msg_handle(last_dispatch_msg); //must before next msg dispatching to keep sequence
 			BOOST_AUTO(end_time, statistic::now());
 			stat.handle_time_sum += end_time - begin_time;
@@ -608,7 +686,7 @@ private:
 protected:
 	struct statistic stat;
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer_;
-	boost::container::list<OutMsgType> temp_msg_can;
+	list<OutMsgType> temp_msg_can;
 
 	in_queue_type send_msg_buffer;
 	volatile bool sending;

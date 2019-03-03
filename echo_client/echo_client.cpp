@@ -16,10 +16,11 @@
 #define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
 #define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-//#define ST_ASIO_MAX_MSG_NUM		16
-//if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_MSG_NUM macro.
-//please think about if we have 512 links, how much memory we can accupy at most with default ST_ASIO_MAX_MSG_NUM?
-//it's 2 * 1024 * 1024 * 512 = 1G
+//#define ST_ASIO_MAX_SEND_BUF	65536
+//#define ST_ASIO_MAX_RECV_BUF	65536
+//if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF macro.
+//please think about if we have 512 links, how much memory we can accupy at most with default ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF?
+//it's 2 * 1M * 512 = 1G
 
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	0
@@ -37,8 +38,6 @@
 #define ST_ASIO_DEFAULT_PACKER fixed_length_packer
 #define ST_ASIO_DEFAULT_UNPACKER fixed_length_unpacker
 #elif 3 == PACKER_UNPACKER_TYPE
-#undef ST_ASIO_HEARTBEAT_INTERVAL
-#define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat
 #define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
 #define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
@@ -79,11 +78,9 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 class echo_socket : public client_socket
 {
 public:
-	echo_socket(boost::asio::io_context& io_context_) : client_socket(io_context_), recv_bytes(0), recv_index(0)
+	echo_socket(i_matrix& matrix_) : client_socket(matrix_), recv_bytes(0), recv_index(0)
 	{
-#if 2 == PACKER_UNPACKER_TYPE
-		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(unpacker())->fixed_length(1024);
-#elif 3 == PACKER_UNPACKER_TYPE
+#if 3 == PACKER_UNPACKER_TYPE
 		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_PACKER>(packer())->prefix_suffix("begin", "end");
 		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_UNPACKER>(unpacker())->prefix_suffix("begin", "end");
 #endif
@@ -98,19 +95,22 @@ public:
 		clear_status();
 		msg_num = msg_num_;
 
-		char* buff = new char[msg_len];
-		memset(buff, msg_fill, msg_len);
-		memcpy(buff, &recv_index, sizeof(size_t)); //seq
+		std::string msg(msg_len, msg_fill);
+		msg.replace(0, sizeof(size_t), (const char*) &recv_index, sizeof(size_t)); //seq
 
-		send_msg(buff, msg_len, false);
-		delete[] buff;
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+		send_msg(boost::cref(msg).get()); //can not apply new feature introduced by version 2.2.0, we need a whole message in on_msg_send
+#else
+		send_msg(msg); //new feature introduced by version 2.2.0, avoid one memory replication
+#endif
 	}
 
 protected:
 	//msg handling
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//do not hold msg_can for further using, return from on_msg as quickly as possible
-	virtual size_t on_msg(boost::container::list<out_msg_type>& msg_can)
+	//access msg_can freely within this callback, it's always thread safe.
+	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
 		BOOST_AUTO(re, msg_can.size());
@@ -124,11 +124,12 @@ protected:
 #endif
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
+	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
+	// that new messages will not come until we returned from this callback (for example, pingpong test).
 	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
-		//to consume a part of the messages in msg_can, see echo_server.
 		out_container_type tmp_can;
-		msg_can.swap(tmp_can); //must be thread safe
+		msg_can.swap(tmp_can); //to consume a part of the messages in msg_can, see echo_server
 
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&echo_socket::handle_msg, this, _1));
 		return tmp_can.size();
@@ -251,7 +252,7 @@ void send_msg_one_by_one(echo_client& client, size_t msg_num, size_t msg_len, ch
 	begin_time.stop();
 
 	double used_time = (double) begin_time.elapsed().wall / 1000000000;
-	printf(" finished in %f seconds, speed: %f(*2) MBps.\n", used_time, total_msg_bytes / used_time / 1024 / 1024);
+	printf(" finished in %f seconds, TPS: %f(*2), speed: %f(*2) MBps.\n", used_time, client.size() * msg_num / used_time, total_msg_bytes / used_time / 1024 / 1024);
 }
 
 void send_msg_randomly(echo_client& client, size_t msg_num, size_t msg_len, char msg_fill)
@@ -287,10 +288,11 @@ void send_msg_randomly(echo_client& client, size_t msg_num, size_t msg_len, char
 	delete[] buff;
 
 	double used_time = (double) begin_time.elapsed().wall / 1000000000;
-	printf(" finished in %f seconds, speed: %f(*2) MBps.\n", used_time, total_msg_bytes / used_time / 1024 / 1024);
+	printf(" finished in %f seconds, TPS: %f(*2), speed: %f(*2) MBps.\n", used_time, msg_num / used_time, total_msg_bytes / used_time / 1024 / 1024);
 }
 
-void thread_runtine(boost::container::list<echo_client::object_type>& link_group, size_t msg_num, size_t msg_len, char msg_fill)
+typedef boost::container::list<echo_client::object_type> link_container;
+void thread_runtine(link_container& link_group, size_t msg_num, size_t msg_len, char msg_fill)
 {
 	char* buff = new char[msg_len];
 	memset(buff, msg_fill, msg_len);
@@ -303,7 +305,6 @@ void thread_runtine(boost::container::list<echo_client::object_type>& link_group
 	delete[] buff;
 }
 
-typedef boost::container::list<echo_client::object_type> link_container;
 void group_links(echo_client::object_ctype& link, std::vector<link_container>& link_groups, size_t group_link_num,
 	size_t& group_index, size_t& this_group_link_num, size_t& left_link_num)
 {
@@ -520,7 +521,7 @@ int main(int argc, const char* argv[])
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq
 #elif 2 == PACKER_UNPACKER_TYPE
 			if (iter != parameters.end()) ++iter;
-			msg_len = 1024; //we hard code this because we fixedly initialized the length of fixed_length_unpacker to 1024
+			msg_len = 1024; //we hard code this because the default fixed length is 1024, and we not changed it
 #elif 3 == PACKER_UNPACKER_TYPE
 			if (iter != parameters.end()) msg_len = std::min((size_t) ST_ASIO_MSG_BUFFER_SIZE,
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq

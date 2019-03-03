@@ -96,16 +96,23 @@ private:
 
 class tracked_executor;
 class service_pump;
+class i_matrix
+{
+public:
+	virtual bool started() const = 0;
+	virtual service_pump& get_service_pump() = 0;
+	virtual const service_pump& get_service_pump() const = 0;
+
+	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) = 0;
+};
+
 namespace tcp
 {
-	class i_server
+	class i_server : public i_matrix
 	{
 	public:
-		virtual service_pump& get_service_pump() = 0;
-		virtual const service_pump& get_service_pump() const = 0;
 		virtual bool del_socket(const boost::shared_ptr<tracked_executor>& socket_ptr) = 0;
 		virtual bool restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id) = 0;
-		virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) = 0;
 	};
 } //namespace
 
@@ -132,7 +139,7 @@ public:
 	~auto_buffer() {clear();}
 
 	buffer_type raw_buffer() const {return buffer;}
-	void raw_buffer(buffer_type _buffer) {buffer = _buffer;}
+	void raw_buffer(buffer_type _buffer) {clear(); buffer = _buffer;}
 
 	//the following five functions are needed by st_asio_wrapper
 	bool empty() const {return NULL == buffer || buffer->empty();}
@@ -175,6 +182,22 @@ protected:
 //not like auto_buffer, shared_buffer is copyable, but auto_buffer is a bit more efficient.
 //packer or/and unpacker who used auto_buffer or shared_buffer as its msg type will be replaceable.
 
+//st_asio_wrapper requires that container must take one and only one template argument
+template<typename T> class list : public boost::container::list<T>
+{
+private:
+	typedef boost::container::list<T> super;
+
+public:
+	list() {}
+	list(size_t n) : super(n) {}
+
+#if BOOST_VERSION < 106200
+	using super::emplace_back;
+	typename super::reference emplace_back() {super::emplace_back(); return super::back();}
+#endif
+};
+
 //packer concept
 template<typename MsgType>
 class i_packer
@@ -182,6 +205,7 @@ class i_packer
 public:
 	typedef MsgType msg_type;
 	typedef const msg_type msg_ctype;
+	typedef list<msg_type> container_type;
 
 protected:
 	virtual ~i_packer() {}
@@ -189,6 +213,10 @@ protected:
 public:
 	virtual void reset() {}
 	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false) = 0;
+	//no native parameter anymore, which means it's always false, if true, you should call direct_(sync_)send_msg instead
+	virtual bool pack_msg(msg_type& msg, container_type& msg_can) {return false;}
+	virtual bool pack_msg(msg_type& msg1, msg_type& msg2, container_type& msg_can) {return false;}
+	virtual bool pack_msg(container_type& in, container_type& out) {return false;}
 	virtual bool pack_heartbeat(msg_type& msg) {return false;}
 	virtual char* raw_data(msg_type& msg) const {return NULL;}
 	virtual const char* raw_data(msg_ctype& msg) const {return NULL;}
@@ -218,7 +246,7 @@ class i_unpacker
 public:
 	typedef MsgType msg_type;
 	typedef const msg_type msg_ctype;
-	typedef boost::container::list<msg_type> container_type;
+	typedef list<msg_type> container_type;
 	typedef ST_ASIO_RECV_BUFFER_TYPE buffer_type;
 
 	bool stripped() const {return _stripped;}
@@ -299,7 +327,7 @@ struct statistic
 	{
 		send_delay_sum = send_time_sum = pack_time_sum = stat_duration();
 
-		dispatch_dealy_sum = recv_idle_sum = stat_duration();
+		dispatch_delay_sum = recv_idle_sum = stat_duration();
 		handle_time_sum = stat_duration();
 		unpack_time_sum = stat_duration();
 	}
@@ -317,7 +345,7 @@ struct statistic
 
 		recv_msg_sum += other.recv_msg_sum;
 		recv_byte_sum += other.recv_byte_sum;
-		dispatch_dealy_sum += other.dispatch_dealy_sum;
+		dispatch_delay_sum += other.dispatch_delay_sum;
 		recv_idle_sum += other.recv_idle_sum;
 		handle_time_sum += other.handle_time_sum;
 		unpack_time_sum += other.unpack_time_sum;
@@ -340,7 +368,7 @@ struct statistic
 			<< "message sum: " << recv_msg_sum << std::endl
 			<< "size in bytes: " << recv_byte_sum
 #ifdef ST_ASIO_FULL_STATISTIC
-			<< "\ndispatch delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(dispatch_dealy_sum).count() << std::endl
+			<< "\ndispatch delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(dispatch_delay_sum).count() << std::endl
 			<< "recv idle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(recv_idle_sum).count() << std::endl
 			<< "on_msg_handle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(handle_time_sum).count() << std::endl
 			<< "unpack duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(unpack_time_sum).count()
@@ -359,7 +387,7 @@ struct statistic
 	//recv corresponding statistic
 	boost::uint_fast64_t recv_msg_sum; //msgs returned by i_unpacker::parse_msg
 	boost::uint_fast64_t recv_byte_sum; //msgs (in bytes) returned by i_unpacker::parse_msg
-	stat_duration dispatch_dealy_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
+	stat_duration dispatch_delay_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
 	stat_duration recv_idle_sum; //during this duration, socket suspended msg reception (receiving buffer overflow)
 	stat_duration handle_time_sum; //on_msg_handle (and on_msg) consumed time, this indicate the efficiency of msg handling
 	stat_duration unpack_time_sum; //udp::socket_base will not gather this item
@@ -390,13 +418,21 @@ enum sync_call_result {SUCCESS, NOT_APPLICABLE, DUPLICATE, TIMEOUT};
 template<typename T> struct obj_with_begin_time : public T
 {
 	obj_with_begin_time() {}
+	obj_with_begin_time(const T& obj) : T(obj) {restart();}
 	obj_with_begin_time(T& obj) {T::swap(obj); restart();} //after this call, obj becomes empty, please note.
+	obj_with_begin_time& operator=(const T& obj) {T::operator=(obj); restart(); return *this;}
 	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, obj becomes empty, please note.
+	obj_with_begin_time(const obj_with_begin_time& other) : T(other), begin_time(other.begin_time) {}
+	obj_with_begin_time(obj_with_begin_time& other) {swap(other);} //after this call, other becomes empty, please note.
+	obj_with_begin_time& operator=(const obj_with_begin_time& other) {T::operator=(other); begin_time = other.begin_time; return *this;}
+	obj_with_begin_time& operator=(obj_with_begin_time& other) {clear(); swap(other);} //after this call, other becomes empty, please note.
 
 	void restart() {restart(statistic::now());}
 	void restart(const typename statistic::stat_time& begin_time_) {begin_time = begin_time_;}
 	void swap(T& obj) {T::swap(obj); restart();}
 	void swap(obj_with_begin_time& other) {T::swap(other); std::swap(begin_time, other.begin_time);}
+
+	void clear() {T::clear(); begin_time = typename statistic::stat_time();}
 
 	typename statistic::stat_time begin_time;
 };
@@ -421,14 +457,20 @@ template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_
 #define BOOST_THREAD_FUTURE unique_future
 #endif
 	typedef boost::BOOST_THREAD_FUTURE<sync_call_result> future;
+	typedef obj_with_begin_time<T> super;
 
 	obj_with_begin_time_promise(bool need_promise = false) {check_and_create_promise(need_promise);}
-	obj_with_begin_time_promise(T& obj, bool need_promise = false) : obj_with_begin_time<T>(obj) {check_and_create_promise(need_promise);}
+	obj_with_begin_time_promise(T& obj, bool need_promise = false) : super(obj) {check_and_create_promise(need_promise);}
+	obj_with_begin_time_promise(const T& obj, bool need_promise = false) : super(obj) {check_and_create_promise(need_promise);}
+	obj_with_begin_time_promise(const obj_with_begin_time_promise& other) : super(other), p(other.p) {}
+	obj_with_begin_time_promise(obj_with_begin_time_promise& other) : super(other) {p.swap(other.p);}
+	obj_with_begin_time_promise& operator=(const obj_with_begin_time_promise& other) {super::operator=(other); p = other.p; return *this;}
+	obj_with_begin_time_promise& operator=(obj_with_begin_time_promise& other) {clear(); swap(other); return *this;}
 
-	void swap(T& obj, bool need_promise = false) {obj_with_begin_time<T>::swap(obj); check_and_create_promise(need_promise);}
-	void swap(obj_with_begin_time_promise& other) {obj_with_begin_time<T>::swap(other); p.swap(other.p);}
+	void swap(T& obj, bool need_promise = false) {super::swap(obj); check_and_create_promise(need_promise);}
+	void swap(obj_with_begin_time_promise& other) {super::swap(other); p.swap(other.p);}
 
-	void clear() {p.reset(); T::clear();}
+	void clear() {super::clear(); p.reset();}
 	void check_and_create_promise(bool need_promise) {if (!need_promise) p.reset(); else if (!p) p = boost::make_shared<boost::promise<sync_call_result> >();}
 
 	boost::shared_ptr<boost::promise<sync_call_result> > p;
@@ -440,11 +482,11 @@ template<typename _Can, typename _Mutex, typename _Predicate>
 void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 {
 	boost::lock_guard<boost::mutex> lock(__mutex);
-	for(BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);
+	for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);
 }
 
 template<typename _Can, typename _Predicate>
-void do_something_to_all(_Can& __can, const _Predicate& __pred) {for(BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);}
+void do_something_to_all(_Can& __can, const _Predicate& __pred) {for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);}
 
 template<typename _Can, typename _Mutex, typename _Predicate>
 void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
@@ -455,6 +497,14 @@ void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 
 template<typename _Can, typename _Predicate>
 void do_something_to_one(_Can& __can, const _Predicate& __pred) {for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) if (__pred(*iter)) break;}
+
+template<typename _Can>
+size_t get_size_in_byte(const _Can& __can)
+{
+	size_t size_in_byte = 0;
+	do_something_to_all(__can, size_in_byte += boost::lambda::bind(&_Can::value_type::size, boost::lambda::_1));
+	return size_in_byte;
+}
 
 //member functions, used to do something to any member container(except map and multimap) optionally with any member mutex
 #define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)
@@ -499,22 +549,68 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow) {return FUNNAME(&pstr, &len, 1, can_overflow);} \
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, bool can_overflow = false) {return FUNNAME(buffer.data(), buffer.size(), can_overflow);}
 
-#define TCP_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
+#define TCP_SEND_MSG(FUNNAME, NATIVE) \
+bool FUNNAME(in_msg_type& msg, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return false; \
+	else if (NATIVE) \
+		return do_direct_send_msg(msg); \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg, msg_can); \
+	dur.end(); \
+	return re ? do_direct_send_msg(msg_can) : FUNNAME(msg, can_overflow); \
+} \
+bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return false; \
+	else if (NATIVE) \
+	{ \
+		do_direct_send_msg(msg1); \
+		do_direct_send_msg(msg2); \
+		return true; /*do_direct_send_msg will always succeed*/ \
+	} \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg1, msg2, msg_can); \
+	dur.end(); \
+	return re && do_direct_send_msg(msg_can); \
+} \
+bool FUNNAME(typename Packer::container_type& msg_can, bool can_overflow = false)  \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return false; \
+	else if (NATIVE) \
+		return do_direct_send_msg(msg_can); \
+	typename Packer::container_type out; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg_can, out); \
+	dur.end(); \
+	return re && do_direct_send_msg(out); \
+} \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
 		return false; \
-	auto_duration dur(ST_THIS stat.pack_time_sum); \
+	auto_duration dur(stat.pack_time_sum); \
 	in_msg_type msg; \
-	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
-	return SEND_FUNNAME(msg); \
+	return do_direct_send_msg(msg); \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into tcp::socket_base's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define TCP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
+bool FUNNAME(in_msg_type& msg, bool can_overflow = false) \
+	{while (!SEND_FUNNAME(msg, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
+bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false) \
+	{while (!SEND_FUNNAME(msg1, msg2, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
+bool FUNNAME(typename Packer::container_type& msg_can, bool can_overflow = false) \
+	{while (!SEND_FUNNAME(msg_can, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 	{while (!SEND_FUNNAME(pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
@@ -534,22 +630,71 @@ TYPE FUNNAME(const char* pstr, size_t len, unsigned duration, bool can_overflow)
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(buffer.data(), buffer.size(), duration, can_overflow);}
 
-#define TCP_SYNC_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
+#define TCP_SYNC_SEND_MSG(FUNNAME, NATIVE) \
+sync_call_result FUNNAME(in_msg_type& msg, unsigned duration = 0, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return NOT_APPLICABLE; \
+	else if (NATIVE) \
+		return do_direct_sync_send_msg(msg, duration); \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg, msg_can); \
+	dur.end(); \
+	return re ? do_direct_sync_send_msg(msg_can, duration) : FUNNAME(msg, duration, can_overflow); \
+} \
+sync_call_result FUNNAME(in_msg_type& msg1, in_msg_type& msg2, unsigned duration = 0, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return NOT_APPLICABLE; \
+	else if (NATIVE) \
+	{ \
+		do_direct_sync_send_msg(msg1, duration); \
+		do_direct_sync_send_msg(msg2, duration); \
+		return SUCCESS; /*do_direct_sync_send_msg will always succeed*/ \
+	} \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg1, msg2, msg_can); \
+	dur.end(); \
+	return re ? do_direct_sync_send_msg(msg_can, duration) : NOT_APPLICABLE; \
+} \
+sync_call_result FUNNAME(typename Packer::container_type& msg_can, unsigned duration = 0, bool can_overflow = false) \
+{ \
+	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
+		return NOT_APPLICABLE; \
+	else if (NATIVE) \
+		return do_direct_sync_send_msg(msg_can, duration); \
+	typename Packer::container_type out; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = packer_->pack_msg(msg_can, out); \
+	dur.end(); \
+	return re ? do_direct_sync_send_msg(out, duration) : NOT_APPLICABLE; \
+} \
 sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
 		return NOT_APPLICABLE; \
-	auto_duration dur(ST_THIS stat.pack_time_sum); \
+	auto_duration dur(stat.pack_time_sum); \
 	in_msg_type msg; \
 	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
-	return SEND_FUNNAME(msg, duration); \
+	return do_direct_sync_send_msg(msg, duration); \
 } \
 TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into tcp::socket_base's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define TCP_SYNC_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
+sync_call_result FUNNAME(in_msg_type& msg, unsigned duration = 0, bool can_overflow = false) \
+	{while (SUCCESS != SEND_FUNNAME(msg, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
+sync_call_result FUNNAME(in_msg_type& msg1, in_msg_type& msg2, unsigned duration = 0, bool can_overflow = false) \
+	{while (SUCCESS != SEND_FUNNAME(msg1, msg2, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
+sync_call_result FUNNAME(typename Packer::container_type& msg_can, unsigned duration = 0, bool can_overflow = false) \
+	{while (SUCCESS != SEND_FUNNAME(msg_can, duration, can_overflow)) \
+		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
 sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 	{while (SUCCESS != SEND_FUNNAME(pstr, len, num, duration, can_overflow)) \
 		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
@@ -567,15 +712,15 @@ template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, bool can_overflow =
 template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const Buffer& buffer, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, buffer.data(), buffer.size(), can_overflow);}
 
-#define UDP_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
+#define UDP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) {return FUNNAME(peer_addr, pstr, len, num, can_overflow);} \
 bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
 { \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
 		return false; \
 	in_msg_type msg(peer_addr); \
-	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
-	return SEND_FUNNAME(msg); \
+	packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	return do_direct_send_msg(msg); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
@@ -600,7 +745,7 @@ template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration =
 template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const Buffer& buffer, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, buffer.data(), buffer.size(), duration, can_overflow);}
 
-#define UDP_SYNC_SEND_MSG(FUNNAME, NATIVE, SEND_FUNNAME) \
+#define UDP_SYNC_SEND_MSG(FUNNAME, NATIVE) \
 sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, pstr, len, num, duration, can_overflow);} \
 sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
@@ -609,8 +754,8 @@ sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const 
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
 		return NOT_APPLICABLE; \
 	in_msg_type msg(peer_addr); \
-	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
-	return SEND_FUNNAME(msg, duration); \
+	packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	return do_direct_sync_send_msg(msg, duration); \
 } \
 UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 
