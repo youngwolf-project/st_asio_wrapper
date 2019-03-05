@@ -94,8 +94,7 @@ protected:
 #ifndef ST_ASIO_DISPATCH_BATCH_MSG
 		last_dispatch_msg.clear();
 #endif
-		in_container_type can;
-		pop_all_pending_send_msg(can);
+		send_msg_buffer.clear();
 		recv_msg_buffer.clear();
 	}
 
