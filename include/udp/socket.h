@@ -196,19 +196,7 @@ private:
 	using super::do_direct_sync_send_msg;
 #endif
 
-	void shutdown()
-	{
-		ST_THIS stop_all_timer();
-		close();
-
-		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
-		if (lowest_object.is_open())
-		{
-			boost::system::error_code ec;
-			lowest_object.shutdown(boost::asio::ip::udp::socket::shutdown_both, ec);
-			lowest_object.close(ec);
-		}
-	}
+	void shutdown() {close();}
 
 	void do_recv_msg()
 	{

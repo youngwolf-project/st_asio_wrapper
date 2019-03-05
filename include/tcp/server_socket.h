@@ -28,8 +28,7 @@ private:
 
 public:
 	server_socket_base(Server& server_) : super(server_.get_service_pump()), server(server_) {}
-	template<typename Arg>
-	server_socket_base(Server& server_, Arg& arg) : super(server_.get_service_pump(), arg), server(server_) {}
+	template<typename Arg> server_socket_base(Server& server_, Arg& arg) : super(server_.get_service_pump(), arg), server(server_) {}
 
 	virtual const char* type_name() const {return "TCP (server endpoint)";}
 	virtual int type_id() const {return 2;}
