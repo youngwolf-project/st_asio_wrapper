@@ -199,7 +199,8 @@ protected:
 			if (on_accept(socket_ptr) && add_socket(socket_ptr))
 				socket_ptr->start();
 
-			start_next_accept();
+			if (is_listening())
+				start_next_accept();
 		}
 		else if (on_accept_error(ec, socket_ptr))
 			start_next_accept();
