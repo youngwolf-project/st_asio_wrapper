@@ -47,8 +47,48 @@ public:
 	}
 	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
 
-	void stop_listen() {boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
+	bool start_listen()
+	{
+		boost::system::error_code ec;
+		if (!acceptor.is_open()) {acceptor.open(server_addr.protocol(), ec); assert(!ec);} //user maybe has opened this acceptor (to set options for example)
+#ifndef ST_ASIO_NOT_REUSE_ADDRESS
+		acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true), ec); assert(!ec);
+#endif
+		acceptor.bind(server_addr, ec); assert(!ec);
+		if (ec) {unified_out::error_out("bind failed."); return false;}
+
+		int num = async_accept_num();
+		assert(num > 0);
+		if (num <= 0)
+			num = 16;
+
+		boost::container::list<typename Pool::object_type> sockets;
+		unified_out::info_out("begin to pre-create %d server socket...", num);
+		while (--num >= 0)
+		{
+			BOOST_AUTO(socket_ptr, create_object());
+			if (!socket_ptr)
+				break;
+
+			sockets.push_back(socket_ptr);
+		}
+		if (num >= 0)
+			unified_out::info_out("finished pre-creating server sockets, but failed %d time(s).", num + 1);
+		else
+			unified_out::info_out("finished pre-creating server sockets.");
+
+#if BOOST_ASIO_VERSION >= 101100
+		acceptor.listen(boost::asio::ip::tcp::acceptor::max_listen_connections, ec); assert(!ec);
+#else
+		acceptor.listen(boost::asio::ip::tcp::acceptor::max_connections, ec); assert(!ec);
+#endif
+		if (ec) {unified_out::error_out("listen failed."); return false;}
+
+		st_asio_wrapper::do_something_to_all(sockets, boost::bind(&server_base::do_async_accept, this, _1));
+		return true;
+	}
 	bool is_listening() const {return acceptor.is_open();}
+	void stop_listen() {boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
 
 	boost::asio::ip::tcp::acceptor& next_layer() {return acceptor;}
 	const boost::asio::ip::tcp::acceptor& next_layer() const {return acceptor;}
@@ -113,48 +153,7 @@ public:
 
 protected:
 	virtual int async_accept_num() {return ST_ASIO_ASYNC_ACCEPT_NUM;}
-	virtual bool init()
-	{
-		boost::system::error_code ec;
-		if (!acceptor.is_open()) {acceptor.open(server_addr.protocol(), ec); assert(!ec);} //user maybe has opened this acceptor (to set options for example)
-#ifndef ST_ASIO_NOT_REUSE_ADDRESS
-		acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true), ec); assert(!ec);
-#endif
-		acceptor.bind(server_addr, ec); assert(!ec);
-		if (ec) {unified_out::error_out("bind failed."); return false;}
-
-		int num = async_accept_num();
-		assert(num > 0);
-		if (num <= 0)
-			num = 16;
-
-		boost::container::list<typename Pool::object_type> sockets;
-		unified_out::info_out("begin to pre-create %d server socket...", num);
-		while (--num >= 0)
-		{
-			BOOST_AUTO(socket_ptr, create_object());
-			if (!socket_ptr)
-				break;
-
-			sockets.push_back(socket_ptr);
-		}
-		if (num >= 0)
-			unified_out::info_out("finished pre-creating server sockets, but failed %d time(s).", num + 1);
-		else
-			unified_out::info_out("finished pre-creating server sockets.");
-
-#if BOOST_ASIO_VERSION >= 101100
-		acceptor.listen(boost::asio::ip::tcp::acceptor::max_listen_connections, ec); assert(!ec);
-#else
-		acceptor.listen(boost::asio::ip::tcp::acceptor::max_connections, ec); assert(!ec);
-#endif
-		if (ec) {unified_out::error_out("listen failed."); return false;}
-
-		st_asio_wrapper::do_something_to_all(sockets, boost::bind(&server_base::do_async_accept, this, _1));
-		ST_THIS start();
-
-		return true;
-	}
+	virtual bool init() {return start_listen() ? (ST_THIS start(), true) : false;}
 	virtual void uninit() {ST_THIS stop(); stop_listen(); force_shutdown();} //if you wanna graceful shutdown, call graceful_shutdown before service_pump::stop_service invocation.
 
 	virtual bool on_accept(typename Pool::object_ctype& socket_ptr) {return true;}
