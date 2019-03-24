@@ -61,7 +61,11 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::container::list<object_type> container_type;
 
+#if BOOST_ASIO_VERSION >= 101200
+	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : boost::asio::io_context(concurrency_hint), started(false)
+#else
 	service_pump() : started(false)
+#endif
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 		, real_thread_num(0), del_thread_num(0)
 #endif
