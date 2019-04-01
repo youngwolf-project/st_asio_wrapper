@@ -12,16 +12,10 @@
  * license: www.boost.org/LICENSE_1_0.txt
  *
  * Known issues:
- * 1. since 1.2.0, with boost-1.49, compatible edition's st_object::is_last_async_call() cannot work properly, it is because before asio calling any callbacks,
- *    it copied the callback(not a good behavior), this cause st_object::is_last_async_call() never return true, so objects in st_object_pool can never be reused
- *    or freed. To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro.
- *    BTW, boost-1.61 and standard edition even with boost-1.49 don't have such issue, I'm not sure in which edition, asio fixed this defect,
- *    if you have other versions, please help me to find out the minimum version via the following steps:
- *     1. Compile demo asio_server and test_client;
- *     2. Run asio_server and test_client without any parameters;
- *     3. Stop test_client (input 'quit');
- *     4. Stop asio_server (input 'quit');
- *     5. If asio_server successfully quited, means this edition doesn't have above defect.
+ * 1. since 1.2.0, before boost-1.55, compatible edition(now is st_asio_wrapper)'s st_object(now is tracked_executor)::is_last_async_call() cannot work properly,
+ *    this is because before asio calling any callbacks, it copied the callback(not a good behavior), this causes is_last_async_call() never return true,
+ *    so objects in st_object_pool can never be reused or freed. To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro(for now, you should define
+ *    macro ST_ASIO_DELAY_CLOSE to a value that bigger than zero).
  * 2. since 1.3.5 until 1.4, heartbeat function cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
  * 3. since 1.3.5 until 1.4, UDP doesn't support heartbeat because UDP doesn't support OOB data.
  * 4. since 1.3.5 until 1.4, SSL doesn't support heartbeat because SSL doesn't support OOB data.
@@ -708,6 +702,9 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #define ST_ASIO_DELAY_CLOSE	0 //seconds, guarantee 100% safety when reusing or freeing this socket
 #elif ST_ASIO_DELAY_CLOSE < 0
 	#error "delay close duration must be bigger than or equal to zero."
+#endif
+#if BOOST_VERSION < 105500 && 0 == ST_ASIO_DELAY_CLOSE
+	#error "before boost-1.55, macro ST_ASIO_DELAY_CLOSE must be bigger than zero, so no 100% safety will be guaranteed when reusing or freeing this socket."
 #endif
 
 //full statistic include time consumption, or only numerable informations will be gathered
