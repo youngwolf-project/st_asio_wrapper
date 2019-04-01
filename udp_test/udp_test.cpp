@@ -11,9 +11,8 @@
 							 //some messages will be dispatched via on_msg_handle(), some messages will be returned via sync_recv_msg(),
 							 //type more than one messages (separate them by space) in one line with ENTER key to send them,
 							 //you will see them cross together on the receiver's screen.
-//#define ST_ASIO_DEFAULT_UDP_UNPACKER replaceable_udp_unpacker<>
-#define ST_ASIO_HEARTBEAT_INTERVAL 5 //neither udp_unpacker nor replaceable_udp_unpacker support heartbeat message,
-									 //so heartbeat will be treated as normal message.
+//#define ST_ASIO_DEFAULT_UDP_UNPACKER udp_unpacker2<>
+#define ST_ASIO_HEARTBEAT_INTERVAL 5 //neither udp_unpacker nor udp_unpacker2 support heartbeat message, so heartbeat will be treated as normal message.
 //configuration
 
 #include "../include/ext/udp.h"

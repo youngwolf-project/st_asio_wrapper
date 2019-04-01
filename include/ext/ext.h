@@ -43,7 +43,7 @@
 
 namespace st_asio_wrapper { namespace ext {
 
-//implement i_buffer interface, then string_buffer can be wrapped by replaceable_buffer
+//implement i_buffer interface, then string_buffer can be wrapped by auto_buffer or shared_buffer
 class string_buffer : public std::string, public i_buffer
 {
 public:

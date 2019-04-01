@@ -15,7 +15,7 @@ public:
 protected:
 	//msg handling
 #if 1 == PACKER_UNPACKER_TYPE
-	//replaceable_unpacker uses auto_buffer or shared_buffer as its message type
+	//unpacker2 uses auto_buffer or shared_buffer as its message type
 	virtual bool on_msg_handle(out_msg_type& msg)
 	{
 		BOOST_AUTO(raw_msg, new string_buffer());

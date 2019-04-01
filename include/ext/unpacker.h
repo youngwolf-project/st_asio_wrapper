@@ -147,9 +147,9 @@ protected:
 };
 
 //protocol: length + body
-//T can be replaceable_buffer (an alias of auto_buffer) or shared_buffer, the latter makes output messages seemingly copyable,
-template<typename T = replaceable_buffer>
-class replaceable_unpacker : public st_asio_wrapper::i_unpacker<T>
+//T can be auto_buffer or shared_buffer, the latter makes output messages seemingly copyable.
+template<typename T = auto_buffer<i_buffer> >
+class unpacker2 : public st_asio_wrapper::i_unpacker<T>
 {
 private:
 	typedef st_asio_wrapper::i_unpacker<T> super;
@@ -179,9 +179,9 @@ protected:
 };
 
 //protocol: UDP has message boundary, so we don't need a specific protocol to unpack it.
-//T can be replaceable_buffer (an alias of auto_buffer) or shared_buffer, the latter makes output messages seemingly copyable.
-template<typename T = replaceable_buffer>
-class replaceable_udp_unpacker : public st_asio_wrapper::i_unpacker<T>
+//T can be auto_buffer or shared_buffer, the latter makes output messages seemingly copyable.
+template<typename T = auto_buffer<i_buffer> >
+class udp_unpacker2 : public st_asio_wrapper::i_unpacker<T>
 {
 private:
 	typedef st_asio_wrapper::i_unpacker<T> super;

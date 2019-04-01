@@ -6,8 +6,8 @@
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_REUSE_SSL_STREAM
 #define ST_ASIO_ENHANCED_STABILITY
-//#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
-//#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
+//#define ST_ASIO_DEFAULT_PACKER packer2<>
+//#define ST_ASIO_DEFAULT_UNPACKER unpacker2<>
 #define ST_ASIO_HEARTBEAT_INTERVAL 5 //SSL has supported heartbeat because we used user data instead of OOB to implement
 									 //heartbeat since 1.4.0
 //configuration

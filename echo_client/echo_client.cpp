@@ -25,13 +25,13 @@
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	0
 //0-default packer and unpacker, head(length) + body
-//1-replaceable packer and unpacker, head(length) + body
+//1-packer2 and unpacker2, head(length) + body
 //2-fixed length packer and unpacker
 //3-prefix and/or suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
-#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
+#define ST_ASIO_DEFAULT_PACKER packer2<>
+#define ST_ASIO_DEFAULT_UNPACKER unpacker2<>
 #elif 2 == PACKER_UNPACKER_TYPE
 #undef ST_ASIO_HEARTBEAT_INTERVAL
 #define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat

@@ -141,9 +141,9 @@ public:
 };
 
 //protocol: length + body
-//T can be replaceable_buffer (an alias of auto_buffer) or shared_buffer, the latter makes output messages seemingly copyable.
-template<typename T = replaceable_buffer>
-class replaceable_packer : public i_packer<T>
+//T can be auto_buffer or shared_buffer, the latter makes output messages seemingly copyable.
+template<typename T = auto_buffer<i_buffer> >
+class packer2 : public i_packer<T>
 {
 private:
 	typedef i_packer<T> super;

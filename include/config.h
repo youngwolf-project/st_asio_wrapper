@@ -96,7 +96,6 @@
  * In contrast to non_lock_queue, rename message_queue to lock_queue.
  * Move container related classes and functions from st_asio_wrapper_base.h to st_asio_wrapper_container.h.
  * Improve efficiency in scenarios of low throughput like pingpong test.
- * Replaceable packer/unpacker now support replaceable_buffer (an alias of auto_buffer) and shared_buffer to be their message type.
  * Move class statistic and obj_with_begin_time out of st_socket to reduce template tiers.
  *
  * 2016.11.13	version 1.3.2
@@ -544,6 +543,8 @@
  * Use st_asio_wrapper::list instead of boost::container::list, the former guarantee that emplace_back() function always return the reference of
  *  the newly added item.
  * Make function tcp::socket_base::reset to be virtual.
+ * Rename replaceable_unpacker to unpacker2, replaceable_udp_unpacker to udp_unpacker2, replaceable_packer to packer2, because their names confuse
+ *  users, any packer or unpacker is replaceable for those packer or unpacker that has the same msg_type.
  *
  * HIGHLIGHT:
  * Make client_socket_base be able to call multi_client_base (via i_matrix) like server_socket_base call server_base (via i_server),
@@ -552,6 +553,7 @@
  * Introduce shared_mutex, it can promote performance if you find or traverse (via do_something_to_all or do_something_to_one) objects frequently.
  *
  * FIX:
+ * Disable warnings C4521 and C4521 for Visual C++.
  *
  * ENHANCEMENTS:
  * Introduce macro ST_ASIO_RECONNECT to control the default switch of reconnecting mechanism.
@@ -568,6 +570,9 @@
  * direct_send_msg and direct_sync_send_msg support batch operation.
  * Introduce virtual function type_name() and type_id() to st_asio_wrapper::socket, they can identify whether a given two st_asio_wrapper::socket has the same type.
  * force_shutdown and graceful_shutdown support reconnecting even if the link has broken.
+ * Extract function start_listen from current implementations.
+ * Support concurrency hint for io_context if possible.
+ * Demonstrate how to accept just one client at server endpoint in demo echo_server.
  *
  * DELETION:
  *
