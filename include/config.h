@@ -699,11 +699,14 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //st_asio_wrapper will hook all async calls to avoid this socket to be reused or freed before all async calls finish
 //or been interrupted (of course, this mechanism will slightly impact efficiency).
 #ifndef ST_ASIO_DELAY_CLOSE
-#define ST_ASIO_DELAY_CLOSE	0 //seconds, guarantee 100% safety when reusing or freeing this socket
+	#if BOOST_VERSION < 105500
+	#define ST_ASIO_DELAY_CLOSE	5 //seconds, cannot guarantee 100% safety when reusing or freeing this socket (asio 1.10.1 fixed this issue)
+	#else
+	#define ST_ASIO_DELAY_CLOSE	0 //seconds, guarantee 100% safety when reusing or freeing this socket
+	#endif
 #elif ST_ASIO_DELAY_CLOSE < 0
 	#error "delay close duration must be bigger than or equal to zero."
-#endif
-#if BOOST_VERSION < 105500 && 0 == ST_ASIO_DELAY_CLOSE
+#elif BOOST_VERSION < 105500 && 0 == ST_ASIO_DELAY_CLOSE
 	#error "before boost-1.55, macro ST_ASIO_DELAY_CLOSE must be bigger than zero, so no 100% safety will be guaranteed when reusing or freeing this socket."
 #endif
 
