@@ -543,8 +543,6 @@
  * Use st_asio_wrapper::list instead of boost::container::list, the former guarantee that emplace_back() function always return the reference of
  *  the newly added item.
  * Make function tcp::socket_base::reset to be virtual.
- * Rename replaceable_unpacker to unpacker2, replaceable_udp_unpacker to udp_unpacker2, replaceable_packer to packer2, because their names confuse
- *  users, any packer or unpacker is replaceable for those packer or unpacker that has the same msg_type.
  *
  * HIGHLIGHT:
  * Make client_socket_base be able to call multi_client_base (via i_matrix) like server_socket_base call server_base (via i_server),
@@ -553,7 +551,6 @@
  * Introduce shared_mutex, it can promote performance if you find or traverse (via do_something_to_all or do_something_to_one) objects frequently.
  *
  * FIX:
- * Disable warnings C4521 and C4521 for Visual C++.
  *
  * ENHANCEMENTS:
  * Introduce macro ST_ASIO_RECONNECT to control the default switch of reconnecting mechanism.
@@ -570,6 +567,27 @@
  * direct_send_msg and direct_sync_send_msg support batch operation.
  * Introduce virtual function type_name() and type_id() to st_asio_wrapper::socket, they can identify whether a given two st_asio_wrapper::socket has the same type.
  * force_shutdown and graceful_shutdown support reconnecting even if the link has broken.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ * Unify all container to st_asio_wrapper::list (before, some of them were boost::container::list).
+ *
+ * REPLACEMENTS:
+ *
+ * ===============================================================
+ * 2019.4.6		version 2.2.1
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * Rename replaceable_unpacker to unpacker2, replaceable_udp_unpacker to udp_unpacker2, replaceable_packer to packer2, because their names confuse
+ *  users, any packer or unpacker is replaceable for those packer or unpacker that has the same msg_type.
+ *
+ * HIGHLIGHT:
+ *
+ * FIX:
+ * Disable warnings C4521 and C4521 for Visual C++.
+ *
+ * ENHANCEMENTS:
  * Extract function start_listen from current implementations.
  * Support concurrency hint for io_context if possible.
  * Demonstrate how to accept just one client at server endpoint in demo echo_server.
@@ -577,7 +595,6 @@
  * DELETION:
  *
  * REFACTORING:
- * Unify all container to st_asio_wrapper::list (before, some of them were boost::container::list).
  *
  * REPLACEMENTS:
  *
@@ -590,8 +607,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20200	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.2.0"
+#define ST_ASIO_VER		20201	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.2.1"
 
 //#define ST_ASIO_HIDE_WARNINGS
 
