@@ -272,8 +272,6 @@ protected:
 
 		return true;
 	}
-
-	virtual void on_recv_error(const boost::system::error_code& ec) = 0; //receiving error or peer endpoint quit(false ec means okay)
 	virtual bool on_heartbeat_error() = 0; //heartbeat timed out, return true to continue heartbeat function (useful for UDP)
 
 	//if ST_ASIO_DELAY_CLOSE is equal to zero, in this callback, socket guarantee that there's no any other async call associated it,
@@ -362,6 +360,20 @@ protected:
 		}
 
 		return true;
+	}
+
+	void handle_error()
+	{
+#ifdef ST_ASIO_SYNC_RECV
+		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
+		if (REQUESTED == sr_status)
+		{
+			sr_status = RESPONDED;
+			sync_recv_cv.notify_one();
+
+			sync_recv_cv.wait(lock, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || RESPONDED != boost::lambda::var(sr_status), true, false));
+		}
+#endif
 	}
 
 	bool handle_msg()
@@ -471,8 +483,9 @@ protected:
 		}
 
 		in_msg unused(msg, true);
+		BOOST_AUTO(p, unused.p);
 		typename in_msg::future f;
-		unused.p->get_future().swap(f);
+		p->get_future().swap(f);
 		if (!send_msg_buffer.enqueue(unused))
 			return NOT_APPLICABLE;
 		else if (!sending && is_ready())
@@ -496,8 +509,9 @@ protected:
 		}
 
 		in_msg unused(msg, true);
+		BOOST_AUTO(p, unused.p);
 		typename in_msg::future f;
-		unused.p->get_future().swap(f);
+		p->get_future().swap(f);
 		if (!send_msg_buffer.enqueue(unused))
 			return NOT_APPLICABLE;
 		else if (!sending && is_ready())
@@ -526,8 +540,9 @@ protected:
 		}
 
 		temp_buffer.back().check_and_create_promise(true);
+		BOOST_AUTO(p, temp_buffer.back().p);
 		typename in_msg::future f;
-		temp_buffer.back().p->get_future().swap(f);
+		p->get_future().swap(f);
 		send_msg_buffer.move_items_in(temp_buffer, size_in_byte);
 		if (!sending && is_ready())
 			send_msg();

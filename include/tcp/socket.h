@@ -192,6 +192,8 @@ protected:
 	virtual void on_send_error(const boost::system::error_code& ec, typename super::in_container_type& msg_can)
 		{unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
 
+	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
+
 	virtual void on_close()
 	{
 #ifdef ST_ASIO_SYNC_SEND
@@ -216,6 +218,7 @@ private:
 	virtual void send_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
 
 	using super::close;
+	using super::handle_error;
 	using super::handle_msg;
 	using super::do_direct_send_msg;
 #ifdef ST_ASIO_SYNC_SEND
@@ -281,7 +284,10 @@ private:
 			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
 			if (ec)
-				ST_THIS on_recv_error(ec);
+			{
+				handle_error();
+				on_recv_error(ec);
+			}
 			else if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
@@ -344,6 +350,11 @@ private:
 		}
 		else
 		{
+#ifdef ST_ASIO_SYNC_SEND
+			for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
+				if (iter->p)
+					iter->p->set_value(NOT_APPLICABLE);
+#endif
 			on_send_error(ec, last_send_msg);
 			last_send_msg.clear(); //clear sending messages after on_send_error, then user can decide how to deal with them in on_send_error
 

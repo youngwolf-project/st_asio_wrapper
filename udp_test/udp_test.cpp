@@ -5,14 +5,17 @@
 #define ST_ASIO_DELAY_CLOSE 1 //this demo not used object pool and doesn't need life cycle management,
 							  //so, define this to avoid hooks for async call (and slightly improve efficiency),
 							  //any value which is bigger than zero is okay.
+#define ST_ASIO_NOT_REUSE_ADDRESS
 #define ST_ASIO_SYNC_RECV
 #define ST_ASIO_SYNC_SEND
 #define ST_ASIO_PASSIVE_RECV //if you annotate this definition, this demo will use mix model to receive messages, which means
 							 //some messages will be dispatched via on_msg_handle(), some messages will be returned via sync_recv_msg(),
 							 //type more than one messages (separate them by space) in one line with ENTER key to send them,
 							 //you will see them cross together on the receiver's screen.
+							 //with this macro, if heartbeat not applied, macro ST_ASIO_AVOID_AUTO_STOP_SERVICE must be defined to avoid the service_pump run out.
+#define ST_ASIO_AVOID_AUTO_STOP_SERVICE
+//#define ST_ASIO_HEARTBEAT_INTERVAL 5 //neither udp_unpacker nor udp_unpacker2 support heartbeat message, so heartbeat will be treated as normal message.
 //#define ST_ASIO_DEFAULT_UDP_UNPACKER udp_unpacker2<>
-#define ST_ASIO_HEARTBEAT_INTERVAL 5 //neither udp_unpacker nor udp_unpacker2 support heartbeat message, so heartbeat will be treated as normal message.
 //configuration
 
 #include "../include/ext/udp.h"
@@ -62,6 +65,13 @@ int main(int argc, const char* argv[])
 //	service.lowest_layer().open(ST_ASIO_UDP_DEFAULT_IP_VERSION);
 //	service.lowest_layer().set_option(boost::asio::ip::multicast::join_group(boost::asio::ip::address::from_string("x.x.x.x")));
 //	sp.start_service();
+
+	//demonstrate how to change local address if the binding was failed.
+	if (!service.is_started())
+	{
+		service.set_local_addr(6666);
+		sp.start_service(&service);
+	}
 
 	boost::thread t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(service)));
 	while(sp.is_running())
