@@ -173,7 +173,7 @@ private:
 	typedef st_asio_wrapper::object_pool<Object> super;
 
 public:
-	object_pool(service_pump& service_pump_, const boost::asio::ssl::context::method& m) : super(service_pump_), ctx(m) {}
+	object_pool(service_pump& service_pump_, boost::asio::ssl::context::method m) : super(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& context() {return ctx;}
 
 protected:

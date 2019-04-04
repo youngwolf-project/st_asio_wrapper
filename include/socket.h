@@ -368,10 +368,10 @@ protected:
 		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
 		if (REQUESTED == sr_status)
 		{
-			sr_status = RESPONDED;
+			sr_status = RESPONDED_FAILURE;
 			sync_recv_cv.notify_one();
 
-			sync_recv_cv.wait(lock, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || RESPONDED != boost::lambda::var(sr_status), true, false));
+			sync_recv_cv.wait(lock, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || RESPONDED_FAILURE != boost::lambda::var(sr_status), true, false));
 		}
 #endif
 	}
@@ -728,7 +728,7 @@ private:
 	boost::asio::io_context::strand strand;
 
 #ifdef ST_ASIO_SYNC_RECV
-	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED};
+	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED, RESPONDED_FAILURE};
 	sync_recv_status sr_status;
 
 	boost::mutex sync_recv_mutex;
