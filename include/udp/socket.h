@@ -178,6 +178,7 @@ private:
 	virtual void send_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
 
 	using super::close;
+	using super::handle_error;
 	using super::handle_msg;
 	using super::do_direct_send_msg;
 #ifdef ST_ASIO_SYNC_SEND
@@ -245,7 +246,10 @@ private:
 #else
 			if (ec)
 #endif
+			{
+				handle_error();
 				on_recv_error(ec);
+			}
 			else if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
@@ -291,7 +295,13 @@ private:
 #endif
 		}
 		else
+		{
+#ifdef ST_ASIO_SYNC_SEND
+			if (last_send_msg.p)
+				last_send_msg.p->set_value(NOT_APPLICABLE);
+#endif
 			on_send_error(ec, last_send_msg);
+		}
 		last_send_msg.clear(); //clear sending message after on_send_error, then user can decide how to deal with it in on_send_error
 
 		if (ec && (boost::asio::error::not_socket == ec || boost::asio::error::bad_descriptor == ec))

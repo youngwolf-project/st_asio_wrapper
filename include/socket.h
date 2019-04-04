@@ -268,8 +268,6 @@ protected:
 
 		return true;
 	}
-
-	virtual void on_recv_error(const boost::system::error_code& ec) = 0; //receiving error or peer endpoint quit(false ec means okay)
 	virtual bool on_heartbeat_error() = 0; //heartbeat timed out, return true to continue heartbeat function (useful for UDP)
 
 	//if ST_ASIO_DELAY_CLOSE is equal to zero, in this callback, socket guarantee that there's no any other async call associated it,
@@ -360,6 +358,20 @@ protected:
 		return true;
 	}
 
+	void handle_error()
+	{
+#ifdef ST_ASIO_SYNC_RECV
+		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
+		if (REQUESTED == sr_status)
+		{
+			sr_status = RESPONDED_FAILURE;
+			sync_recv_cv.notify_one();
+
+			sync_recv_cv.wait(lock, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || RESPONDED_FAILURE != boost::lambda::var(sr_status), true, false));
+		}
+#endif
+	}
+
 	bool handle_msg()
 	{
 		for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++iter)
@@ -445,8 +457,9 @@ protected:
 		}
 
 		in_msg unused(msg, true);
+		BOOST_AUTO(p, unused.p);
 		typename in_msg::future f;
-		unused.p->get_future().swap(f);
+		p->get_future().swap(f);
 		send_msg_buffer.enqueue(unused);
 		if (!sending && is_ready())
 			send_msg();
@@ -636,7 +649,7 @@ private:
 	boost::asio::io_context::strand strand;
 
 #ifdef ST_ASIO_SYNC_RECV
-	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED};
+	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED, RESPONDED_FAILURE};
 	sync_recv_status sr_status;
 
 	boost::mutex sync_recv_mutex;
