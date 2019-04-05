@@ -11,7 +11,7 @@
 //but file_server only receive talking message, not send talking message proactively), the previous message has been
 //sent to file_client, so sending buffer will always be empty, which means we will never operate sending buffer concurrently,
 //so need no locks.
-#define ST_ASIO_DEFAULT_PACKER	replaceable_packer<>
+#define ST_ASIO_DEFAULT_PACKER	packer2<>
 #define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
 #define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
 //configuration

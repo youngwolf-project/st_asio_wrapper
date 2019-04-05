@@ -23,13 +23,13 @@
 //use the following macro to control the type of packer and unpacker
 #define PACKER_UNPACKER_TYPE	0
 //0-default packer and unpacker, head(length) + body
-//1-replaceable packer and unpacker, head(length) + body
+//1-packer2 and unpacker2, head(length) + body
 //2-fixed length packer and unpacker
 //3-prefix and/or suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER replaceable_packer<>
-#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
+#define ST_ASIO_DEFAULT_PACKER packer2<>
+#define ST_ASIO_DEFAULT_UNPACKER unpacker2<>
 #elif 2 == PACKER_UNPACKER_TYPE
 #undef ST_ASIO_HEARTBEAT_INTERVAL
 #define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat
@@ -180,6 +180,18 @@ protected:
 };
 #endif
 
+//demonstrate how to accept just one client at server endpoint
+typedef server_base<normal_socket> normal_server_base;
+class normal_server : public normal_server_base
+{
+public:
+	normal_server(service_pump& service_pump_) : normal_server_base(service_pump_) {}
+
+protected:
+	virtual int async_accept_num() {return 1;} //this make on_accept to be called in single thread, because stop_listen() is not thread safe
+	virtual bool on_accept(object_ctype& socket_ptr) {stop_listen(); return true;}
+};
+
 typedef server_socket_base<packer, unpacker> short_socket_base;
 class short_connection : public short_socket_base
 {
@@ -215,13 +227,11 @@ int main(int argc, const char* argv[])
 		puts("type " QUIT_COMMAND " to end.");
 
 	service_pump sp;
-	//only need a simple server? you can directly use server or tcp::server_base, because of normal_socket,
-	//this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
-	//the reason is these packer and unpacker need additional initializations that normal_socket not implemented,
-	//see echo_socket's constructor for more details.
-	server_base<normal_socket> normal_server(sp);
-	server_base<short_connection> short_server(sp);
+	//because of normal_socket, this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
+	//the reason is these packer and unpacker need additional initializations that normal_socket not implemented, see echo_socket's constructor for more details.
+	normal_server normal_server_(sp);
 	echo_server echo_server_(sp); //echo server
+	server_base<short_connection> short_server(sp);
 
 	unsigned short port = ST_ASIO_SERVER_PORT;
 	std::string ip;
@@ -230,7 +240,7 @@ int main(int argc, const char* argv[])
 	if (argc > 3)
 		ip = argv[3];
 
-	normal_server.set_server_addr(port + 100, ip);
+	normal_server_.set_server_addr(port + 100, ip);
 	short_server.set_server_addr(port + 200, ip);
 	echo_server_.set_server_addr(port, ip);
 
@@ -258,19 +268,19 @@ int main(int argc, const char* argv[])
 		}
 		else if (STATISTIC == str)
 		{
-			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", normal_server.size(), normal_server.invalid_object_size());
+			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", normal_server_.size(), normal_server_.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n\n", echo_server_.size(), echo_server_.invalid_object_size());
 			puts(echo_server_.get_statistic().to_string().data());
 		}
 		else if (STATUS == str)
 		{
-			normal_server.list_all_status();
+			normal_server_.list_all_status();
 			echo_server_.list_all_status();
 		}
 		else if (LIST_ALL_CLIENT == str)
 		{
 			puts("clients from normal server:");
-			normal_server.list_all_object();
+			normal_server_.list_all_object();
 			puts("clients from echo server:");
 			echo_server_.list_all_object();
 		}
@@ -282,7 +292,7 @@ int main(int argc, const char* argv[])
 		{
 //			/*
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
-			normal_server.broadcast_msg(str.data(), str.size() + 1, false);
+			normal_server_.broadcast_msg(str.data(), str.size() + 1, false);
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 //			*/
@@ -293,11 +303,11 @@ int main(int argc, const char* argv[])
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
-				normal_server.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(msg), false));
+				normal_server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(msg), false));
 			*/
 			/*
 			//if demo client is using stream_unpacker
-			normal_server.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
+			normal_server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
 			*/
 		}
 	}

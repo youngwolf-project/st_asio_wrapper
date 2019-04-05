@@ -8,7 +8,6 @@
 #define ST_ASIO_PASSIVE_RECV
 //#define ST_ASIO_INPUT_QUEUE non_lock_queue
 //we cannot use non_lock_queue, because we also send messages (talking messages) out of st_asio_wrapper::socket::on_msg_send().
-#define ST_ASIO_DEFAULT_UNPACKER replaceable_unpacker<>
 #define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
 #define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
 //configuration

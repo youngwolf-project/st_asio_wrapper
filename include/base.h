@@ -151,10 +151,10 @@ public:
 protected:
 	buffer_type buffer;
 };
-typedef auto_buffer<i_buffer> replaceable_buffer;
 
 //convert '->' operation to '.' operation
 //user need to allocate object, and shared_buffer will free it
+//not like auto_buffer, shared_buffer is copyable (seemingly), but auto_buffer is a bit more efficient.
 template<typename T> class shared_buffer
 {
 public:
@@ -179,8 +179,6 @@ public:
 protected:
 	buffer_type buffer;
 };
-//not like auto_buffer, shared_buffer is copyable, but auto_buffer is a bit more efficient.
-//packer or/and unpacker who used auto_buffer or shared_buffer as its msg type will be replaceable.
 
 //st_asio_wrapper requires that container must take one and only one template argument
 template<typename T> class list : public boost::container::list<T>
@@ -415,6 +413,11 @@ private:
 
 enum sync_call_result {SUCCESS, NOT_APPLICABLE, DUPLICATE, TIMEOUT};
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4521)
+#pragma warning(disable:4522)
+#endif
 template<typename T> struct obj_with_begin_time : public T
 {
 	obj_with_begin_time() {}
@@ -436,6 +439,9 @@ template<typename T> struct obj_with_begin_time : public T
 
 	typename statistic::stat_time begin_time;
 };
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #ifdef ST_ASIO_SYNC_RECV
 #ifdef BOOST_THREAD_USES_CHRONO
@@ -451,6 +457,11 @@ public:
 #endif
 
 #ifdef ST_ASIO_SYNC_SEND
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4521)
+#pragma warning(disable:4522)
+#endif
 template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_time<T>
 {
 #ifndef BOOST_THREAD_FUTURE
@@ -475,6 +486,9 @@ template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_
 
 	boost::shared_ptr<boost::promise<sync_call_result> > p;
 };
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 #endif
 
 //free functions, used to do something to any container(except map and multimap) optionally with any mutex
