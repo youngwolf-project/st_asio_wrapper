@@ -380,6 +380,7 @@ protected:
 	{
 		size_t size_in_byte = st_asio_wrapper::get_size_in_byte(temp_msg_can);
 		size_t msg_num = temp_msg_can.size();
+		size_t left_msg_num = msg_num;
 		stat.recv_msg_sum += msg_num;
 		stat.recv_byte_sum += size_in_byte;
 #ifdef ST_ASIO_SYNC_RECV
@@ -396,33 +397,33 @@ protected:
 				return handled_msg(); //sync_recv_msg() has consumed temp_msg_can
 		}
 		lock.unlock();
-		msg_num = temp_msg_can.size();
+		left_msg_num = temp_msg_can.size();
 #endif
 #ifdef ST_ASIO_SYNC_DISPATCH
 #ifndef ST_ASIO_PASSIVE_RECV
-		if (msg_num > 0)
+		if (left_msg_num > 0)
 #endif
 		{
 			auto_duration dur(stat.handle_time_sum);
 			on_msg(temp_msg_can);
-			msg_num = temp_msg_can.size();
+			left_msg_num = temp_msg_can.size();
 		}
 #elif defined(ST_ASIO_PASSIVE_RECV)
-		if (0 == msg_num)
+		if (0 == left_msg_num)
 		{
-			msg_num = 1;
+			left_msg_num = 1;
 			temp_msg_can.emplace_back(); //empty message, let you always having the chance to call recv_msg()
 		}
 #endif
-		if (msg_num > 0)
+		if (left_msg_num > 0)
 		{
-			out_container_type temp_buffer(msg_num);
+			out_container_type temp_buffer(left_msg_num);
 			BOOST_AUTO(op_iter, temp_buffer.begin());
 			for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++op_iter, ++iter)
 				op_iter->swap(*iter);
 			temp_msg_can.clear();
 
-			recv_msg_buffer.move_items_in(temp_buffer, size_in_byte);
+			recv_msg_buffer.move_items_in(temp_buffer, left_msg_num < msg_num ? 0 : size_in_byte);
 			dispatch_msg();
 		}
 

@@ -14,8 +14,8 @@
  * Known issues:
  * 1. since 1.2.0, before boost-1.55, compatible edition(now is st_asio_wrapper)'s st_object(now is tracked_executor)::is_last_async_call() cannot work properly,
  *    this is because before asio calling any callbacks, it copied the callback(not a good behavior), this causes is_last_async_call() never return true,
- *    so objects in st_object_pool can never be reused or freed. To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro(for now, you should define
- *    macro ST_ASIO_DELAY_CLOSE to a value that bigger than zero).
+ *    so objects in st_object_pool(now is object_pool) can never be reused or freed. To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro
+ *    (for now, you should define macro ST_ASIO_DELAY_CLOSE to a value that bigger than zero).
  * 2. since 1.3.5 until 1.4, heartbeat function cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
  * 3. since 1.3.5 until 1.4, UDP doesn't support heartbeat because UDP doesn't support OOB data.
  * 4. since 1.3.5 until 1.4, SSL doesn't support heartbeat because SSL doesn't support OOB data.
