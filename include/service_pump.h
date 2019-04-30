@@ -133,7 +133,7 @@ public:
 		}
 	}
 
-	//if you add a service after start_service, use this to start it
+	//if you add a service after start_service(), use this to start it
 	void start_service(object_type i_service_, int thread_num = ST_ASIO_SERVICE_THREAD_NUM)
 	{
 		assert(NULL != i_service_);
@@ -143,9 +143,14 @@ public:
 		else
 			start_service(thread_num);
 	}
+	//doesn't like stop_service(), this will asynchronously stop service i_service_, you must NOT free i_service_ immediately,
+	// otherwise, you may lead segment fault if you freed i_service_ before any async operation ends.
+	//my suggestion is, DO NOT free i_service_, we can suspend it (by your own implementation and invocation rather than
+	// stop_service(object_type)).
+	//BTW, all i_services managed by this service_pump can be safely freed after stop_service().
 	void stop_service(object_type i_service_) {assert(NULL != i_service_); i_service_->stop_service();}
 
-	//this function works like start_service except that it will block until all services run out
+	//this function works like start_service() except that it will block until all services run out
 	void run_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM)
 	{
 		if (!is_service_started())

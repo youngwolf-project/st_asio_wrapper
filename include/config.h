@@ -581,6 +581,8 @@
  * SPECIAL ATTENTION (incompatible with old editions):
  * Rename replaceable_unpacker to unpacker2, replaceable_udp_unpacker to udp_unpacker2, replaceable_packer to packer2, because their names confuse
  *  users, any packer or unpacker is replaceable for those packer or unpacker that has the same msg_type.
+ * Drop the 'reset' parameter in multi_socket_service::add_socket, this means never call reset() for the socket anymore.
+ * Don't call reset() in single_socket_service::init() and multi_socket_service::init() anymore.
  *
  * HIGHLIGHT:
  *

@@ -28,7 +28,7 @@ public:
 	single_socket_service(service_pump& service_pump_, Arg& arg) : i_service(service_pump_), Socket(service_pump_, arg) {}
 
 protected:
-	virtual bool init() {ST_THIS reset(); ST_THIS start(); return Socket::started();}
+	virtual bool init() {ST_THIS start(); return Socket::started();}
 	virtual void uninit() {ST_THIS graceful_shutdown();} //if you wanna force shutdown, call force_shutdown before service_pump::stop_service invocation.
 
 private:
@@ -44,7 +44,7 @@ protected:
 
 	virtual bool init()
 	{
-		ST_THIS do_something_to_all((boost::lambda::bind(&Socket::reset, *boost::lambda::_1), boost::lambda::bind(&Socket::start, *boost::lambda::_1)));
+		ST_THIS do_something_to_all(boost::lambda::bind(&Socket::start, *boost::lambda::_1));
 		ST_THIS start();
 		return true;
 	}
@@ -57,16 +57,12 @@ public:
 	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return ST_THIS find(id);}
 
 	//parameter reset valid only if the service pump already started, or service pump will call object pool's init function before start service pump
-	bool add_socket(typename Pool::object_ctype& socket_ptr, bool reset = true)
+	bool add_socket(typename Pool::object_ctype& socket_ptr)
 	{
 		if (ST_THIS add_object(socket_ptr))
 		{
-			if (ST_THIS get_service_pump().is_service_started()) //service already started
-			{
-				if (reset)
-					socket_ptr->reset();
+			if (get_service_pump().is_service_started()) //service already started
 				socket_ptr->start();
-			}
 
 			return true;
 		}
