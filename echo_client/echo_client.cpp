@@ -423,7 +423,7 @@ int main(int argc, const char* argv[])
 	BOOST_AUTO(socket_ptr, client.create_object());
 	//socket_ptr->set_server_addr(port, ip); //we don't have to set server address at here, the following do_something_to_all will do it for us
 	//some other initializations according to your business
-	client.add_socket(socket_ptr, false);
+	client.add_socket(socket_ptr);
 	socket_ptr.reset(); //important, otherwise, object_pool will not be able to free or reuse this object.
 
 	//method #2, add clients first without any arguments, then set the server address.
