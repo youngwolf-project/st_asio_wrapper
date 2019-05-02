@@ -32,12 +32,10 @@ private:
 public:
 	multi_service_base(service_pump& service_pump_) : super(service_pump_) {}
 
-	typename Pool::object_type create_object() {return Pool::create_object(boost::ref(*this));}
-
 	using super::add_socket;
 	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = std::string())
 	{
-		BOOST_AUTO(socket_ptr, create_object());
+		BOOST_AUTO(socket_ptr, ST_THIS create_object());
 		if (!socket_ptr)
 			return socket_ptr;
 
@@ -46,7 +44,7 @@ public:
 	}
 	typename Pool::object_type add_socket(unsigned short port, unsigned short peer_port, const std::string& ip = std::string(), const std::string& peer_ip = std::string())
 	{
-		BOOST_AUTO(socket_ptr, create_object());
+		BOOST_AUTO(socket_ptr, ST_THIS create_object());
 		if (!socket_ptr)
 			return socket_ptr;
 
