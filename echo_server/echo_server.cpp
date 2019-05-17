@@ -100,10 +100,10 @@ protected:
 #ifdef ST_ASIO_SYNC_DISPATCH //do not open this feature
 	//do not hold msg_can for further using, return from on_msg as quickly as possible
 	//access msg_can freely within this callback, it's always thread safe.
-	virtual size_t on_msg(list<out_msg_type>& msg_can)
+	virtual bool on_msg(list<out_msg_type>& msg_can)
 	{
 		if (!is_send_buffer_available())
-			return 0;
+			return false;
 		//here if we cannot handle all messages in msg_can, do not use sync message dispatching except we can bear message disordering,
 		//this is because on_msg_handle can be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
 		//and do not try to handle all messages here (just for echo_server's business logic) because:
@@ -117,10 +117,9 @@ protected:
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
 #endif
-		size_t re = msg_can.size();
 		msg_can.clear();
 
-		return re;
+		return true;
 	}
 #endif
 
@@ -128,10 +127,10 @@ protected:
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
 	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
 	// that new messages will not come until we returned from this callback (for example, pingpong test).
-	virtual size_t on_msg_handle(out_queue_type& msg_can)
+	virtual bool on_msg_handle(out_queue_type& msg_can)
 	{
 		if (!is_send_buffer_available())
-			return 0;
+			return false;
 
 		out_container_type tmp_can;
 		msg_can.move_items_out(tmp_can, 10); //don't be too greedy, here is in a service thread, we should not block this thread for a long time
@@ -143,7 +142,7 @@ protected:
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
 #endif
-		return tmp_can.size();
+		return true;
 	}
 #else
 	//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
@@ -210,7 +209,7 @@ protected:
 	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
 	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
 	// that new messages will not come until we returned from this callback (for example, pingpong test).
-	virtual size_t on_msg_handle(out_queue_type& msg_can) {size_t re = short_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
+	virtual bool on_msg_handle(out_queue_type& msg_can) {bool re = short_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
 #else
 	virtual bool on_msg_handle(out_msg_type& msg) {bool re = short_socket_base::on_msg_handle(msg); force_shutdown(); return re;}
 #endif
@@ -227,11 +226,13 @@ int main(int argc, const char* argv[])
 		puts("type " QUIT_COMMAND " to end.");
 
 	service_pump sp;
+	echo_server echo_server_(sp); //echo server
+
+	//demonstrate how to use singel_service
 	//because of normal_socket, this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
 	//the reason is these packer and unpacker need additional initializations that normal_socket not implemented, see echo_socket's constructor for more details.
-	normal_server normal_server_(sp);
-	echo_server echo_server_(sp); //echo server
-	server_base<short_connection> short_server(sp);
+	single_service_pump<normal_server> normal_server_;
+	single_service_pump<server_base<short_connection> > short_server;
 
 	unsigned short port = ST_ASIO_SERVER_PORT;
 	std::string ip;
@@ -253,6 +254,8 @@ int main(int argc, const char* argv[])
 #endif
 
 	sp.start_service(thread_num);
+	normal_server_.start_service(1);
+	short_server.start_service(1);
 	while(sp.is_running())
 	{
 		std::string str;
@@ -260,7 +263,11 @@ int main(int argc, const char* argv[])
 		if (str.empty())
 			;
 		else if (QUIT_COMMAND == str)
+		{
 			sp.stop_service();
+			normal_server_.stop_service();
+			short_server.stop_service();
+		}
 		else if (RESTART_COMMAND == str)
 		{
 			sp.stop_service();

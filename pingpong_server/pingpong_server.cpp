@@ -39,17 +39,16 @@ protected:
 	//msg handling: send the original msg back(echo server), must define macro ST_ASIO_SYNC_DISPATCH
 	//do not hold msg_can for further using, access msg_can and return from on_msg as quickly as possible
 	//access msg_can freely within this callback, it's always thread safe.
-	virtual size_t on_msg(list<out_msg_type>& msg_can)
+	virtual bool on_msg(list<out_msg_type>& msg_can)
 	{
 		//if the type of out_msg_type and in_msg_type are not identical, the compilation will fail, then you should use send_native_msg instead.
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::direct_send_msg, this, _1, false));
-		BOOST_AUTO(re, msg_can.size());
 		msg_can.clear(); //if we left behind some messages in msg_can, they will be dispatched via on_msg_handle asynchronously, which means it's
 		//possible that on_msg_handle be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
 		//here we always consumed all messages, so we can use sync message dispatching, otherwise, we should not use sync message dispatching
 		//except we can bear message disordering.
 
-		return re;
+		return true;
 	}
 	//msg handling end
 };

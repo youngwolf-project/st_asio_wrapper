@@ -16,6 +16,7 @@
 #include "packer.h"
 #include "unpacker.h"
 #include "../tcp/ssl/ssl.h"
+#include "../single_service_pump.h"
 
 #ifndef ST_ASIO_DEFAULT_PACKER
 #define ST_ASIO_DEFAULT_PACKER st_asio_wrapper::ext::packer

@@ -63,10 +63,10 @@
 //udp
 #define st_udp_socket_base socket_base //from st_asio_wrapper to st_asio_wrapper::udp
 #define st_udp_socket socket //from st_asio_wrapper::ext to st_asio_wrapper::ext::udp
-#define st_udp_sclient_base single_service_base //from st_asio_wrapper to st_asio_wrapper::udp
-#define st_udp_sclient single_service //from st_asio_wrapper::ext to st_asio_wrapper::ext::udp
-#define st_udp_client_base service_base //from st_asio_wrapper to st_asio_wrapper::udp
-#define st_udp_client service //from st_asio_wrapper::ext to st_asio_wrapper::ext::udp
+#define st_udp_sclient_base single_socket_service_base //from st_asio_wrapper to st_asio_wrapper::udp
+#define st_udp_sclient single_socket_service //from st_asio_wrapper::ext to st_asio_wrapper::ext::udp
+#define st_udp_client_base socket_service_base //from st_asio_wrapper to st_asio_wrapper::udp
+#define st_udp_client socket_service //from st_asio_wrapper::ext to st_asio_wrapper::ext::udp
 //udp
 
 #endif /* ST_ASIO_OLD_CLASS_NAMES_H_ */

@@ -20,14 +20,13 @@
 
 #include "../include/ext/udp.h"
 using namespace st_asio_wrapper;
-using namespace st_asio_wrapper::ext::udp;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 
-void sync_recv_thread(single_service& service)
+void sync_recv_thread(ext::udp::single_socket_service& service)
 {
-	list<single_service::out_msg_type> msg_can;
+	list<ext::udp::single_socket_service::out_msg_type> msg_can;
 	sync_call_result re = SUCCESS;
 	do
 	{
@@ -53,7 +52,7 @@ int main(int argc, const char* argv[])
 		puts("type " QUIT_COMMAND " to end.");
 
 	service_pump sp;
-	single_service service(sp);
+	ext::udp::single_socket_service service(sp);
 	service.set_local_addr((unsigned short) atoi(argv[1])); //for multicast, do not bind to a specific IP, just port is enough
 	service.set_peer_addr((unsigned short) atoi(argv[2]), argc >= 4 ? argv[3] : "127.0.0.1");
 

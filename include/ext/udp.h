@@ -17,6 +17,7 @@
 #include "unpacker.h"
 #include "../udp/socket.h"
 #include "../udp/socket_service.h"
+#include "../single_service_pump.h"
 
 #ifndef ST_ASIO_DEFAULT_PACKER
 #define ST_ASIO_DEFAULT_PACKER st_asio_wrapper::ext::packer
@@ -29,9 +30,9 @@
 namespace st_asio_wrapper { namespace ext { namespace udp {
 
 typedef st_asio_wrapper::udp::socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UDP_UNPACKER> socket;
-typedef st_asio_wrapper::udp::single_service_base<socket> single_service;
-typedef st_asio_wrapper::udp::multi_service_base<socket> multi_service;
-typedef multi_service service;
+typedef st_asio_wrapper::udp::single_socket_service_base<socket> single_socket_service;
+typedef st_asio_wrapper::udp::multi_socket_service_base<socket> multi_socket_service;
+typedef multi_socket_service socket_service;
 
 }}} //namespace
 

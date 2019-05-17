@@ -245,8 +245,8 @@ public:
 #endif
 
 	//how many msgs waiting for sending or dispatching
-	GET_PENDING_MSG_NUM(get_pending_send_msg_num, send_msg_buffer)
-	GET_PENDING_MSG_NUM(get_pending_recv_msg_num, recv_msg_buffer)
+	GET_PENDING_MSG_SIZE(get_pending_send_msg_size, send_msg_buffer)
+	GET_PENDING_MSG_SIZE(get_pending_recv_msg_size, recv_msg_buffer)
 
 #ifdef ST_ASIO_SYNC_SEND
 	POP_FIRST_PENDING_MSG_NOTIFY(pop_first_pending_send_msg, send_msg_buffer, in_msg)
@@ -282,31 +282,30 @@ protected:
 	virtual void after_close() {} //a good case for using this is to reconnect the server, please refer to client_socket_base.
 
 #ifdef ST_ASIO_SYNC_DISPATCH
-	//return the number of handled msg, if some msg left behind, socket will re-dispatch them asynchronously
+	//return true if handled some messages (include all messages), if some msg left behind, socket will re-dispatch them asynchronously
 	//notice: using inconstant is for the convenience of swapping
-	virtual size_t on_msg(list<OutMsgType>& msg_can)
+	virtual bool on_msg(list<OutMsgType>& msg_can)
 	{
 		//it's always thread safe in this virtual function, because it blocks message receiving
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
-		BOOST_AUTO(re, msg_can.size());
 		msg_can.clear(); //have handled all messages
 
-		return re;
+		return true;
 	}
 #endif
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
-	//return the number of handled msg, if some msg left behind, socket will re-dispatch them asynchronously
+	//return true if handled some messages (include all messages), if some msg left behind, socket will re-dispatch them asynchronously
 	//notice: using inconstant is for the convenience of swapping
-	virtual size_t on_msg_handle(out_queue_type& msg_can)
+	virtual bool on_msg_handle(out_queue_type& msg_can)
 	{
 		out_container_type tmp_can;
-		msg_can.swap(tmp_can); //must be thread safe
+		msg_can.swap(tmp_can);
 
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
 			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
 
-		return tmp_can.size();
+		return true;
 	}
 #else
 	//return true means msg been handled, false means msg cannot be handled right now, and socket will re-dispatch it asynchronously

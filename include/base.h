@@ -549,7 +549,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(50)); \
 }
 
-#define GET_PENDING_MSG_NUM(FUNNAME, CAN) size_t FUNNAME() const {return CAN.size();}
+#define GET_PENDING_MSG_SIZE(FUNNAME, CAN) size_t FUNNAME() const {return CAN.size_in_byte();}
 #define POP_FIRST_PENDING_MSG(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) {msg.clear(); CAN.try_dequeue(msg);}
 #define POP_FIRST_PENDING_MSG_NOTIFY(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) \
 	{msg.clear(); if (CAN.try_dequeue(msg) && msg.p) msg.p->set_value(NOT_APPLICABLE);}

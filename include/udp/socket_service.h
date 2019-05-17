@@ -17,20 +17,20 @@
 
 namespace st_asio_wrapper { namespace udp {
 
-template<typename Socket> class single_service_base : public single_socket_service<Socket>
+template<typename Socket> class single_socket_service_base : public single_socket_service<Socket>
 {
 public:
-	single_service_base(service_pump& service_pump_) : single_socket_service<Socket>(service_pump_) {}
+	single_socket_service_base(service_pump& service_pump_) : single_socket_service<Socket>(service_pump_) {}
 };
 
 template<typename Socket, typename Pool = object_pool<Socket>, typename Matrix = i_matrix>
-class multi_service_base : public multi_socket_service<Socket, Pool, Matrix>
+class multi_socket_service_base : public multi_socket_service<Socket, Pool, Matrix>
 {
 private:
 	typedef multi_socket_service<Socket, Pool, Matrix> super;
 
 public:
-	multi_service_base(service_pump& service_pump_) : super(service_pump_) {}
+	multi_socket_service_base(service_pump& service_pump_) : super(service_pump_) {}
 
 	using super::add_socket;
 	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = std::string())

@@ -45,7 +45,6 @@ private:
 
 //Container must at least has the following functions (like boost::container::list):
 // Container() and Container(size_t) constructor
-// size, must be thread safe, but doesn't have to be consistent
 // empty, must be thread safe, but doesn't have to be consistent
 // clear
 // swap
@@ -68,20 +67,20 @@ public:
 	using Container::size;
 	using Container::empty;
 
-	queue() : buff_size(0) {}
-	queue(size_t capacity) : Container(capacity), buff_size(0) {}
+	queue() : total_size(0) {}
+	queue(size_t capacity) : Container(capacity), total_size(0) {}
 
 	//thread safe
 	bool is_thread_safe() const {return Lockable::is_lockable();}
-	size_t size_in_byte() const {return buff_size;}
-	void clear() {typename Lockable::lock_guard lock(*this); Container::clear(); buff_size = 0;}
+	size_t size_in_byte() const {return total_size;}
+	void clear() {typename Lockable::lock_guard lock(*this); Container::clear(); total_size = 0;}
 	void swap(Container& can)
 	{
 		size_t size_in_byte = st_asio_wrapper::get_size_in_byte(can);
 
 		typename Lockable::lock_guard lock(*this);
 		Container::swap(can);
-		buff_size = size_in_byte;
+		total_size = size_in_byte;
 	}
 
 	template<typename T> bool enqueue(const T& item) {typename Lockable::lock_guard lock(*this); return enqueue_(item);}
@@ -100,7 +99,7 @@ public:
 		try
 		{
 			ST_THIS emplace_back(item);
-			buff_size += item.size();
+			total_size += item.size();
 		}
 		catch (const std::exception& e)
 		{
@@ -115,9 +114,9 @@ public:
 	{
 		try
 		{
-			size_t s = item.size();
+			size_t size = item.size();
 			ST_THIS emplace_back().swap(item); //with c++0x, this can be emplace_back(item)
-			buff_size += s;
+			total_size += size;
 		}
 		catch (const std::exception& e)
 		{
@@ -134,56 +133,45 @@ public:
 			size_in_byte = st_asio_wrapper::get_size_in_byte(src);
 
 		ST_THIS splice(ST_THIS end(), src);
-		buff_size += size_in_byte;
+		total_size += size_in_byte;
 	}
 
-	bool try_dequeue_(reference item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); buff_size -= item.size(); return true;}
+	bool try_dequeue_(reference item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); total_size -= item.size(); return true;}
 
 	void move_items_out_(Container& dest, size_t max_item_num = -1)
 	{
 		if ((size_t) -1 == max_item_num)
 		{
 			dest.splice(dest.end(), *this);
-			buff_size = 0;
+			total_size = 0;
 		}
 		else if (max_item_num > 0)
 		{
-			size_t s = 0, index = 0;
+			size_t size = 0, index = 0;
 			BOOST_AUTO(end_iter, ST_THIS begin());
 			for (; end_iter != ST_THIS end() && index++ < max_item_num; ++end_iter)
-				s += end_iter->size();
+				size += end_iter->size();
 
-			if (end_iter == ST_THIS end())
-				dest.splice(dest.end(), *this);
-			else
-				dest.splice(dest.end(), *this, ST_THIS begin(), end_iter);
-			buff_size -= s;
+			move_items_out(dest, end_iter, size);
 		}
 	}
 
 	void move_items_out_(size_t max_size_in_byte, Container& dest)
 	{
 		if ((size_t) -1 == max_size_in_byte)
-		{
-			dest.splice(dest.end(), *this);
-			buff_size = 0;
-		}
+			move_items_out_(dest);
 		else
 		{
-			size_t s = 0;
+			size_t size = 0;
 			BOOST_AUTO(end_iter, ST_THIS begin());
 			while (end_iter != ST_THIS end())
 			{
-				s += end_iter++->size();
-				if (s >= max_size_in_byte)
+				size += end_iter++->size();
+				if (size >= max_size_in_byte)
 					break;
 			}
 
-			if (end_iter == ST_THIS end())
-				dest.splice(dest.end(), *this);
-			else
-				dest.splice(dest.end(), *this, ST_THIS begin(), end_iter);
-			buff_size -= s;
+			move_items_out(dest, end_iter, size);
 		}
 	}
 
@@ -198,8 +186,19 @@ public:
 	void do_something_to_one_(const _Predicate& __pred) const {for (BOOST_AUTO(iter, ST_THIS begin()); iter != ST_THIS end(); ++iter) if (__pred(*iter)) break;}
 	//not thread safe
 
+protected:
+	void move_items_out(Container& dest, typename Container::const_iterator end_iter, size_t size)
+	{
+		if (end_iter == ST_THIS end())
+			dest.splice(dest.end(), *this);
+		else
+			dest.splice(dest.end(), *this, ST_THIS begin(), end_iter);
+
+		total_size -= size;
+	}
+
 private:
-	size_t buff_size; //in use
+	size_t total_size;
 };
 
 //st_asio_wrapper requires that queue must take one and only one template argument

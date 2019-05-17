@@ -107,9 +107,10 @@ int main(int argc, const char* argv[])
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
-	service_pump sp;
-	single_client client(sp);
-	short_client client2(sp); //without single_client, we need to define ST_ASIO_AVOID_AUTO_STOP_SERVICE macro to forbid service_pump stopping services automatically
+	//demonstrate how to use singel_service
+	single_service_pump<single_client> client;
+	//singel_service_pump also is a service_pump, this let us to control client2 via client
+	short_client client2(client); //without single_client, we need to define ST_ASIO_AVOID_AUTO_STOP_SERVICE macro to forbid service_pump stopping services automatically
 
 //	argv[2] = "::1" //ipv6
 //	argv[2] = "127.0.0.1" //ipv4
@@ -123,24 +124,24 @@ int main(int argc, const char* argv[])
 	client.set_server_addr(port, ip);
 	client2.set_server_addr(port + 100, ip);
 
-	sp.start_service();
+	client.start_service();
 	boost::thread t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(client)));
-	while(sp.is_running())
+	while(client.is_running())
 	{
 		std::string str;
 		std::cin >> str;
 		if (QUIT_COMMAND == str)
 		{
-			sp.stop_service();
+			client.stop_service();
 			t.join();
 		}
 		else if (RESTART_COMMAND == str)
 		{
-			sp.stop_service();
+			client.stop_service();
 			t.join();
 
 			t = boost::thread(boost::bind(&sync_recv_thread, boost::ref(client)));
-			sp.start_service();
+			client.start_service();
 		}
 		else if (RECONNECT == str)
 			client.graceful_shutdown(true);
