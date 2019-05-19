@@ -614,7 +614,6 @@
  * Rename ext::udp::service to socket_service.
  * Rename socket::get_pending_send_msg_num to get_pending_send_msg_size and socket::get_pending_recv_msg_num to get_pending_recv_msg_size,
  *  and the return value not means message entries any more, but total size of all messages.
- * Change the return type of socket::on_msg and socket::on_msg_handle from size_t to bool.
  *
  * HIGHLIGHT:
  * Introduce new class single_service_pump--one service_pump for one service.
