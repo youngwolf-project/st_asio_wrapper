@@ -71,7 +71,7 @@ public:
 
 protected:
 	//msg handling
-	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); if (0 == get_pending_recv_msg_num()) recv_msg(); return true;}
+	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); if (0 == get_pending_recv_msg_size()) recv_msg(); return true;}
 	//only raise recv_msg() invocation after recveiving buffer becomes empty, it's very important, otherwise we must use mutex to guarantee that at any time,
 	//there only exists one or zero asynchronous reception.
 	//msg handling end

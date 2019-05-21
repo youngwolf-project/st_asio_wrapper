@@ -227,11 +227,13 @@ int main(int argc, const char* argv[])
 		puts("type " QUIT_COMMAND " to end.");
 
 	service_pump sp;
+	echo_server echo_server_(sp); //echo server
+
+	//demonstrate how to use singel_service
 	//because of normal_socket, this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
 	//the reason is these packer and unpacker need additional initializations that normal_socket not implemented, see echo_socket's constructor for more details.
-	normal_server normal_server_(sp);
-	echo_server echo_server_(sp); //echo server
-	server_base<short_connection> short_server(sp);
+	single_service_pump<normal_server> normal_server_;
+	single_service_pump<server_base<short_connection> > short_server;
 
 	unsigned short port = ST_ASIO_SERVER_PORT;
 	std::string ip;
@@ -253,6 +255,8 @@ int main(int argc, const char* argv[])
 #endif
 
 	sp.start_service(thread_num);
+	normal_server_.start_service(1);
+	short_server.start_service(1);
 	while(sp.is_running())
 	{
 		std::string str;
@@ -260,7 +264,11 @@ int main(int argc, const char* argv[])
 		if (str.empty())
 			;
 		else if (QUIT_COMMAND == str)
+		{
 			sp.stop_service();
+			normal_server_.stop_service();
+			short_server.stop_service();
+		}
 		else if (RESTART_COMMAND == str)
 		{
 			sp.stop_service();

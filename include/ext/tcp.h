@@ -19,6 +19,7 @@
 #include "../tcp/client.h"
 #include "../tcp/server_socket.h"
 #include "../tcp/server.h"
+#include "../single_service_pump.h"
 
 #ifndef ST_ASIO_DEFAULT_PACKER
 #define ST_ASIO_DEFAULT_PACKER st_asio_wrapper::ext::packer
