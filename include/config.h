@@ -12,16 +12,12 @@
  * license: www.boost.org/LICENSE_1_0.txt
  *
  * Known issues:
- * 1. since 1.2.0, before boost-1.55, compatible edition(now is st_asio_wrapper)'s st_object(now is tracked_executor)::is_last_async_call() cannot work properly,
- *    this is because before asio calling any callbacks, it copied the callback(not a good behavior), this causes is_last_async_call() never return true,
- *    so objects in st_object_pool(now is object_pool) can never be reused or freed. To fix this issue, we must not define ST_ASIO_ENHANCED_STABILITY macro
- *    (for now, you should define macro ST_ASIO_DELAY_CLOSE to a value that bigger than zero).
- * 2. since 1.3.5 until 1.4, heartbeat function cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
- * 3. since 1.3.5 until 1.4, UDP doesn't support heartbeat because UDP doesn't support OOB data.
- * 4. since 1.3.5 until 1.4, SSL doesn't support heartbeat because SSL doesn't support OOB data.
- * 5. with old openssl (at least 0.9.7), ssl::client_socket_base and ssl_server_socket_base are not reusable, I'm not sure in which version,
+ * 1. since 1.3.5 until 1.4, heartbeat function cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
+ * 2. since 1.3.5 until 1.4, UDP doesn't support heartbeat because UDP doesn't support OOB data.
+ * 3. since 1.3.5 until 1.4, SSL doesn't support heartbeat because SSL doesn't support OOB data.
+ * 4. with old openssl (at least 0.9.7), ssl::client_socket_base and ssl_server_socket_base are not reusable, I'm not sure in which version,
  *    they became available, seems it's 1.0.0.
- * 6. since 1.0.0 until 2.1.0, async_write and async_read are not mutexed on the same socket, which is a violation of asio threading model.
+ * 5. since 1.0.0 until 2.1.0, async_write and async_read are not mutexed on the same socket, which is a violation of asio threading model.
  *
  * change log:
  * 2012.7.7
@@ -753,15 +749,9 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //st_asio_wrapper will hook all async calls to avoid this socket to be reused or freed before all async calls finish
 //or been interrupted (of course, this mechanism will slightly impact efficiency).
 #ifndef ST_ASIO_DELAY_CLOSE
-	#if BOOST_VERSION < 105500
-	#define ST_ASIO_DELAY_CLOSE	5 //seconds, cannot guarantee 100% safety when reusing or freeing this socket (asio 1.10.1 fixed this issue)
-	#else
-	#define ST_ASIO_DELAY_CLOSE	0 //seconds, guarantee 100% safety when reusing or freeing this socket
-	#endif
+#define ST_ASIO_DELAY_CLOSE	0 //seconds, guarantee 100% safety when reusing or freeing socket objects
 #elif ST_ASIO_DELAY_CLOSE < 0
 	#error "delay close duration must be bigger than or equal to zero."
-#elif BOOST_VERSION < 105500 && 0 == ST_ASIO_DELAY_CLOSE
-	#error "before boost-1.55, macro ST_ASIO_DELAY_CLOSE must be bigger than zero, so no 100% safety will be guaranteed when reusing or freeing this socket."
 #endif
 
 //full statistic include time consumption, or only numerable informations will be gathered

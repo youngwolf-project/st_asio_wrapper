@@ -23,7 +23,12 @@ class tracked_executor
 {
 protected:
 	virtual ~tracked_executor() {}
-	tracked_executor(boost::asio::io_context& _io_context_) : io_context_(_io_context_), aci(boost::make_shared<char>('\0')) {}
+	tracked_executor(boost::asio::io_context& _io_context_) : io_context_(_io_context_), aci(boost::make_shared<char>('\0')), aci_min_ref(3)
+	{
+#if defined(_MSC_VER) || (105500 <= BOOST_VERSION && BOOST_VERSION < 107000) || defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L
+		aci_min_ref = 2;
+#endif
+	}
 
 public:
 	typedef boost::function<void(const boost::system::error_code&)> handler_with_error;
@@ -55,7 +60,17 @@ public:
 		{return (aci, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1, boost::lambda::_2));}
 
 	bool is_async_calling() const {return !aci.unique();}
-	bool is_last_async_call() const {return aci.use_count() <= 2;} //can only be called in callbacks
+	bool is_last_async_call() //can only be called in callbacks
+	{
+		long cur_ref = aci.use_count();
+		if (cur_ref > aci_min_ref)
+			return false;
+		else if (cur_ref < aci_min_ref)
+			printf("fault error, please contact the author immediately with these two number -- (%ld/%ld), and the version of the boost and the compiler.",
+				cur_ref, aci_min_ref--);
+
+		return true;
+	}
 	inline void set_async_calling(bool) {}
 
 protected:
@@ -63,6 +78,7 @@ protected:
 
 private:
 	boost::shared_ptr<char> aci; //asynchronous calling indicator
+	long aci_min_ref;
 };
 #else
 class tracked_executor : public executor
