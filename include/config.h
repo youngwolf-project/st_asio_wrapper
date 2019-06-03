@@ -665,8 +665,8 @@
 		#if !defined(ST_ASIO_HIDE_WARNINGS) && (__clang_major__ > 3 || __clang_major__ == 3 && __clang_minor__ >= 1)
 			#warning Your compiler is Clang 3.1 or higher, you can use ascs to gain some performance improvement.
 		#endif
-	#elif !defined(ST_ASIO_HIDE_WARNINGS) && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6)
-		#warning Your compiler is GCC 4.6 or higher, you can use ascs to gain some performance improvement.
+	#elif !defined(ST_ASIO_HIDE_WARNINGS) && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ > 6)
+		#warning Your compiler is GCC 4.7 or higher, you can use ascs to gain some performance improvement.
 	#endif
 
 	#if !defined(ST_ASIO_HIDE_WARNINGS) && (defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L)
