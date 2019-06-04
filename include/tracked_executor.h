@@ -22,13 +22,8 @@ namespace st_asio_wrapper
 class tracked_executor
 {
 protected:
+	tracked_executor(boost::asio::io_context& _io_context_) : io_context_(_io_context_), aci(boost::make_shared<char>((char) ST_ASIO_MIN_ACI_REF)) {}
 	virtual ~tracked_executor() {}
-	tracked_executor(boost::asio::io_context& _io_context_) : io_context_(_io_context_), aci(boost::make_shared<char>('\0')), aci_min_ref(3)
-	{
-#if defined(_MSC_VER) || (105500 <= BOOST_VERSION && BOOST_VERSION < 107000) || defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L
-		aci_min_ref = 2;
-#endif
-	}
 
 public:
 	typedef boost::function<void(const boost::system::error_code&)> handler_with_error;
@@ -63,11 +58,11 @@ public:
 	bool is_last_async_call() //can only be called in callbacks
 	{
 		long cur_ref = aci.use_count();
-		if (cur_ref > aci_min_ref)
+		if (cur_ref > *aci)
 			return false;
-		else if (cur_ref < aci_min_ref)
-			printf("fault error, please contact the author immediately with these two number -- (%ld/%ld), and the version of the boost and the compiler.",
-				cur_ref, aci_min_ref--);
+		else if (cur_ref < *aci)
+			printf("fault error, please contact the author immediately with these two number -- (%ld/%d), and the version of the boost and the compiler.",
+				cur_ref, (*aci)--);
 
 		return true;
 	}
@@ -78,7 +73,6 @@ protected:
 
 private:
 	boost::shared_ptr<char> aci; //asynchronous calling indicator
-	long aci_min_ref;
 };
 #else
 class tracked_executor : public executor

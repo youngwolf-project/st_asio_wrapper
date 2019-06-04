@@ -645,6 +645,10 @@
 	#define ST_ASIO_SF "%Iu" //format used to print 'size_t'
 	#define ST_ASIO_LLF "%I64u" //format used to print 'boost::uint_fast64_t'
 
+	#ifndef ST_ASIO_MIN_ACI_REF
+		#define ST_ASIO_MIN_ACI_REF 2 //TBD
+	#endif
+
 	#if _MSC_VER < 1700
 		#define ST_THIS //workaround to make up the BOOST_AUTO's defect on vc2008 and compiler crush before vc2012
 	#else
@@ -661,6 +665,19 @@
 	#else
 		#define ST_ASIO_LLF "%llu" //format used to print 'boost::uint_fast64_t'
 	#endif
+
+	#ifndef ST_ASIO_MIN_ACI_REF
+		#if BOOST_VERSION < 105500
+			#define ST_ASIO_MIN_ACI_REF 3
+		#elif BOOST_VERSION < 107000
+			#define ST_ASIO_MIN_ACI_REF 2
+		#elif defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L
+			#define ST_ASIO_MIN_ACI_REF 2
+		#else
+			#define ST_ASIO_MIN_ACI_REF 3
+		#endif
+	#endif
+
 	#ifdef __clang__
 		#if !defined(ST_ASIO_HIDE_WARNINGS) && (__clang_major__ > 3 || __clang_major__ == 3 && __clang_minor__ >= 1)
 			#warning Your compiler is Clang 3.1 or higher, you can use ascs to gain some performance improvement.
