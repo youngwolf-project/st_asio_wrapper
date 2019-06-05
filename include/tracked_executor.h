@@ -54,17 +54,15 @@ public:
 	handler_with_error_size make_handler_error_size(const handler_with_error_size& handler) const
 		{return (aci, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1, boost::lambda::_2));}
 
+	long get_aci_ref() const {return aci.use_count();}
 	bool is_async_calling() const {return !aci.unique();}
-	bool is_last_async_call() //can only be called in callbacks
+	int is_last_async_call() //can only be called in callbacks, 0-not, -1-fault error, 1-yes
 	{
 		long cur_ref = aci.use_count();
 		if (cur_ref > *aci)
-			return false;
-		else if (cur_ref < *aci)
-			printf("fault error, please contact the author immediately with these two number -- (%ld/%d), and the version of the boost and the compiler.",
-				cur_ref, (*aci)--);
+			return 0;
 
-		return true;
+		return cur_ref < *aci ? ((*aci)--, -1) : 1;
 	}
 	inline void set_async_calling(bool) {}
 
@@ -81,8 +79,9 @@ protected:
 	tracked_executor(boost::asio::io_context& io_context_) : executor(io_context_), aci(false) {}
 
 public:
+	inline long get_aci_ref() const {return -1;} //na
 	inline bool is_async_calling() const {return aci;}
-	inline bool is_last_async_call() const {return true;}
+	inline int is_last_async_call() const {return 1;} //1-yes
 	inline void set_async_calling(bool value) {aci = value;}
 
 private:

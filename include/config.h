@@ -646,7 +646,11 @@
 	#define ST_ASIO_LLF "%I64u" //format used to print 'boost::uint_fast64_t'
 
 	#ifndef ST_ASIO_MIN_ACI_REF
-		#define ST_ASIO_MIN_ACI_REF 2 //TBD
+		#if BOOST_VERSION < 105500
+			#define ST_ASIO_MIN_ACI_REF 3
+		#else
+			#define ST_ASIO_MIN_ACI_REF 2
+		#endif
 	#endif
 
 	#if _MSC_VER < 1700

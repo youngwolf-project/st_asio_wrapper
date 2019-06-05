@@ -221,10 +221,10 @@ class test_aci_ref : public tracked_executor
 {
 public:
 	test_aci_ref(boost::asio::io_context& io_context_) : tracked_executor(io_context_) {}
-	void start() {post(boost::bind(&test_aci_ref::handler, this));}
+	void start() {post(boost::bind(&test_aci_ref::handler, this)); printf("haha %ld\n", get_aci_ref());}
 
 private:
-	void handler() {printf("xixi %d\n", is_last_async_call());}
+	void handler() {printf("xixi %ld %d\n", get_aci_ref(), is_last_async_call());}
 };
 */
 int main(int argc, const char* argv[])
@@ -235,12 +235,12 @@ int main(int argc, const char* argv[])
 		return 0;
 	else
 		puts("type " QUIT_COMMAND " to end.");
-
-//	boost::asio::io_context context;
-//	test_aci_ref t(context);
-//	t.start();
-//	context.run();
-
+/*
+	boost::asio::io_context context;
+	test_aci_ref t(context);
+	t.start();
+	context.run();
+*/
 	service_pump sp;
 	echo_server echo_server_(sp); //echo server
 

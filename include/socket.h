@@ -676,12 +676,18 @@ private:
 			dispatch_msg();
 			break;
 		case TIMER_DELAY_CLOSE:
-			if (!is_last_async_call())
 			{
-				stop_all_timer(TIMER_DELAY_CLOSE);
-				return true;
+				int re = is_last_async_call();
+				if (0 == re)
+				{
+					stop_all_timer(TIMER_DELAY_CLOSE);
+					return true;
+				}
+				else if (1 != re)
+					unified_out::fatal_out("fatal error, please contact the author immediately with the version of your boost and compiler.");
 			}
-			else if (lowest_layer().is_open())
+
+			if (lowest_layer().is_open())
 			{
 				boost::system::error_code ec;
 				lowest_layer().close(ec);
