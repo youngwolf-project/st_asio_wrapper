@@ -379,9 +379,7 @@ protected:
 	bool handle_msg()
 	{
 		size_t size_in_byte = st_asio_wrapper::get_size_in_byte(temp_msg_can);
-		size_t msg_num = temp_msg_can.size();
-		size_t left_msg_num = msg_num;
-		stat.recv_msg_sum += msg_num;
+		stat.recv_msg_sum += temp_msg_can.size();
 		stat.recv_byte_sum += size_in_byte;
 #ifdef ST_ASIO_SYNC_RECV
 		boost::unique_lock<boost::mutex> lock(sync_recv_mutex);
@@ -397,33 +395,36 @@ protected:
 				return handled_msg(); //sync_recv_msg() has consumed temp_msg_can
 		}
 		lock.unlock();
-		left_msg_num = temp_msg_can.size();
 #endif
+		bool empty = temp_msg_can.empty();
 #ifdef ST_ASIO_SYNC_DISPATCH
 #ifndef ST_ASIO_PASSIVE_RECV
-		if (left_msg_num > 0)
+		if (!empty)
 #endif
 		{
 			auto_duration dur(stat.handle_time_sum);
-			on_msg(temp_msg_can);
-			left_msg_num = temp_msg_can.size();
+			if (on_msg(temp_msg_can) > 0)
+			{
+				size_in_byte = 0; //to re-calculate size_in_byte
+				empty = temp_msg_can.empty();
+			}
 		}
 #elif defined(ST_ASIO_PASSIVE_RECV)
-		if (0 == left_msg_num)
+		if (empty)
 		{
-			left_msg_num = 1;
+			empty = false;
 			temp_msg_can.emplace_back(); //empty message, let you always having the chance to call recv_msg()
 		}
 #endif
-		if (left_msg_num > 0)
+		if (!empty)
 		{
-			out_container_type temp_buffer(left_msg_num);
+			out_container_type temp_buffer(temp_msg_can.size());
 			BOOST_AUTO(op_iter, temp_buffer.begin());
 			for (BOOST_AUTO(iter, temp_msg_can.begin()); iter != temp_msg_can.end(); ++op_iter, ++iter)
 				op_iter->swap(*iter);
 			temp_msg_can.clear();
 
-			recv_msg_buffer.move_items_in(temp_buffer, left_msg_num < msg_num ? 0 : size_in_byte);
+			recv_msg_buffer.move_items_in(temp_buffer, size_in_byte);
 			dispatch_msg();
 		}
 
@@ -675,12 +676,18 @@ private:
 			dispatch_msg();
 			break;
 		case TIMER_DELAY_CLOSE:
-			if (!is_last_async_call())
 			{
-				stop_all_timer(TIMER_DELAY_CLOSE);
-				return true;
+				int re = is_last_async_call();
+				if (0 == re)
+				{
+					stop_all_timer(TIMER_DELAY_CLOSE);
+					return true;
+				}
+				else if (1 != re)
+					unified_out::fatal_out("fatal error, please contact the author immediately with the version of your boost and compiler.");
 			}
-			else if (lowest_layer().is_open())
+
+			if (lowest_layer().is_open())
 			{
 				boost::system::error_code ec;
 				lowest_layer().close(ec);

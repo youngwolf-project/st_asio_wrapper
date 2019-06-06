@@ -295,7 +295,11 @@ struct statistic
 	static stat_time now() {return boost::chrono::system_clock::now();}
 	typedef boost::chrono::system_clock::duration stat_duration;
 #else
-	struct dummy_duration {dummy_duration& operator+=(const dummy_duration& other) {return *this;}}; //not a real duration, just satisfy compiler(d1 += d2)
+	struct dummy_duration //not a real duration
+	{
+		dummy_duration& operator+=(const dummy_duration& other) {return *this;} //just satisfy compiler(d1 += d2)
+		dummy_duration& operator-=(const dummy_duration& other) {return *this;} //just satisfy compiler(d1 -= d2)
+	};
 	struct dummy_time {dummy_duration operator-(const dummy_time& other) {return dummy_duration();}}; //not a real time, just satisfy compiler(t1 - t2)
 
 	typedef dummy_time stat_time;
@@ -349,6 +353,40 @@ struct statistic
 		unpack_time_sum += other.unpack_time_sum;
 
 		return *this;
+	}
+
+	statistic operator+(const struct statistic& other)
+	{
+		struct statistic re = *this;
+		re += other;
+
+		return re;
+	}
+
+	statistic& operator-=(const struct statistic& other)
+	{
+		send_msg_sum -= other.send_msg_sum;
+		send_byte_sum -= other.send_byte_sum;
+		send_delay_sum -= other.send_delay_sum;
+		send_time_sum -= other.send_time_sum;
+		pack_time_sum -= other.pack_time_sum;
+
+		recv_msg_sum -= other.recv_msg_sum;
+		recv_byte_sum -= other.recv_byte_sum;
+		dispatch_delay_sum -= other.dispatch_delay_sum;
+		recv_idle_sum -= other.recv_idle_sum;
+		handle_time_sum -= other.handle_time_sum;
+		unpack_time_sum -= other.unpack_time_sum;
+
+		return *this;
+	}
+
+	statistic operator-(const struct statistic& other)
+	{
+		struct statistic re = *this;
+		re -= other;
+
+		return re;
 	}
 
 	std::string to_string() const

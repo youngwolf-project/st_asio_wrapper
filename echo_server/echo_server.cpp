@@ -8,7 +8,7 @@
 //#define ST_ASIO_SYNC_DISPATCH //do not open this feature, see below for more details
 #define ST_ASIO_DISPATCH_BATCH_MSG
 #define ST_ASIO_ENHANCED_STABILITY
-#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
+//#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 #define ST_ASIO_USE_STEADY_TIMER
 //#define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_ALIGNED_TIMER
@@ -278,7 +278,10 @@ int main(int argc, const char* argv[])
 		{
 			printf("normal server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", normal_server_.size(), normal_server_.invalid_object_size());
 			printf("echo server, link #: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n\n", echo_server_.size(), echo_server_.invalid_object_size());
-			puts(echo_server_.get_statistic().to_string().data());
+			static statistic last_stat;
+			statistic this_stat = echo_server_.get_statistic();
+			puts((this_stat - last_stat).to_string().data());
+			last_stat = this_stat;
 		}
 		else if (STATUS == str)
 		{

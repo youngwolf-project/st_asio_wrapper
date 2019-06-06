@@ -59,13 +59,13 @@ public:
 	short_connection(i_matrix& matrix_) : client_socket(matrix_) {}
 
 protected:
-	virtual void on_connect() {close_reconnect();} //close reconnecting mechanism
+	virtual void on_connect() {close_reconnect(); client_socket::on_connect();} //close reconnecting mechanism
 };
 
 class short_client : public multi_client_base<short_connection>
 {
 public:
-	short_client(service_pump& service_pump_) : multi_client_base<short_connection>(service_pump_) {}
+	short_client(service_pump& service_pump_) : multi_client_base<short_connection>(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
 
 	void set_server_addr(unsigned short _port, const std::string& _ip = ST_ASIO_SERVER_IP) {port = _port; ip = _ip;}
 	bool send_msg(const std::string& msg) {return send_msg(msg, port, ip);}
