@@ -616,10 +616,14 @@
  * Demonstrate how to use single_service_pump in demo echo_server and client.
  *
  * FIX:
+ * service_pump::stop_service() get stuck on boost-1.70.
  *
  * ENHANCEMENTS:
+ * Class statistic support operator+, -= and -.
+ * Guarantee 100% safety when reusing or freeing socket objects on all editions of boost (before, this guarantee only available on boost 1.55 ~ 1.69).
  *
  * DELETION:
+ * Undefine macro ST_ASIO_FULL_STATISTIC for demo echo_server, it impacts performance a lot.
  *
  * REFACTORING:
  * Move function create_object() from client_base and multi_socket_service_base to multi_socket_service.
