@@ -291,9 +291,56 @@ namespace udp
 struct statistic
 {
 #ifdef ST_ASIO_FULL_STATISTIC
+	struct duration : public boost::chrono::system_clock::duration
+	{
+		typedef boost::chrono::system_clock::duration super;
+
+		duration() {reset();}
+		super get_avg() const {return 0 == num ? super(*this) : *this / num;}
+		void reset() {super::operator=(min_duration = max_duration = super()); num = 0;}
+
+		duration& operator+=(const super& other)
+		{
+			super::operator+=(other);
+			++num;
+
+			if (max_duration < other)
+				max_duration = other;
+			if (0 == min_duration.count() || min_duration > other)
+				min_duration = other;
+
+			return *this;
+		}
+		duration& operator+=(const duration& other)
+		{
+			super::operator+=(other);
+			num += other.num;
+
+			if (max_duration < other.max_duration)
+				max_duration = other.max_duration;
+			if (0 == min_duration.count() || min_duration > other.min_duration)
+				min_duration = other.min_duration;
+
+			return *this;
+		}
+		duration& operator-=(const duration& other) {super::operator-=(other); num -= other.num; return *this;}
+
+		float to_float() const {return to_float(*this);}
+		static float to_float(const super& dur) {return boost::chrono::duration_cast<boost::chrono::duration<float>>(dur).count();}
+
+		template<typename stream_type> friend stream_type& operator<<(stream_type& stream, const duration& dur)
+		{
+			return stream << dur.to_float() << "[" << duration::to_float(dur.min_duration) << ", "
+				<< duration::to_float(dur.get_avg()) << " * " << dur.num << ", " << duration::to_float(dur.max_duration) << "]";
+		}
+
+		super min_duration, max_duration;
+		boost::int_fast64_t num;
+	};
+
 	typedef boost::chrono::system_clock::time_point stat_time;
 	static stat_time now() {return boost::chrono::system_clock::now();}
-	typedef boost::chrono::system_clock::duration stat_duration;
+	typedef duration stat_duration;
 #else
 	struct dummy_duration //not a real duration
 	{
@@ -327,11 +374,14 @@ struct statistic
 	void reset() {reset_number(); reset_duration();}
 	void reset_duration()
 	{
-		send_delay_sum = send_time_sum = pack_time_sum = stat_duration();
+		send_delay_sum.reset();
+		send_time_sum.reset();
+		pack_time_sum.reset();
 
-		dispatch_delay_sum = recv_idle_sum = stat_duration();
-		handle_time_sum = stat_duration();
-		unpack_time_sum = stat_duration();
+		dispatch_delay_sum.reset();
+		recv_idle_sum.reset();
+		handle_time_sum.reset();
+		unpack_time_sum.reset();
 	}
 #else
 	void reset() {reset_number();}
@@ -355,7 +405,7 @@ struct statistic
 		return *this;
 	}
 
-	statistic operator+(const struct statistic& other)
+	statistic operator+(const struct statistic& other) const
 	{
 		struct statistic re = *this;
 		re += other;
@@ -381,7 +431,7 @@ struct statistic
 		return *this;
 	}
 
-	statistic operator-(const struct statistic& other)
+	statistic operator-(const struct statistic& other) const
 	{
 		struct statistic re = *this;
 		re -= other;
@@ -392,22 +442,14 @@ struct statistic
 	std::string to_string() const
 	{
 		std::ostringstream s;
-		s << "send corresponding statistic:\n"
-			<< "message sum: " << send_msg_sum << std::endl
-			<< "size in bytes: " << send_byte_sum << std::endl
+		s << "send corresponding statistic:\nmessage sum: " << send_msg_sum << std::endl << "size in bytes: " << send_byte_sum << std::endl
 #ifdef ST_ASIO_FULL_STATISTIC
-			<< "send delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(send_delay_sum).count() << std::endl
-			<< "send duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(send_time_sum).count() << std::endl
-			<< "pack duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(pack_time_sum).count() << std::endl
+			<< "send delay: " << send_delay_sum << std::endl << "send duration: " << send_time_sum << std::endl << "pack duration: " << pack_time_sum << std::endl
 #endif
-			<< "\nrecv corresponding statistic:\n"
-			<< "message sum: " << recv_msg_sum << std::endl
-			<< "size in bytes: " << recv_byte_sum
+			<< "\nrecv corresponding statistic:\nmessage sum: " << recv_msg_sum << std::endl << "size in bytes: " << recv_byte_sum
 #ifdef ST_ASIO_FULL_STATISTIC
-			<< "\ndispatch delay: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(dispatch_delay_sum).count() << std::endl
-			<< "recv idle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(recv_idle_sum).count() << std::endl
-			<< "on_msg_handle duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(handle_time_sum).count() << std::endl
-			<< "unpack duration: " << boost::chrono::duration_cast<boost::chrono::duration<float> >(unpack_time_sum).count()
+			<< "\ndispatch delay: " << dispatch_delay_sum << std::endl << "recv idle duration: " << recv_idle_sum << std::endl
+			<< "msg handling duration: " << handle_time_sum << std::endl << "unpack duration: " << unpack_time_sum
 #endif
 		;return s.str();
 	}

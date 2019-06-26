@@ -34,14 +34,11 @@ public:
 		_data_len -= bytes_transferred;
 		received_size += bytes_transferred;
 
-		if (bytes_transferred != fwrite(buffer, 1, bytes_transferred, _file))
-		{
-			printf("fwrite(" ST_ASIO_SF ") error!\n", bytes_transferred);
-			return false;
-		}
+		if (bytes_transferred == fwrite(buffer, 1, bytes_transferred, _file))
+			return true;
 
-		msg_can.emplace_back(); //need empty message to trigger the next receiving
-		return true;
+		printf("fwrite(" ST_ASIO_SF ") error!\n", bytes_transferred);
+		return false;
 	}
 
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return ec ? 0 : boost::asio::detail::default_max_transfer_size;}

@@ -180,7 +180,6 @@ public:
 	size_t msg_handling_interval() const {return msg_handling_interval_;}
 
 	//in st_asio_wrapper, it's thread safe to access stat without mutex, because for a specific member of stat, st_asio_wrapper will never access it concurrently.
-	//in other words, in a specific thread, st_asio_wrapper just access only one member of stat.
 	//but user can access stat out of st_asio_wrapper via get_statistic function, although user can only read it, there's still a potential risk,
 	//so whether it's thread safe or not depends on boost::chrono::system_clock::duration.
 	//i can make it thread safe in st_asio_wrapper, but is it worth to do so? this is a problem.
@@ -413,7 +412,7 @@ protected:
 		if (empty)
 		{
 			empty = false;
-			temp_msg_can.emplace_back(); //empty message, let you always having the chance to call recv_msg()
+			temp_msg_can.emplace_back(); //empty message, let user always having the chance to call recv_msg()
 		}
 #endif
 		if (!empty)
