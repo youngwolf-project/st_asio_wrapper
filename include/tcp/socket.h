@@ -273,7 +273,7 @@ private:
 				on_unpack_error(); //the user will decide whether to reset the unpacker or not in this callback
 
 #ifdef ST_ASIO_PASSIVE_RECV
-			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
+			reading = false; //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
 #endif
 			if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
@@ -281,7 +281,7 @@ private:
 		else
 		{
 #ifdef ST_ASIO_PASSIVE_RECV
-			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
+			reading = false; //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
 #endif
 			if (ec)
 			{

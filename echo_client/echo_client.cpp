@@ -113,13 +113,14 @@ protected:
 	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
-		BOOST_AUTO(re, msg_can.size());
 		msg_can.clear(); //if we left behind some messages in msg_can, they will be dispatched via on_msg_handle asynchronously, which means it's
 		//possible that on_msg_handle be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
 		//here we always consumed all messages, so we can use sync message dispatching, otherwise, we should not use sync message dispatching
 		//except we can bear message disordering.
 
-		return re;
+		return 1;
+		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
+		//if we handled nothing, return a positive number is also okey but will very slightly impact performance (if msg_can is not empty), return 0 is suggested
 	}
 #endif
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
@@ -133,6 +134,8 @@ protected:
 
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&echo_socket::handle_msg, this, _1));
 		return tmp_can.size();
+		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
+		//if we handled nothing, return a positive number is also okey but will very slightly impact performance, return 0 is suggested
 	}
 #else
 	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}

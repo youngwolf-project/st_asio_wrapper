@@ -131,6 +131,8 @@ public:
 	{
 		if (0 == size_in_byte)
 			size_in_byte = st_asio_wrapper::get_size_in_byte(src);
+		else
+			assert(st_asio_wrapper::get_size_in_byte(src) == size_in_byte);
 
 		ST_THIS splice(ST_THIS end(), src);
 		total_size += size_in_byte;

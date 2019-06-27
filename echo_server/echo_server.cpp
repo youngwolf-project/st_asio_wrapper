@@ -117,10 +117,11 @@ protected:
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
 #endif
-		size_t re = msg_can.size();
 		msg_can.clear();
 
-		return re;
+		return 1;
+		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
+		//if we handled nothing, return a positive number is also okey but will very slightly impact performance (if msg_can is not empty), return 0 is suggested
 	}
 #endif
 
@@ -144,6 +145,8 @@ protected:
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
 #endif
 		return tmp_can.size();
+		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
+		//if we handled nothing, return a positive number is also okey but will very slightly impact performance, return 0 is suggested
 	}
 #else
 	//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
