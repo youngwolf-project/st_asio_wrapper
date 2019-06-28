@@ -60,7 +60,7 @@ public:
 	//notice, when reusing this socket, object_pool will invoke this function, so if you want to do some additional initialization
 	// for this socket, do it at here and in the constructor.
 	//for tcp::single_client_base and ssl::single_client_base, this virtual function will never be called, please note.
-	virtual void reset() {status = BROKEN; last_send_msg.clear(); unpacker_->reset(); super::reset();}
+	virtual void reset() {status = BROKEN; sending_msgs.clear(); unpacker_->reset(); super::reset();}
 
 	//SOCKET status
 	bool is_broken() const {return BROKEN == status;}
@@ -197,7 +197,7 @@ protected:
 	virtual void on_close()
 	{
 #ifdef ST_ASIO_SYNC_SEND
-		for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
+		for (BOOST_AUTO(iter, sending_msgs.begin()); iter != sending_msgs.end(); ++iter)
 			if (iter->p)
 				iter->p->set_value(NOT_APPLICABLE);
 #endif
@@ -300,13 +300,13 @@ private:
 
 		BOOST_AUTO(end_time, statistic::now());
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-		send_msg_buffer.move_items_out(0, last_send_msg);
+		send_buffer.move_items_out(0, sending_msgs);
 #else
-		send_msg_buffer.move_items_out(boost::asio::detail::default_max_transfer_size, last_send_msg);
+		send_buffer.move_items_out(boost::asio::detail::default_max_transfer_size, sending_msgs);
 #endif
 		std::vector<boost::asio::const_buffer> bufs;
-		bufs.reserve(last_send_msg.size());
-		for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
+		bufs.reserve(sending_msgs.size());
+		for (BOOST_AUTO(iter, sending_msgs.begin()); iter != sending_msgs.end(); ++iter)
 		{
 			stat.send_delay_sum += end_time - iter->begin_time;
 			bufs.push_back(boost::asio::const_buffer(iter->data(), iter->size()));
@@ -314,7 +314,7 @@ private:
 
 		if ((sending = !bufs.empty()))
 		{
-			last_send_msg.front().restart();
+			sending_msgs.front().restart();
 			boost::asio::async_write(ST_THIS next_layer(), bufs, make_strand_handler(strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
@@ -330,33 +330,33 @@ private:
 			stat.last_send_time = time(NULL);
 
 			stat.send_byte_sum += bytes_transferred;
-			stat.send_time_sum += statistic::now() - last_send_msg.front().begin_time;
-			stat.send_msg_sum += last_send_msg.size();
+			stat.send_time_sum += statistic::now() - sending_msgs.front().begin_time;
+			stat.send_msg_sum += sending_msgs.size();
 #ifdef ST_ASIO_SYNC_SEND
-			for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
+			for (BOOST_AUTO(iter, sending_msgs.begin()); iter != sending_msgs.end(); ++iter)
 				if (iter->p)
 					iter->p->set_value(SUCCESS);
 #endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-			ST_THIS on_msg_send(last_send_msg.front());
+			ST_THIS on_msg_send(sending_msgs.front());
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-			if (send_msg_buffer.empty())
-				ST_THIS on_all_msg_send(last_send_msg.back());
+			if (send_buffer.empty())
+				ST_THIS on_all_msg_send(sending_msgs.back());
 #endif
-			last_send_msg.clear();
-			if (!do_send_msg(true) && !send_msg_buffer.empty()) //send msg in sequence
+			sending_msgs.clear();
+			if (!do_send_msg(true) && !send_buffer.empty()) //send msg in sequence
 				do_send_msg(true); //just make sure no pending msgs
 		}
 		else
 		{
 #ifdef ST_ASIO_SYNC_SEND
-			for (BOOST_AUTO(iter, last_send_msg.begin()); iter != last_send_msg.end(); ++iter)
+			for (BOOST_AUTO(iter, sending_msgs.begin()); iter != sending_msgs.end(); ++iter)
 				if (iter->p)
 					iter->p->set_value(NOT_APPLICABLE);
 #endif
-			on_send_error(ec, last_send_msg);
-			last_send_msg.clear(); //clear sending messages after on_send_error, then user can decide how to deal with them in on_send_error
+			on_send_error(ec, sending_msgs);
+			sending_msgs.clear(); //clear sending messages after on_send_error, then user can decide how to deal with them in on_send_error
 
 			sending = false;
 		}
@@ -391,7 +391,7 @@ private:
 	using super::packer_;
 	using super::temp_msg_can;
 
-	using super::send_msg_buffer;
+	using super::send_buffer;
 	using super::sending;
 
 #ifdef ST_ASIO_PASSIVE_RECV
@@ -399,7 +399,7 @@ private:
 #endif
 
 	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker_;
-	typename super::in_container_type last_send_msg;
+	typename super::in_container_type sending_msgs;
 	boost::asio::io_context::strand strand;
 };
 
