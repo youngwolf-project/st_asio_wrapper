@@ -454,7 +454,7 @@
  * 2018.8.22	version 2.1.2
  *
  * SPECIAL ATTENTION (incompatible with old editions):
- * If macro ST_ASIO_PASSIVE_RECV been defined, you may receive empty messages in on_msg() or on_msg_handle() and sync_recv_msg(), this makes you always having
+ * If macro ST_ASIO_PASSIVE_RECV been defined, you may receive an empty message in on_msg_handle(), this makes you always having
  *  the chance to call recv_msg().
  * i_unpacker has been moved from namespace st_asio_wrapper::tcp and st_asio_wrapper::udp to namespace st_asio_wrapper, and the signature of
  *  st_asio_wrapper::udp::i_unpacker::parse_msg has been changed to obey st_asio_wrapper::tcp::i_unpacker::parse_msg.
