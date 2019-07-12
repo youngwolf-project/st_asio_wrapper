@@ -19,7 +19,7 @@ namespace st_asio_wrapper { namespace tcp {
 
 template <typename Socket, typename Packer, typename Unpacker,
 	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
-class socket_base : public socket<Socket, Packer, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
+class socket_base : public socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -28,16 +28,13 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 private:
-	typedef socket<Socket, Packer, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 protected:
 	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN};
 
-	socket_base(boost::asio::io_context& io_context_) : super(io_context_), strand(io_context_) {first_init();}
-	template<typename Arg> socket_base(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg), strand(io_context_) {first_init();}
-
-	//helper function, just call it in constructor
-	void first_init() {status = BROKEN; unpacker_ = boost::make_shared<Unpacker>();}
+	socket_base(boost::asio::io_context& io_context_) : super(io_context_), status(BROKEN) {}
+	template<typename Arg> socket_base(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg), status(BROKEN) {}
 
 public:
 	static const typename super::tid TIMER_BEGIN = super::TIMER_END;
@@ -60,7 +57,7 @@ public:
 	//notice, when reusing this socket, object_pool will invoke this function, so if you want to do some additional initialization
 	// for this socket, do it at here and in the constructor.
 	//for tcp::single_client_base and ssl::single_client_base, this virtual function will never be called, please note.
-	virtual void reset() {status = BROKEN; sending_msgs.clear(); unpacker_->reset(); super::reset();}
+	virtual void reset() {status = BROKEN; sending_msgs.clear(); super::reset();}
 
 	//SOCKET status
 	bool is_broken() const {return BROKEN == status;}
@@ -113,15 +110,6 @@ public:
 #endif
 			ST_THIS is_dispatching(), status, ST_THIS is_recv_idle());
 	}
-
-	//get or change the unpacker at runtime
-	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker() {return unpacker_;}
-	boost::shared_ptr<const i_unpacker<out_msg_type> > unpacker() const {return unpacker_;}
-#ifdef ST_ASIO_PASSIVE_RECV
-	//changing unpacker must before calling st_asio_wrapper::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
-	void unpacker(const boost::shared_ptr<i_unpacker<out_msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
-	virtual void recv_msg() {if (!reading && is_ready()) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
-#endif
 
 	///////////////////////////////////////////////////
 	//msg sending interface
@@ -212,11 +200,6 @@ protected:
 	virtual void on_async_shutdown_error() = 0;
 
 private:
-#ifndef ST_ASIO_PASSIVE_RECV
-	virtual void recv_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
-#endif
-	virtual void send_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
-
 	using super::close;
 	using super::handle_error;
 	using super::handle_msg;
@@ -238,7 +221,7 @@ private:
 		return unpacker_->completion_condition(ec, bytes_transferred);
 	}
 
-	void do_recv_msg()
+	virtual void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
 		if (reading)
@@ -254,7 +237,7 @@ private:
 			reading = true;
 #endif
 			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
-				boost::bind(&socket_base::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), make_strand_handler(strand,
+				boost::bind(&socket_base::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), make_strand_handler(rw_strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 		}
 	}
@@ -293,7 +276,7 @@ private:
 		}
 	}
 
-	bool do_send_msg(bool in_strand)
+	virtual bool do_send_msg(bool in_strand = false)
 	{
 		if (!in_strand && sending)
 			return true;
@@ -315,7 +298,7 @@ private:
 		if ((sending = !bufs.empty()))
 		{
 			sending_msgs.front().restart();
-			boost::asio::async_write(ST_THIS next_layer(), bufs, make_strand_handler(strand,
+			boost::asio::async_write(ST_THIS next_layer(), bufs, make_strand_handler(rw_strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
@@ -389,6 +372,7 @@ protected:
 private:
 	using super::stat;
 	using super::packer_;
+	using super::unpacker_;
 	using super::temp_msg_can;
 
 	using super::send_buffer;
@@ -397,10 +381,9 @@ private:
 #ifdef ST_ASIO_PASSIVE_RECV
 	using super::reading;
 #endif
+	using super::rw_strand;
 
-	boost::shared_ptr<i_unpacker<out_msg_type> > unpacker_;
 	typename super::in_container_type sending_msgs;
-	boost::asio::io_context::strand strand;
 };
 
 }} //namespace

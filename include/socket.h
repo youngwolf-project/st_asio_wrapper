@@ -20,7 +20,7 @@
 namespace st_asio_wrapper
 {
 
-template<typename Socket, typename Packer, typename InMsgType, typename OutMsgType,
+template<typename Socket, typename Packer, typename Unpacker, typename InMsgType, typename OutMsgType,
 	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
 class socket : public timer<tracked_executor>
 {
@@ -36,14 +36,16 @@ public:
 	static const tid TIMER_END = TIMER_BEGIN + 10;
 
 protected:
-	socket(boost::asio::io_context& io_context_) : super(io_context_), next_layer_(io_context_), strand(io_context_) {first_init();}
-	template<typename Arg> socket(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_), next_layer_(io_context_, arg), strand(io_context_) {first_init();}
+	socket(boost::asio::io_context& io_context_) : super(io_context_), rw_strand(io_context_), next_layer_(io_context_), dis_strand(io_context_) {first_init();}
+	template<typename Arg> socket(boost::asio::io_context& io_context_, Arg& arg) :
+		super(io_context_), rw_strand(io_context_), next_layer_(io_context_, arg), dis_strand(io_context_) {first_init();}
 
 	//helper function, just call it in constructor
 	void first_init()
 	{
 		_id = -1;
 		packer_ = boost::make_shared<Packer>();
+		unpacker_ = boost::make_shared<Unpacker>();
 		sending = false;
 #ifdef ST_ASIO_PASSIVE_RECV
 		reading = false;
@@ -71,6 +73,7 @@ protected:
 
 		stat.reset();
 		packer_->reset();
+		unpacker_->reset();
 		sending = false;
 #ifdef ST_ASIO_PASSIVE_RECV
 		reading = false;
@@ -129,6 +132,19 @@ public:
 		}
 	}
 
+#ifdef ST_ASIO_PASSIVE_RECV
+	bool is_reading() const {return reading;}
+	void recv_msg() {if (!reading && is_ready()) dispatch_strand(rw_strand, boost::bind(&socket::do_recv_msg, this));}
+#else
+private:
+	void recv_msg() {dispatch_strand(rw_strand, boost::bind(&socket::do_recv_msg, this));}
+#endif
+#ifndef ST_ASIO_EXPOSE_SEND_INTERFACE
+private:
+#endif
+	void send_msg() {if (!sending && is_ready()) dispatch_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}
+
+public:
 	void start_heartbeat(int interval, int max_absence = ST_ASIO_HEARTBEAT_MAX_ABSENCE)
 	{
 		assert(interval > 0 && max_absence > 0);
@@ -161,9 +177,6 @@ public:
 	}
 
 	bool is_sending() const {return sending;}
-#ifdef ST_ASIO_PASSIVE_RECV
-	bool is_reading() const {return reading;}
-#endif
 	bool is_dispatching() const {return dispatching;}
 	bool is_recv_idle() const {return recv_idle_began;}
 
@@ -181,10 +194,20 @@ public:
 
 	//get or change the packer at runtime
 	//changing packer at runtime is not thread-safe (if we're sending messages concurrently), please pay special attention,
-	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
+	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not commonly needed and you know how to avoid
+	// race condition between message sending and packer replacement (because ascs never send messages automatically except with macro
+	// ST_ASIO_HEARTBEAT_INTERVAL, please note).
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer() {return packer_;}
 	boost::shared_ptr<const i_packer<typename Packer::msg_type> > packer() const {return packer_;}
 	void packer(const boost::shared_ptr<i_packer<typename Packer::msg_type> >& _packer_) {packer_ = _packer_;}
+
+	//get or change the unpacker at runtime
+	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker() {return unpacker_;}
+	boost::shared_ptr<const i_unpacker<typename Unpacker::msg_type> > unpacker() const {return unpacker_;}
+#ifdef ST_ASIO_PASSIVE_RECV
+	//changing unpacker must before calling ascs::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
+	void unpacker(const boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
+#endif
 
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is overflow or not,
 	//this can exhaust all virtual memory, please pay special attentions.
@@ -427,7 +450,7 @@ protected:
 	{
 		if (msg.empty())
 			unified_out::error_out("found an empty message, please check your packer.");
-		else if (send_buffer.enqueue(msg) && !sending && is_ready())
+		else if (send_buffer.enqueue(msg))
 			send_msg();
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
@@ -440,7 +463,7 @@ protected:
 	{
 		if (msg.empty())
 			unified_out::error_out("found an empty message, please check your packer.");
-		else if (send_buffer.enqueue(msg) && !sending && is_ready())
+		else if (send_buffer.enqueue(msg))
 			send_msg();
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
@@ -459,8 +482,7 @@ protected:
 			temp_buffer.emplace_back().swap(*iter); //with c++0x, this can be emplace_back(*iter)
 		}
 		send_buffer.move_items_in(temp_buffer, size_in_byte);
-		if (!sending && is_ready())
-			send_msg();
+		send_msg();
 
 		return true;
 	}
@@ -482,9 +504,8 @@ protected:
 		p->get_future().swap(f);
 		if (!send_buffer.enqueue(unused))
 			return NOT_APPLICABLE;
-		else if (!sending && is_ready())
-			send_msg();
 
+		send_msg();
 #ifdef BOOST_THREAD_USES_CHRONO
 		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
 #else
@@ -508,9 +529,8 @@ protected:
 		p->get_future().swap(f);
 		if (!send_buffer.enqueue(unused))
 			return NOT_APPLICABLE;
-		else if (!sending && is_ready())
-			send_msg();
 
+		send_msg();
 #ifdef BOOST_THREAD_USES_CHRONO
 		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
 #else
@@ -538,9 +558,8 @@ protected:
 		typename in_msg::future f;
 		p->get_future().swap(f);
 		send_buffer.move_items_in(temp_buffer, size_in_byte);
-		if (!sending && is_ready())
-			send_msg();
 
+		send_msg();
 #ifdef BOOST_THREAD_USES_CHRONO
 		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
 #else
@@ -550,8 +569,8 @@ protected:
 #endif
 
 private:
-	virtual void recv_msg() = 0;
-	virtual void send_msg() = 0;
+	virtual void do_recv_msg() = 0;
+	virtual bool do_send_msg(bool in_strand = false) = 0;
 
 	//please do not change id at runtime via the following function, except this socket is not managed by object_pool,
 	//it should only be used by object_pool when reusing or creating new socket.
@@ -608,7 +627,7 @@ private:
 	}
 
 	//do not use dispatch_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
-	void dispatch_msg() {if (!dispatching) post_strand(strand, boost::bind(&socket::do_dispatch_msg, this));}
+	void dispatch_msg() {if (!dispatching) post_strand(dis_strand, boost::bind(&socket::do_dispatch_msg, this));}
 	void accumulate_dispatch_delay(const statistic::stat_time& begin_time, const out_msg& msg) {stat.dispatch_delay_sum += begin_time - msg.begin_time;}
 	void do_dispatch_msg()
 	{
@@ -699,6 +718,7 @@ private:
 protected:
 	struct statistic stat;
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer_;
+	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker_;
 	list<OutMsgType> temp_msg_can;
 
 	in_queue_type send_buffer;
@@ -707,6 +727,7 @@ protected:
 #ifdef ST_ASIO_PASSIVE_RECV
 	volatile bool reading;
 #endif
+	boost::asio::io_context::strand rw_strand;
 
 private:
 	bool recv_idle_began;
@@ -723,7 +744,7 @@ private:
 	Socket next_layer_;
 
 	atomic_size_t start_atomic;
-	boost::asio::io_context::strand strand;
+	boost::asio::io_context::strand dis_strand;
 
 #ifdef ST_ASIO_SYNC_RECV
 	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED, RESPONDED_FAILURE};

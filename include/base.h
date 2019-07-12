@@ -326,7 +326,7 @@ struct statistic
 		duration& operator-=(const duration& other) {super::operator-=(other); num -= other.num; return *this;}
 
 		float to_float() const {return to_float(*this);}
-		static float to_float(const super& dur) {return boost::chrono::duration_cast<boost::chrono::duration<float>>(dur).count();}
+		static float to_float(const super& dur) {return boost::chrono::duration_cast<boost::chrono::duration<float> >(dur).count();}
 
 		template<typename stream_type> friend stream_type& operator<<(stream_type& stream, const duration& dur)
 		{

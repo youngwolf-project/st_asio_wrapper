@@ -966,10 +966,17 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //call on_msg_handle, if failed, retry it after ST_ASIO_MSG_HANDLING_INTERVAL milliseconds later.
 //this value can be changed via st_asio_wrapper::socket::msg_handling_interval(size_t) at runtime.
 
+//#define ST_ASIO_EXPOSE_SEND_INTERFACE
+//for some reason (i still not met yet), the message sending has stopped but some messages left behind in the sending buffer, they won't be
+// sent until new messages come in, define this macro to expose send_msg() interface, then you can call it manually to fix this situation.
+//during message sending, calling send_msg() will fail, this is by design to avoid asio::io_context using up all virtual memory, this also
+// means that before the sending really started, you can greedily call send_msg() and may exhaust all virtual memory, please note.
+
 //#define ST_ASIO_PASSIVE_RECV
 //to gain the ability of changing the unpacker at runtime, with this macro, st_asio_wrapper will not do message receiving automatically (except the firt one),
 // so you need to manually call recv_msg(), if you need to change the unpacker, do it before recv_msg() invocation, please note.
-//during async message receiving, calling recv_msg() will fail, this is by design to avoid asio::io_context using up all virtual memory.
+//during async message receiving, calling recv_msg() will fail, this is by design to avoid asio::io_context using up all virtual memory, this also
+// means that before the receiving really started, you can greedily call recv_msg() and may exhaust all virtual memory, please note.
 //because user can greedily call recv_msg(), it's your responsibility to keep the recv buffer from overflowed, please pay special attention.
 //this macro also makes you to be able to pause message receiving, then, if there's no other tasks (like timers), service_pump will stop itself,
 // to avoid this, please define macro ST_ASIO_AVOID_AUTO_STOP_SERVICE.
