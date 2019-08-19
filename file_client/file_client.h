@@ -145,7 +145,7 @@ private:
 		{
 			assert(msg.empty());
 
-			BOOST_AUTO(unp, boost::dynamic_pointer_cast<data_unpacker>(unpacker()));
+			BOOST_AUTO(unp, boost::dynamic_pointer_cast<file_unpacker>(unpacker()));
 			if (NULL == unp || unp->is_finished())
 				trans_end();
 
@@ -191,7 +191,7 @@ private:
 						send_msg(buffer, sizeof(buffer), true);
 
 						fseeko(file, offset, SEEK_SET);
-						unpacker(boost::make_shared<data_unpacker>(file, my_length));
+						unpacker(boost::make_shared<file_unpacker>(file, my_length));
 					}
 					else
 						trans_end();
