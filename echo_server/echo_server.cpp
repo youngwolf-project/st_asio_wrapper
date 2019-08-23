@@ -224,10 +224,21 @@ class test_aci_ref : public tracked_executor
 {
 public:
 	test_aci_ref(boost::asio::io_context& io_context_) : tracked_executor(io_context_) {}
-	void start() {post(boost::bind(&test_aci_ref::handler, this)); printf("haha %ld\n", get_aci_ref());}
+	void start() {post(boost::bind(&test_aci_ref::handler, this)); printf("after post invocation, the aci ref is %ld\n", get_aci_ref());}
 
 private:
-	void handler() {printf("xixi %ld %d\n", get_aci_ref(), is_last_async_call());}
+	void handler() {printf("in post handler, the aci ref is %ld, is last async call is %d\n", get_aci_ref(), is_last_async_call());}
+};
+
+class my_timer : public timer<tracked_executor>
+{
+public:
+    my_timer(boost::asio::io_context& io_context_) :timer<tracked_executor>(io_context_) {}
+    void start() {set_timer(0, 10, boost::bind(&my_timer::handler, this, _1)); printf("after set_timer invocation, the aci ref is %ld\n", get_aci_ref());}
+
+private:
+    bool handler(tid id)
+        {printf("in timer handler, the aci ref is %ld, is last async call is %d\n", get_aci_ref(), is_last_async_call()); return false;}
 };
 */
 int main(int argc, const char* argv[])
@@ -239,9 +250,12 @@ int main(int argc, const char* argv[])
 	else
 		puts("type " QUIT_COMMAND " to end.");
 /*
+	printf("the ST_ASIO_MIN_ACI_REF is %d\n", ST_ASIO_MIN_ACI_REF);
 	boost::asio::io_context context;
 	test_aci_ref t(context);
 	t.start();
+	my_timer tt(context);
+	tt.start();
 	context.run();
 */
 	service_pump sp;
