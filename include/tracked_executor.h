@@ -56,13 +56,13 @@ public:
 
 	long get_aci_ref() const {return aci.use_count();}
 	bool is_async_calling() const {return !aci.unique();}
-	int is_last_async_call() //can only be called in callbacks, 0-not, -1-fault error, 1-yes
+	int is_last_async_call() const //can only be called in callbacks, 0-not, -1-fault error, 1-yes
 	{
 		long cur_ref = aci.use_count();
 		if (cur_ref > *aci)
 			return 0;
 
-		return cur_ref < *aci ? ((*aci)--, -1) : 1;
+		return cur_ref < *aci ? -1 : 1;
 	}
 	inline void set_async_calling(bool) {}
 
