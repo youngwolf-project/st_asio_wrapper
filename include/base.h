@@ -661,11 +661,7 @@ bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false) \
 	if (!can_overflow && !ST_THIS is_send_buffer_available()) \
 		return false; \
 	else if (NATIVE) \
-	{ \
-		do_direct_send_msg(msg1); \
-		do_direct_send_msg(msg2); \
-		return true; /*do_direct_send_msg will always succeed*/ \
-	} \
+		return do_direct_send_msg(msg1) && do_direct_send_msg(msg2); \
 	typename Packer::container_type msg_can; \
 	auto_duration dur(stat.pack_time_sum); \
 	bool re = packer_->pack_msg(msg1, msg2, msg_can); \
