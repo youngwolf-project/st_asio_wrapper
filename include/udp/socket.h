@@ -20,7 +20,7 @@ namespace st_asio_wrapper { namespace udp {
 template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::udp::socket,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class socket_base : public socket<Socket, Packer, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>, InQueue, InContainer, OutQueue, OutContainer>
+class socket_base : public socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>, InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
 	typedef udp_msg<typename Packer::msg_type> in_msg_type;
@@ -29,11 +29,11 @@ public:
 	typedef const out_msg_type out_msg_ctype;
 
 private:
-	typedef socket<Socket, Packer, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	socket_base(boost::asio::io_context& io_context_) : super(io_context_), strand(io_context_) {first_init();}
-	socket_base(Matrix& matrix_) : super(matrix_.get_service_pump()), strand(matrix_.get_service_pump()) {first_init(&matrix_);}
+	socket_base(boost::asio::io_context& io_context_) : super(io_context_), has_bound(false), matrix(NULL) {}
+	socket_base(Matrix& matrix_) : super(matrix_.get_service_pump()), has_bound(false), matrix(&matrix_) {}
 
 	virtual bool is_ready() {return has_bound;}
 	virtual void send_heartbeat()
@@ -54,8 +54,7 @@ public:
 	{
 		has_bound = false;
 
-		last_send_msg.clear();
-		unpacker_->reset();
+		sending_msg.clear();
 		super::reset();
 	}
 
@@ -65,7 +64,7 @@ public:
 	const boost::asio::ip::udp::endpoint& get_peer_addr() const {return peer_addr;}
 
 	void disconnect() {force_shutdown();}
-	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(strand, boost::bind(&socket_base::shutdown, this));}
+	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&socket_base::shutdown, this));}
 	void graceful_shutdown() {force_shutdown();}
 
 	void show_info(const char* head, const char* tail) const {unified_out::info_out("%s %s:%hu %s", head, local_addr.address().to_string().data(), local_addr.port(), tail);}
@@ -87,17 +86,6 @@ public:
 #endif
 			ST_THIS is_dispatching(), ST_THIS is_recv_idle());
 	}
-
-	//get or change the unpacker at runtime
-	//changing unpacker at runtime is not thread-safe, this operation can only be done in on_msg(), reset() or constructor, please pay special attention
-	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not frequently used
-	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker() {return unpacker_;}
-	boost::shared_ptr<const i_unpacker<typename Unpacker::msg_type> > unpacker() const {return unpacker_;}
-#ifdef ST_ASIO_PASSIVE_RECV
-	//changing unpacker must before calling st_asio_wrapper::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
-	void unpacker(const boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
-	virtual void recv_msg() {if (!reading && is_ready()) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
-#endif
 
 	///////////////////////////////////////////////////
 	//msg sending interface
@@ -122,9 +110,6 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
-	//helper function, just call it in constructor
-	void first_init(Matrix* matrix_ = NULL) {has_bound = false; unpacker_ = boost::make_shared<Unpacker>(); matrix = matrix_;}
-
 	Matrix* get_matrix() {return matrix;}
 	const Matrix* get_matrix() const {return matrix;}
 
@@ -180,15 +165,10 @@ protected:
 	}
 
 #ifdef ST_ASIO_SYNC_SEND
-	virtual void on_close() {if (last_send_msg.p) last_send_msg.p->set_value(NOT_APPLICABLE); super::on_close();}
+	virtual void on_close() {if (sending_msg.p) sending_msg.p->set_value(NOT_APPLICABLE); super::on_close();}
 #endif
 
 private:
-#ifndef ST_ASIO_PASSIVE_RECV
-	virtual void recv_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
-#endif
-	virtual void send_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
-
 	using super::close;
 	using super::handle_error;
 	using super::handle_msg;
@@ -199,7 +179,7 @@ private:
 
 	void shutdown() {close();}
 
-	void do_recv_msg()
+	virtual void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
 		if (reading)
@@ -214,7 +194,7 @@ private:
 #ifdef ST_ASIO_PASSIVE_RECV
 			reading = true;
 #endif
-			ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(strand,
+			ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(rw_strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 		}
 	}
@@ -255,17 +235,17 @@ private:
 		}
 	}
 
-	bool do_send_msg(bool in_strand)
+	virtual bool do_send_msg(bool in_strand = false)
 	{
 		if (!in_strand && sending)
 			return true;
 
-		if ((sending = send_msg_buffer.try_dequeue(last_send_msg)))
+		if ((sending = send_buffer.try_dequeue(sending_msg)))
 		{
-			stat.send_delay_sum += statistic::now() - last_send_msg.begin_time;
+			stat.send_delay_sum += statistic::now() - sending_msg.begin_time;
 
-			last_send_msg.restart();
-			ST_THIS next_layer().async_send_to(boost::asio::buffer(last_send_msg.data(), last_send_msg.size()), last_send_msg.peer_addr, make_strand_handler(strand,
+			sending_msg.restart();
+			ST_THIS next_layer().async_send_to(boost::asio::buffer(sending_msg.data(), sending_msg.size()), sending_msg.peer_addr, make_strand_handler(rw_strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
@@ -280,29 +260,29 @@ private:
 			stat.last_send_time = time(NULL);
 
 			stat.send_byte_sum += bytes_transferred;
-			stat.send_time_sum += statistic::now() - last_send_msg.begin_time;
+			stat.send_time_sum += statistic::now() - sending_msg.begin_time;
 			++stat.send_msg_sum;
 #ifdef ST_ASIO_SYNC_SEND
-			if (last_send_msg.p)
-				last_send_msg.p->set_value(SUCCESS);
+			if (sending_msg.p)
+				sending_msg.p->set_value(SUCCESS);
 #endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-			ST_THIS on_msg_send(last_send_msg);
+			ST_THIS on_msg_send(sending_msg);
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-			if (send_msg_buffer.empty())
-				ST_THIS on_all_msg_send(last_send_msg);
+			if (send_buffer.empty())
+				ST_THIS on_all_msg_send(sending_msg);
 #endif
 		}
 		else
 		{
 #ifdef ST_ASIO_SYNC_SEND
-			if (last_send_msg.p)
-				last_send_msg.p->set_value(NOT_APPLICABLE);
+			if (sending_msg.p)
+				sending_msg.p->set_value(NOT_APPLICABLE);
 #endif
-			on_send_error(ec, last_send_msg);
+			on_send_error(ec, sending_msg);
 		}
-		last_send_msg.clear(); //clear sending message after on_send_error, then user can decide how to deal with it in on_send_error
+		sending_msg.clear(); //clear sending message after on_send_error, then user can decide how to deal with it in on_send_error
 
 		if (ec && (boost::asio::error::not_socket == ec || boost::asio::error::bad_descriptor == ec))
 			return;
@@ -310,7 +290,7 @@ private:
 		//send msg in sequence
 		//on windows, sending a msg to addr_any may cause errors, please note
 		//for UDP, sending error will not stop subsequent sending.
-		if (!do_send_msg(true) && !send_msg_buffer.empty())
+		if (!do_send_msg(true) && !send_buffer.empty())
 			do_send_msg(true); //just make sure no pending msgs
 	}
 
@@ -341,24 +321,24 @@ private:
 private:
 	using super::stat;
 	using super::packer_;
+	using super::unpacker_;
 	using super::temp_msg_can;
 
-	using super::send_msg_buffer;
+	using super::send_buffer;
 	using super::sending;
 
 #ifdef ST_ASIO_PASSIVE_RECV
 	using super::reading;
 #endif
+	using super::rw_strand;
 
 	bool has_bound;
-	typename super::in_msg last_send_msg;
-	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker_;
+	typename super::in_msg sending_msg;
 	boost::asio::ip::udp::endpoint local_addr;
 	boost::asio::ip::udp::endpoint temp_addr; //used when receiving messages
 	boost::asio::ip::udp::endpoint peer_addr;
 
 	Matrix* matrix;
-	boost::asio::io_context::strand strand;
 };
 
 }} //namespace

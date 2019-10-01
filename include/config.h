@@ -191,7 +191,7 @@
  * HIGHLIGHT:
  *
  * FIX:
- * Fix race condition on member variable last_send_msg in st_tcp_socket_base.
+ * Fix race condition on member variable sending_msgs in tcp::socket_base.
  *
  * ENHANCEMENTS:
  * Optimize reconnecting mechanism.
@@ -250,7 +250,7 @@
  * ENHANCEMENTS:
  * Optimized and simplified auto_buffer, shared_buffer and ext::basic_buffer.
  * Optimized class obj_with_begin_time.
- * Not use sending buffer (send_msg_buffer) if possible.
+ * Not use sending buffer (send_buffer) if possible.
  * Reduced stopped() invocation (because it needs locks).
  * Introduced boost::asio::io_service::work (boost::asio::executor_work_guard) by defining ST_ASIO_AVOID_AUTO_STOP_SERVICE macro.
  * Add function service_pump::service_thread_num to fetch the real number of service thread (must define ST_ASIO_DECREASE_THREAD_AT_RUNTIME macro).
@@ -630,6 +630,28 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2019.10.1	version 2.2.3
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ *
+ * HIGHLIGHT:
+ *
+ * FIX:
+ *
+ * ENHANCEMENTS:
+ * Introduce macro ST_ASIO_EXPOSE_SEND_INTERFACE to expose send_msg() interface, see below for more details.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ * Move unpacker logic from tcp::socket_base and udp::socket_base to st_asio_wrapper::socket.
+ * Move message sending and receiving logic from tcp::socket_base and udp::socket_base to st_asio_wrapper::socket.
+ * Some trivial refactoring in demo file_server and file_client.
+ * Some new comments in demo echo_server, echo_client and file_client to help users to understand on_msg and on_msg_handle interface more.
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -966,10 +988,17 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //call on_msg_handle, if failed, retry it after ST_ASIO_MSG_HANDLING_INTERVAL milliseconds later.
 //this value can be changed via st_asio_wrapper::socket::msg_handling_interval(size_t) at runtime.
 
+//#define ST_ASIO_EXPOSE_SEND_INTERFACE
+//for some reason (i still not met yet), the message sending has stopped but some messages left behind in the sending buffer, they won't be
+// sent until new messages come in, define this macro to expose send_msg() interface, then you can call it manually to fix this situation.
+//during message sending, calling send_msg() will fail, this is by design to avoid asio::io_context using up all virtual memory, this also
+// means that before the sending really started, you can greedily call send_msg() and may exhaust all virtual memory, please note.
+
 //#define ST_ASIO_PASSIVE_RECV
 //to gain the ability of changing the unpacker at runtime, with this macro, st_asio_wrapper will not do message receiving automatically (except the firt one),
 // so you need to manually call recv_msg(), if you need to change the unpacker, do it before recv_msg() invocation, please note.
-//during async message receiving, calling recv_msg() will fail, this is by design to avoid asio::io_context using up all virtual memory.
+//during async message receiving, calling recv_msg() will fail, this is by design to avoid asio::io_context using up all virtual memory, this also
+// means that before the receiving really started, you can greedily call recv_msg() and may exhaust all virtual memory, please note.
 //because user can greedily call recv_msg(), it's your responsibility to keep the recv buffer from overflowed, please pay special attention.
 //this macro also makes you to be able to pause message receiving, then, if there's no other tasks (like timers), service_pump will stop itself,
 // to avoid this, please define macro ST_ASIO_AVOID_AUTO_STOP_SERVICE.

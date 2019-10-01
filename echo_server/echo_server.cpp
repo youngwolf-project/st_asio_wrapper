@@ -117,10 +117,11 @@ protected:
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
 		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
 #endif
-		size_t re = msg_can.size();
 		msg_can.clear();
 
-		return re;
+		return 1;
+		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
+		//if we handled nothing, return a positive number is also okey but will very slightly impact performance (if msg_can is not empty), return 0 is suggested
 	}
 #endif
 
@@ -144,6 +145,8 @@ protected:
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
 #endif
 		return tmp_can.size();
+		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
+		//if we handled nothing, return a positive number is also okey but will very slightly impact performance, return 0 is suggested
 	}
 #else
 	//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
@@ -216,7 +219,28 @@ protected:
 #endif
 	//msg handling end
 };
+/*
+class test_aci_ref : public tracked_executor
+{
+public:
+	test_aci_ref(boost::asio::io_context& io_context_) : tracked_executor(io_context_) {}
+	void start() {post(boost::bind(&test_aci_ref::handler, this)); printf("after post invocation, the aci ref is %ld\n", get_aci_ref());}
 
+private:
+	void handler() {printf("in post handler, the aci ref is %ld, is last async call is %d\n", get_aci_ref(), is_last_async_call());}
+};
+
+class my_timer : public timer<tracked_executor>
+{
+public:
+    my_timer(boost::asio::io_context& io_context_) :timer<tracked_executor>(io_context_) {}
+    void start() {set_timer(0, 10, boost::bind(&my_timer::handler, this, _1)); printf("after set_timer invocation, the aci ref is %ld\n", get_aci_ref());}
+
+private:
+    bool handler(tid id)
+        {printf("in timer handler, the aci ref is %ld, is last async call is %d\n", get_aci_ref(), is_last_async_call()); return false;}
+};
+*/
 int main(int argc, const char* argv[])
 {
 	printf("usage: %s [<service thread number=1> [<port=%d> [ip=0.0.0.0]]]\n", argv[0], ST_ASIO_SERVER_PORT);
@@ -225,7 +249,15 @@ int main(int argc, const char* argv[])
 		return 0;
 	else
 		puts("type " QUIT_COMMAND " to end.");
-
+/*
+	printf("the ST_ASIO_MIN_ACI_REF is %d\n", ST_ASIO_MIN_ACI_REF);
+	boost::asio::io_context context;
+	test_aci_ref t(context);
+	t.start();
+	my_timer tt(context);
+	tt.start();
+	context.run();
+*/
 	service_pump sp;
 	echo_server echo_server_(sp); //echo server
 
