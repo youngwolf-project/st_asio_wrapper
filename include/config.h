@@ -630,6 +630,28 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2019.10.1	version 2.2.3
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ *
+ * HIGHLIGHT:
+ *
+ * FIX:
+ *
+ * ENHANCEMENTS:
+ * Introduce macro ST_ASIO_EXPOSE_SEND_INTERFACE to expose send_msg() interface, see below for more details.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ * Move unpacker logic from tcp::socket_base and udp::socket_base to st_asio_wrapper::socket.
+ * Move message sending and receiving logic from tcp::socket_base and udp::socket_base to st_asio_wrapper::socket.
+ * Some trivial refactoring in demo file_server and file_client.
+ * Some new comments in demo echo_server, echo_client and file_client to help users to understand on_msg and on_msg_handle interface more.
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
