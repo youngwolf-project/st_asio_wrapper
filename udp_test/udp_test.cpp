@@ -57,12 +57,14 @@ int main(int argc, const char* argv[])
 	service.set_peer_addr((unsigned short) atoi(argv[2]), argc >= 4 ? argv[3] : "127.0.0.1");
 
 	sp.start_service();
+	//for broadcast
+//	service.lowest_layer().set_option(boost::asio::socket_base::broadcast(true)); //usage: ./udp_test 5000 5000 "255.255.255.255"
 	//for multicast, join it after start_service():
-//	service.lowest_layer().set_option(boost::asio::ip::multicast::join_group(boost::asio::ip::address::from_string("x.x.x.x")));
+//	service.lowest_layer().set_option(boost::asio::ip::multicast::join_group(boost::asio::ip::make_address("x.x.x.x"))); // >= asio 1.11
 
 	//if you must join it before start_service():
 //	service.lowest_layer().open(ST_ASIO_UDP_DEFAULT_IP_VERSION);
-//	service.lowest_layer().set_option(boost::asio::ip::multicast::join_group(boost::asio::ip::address::from_string("x.x.x.x")));
+//	service.lowest_layer().set_option(boost::asio::ip::multicast::join_group(boost::asio::ip::address::from_string("x.x.x.x"))); // < asio 1.11
 //	sp.start_service();
 
 	//demonstrate how to change local address if the binding was failed.

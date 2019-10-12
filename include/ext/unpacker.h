@@ -79,7 +79,7 @@ public:
 				msg_can.emplace_back(iter->first, iter->second);
 		}
 
-		if (unpack_ok && remain_len > 0)
+		if (remain_len > 0)
 		{
 			const char* pnext = boost::next(msg_pos_can.back().first, msg_pos_can.back().second);
 			memmove(raw_buff.begin(), pnext, remain_len); //left behind unparsed data
