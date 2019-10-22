@@ -634,13 +634,17 @@
  * 2019.10.1	version 2.2.3
  *
  * SPECIAL ATTENTION (incompatible with old editions):
+ * Restore the default value of parameter duration and can_overflow in all message sending interfaces.
+ * Always move unparsed data to the head of the buffer in unpacker and unpacker2.
  *
  * HIGHLIGHT:
  *
  * FIX:
+ * Restore the default value of parameter duration and can_overflow in all message sending interfaces (a defect introduced in version 2.1.0).
  *
  * ENHANCEMENTS:
  * Introduce macro ST_ASIO_EXPOSE_SEND_INTERFACE to expose send_msg() interface, see below for more details.
+ * Always move unparsed data to the head of the buffer in unpacker and unpacker2.
  *
  * DELETION:
  *
