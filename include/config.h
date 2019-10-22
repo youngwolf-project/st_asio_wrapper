@@ -665,8 +665,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20202	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.2.2"
+#define ST_ASIO_VER		20203	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.2.3"
 
 //#define ST_ASIO_HIDE_WARNINGS
 
