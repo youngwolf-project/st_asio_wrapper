@@ -134,7 +134,7 @@ public:
 	virtual bool pack_heartbeat(msg_type& msg)
 		{ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(0); msg.assign((const char*) &head_len, ST_ASIO_HEAD_LEN); return true;}
 
-	//do not use following helper functions for heartbeat messages.
+	//msg must has been packed by this packer with native == false
 	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
 	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
@@ -222,6 +222,7 @@ public:
 		return false;
 	}
 
+	//msg must has been packed by this packer with native == false
 	virtual char* raw_data(typename super::msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
 	virtual const char* raw_data(typename super::msg_ctype& msg) const {return boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
 	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
@@ -237,10 +238,6 @@ public:
 	virtual bool pack_msg(msg_type& msg1, msg_type& msg2, container_type& msg_can) {msg_can.emplace_back().swap(msg1); msg_can.emplace_back().swap(msg2); return true;}
 	virtual bool pack_msg(container_type& in, container_type& out) {in.swap(out); return true;}
 	//not support heartbeat because fixed_length_unpacker cannot recognize heartbeat message
-
-	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(msg.data());}
-	virtual const char* raw_data(msg_ctype& msg) const {return msg.data();}
-	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size();}
 };
 
 //protocol: [prefix] + body + suffix
@@ -320,6 +317,7 @@ public:
 	}
 	virtual bool pack_heartbeat(msg_type& msg) {msg_type hb = _prefix + _suffix; msg.swap(hb); return true;}
 
+	//msg must has been packed by this packer with native == false
 	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), _prefix.size()));}
 	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), _prefix.size());}
 	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - _prefix.size() - _suffix.size();}

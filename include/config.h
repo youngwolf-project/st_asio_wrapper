@@ -656,6 +656,31 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2020.x.x            version 2.3.0
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * Delete macro ST_ASIO_ENHANCED_STABILITY, which means now we always have it, if you really don't want it, define macro ST_ASIO_NO_TRY_CATCH.
+ *
+ * HIGHLIGHT:
+ *
+ * FIX:
+ *
+ * ENHANCEMENTS:
+ * Add following 3 interfaces to i_unpacker as i_packer did (the default implementation is meaningless as i_packer, just satisfy compilers):
+ *  virtual char* raw_data(msg_type& msg) const
+ *  virtual const char* raw_data(msg_ctype& msg) const
+ *  virtual size_t raw_data_len(msg_ctype& msg) const
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ * Move macro definitions from cpp files to makefile (to avoid potential inconsistent definitions between more than one cpp files,
+ *  all other demos have only one cpp file, so have no such potential risk) for demo file_server.
+ *
+ * REPLACEMENTS:
+ * Replace macro ST_ASIO_ENHANCED_STABILITY by ST_ASIO_NO_TRY_CATCH (antonymous).
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -785,8 +810,8 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //don't write any logs.
 //#define ST_ASIO_NO_UNIFIED_OUT
 
-//if defined, service_pump will catch exceptions for boost::asio::io_context::run().
-//#define ST_ASIO_ENHANCED_STABILITY
+//if defined, service_pump will not catch exceptions for boost::asio::io_context::run().
+//#define ST_ASIO_NO_TRY_CATCH
 
 //if defined, boost::asio::steady_timer will be used in st_asio_wrapper::timer.
 //#define ST_ASIO_USE_STEADY_TIMER

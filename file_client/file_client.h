@@ -93,7 +93,7 @@ protected:
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
-		//msg_can can't be empty, with macro ST_ASIO_PASSIVE_RECV, ascs will append an empty message automatically for on_msg_handle if no message nor
+		//msg_can can't be empty, with macro ST_ASIO_PASSIVE_RECV, st_asio_wrapper will append an empty message automatically for on_msg_handle if no message nor
 		// error returned from the unpacker to provide a chance to call recv_msg (calling recv_msg out of on_msg and on_msg_handle is forbidden), please note.
 		assert(!msg_can.empty());
 		out_container_type tmp_can;

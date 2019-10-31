@@ -195,7 +195,7 @@ public:
 	//get or change the packer at runtime
 	//changing packer at runtime is not thread-safe (if we're sending messages concurrently), please pay special attention,
 	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not commonly needed and you know how to avoid
-	// race condition between message sending and packer replacement (because ascs never send messages automatically except with macro
+	// race condition between message sending and packer replacement (because st_asio_wrapper never send messages automatically except with macro
 	// ST_ASIO_HEARTBEAT_INTERVAL, please note).
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer() {return packer_;}
 	boost::shared_ptr<const i_packer<typename Packer::msg_type> > packer() const {return packer_;}
@@ -205,7 +205,7 @@ public:
 	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker() {return unpacker_;}
 	boost::shared_ptr<const i_unpacker<typename Unpacker::msg_type> > unpacker() const {return unpacker_;}
 #ifdef ST_ASIO_PASSIVE_RECV
-	//changing unpacker must before calling ascs::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
+	//changing unpacker must before calling st_asio_wrapper::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
 	void unpacker(const boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
 #endif
 
