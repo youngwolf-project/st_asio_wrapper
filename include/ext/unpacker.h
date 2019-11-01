@@ -41,10 +41,7 @@ public:
 					unpack_ok = false;
 				else if (remain_len >= cur_msg_len) //one msg received
 				{
-					if (stripped())
-						msg_can.emplace_back(boost::next(pnext, ST_ASIO_HEAD_LEN), cur_msg_len - ST_ASIO_HEAD_LEN);
-					else
-						msg_can.emplace_back(pnext, cur_msg_len);
+					msg_can.emplace_back(pnext, cur_msg_len);
 					remain_len -= cur_msg_len;
 					std::advance(pnext, cur_msg_len);
 					cur_msg_len = -1;
@@ -74,10 +71,13 @@ public:
 		boost::container::list<std::pair<const char*, size_t> > msg_pos_can;
 		bool unpack_ok = parse_msg(bytes_transferred, msg_pos_can);
 		for (BOOST_AUTO(iter, msg_pos_can.begin()); iter != msg_pos_can.end(); ++iter)
-		{
-			if (iter->second > 0) //exclude heartbeat
-				msg_can.emplace_back(iter->first, iter->second);
-		}
+			if (iter->second > ST_ASIO_HEAD_LEN) //ignore heartbeat
+			{
+				if (stripped())
+					msg_can.emplace_back(boost::next(iter->first, ST_ASIO_HEAD_LEN), iter->second - ST_ASIO_HEAD_LEN);
+				else
+					msg_can.emplace_back(iter->first, iter->second);
+			}
 
 		if (unpack_ok && remain_len > 0)
 		{
