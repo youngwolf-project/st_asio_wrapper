@@ -123,9 +123,9 @@ public:
 #endif
 
 	//msg must has been unpacked by this unpacker
-	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), stripped() ? 0 : ST_ASIO_HEAD_LEN));}
-	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), stripped() ? 0 : ST_ASIO_HEAD_LEN);}
-	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - (stripped() ? 0 : ST_ASIO_HEAD_LEN);}
+	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(stripped() ? msg.data() : boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
+	virtual const char* raw_data(msg_ctype& msg) const {return stripped() ? msg.data() : boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return stripped() ? msg.size() : msg.size() - ST_ASIO_HEAD_LEN;}
 
 protected:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
@@ -457,9 +457,9 @@ public:
 #endif
 
 	//msg must has been unpacked by this unpacker
-	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), stripped() ? 0 : _prefix.size()));}
-	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), stripped() ? 0 : _prefix.size());}
-	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - (stripped() ? 0 : _prefix.size() + _suffix.size());}
+	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(stripped() ? msg.data() : boost::next(msg.data(), _prefix.size()));}
+	virtual const char* raw_data(msg_ctype& msg) const {return stripped() ? msg.data() : boost::next(msg.data(), _prefix.size());}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return stripped() ? msg.size() : msg.size() - _prefix.size() - _suffix.size();}
 
 private:
 	boost::array<char, ST_ASIO_MSG_BUFFER_SIZE> raw_buff;
