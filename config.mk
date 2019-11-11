@@ -15,17 +15,17 @@ endif
 cflag += -DBOOST_ASIO_NO_DEPRECATED
 common_libs = -lboost_system -lboost_thread -lboost_chrono
 
-kernel = ${shell uname -s}
-ifeq (${kernel}, SunOS)
-cflag += -pthreads
-lflag += -pthreads -lsocket -lnsl
+target_machine = ${shell ${CXX} -dumpmachine}
+ifneq (, ${findstring solaris, ${target_machine}})
+	cflag += -pthreads
+	lflag += -pthreads -lsocket -lnsl
 else
-cflag += -pthread
-lflag += -pthread
-ifeq (${kernel}, FreeBSD)
-common_libs += -lboost_atomic
-#here maybe still have other kernels need to be separated out
-endif
+	cflag += -pthread
+	lflag += -pthread
+	ifneq (, ${findstring freebsd, ${target_machine}})
+		common_libs += -lboost_atomic
+		#here maybe still have other machines need to be separated out
+	endif
 endif
 
 cflag += ${ext_cflag} ${boost_include_dir}
