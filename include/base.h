@@ -103,6 +103,7 @@ public:
 	virtual service_pump& get_service_pump() = 0;
 	virtual const service_pump& get_service_pump() const = 0;
 
+	virtual bool socket_exist(boost::uint_fast64_t id) = 0;
 	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) = 0;
 };
 

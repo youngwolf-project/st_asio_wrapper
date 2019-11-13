@@ -162,6 +162,12 @@ public:
 		return object_can.size();
 	}
 
+	bool exist(boost::uint_fast64_t id)
+	{
+		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
+		return object_can.count(id) > 0;
+	}
+
 	object_type find(boost::uint_fast64_t id)
 	{
 		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);

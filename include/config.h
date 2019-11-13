@@ -667,6 +667,7 @@
  * FIX:
  *
  * ENHANCEMENTS:
+ * Add socket_exist interface to i_matrix, exist function to object_pool to just check the existence of a socket by an given id.
  * Add following 3 interfaces to i_unpacker as i_packer did (the default implementation is meaningless as i_packer, just satisfy compilers):
  *  virtual char* raw_data(msg_type& msg) const
  *  virtual const char* raw_data(msg_ctype& msg) const
