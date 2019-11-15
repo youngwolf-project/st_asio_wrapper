@@ -54,6 +54,8 @@ public:
 				ST_ASIO_HEAD_TYPE head;
 				memcpy(&head, pnext, ST_ASIO_HEAD_LEN);
 				cur_msg_len = ST_ASIO_HEAD_N2H(head);
+				if ((size_t) -1 == cur_msg_len) //avoid dead loop on 32bit system with macro ST_ASIO_HUGE_MSG
+					unpack_ok = false;
 			}
 			else
 				break;
@@ -79,7 +81,7 @@ public:
 					msg_can.emplace_back(iter->first, iter->second);
 			}
 
-		if (unpack_ok && remain_len > 0)
+		if (remain_len > 0 && !msg_pos_can.empty())
 		{
 			const char* pnext = boost::next(msg_pos_can.back().first, msg_pos_can.back().second);
 			memmove(raw_buff.begin(), pnext, remain_len); //left behind unparsed data
