@@ -676,8 +676,8 @@
  * DELETION:
  *
  * REFACTORING:
- * Move macro definitions from cpp files to makefile (to avoid potential inconsistent definitions between more than one cpp files,
- *  all other demos have only one cpp file, so have no such potential risk) for demo file_server.
+ * Move macro definitions from cpp files to makefile for demo file_server (to avoid potential inconsistent definitions between
+ *  more than one cpp files, all other demos have only one cpp file, so have no such potential risk).
  *
  * REPLACEMENTS:
  * Replace macro ST_ASIO_ENHANCED_STABILITY by ST_ASIO_NO_TRY_CATCH (antonymous).
@@ -691,8 +691,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20203	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.2.3"
+#define ST_ASIO_VER		20300	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.3.0"
 
 //#define ST_ASIO_HIDE_WARNINGS
 
