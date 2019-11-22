@@ -162,6 +162,7 @@ public:
 	virtual bool parse_msg(size_t bytes_transferred, typename super::container_type& msg_can)
 	{
 		unpacker::container_type tmp_can;
+		unpacker_.stripped(ST_THIS stripped());
 		bool unpack_ok = unpacker_.parse_msg(bytes_transferred, tmp_can);
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
 		{
