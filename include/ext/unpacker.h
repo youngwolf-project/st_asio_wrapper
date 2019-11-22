@@ -167,6 +167,7 @@ public:
 	virtual bool parse_msg(size_t bytes_transferred, typename super::container_type& msg_can)
 	{
 		unpacker::container_type tmp_can;
+		unpacker_.stripped(ST_THIS stripped());
 		bool unpack_ok = unpacker_.parse_msg(bytes_transferred, tmp_can);
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
 		{
@@ -183,9 +184,9 @@ public:
 	virtual typename super::buffer_type prepare_next_recv() {return unpacker_.prepare_next_recv();}
 
 	//msg must has been unpacked by this unpacker
-	virtual char* raw_data(unpacker::msg_type& msg) const {return unpacker_.raw_data(msg);}
-	virtual const char* raw_data(unpacker::msg_ctype& msg) const {return unpacker_.raw_data(msg);}
-	virtual size_t raw_data_len(unpacker::msg_ctype& msg) const {return unpacker_.raw_data_len(msg);}
+	virtual char* raw_data(typename super::msg_type& msg) const {return const_cast<char*>(ST_THIS stripped() ? msg.data() : boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
+	virtual const char* raw_data(typename super::msg_ctype& msg) const {return ST_THIS stripped() ? msg.data() : boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
+	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return ST_THIS stripped() ? msg.size() : msg.size() - ST_ASIO_HEAD_LEN;}
 
 protected:
 	unpacker unpacker_;
