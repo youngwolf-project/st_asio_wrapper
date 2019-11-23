@@ -649,6 +649,7 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 //TCP msg sending interface
 #define TCP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
 TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow = false) {return FUNNAME(&pstr, &len, 1, can_overflow);} \
+TYPE FUNNAME(char* pstr, size_t len, bool can_overflow = false) {return FUNNAME(&pstr, &len, 1, can_overflow);} \
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, bool can_overflow = false) {return FUNNAME(buffer.data(), buffer.size(), can_overflow);}
 
 #define TCP_SEND_MSG(FUNNAME, NATIVE) \
@@ -725,6 +726,7 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //TCP sync msg sending interface
 #define TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
 TYPE FUNNAME(const char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false) {return FUNNAME(&pstr, &len, 1, duration, can_overflow);} \
+TYPE FUNNAME(char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false) {return FUNNAME(&pstr, &len, 1, duration, can_overflow);} \
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(buffer.data(), buffer.size(), duration, can_overflow);}
 
@@ -805,7 +807,10 @@ TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 //UDP msg sending interface
 #define UDP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
 TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow = false) {return FUNNAME(peer_addr, pstr, len, can_overflow);} \
+TYPE FUNNAME(char* pstr, size_t len, bool can_overflow = false) {return FUNNAME(peer_addr, pstr, len, can_overflow);} \
 TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false) \
+    {return FUNNAME(peer_addr, &pstr, &len, 1, can_overflow);} \
+TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, char* pstr, size_t len, bool can_overflow = false) \
     {return FUNNAME(peer_addr, &pstr, &len, 1, can_overflow);} \
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, bool can_overflow = false) {return FUNNAME(peer_addr, buffer, can_overflow);} \
 template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const Buffer& buffer, bool can_overflow = false) \
@@ -838,7 +843,10 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //UDP sync msg sending interface
 #define UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
 TYPE FUNNAME(const char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false) {return FUNNAME(peer_addr, pstr, len, duration, can_overflow);} \
+TYPE FUNNAME(char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false) {return FUNNAME(peer_addr, pstr, len, duration, can_overflow);} \
 TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false) \
+	{return FUNNAME(peer_addr, &pstr, &len, 1, duration, can_overflow);} \
+TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false) \
 	{return FUNNAME(peer_addr, &pstr, &len, 1, duration, can_overflow);} \
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration = 0, bool can_overflow = false) {return FUNNAME(peer_addr, buffer, duration, can_overflow);} \
 template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const Buffer& buffer, unsigned duration = 0, bool can_overflow = false) \
@@ -884,6 +892,8 @@ public:
 
 		if (NULL != head)
 			os << '[' << head << "] ";
+
+		os << '[' << boost::this_thread::get_id() << "] ";
 
 		char time_buff[64];
 		time_t now = time(NULL);

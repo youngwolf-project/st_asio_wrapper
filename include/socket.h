@@ -294,7 +294,7 @@ protected:
 	// include user timers(created by set_timer()) and user async calls(started via post(), dispatch() or defer()), this means you can clean up any resource
 	// in this socket except this socket itself, because this socket maybe is being maintained by object_pool.
 	//otherwise (bigger than zero), socket simply call this callback ST_ASIO_DELAY_CLOSE seconds later after link down, no any guarantees.
-	virtual void on_close() {unified_out::info_out("on_close()");}
+	virtual void on_close() {unified_out::info_out(ST_ASIO_LLF " on_close()", id());}
 	virtual void after_close() {} //a good case for using this is to reconnect the server, please refer to client_socket_base.
 
 #ifdef ST_ASIO_SYNC_DISPATCH
@@ -304,7 +304,7 @@ protected:
 	{
 		//it's always thread safe in this virtual function, because it blocks message receiving
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
-			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
+			unified_out::debug_out(ST_ASIO_LLF " recv(" ST_ASIO_SF "): %s", id(), iter->size(), iter->data());
 		msg_can.clear(); //have handled all messages
 
 		return 1;
@@ -319,13 +319,14 @@ protected:
 		msg_can.swap(tmp_can); //must be thread safe, or aovid race condition from your business logic
 
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
-			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
+			unified_out::debug_out(ST_ASIO_LLF " recv(" ST_ASIO_SF "): %s", id(), iter->size(), iter->data());
 
 		return tmp_can.size();
 	}
 #else
 	//return true means msg been handled, false means msg cannot be handled right now, and socket will re-dispatch it asynchronously
-	virtual bool on_msg_handle(OutMsgType& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
+	virtual bool on_msg_handle(OutMsgType& msg)
+		{unified_out::debug_out(ST_ASIO_LLF " recv(" ST_ASIO_SF "): %s", id(), msg.size(), msg.data()); return true;}
 #endif
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
@@ -462,7 +463,7 @@ protected:
 	bool do_direct_send_msg(InMsgType& msg)
 	{
 		if (msg.empty())
-			unified_out::error_out("found an empty message, please check your packer.");
+			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
 		else if (send_buffer.enqueue(msg))
 			send_msg();
 
@@ -494,7 +495,7 @@ protected:
 			return NOT_APPLICABLE;
 		else if (msg.empty())
 		{
-			unified_out::error_out("found an empty message, please check your packer.");
+			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
 			return SUCCESS;
 		}
 

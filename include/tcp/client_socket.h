@@ -133,8 +133,8 @@ protected:
 
 	//after how much time (ms), client_socket_base will try to reconnect the server, negative value means give up.
 	virtual int prepare_reconnect(const boost::system::error_code& ec) {return ST_ASIO_RECONNECT_INTERVAL;}
-	virtual void on_connect() {unified_out::info_out("connecting success.");}
-	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); force_shutdown();}
+	virtual void on_connect() {unified_out::info_out(ST_ASIO_LLF " connecting success.", ST_THIS id());}
+	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); force_shutdown();}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
 		ST_THIS show_info("client link:", "broken/been shut down", ec);

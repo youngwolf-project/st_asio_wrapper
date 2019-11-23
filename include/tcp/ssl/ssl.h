@@ -54,7 +54,7 @@ protected:
 			ST_THIS next_layer().shutdown(ec);
 
 			if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
-				unified_out::info_out("shutdown ssl link failed (maybe intentionally because of reusing)");
+				unified_out::info_out(ST_ASIO_LLF " shutdown ssl link failed (maybe intentionally because of reusing)", ST_THIS id());
 		}
 #endif
 
@@ -64,9 +64,9 @@ protected:
 	virtual void on_handshake(const boost::system::error_code& ec)
 	{
 		if (!ec)
-			unified_out::info_out("handshake success.");
+			unified_out::info_out(ST_ASIO_LLF " handshake success.", ST_THIS id());
 		else
-			unified_out::error_out("handshake failed: %s", ec.message().data());
+			unified_out::error_out(ST_ASIO_LLF " handshake failed: %s", ST_THIS id(), ec.message().data());
 	}
 
 	void shutdown_ssl(bool sync = true)
@@ -91,7 +91,7 @@ protected:
 			ST_THIS next_layer().shutdown(ec);
 
 			if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
-				unified_out::info_out("shutdown ssl link failed (maybe intentionally because of reusing)");
+				unified_out::info_out(ST_ASIO_LLF " shutdown ssl link failed (maybe intentionally because of reusing)", ST_THIS id());
 		}
 	}
 
@@ -99,7 +99,7 @@ private:
 	void async_shutdown_handler(const boost::system::error_code& ec)
 	{
 		if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
-			unified_out::info_out("async shutdown ssl link failed (maybe intentionally because of reusing)");
+			unified_out::info_out(ST_ASIO_LLF " async shutdown ssl link failed (maybe intentionally because of reusing)", ST_THIS id());
 	}
 
 private:
@@ -127,7 +127,7 @@ public:
 	void graceful_shutdown(bool reconnect = false, bool sync = true)
 	{
 		if (reconnect)
-			unified_out::error_out("reconnecting mechanism is not available, please define macro ST_ASIO_REUSE_SSL_STREAM");
+			unified_out::error_out(ST_ASIO_LLF " reconnecting mechanism is not available, please define macro ST_ASIO_REUSE_SSL_STREAM", ST_THIS id());
 
 		shutdown_ssl(sync);
 	}
@@ -137,7 +137,7 @@ protected:
 #else
 protected:
 #endif
-	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); ST_THIS force_shutdown();}
+	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS force_shutdown();}
 
 private:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
@@ -211,7 +211,7 @@ protected:
 		return true;
 	}
 
-	virtual void on_unpack_error() {unified_out::info_out("can not unpack msg."); ST_THIS force_shutdown();}
+	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS force_shutdown();}
 
 private:
 	void handle_handshake(const boost::system::error_code& ec)
