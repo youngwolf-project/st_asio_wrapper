@@ -174,6 +174,12 @@ protected:
 		return super::do_start();
 	}
 
+#ifdef ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
+	//some messages have been sent to the kernel buffer
+	//notice: messages are packed, using inconstant reference is for the ability of swapping
+	virtual void on_msg_send(typename super::in_container_type & msg_can) = 0;
+#endif
+
 	//generally, you don't have to rewrite this to maintain the status of connections
 	//msg_can contains messages that were failed to send and tcp::socket_base will not hold them any more, if you want to re-send them in the future,
 	// you must take over them and re-send (at any time) them via direct_send_msg.
@@ -256,7 +262,7 @@ private:
 			if (!unpack_ok)
 			{
 				on_unpack_error();
-				unpacker_->reset(); //use can get the left half-baked msg in unpacker's reset()
+				unpacker_->reset(); //user can get the left half-baked msg in unpacker's reset()
 			}
 
 #ifdef ST_ASIO_PASSIVE_RECV
@@ -326,6 +332,8 @@ private:
 #endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(sending_msgs.front());
+#elif defined(ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY)
+			on_msg_send(sending_msgs);
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 			if (send_buffer.empty())

@@ -665,8 +665,11 @@
  * Apply the same reconnecting mechanism for message unpacking error (before, we always disabled reconnecting mechanism).
  *
  * HIGHLIGHT:
+ * Support batch message sent notification, see new macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY for more details.
  *
  * FIX:
+ * If defined macro ST_ASIO_WANT_MSG_SEND_NOTIFY, virtual function st_asio_wrapper::socket::on_msg_send(InMsgType& msg) must be implemented.
+ * If defined macro ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY, virtual function st_asio_wrapper::socket::on_all_msg_send(InMsgType& msg) must be implemented.
  *
  * ENHANCEMENTS:
  * Add socket_exist interface to i_matrix, exist function to object_pool to just check the existence of a socket by an given id.
@@ -834,16 +837,31 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #ifndef ST_ASIO_DELAY_CLOSE
 #define ST_ASIO_DELAY_CLOSE	0 //seconds, guarantee 100% safety when reusing or freeing socket objects
 #elif ST_ASIO_DELAY_CLOSE < 0
-	#error "delay close duration must be bigger than or equal to zero."
+	#error delay close duration must be bigger than or equal to zero.
 #endif
 
 //full statistic include time consumption, or only numerable informations will be gathered
 //#define ST_ASIO_FULL_STATISTIC
 
-//after every msg sent, call st_asio_wrapper::socket::on_msg_send()
+//after every msg sent, call st_asio_wrapper::socket::on_msg_send(InMsgType& msg)
+//this macro cannot exists with macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+	#ifdef ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
+		#error macro ST_ASIO_WANT_MSG_SEND_NOTIFY cannot exists with macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY.
+	#endif
+#endif
 
-//after sending buffer became empty, call st_asio_wrapper::socket::on_all_msg_send()
+//after some msg sent, call tcp::socket_base::on_msg_send(typename super::in_container_type& msg_can)
+//this macro cannot exists with macro ST_ASIO_WANT_MSG_SEND_NOTIFY
+//#define ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
+	#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+		#error macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY cannot exists with macro ST_ASIO_WANT_MSG_SEND_NOTIFY.
+	#endif
+#endif
+
+//after sending buffer became empty, call st_asio_wrapper::socket::on_all_msg_send(InMsgType& msg)
 //#define ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 
 //max number of objects object_pool can hold.

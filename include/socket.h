@@ -299,7 +299,7 @@ protected:
 
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//return positive value if handled some messages (include all messages), if some msg left behind, socket will re-dispatch them asynchronously
-	//notice: using inconstant is for the convenience of swapping
+	//notice: using inconstant reference is for the ability of swapping
 	virtual size_t on_msg(list<OutMsgType>& msg_can)
 	{
 		//it's always thread safe in this virtual function, because it blocks message receiving
@@ -312,7 +312,7 @@ protected:
 #endif
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//return positive value if handled some messages (include all messages), if some msg left behind, socket will re-dispatch them asynchronously
-	//notice: using inconstant is for the convenience of swapping
+	//notice: using inconstant reference is for the ability of swapping
 	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		out_container_type tmp_can;
@@ -331,13 +331,13 @@ protected:
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	//one msg has sent to the kernel buffer, msg is the right msg
-	//notice: the msg is packed, using inconstant is for the convenience of swapping
-	virtual void on_msg_send(InMsgType& msg) {}
+	//notice: the msg is packed, using inconstant reference is for the ability of swapping
+	virtual void on_msg_send(InMsgType& msg) = 0;
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 	//send buffer goes empty
-	//notice: the msg is packed, using inconstant is for the convenience of swapping
-	virtual void on_all_msg_send(InMsgType& msg) {}
+	//notice: the msg is packed, using inconstant reference is for the ability of swapping
+	virtual void on_all_msg_send(InMsgType & msg) = 0;
 #endif
 
 	//subclass notify shutdown event
