@@ -846,20 +846,10 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //after every msg sent, call st_asio_wrapper::socket::on_msg_send(InMsgType& msg)
 //this macro cannot exists with macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
-#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-	#ifdef ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
-		#error macro ST_ASIO_WANT_MSG_SEND_NOTIFY cannot exists with macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY.
-	#endif
-#endif
 
 //after some msg sent, call tcp::socket_base::on_msg_send(typename super::in_container_type& msg_can)
 //this macro cannot exists with macro ST_ASIO_WANT_MSG_SEND_NOTIFY
 //#define ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
-#ifdef ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
-	#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-		#error macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY cannot exists with macro ST_ASIO_WANT_MSG_SEND_NOTIFY.
-	#endif
-#endif
 
 //after sending buffer became empty, call st_asio_wrapper::socket::on_all_msg_send(InMsgType& msg)
 //#define ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
