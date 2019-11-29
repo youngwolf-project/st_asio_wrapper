@@ -337,7 +337,7 @@ protected:
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 	//send buffer goes empty
 	//notice: the msg is packed, using inconstant reference is for the ability of swapping
-	virtual void on_all_msg_send(InMsgType & msg) = 0;
+	virtual void on_all_msg_send(InMsgType& msg) = 0;
 #endif
 
 	//subclass notify shutdown event
