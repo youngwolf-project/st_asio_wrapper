@@ -672,7 +672,8 @@
  * If defined macro ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY, virtual function st_asio_wrapper::socket::on_all_msg_send(InMsgType& msg) must be implemented.
  *
  * ENHANCEMENTS:
- * Add socket_exist interface to i_matrix, exist function to object_pool to just check the existence of a socket by an given id.
+ * Add resend_msg and sync_resend_msg interface to st_asio_wrapper::socket, it takes packed messages and insert them into the front of the send buffer.
+ * Add socket_exist interface to i_matrix, it calls object_pool::exist to check the existence of a socket by an given id.
  * Add following 3 interfaces to i_unpacker as i_packer did (the default implementation is meaningless as i_packer, just satisfy compilers):
  *  virtual char* raw_data(msg_type& msg) const
  *  virtual const char* raw_data(msg_ctype& msg) const
