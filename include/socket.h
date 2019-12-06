@@ -298,7 +298,6 @@ protected:
 #if ST_ASIO_HEARTBEAT_INTERVAL > 0
 		start_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);
 #endif
-		assert(is_ready());
 		send_msg(); //send buffer may have msgs, send them
 		recv_msg();
 
