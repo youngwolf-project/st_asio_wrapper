@@ -121,7 +121,13 @@ protected:
 	}
 
 	//reconnect at here rather than in on_recv_error to make sure that there's no any async invocations performed on this socket before reconnectiong
-	virtual void after_close() {if (need_reconnect) ST_THIS start();}
+	virtual void after_close()
+	{
+		if (ST_THIS unpacker_)
+			ST_THIS unpacker_->reset(); //very important, otherwise, the unpacker will never be able to parse any more messages if its buffer has legacy data
+		if (need_reconnect)
+			ST_THIS start();
+	}
 
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
 	{
