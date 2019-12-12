@@ -178,6 +178,8 @@ private:
 			}
 		}
 
+		need_reconnect = false;
+		unified_out::info_out(ST_ASIO_LLF " reconnectiong abandon.", ST_THIS id());
 		super::force_shutdown();
 		return false;
 	}

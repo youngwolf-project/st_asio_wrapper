@@ -141,6 +141,7 @@ protected:
 class udp_unpacker : public i_unpacker<std::string>
 {
 public:
+	virtual void reset() {}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 		{assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE); msg_can.emplace_back(raw_buff.data(), bytes_transferred); return true;}
 
@@ -203,6 +204,7 @@ private:
 	typedef st_asio_wrapper::i_unpacker<T> super;
 
 public:
+	virtual void reset() {}
 	virtual bool parse_msg(size_t bytes_transferred, typename super::container_type& msg_can)
 	{
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
