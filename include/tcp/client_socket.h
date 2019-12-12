@@ -48,6 +48,7 @@ public:
 	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
 	//disconnect(bool), force_shutdown(bool) and graceful_shutdown(bool, bool) can overwrite reconnecting behavior, please note.
 	//reset() virtual function will open reconnecting, please note.
+	//if prepare_reconnect returns negative value, reconnecting will be closed, please note.
 	void open_reconnect() {need_reconnect = true;}
 	void close_reconnect() {need_reconnect = false;}
 
@@ -140,7 +141,15 @@ protected:
 	//reconnect at here rather than in on_recv_error to make sure no async invocations performed on this socket before reconnecting.
 	//if you don't want to reconnect the server after link broken, rewrite this virtual function and do nothing in it or call close_reconnt().
 	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
-	virtual void after_close() {if (need_reconnect) ST_THIS start();}
+	virtual void after_close()
+	{
+		BOOST_AUTO(unp, ST_THIS unpacker());
+		if (unp)
+			unp->reset(); //very important, otherwise, the unpacker will never be able to parse any more messages if its buffer has legacy data
+
+		if (need_reconnect)
+			ST_THIS start();
+	}
 
 private:
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
@@ -156,14 +165,12 @@ private:
 			}
 
 			int delay = prepare_reconnect(ec);
-			if (delay >= 0)
-			{
-				ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&client_socket_base::do_start, this), false));
+			if (delay < 0)
+				need_reconnect = false;
+			else if (ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&client_socket_base::do_start, this), false)))
 				return true;
-			}
 		}
 
-		need_reconnect = false;
 		unified_out::info_out("reconnectiong abandon.");
 		super::force_shutdown();
 		return false;
