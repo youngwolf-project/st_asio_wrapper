@@ -87,9 +87,7 @@ protected:
 	virtual bool do_start() //connect
 	{
 		assert(!ST_THIS is_connected());
-
-		ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&client_socket_base::connect_handler, this, boost::asio::placeholders::error)));
-		return true;
+		return ST_THIS set_timer(TIMER_CONNECT, 50, (boost::lambda::bind(&client_socket_base::connect, this), false));
 	}
 
 	virtual void connect_handler(const boost::system::error_code& ec)
@@ -129,6 +127,9 @@ protected:
 			ST_THIS start();
 	}
 
+	void connect() {ST_THIS lowest_layer().async_connect(server_addr,
+		ST_THIS make_handler_error(boost::bind(&client_socket_base::connect_handler, this, boost::asio::placeholders::error)));}
+
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
 	{
 		if (ST_THIS started() && (boost::asio::error::operation_aborted != ec || need_reconnect) && !ST_THIS stopped())
@@ -144,7 +145,7 @@ protected:
 			int delay = prepare_reconnect(ec);
 			if (delay >= 0)
 			{
-				ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&client_socket_base::do_start, this), false));
+				ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&client_socket_base::connect, this), false));
 				return true;
 			}
 		}
