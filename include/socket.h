@@ -133,7 +133,7 @@ public:
 				unified_out::error_out(ST_ASIO_LLF " starting failed.", id());
 		}
 		else
-			unified_out::error_out(ST_ASIO_LLF " starting failed.", id());
+			unified_out::error_out(ST_ASIO_LLF " starting failed because of already stared or closing timer exists or service_pump stopped.", id());
 	}
 
 #ifdef ST_ASIO_PASSIVE_RECV

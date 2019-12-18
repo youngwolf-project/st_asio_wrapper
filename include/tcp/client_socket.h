@@ -61,7 +61,7 @@ public:
 	{
 		need_reconnect = reconnect;
 
-		if (!ST_THIS started() && reconnect)
+		if (reconnect && ST_THIS is_broken() && !ST_THIS started())
 			return ST_THIS start();
 		else if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
 			ST_THIS show_info("client link:", "been shut down.");
@@ -77,7 +77,7 @@ public:
 	{
 		need_reconnect = reconnect;
 
-		if (!ST_THIS started() && reconnect)
+		if (reconnect && ST_THIS is_broken() && !ST_THIS started())
 			return ST_THIS start();
 		else if (ST_THIS is_broken())
 			return force_shutdown(reconnect);
@@ -97,31 +97,7 @@ protected:
 	virtual bool do_start() //connect
 	{
 		assert(!ST_THIS is_connected());
-
-		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
-		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
-		{
-			boost::system::error_code ec;
-			if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
-			{
-				lowest_object.open(local_addr.protocol(), ec); assert(!ec);
-				if (ec)
-				{
-					unified_out::error_out("cannot create socket: %s", ec.message().data());
-					return false;
-				}
-			}
-
-			lowest_object.bind(local_addr, ec);
-			if (ec && boost::asio::error::invalid_argument != ec)
-			{
-				unified_out::error_out("cannot bind socket: %s", ec.message().data());
-				return false;
-			}
-		}
-
-		lowest_object.async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&client_socket_base::connect_handler, this, boost::asio::placeholders::error)));
-		return true;
+		return ST_THIS set_timer(TIMER_CONNECT, 50, (boost::lambda::bind(&client_socket_base::connect, this), false));
 	}
 
 	virtual void connect_handler(const boost::system::error_code& ec)
@@ -159,6 +135,34 @@ protected:
 	virtual void after_close() {if (need_reconnect) ST_THIS start();}
 
 private:
+	bool connect()
+	{
+		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
+		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
+		{
+			boost::system::error_code ec;
+			if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
+			{
+				lowest_object.open(local_addr.protocol(), ec); assert(!ec);
+				if (ec)
+				{
+					unified_out::error_out("cannot create socket: %s", ec.message().data());
+					return false;
+				}
+			}
+
+			lowest_object.bind(local_addr, ec);
+			if (ec && boost::asio::error::invalid_argument != ec)
+			{
+				unified_out::error_out("cannot bind socket: %s", ec.message().data());
+				return false;
+			}
+		}
+
+		lowest_object.async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&client_socket_base::connect_handler, this, boost::asio::placeholders::error)));
+		return true;
+	}
+
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
 	{
 		if (need_reconnect && ST_THIS started() && !ST_THIS stopped())
@@ -174,7 +178,7 @@ private:
 			int delay = prepare_reconnect(ec);
 			if (delay < 0)
 				need_reconnect = false;
-			else if (ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&client_socket_base::do_start, this), false)))
+			else if (ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&client_socket_base::connect, this), false)))
 				return true;
 		}
 
