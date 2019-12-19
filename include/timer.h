@@ -76,7 +76,11 @@ public:
 		timer_info& ti = timer_can[id];
 
 		if (timer_info::TIMER_FAKE == ti.status)
+#if BOOST_ASIO_VERSION >= 101300
+			try {ti.timer = boost::make_shared<timer_type>(io_context_);}
+#else
 			try {ti.timer = boost::make_shared<timer_type>(boost::ref(io_context_));}
+#endif
 			catch (const std::exception& e) {unified_out::error_out("cannot create timer %d (%s)", ti.id, e.what()); return false;}
 		ti.status = timer_info::TIMER_OK;
 		ti.interval_ms = interval;
