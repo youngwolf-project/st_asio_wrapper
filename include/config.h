@@ -11,6 +11,15 @@
 
  * license: www.boost.org/LICENSE_1_0.txt
  *
+ * Overview:
+ * 1. send_msg (series) means send_msg, send_native_msg, safe_send_msg, safe_send_native_msg,
+ *    direct_send_msg, resend_msg, direct_sync_send_msg, sync_resend_msg,
+ *    broadcast_msg, broadcast_native_msg, safe_broadcast_native_msg.
+ * 2. the top namespace (st_asio_wrapper) usually is omitted, for example, socket indicate st_asio_wrapper::socket, tcp::socket_base indicate st_asio_wrapper::tcp::socket_base.
+ * 3. send_msg (series) success just means the message has been moved (or copied) to st_asio_wrapper, it will be sent in the future automatically.
+ * 4. Messages being sent have been moved out from the input queue, so they cannot be fetched via get_pending_send_msg_size and
+ *     pop_first_pending_send_msg, so does output queue.
+ *
  * Known issues:
  * 1. since 1.3.5 until 1.4, heartbeat function cannot work properly between windows (at least win-10) and Ubuntu (at least Ubuntu-16.04).
  * 2. since 1.3.5 until 1.4, UDP doesn't support heartbeat because UDP doesn't support OOB data.
@@ -668,6 +677,7 @@
  *
  * HIGHLIGHT:
  * Support batch message sent notification, see new macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY for more details.
+ * Support discarding oldest messages before sending message if the send buffer is insufficient, see macro ST_ASIO_SHRINK_SEND_BUFFER for more details.
  * Add resend_msg and sync_resend_msg interface to st_asio_wrapper::socket, it takes packed messages and insert them into the front of the send buffer.
  *
  * FIX:
@@ -812,6 +822,15 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #elif ST_ASIO_MAX_RECV_BUF <= 15
 	#error message capacity must be bigger than zero.
 #endif
+
+//by defining this, virtual function socket::calc_shrink_size will be introduced and be called when send buffer is insufficient before sending message,
+//the return value will be used to determine how many messages (in bytes) will be discarded (from the oldest one), 0 means don't shrink send buffer,
+//you can rewrite it or accept the default implementation---1/3 of the current size.
+//please note:
+// 1. shrink size will be round up to the last discarded message.
+// 2. after shrank the send buffer, virtual function on_msg_discard will be called with discarded messages in the same thread calling the send_msg (series)
+//    before send_msg returns, so most likely, it will be in your thread, this is unlike other callbacks, which will be called in service threads.
+//#define ST_ASIO_SHRINK_SEND_BUFFER
 
 //buffer (on stack) size used when writing logs.
 #ifndef ST_ASIO_UNIFIED_OUT_BUF_NUM
