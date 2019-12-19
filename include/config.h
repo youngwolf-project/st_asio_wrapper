@@ -668,13 +668,14 @@
  *
  * HIGHLIGHT:
  * Support batch message sent notification, see new macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY for more details.
+ * Add resend_msg and sync_resend_msg interface to st_asio_wrapper::socket, it takes packed messages and insert them into the front of the send buffer.
  *
  * FIX:
  * If defined macro ST_ASIO_WANT_MSG_SEND_NOTIFY, virtual function st_asio_wrapper::socket::on_msg_send(InMsgType& msg) must be implemented.
  * If defined macro ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY, virtual function st_asio_wrapper::socket::on_all_msg_send(InMsgType& msg) must be implemented.
  *
  * ENHANCEMENTS:
- * Add resend_msg and sync_resend_msg interface to st_asio_wrapper::socket, it takes packed messages and insert them into the front of the send buffer.
+ * Support strict heartbeat sending, see macro ST_ASIO_ALWAYS_SEND_HEARTBEAT for more details.
  * Add socket_exist interface to i_matrix, it calls object_pool::exist to check the existence of a socket by an given id.
  * Add following 3 interfaces to i_unpacker as i_packer did (the default implementation is meaningless as i_packer, just satisfy compilers):
  *  virtual char* raw_data(msg_type& msg) const
@@ -1003,6 +1004,9 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 	#error heartbeat absence must be bigger than zero.
 #endif
 //if no any messages (include heartbeat) been received within ST_ASIO_HEARTBEAT_INTERVAL * ST_ASIO_HEARTBEAT_MAX_ABSENCE second(s), shut down the link.
+
+//#define ST_ASIO_ALWAYS_SEND_HEARTBEAT
+//always send heartbeat in each ST_ASIO_HEARTBEAT_INTERVAL seconds without checking if we're sending other messages or not.
 
 //#define ST_ASIO_REUSE_SSL_STREAM
 //if you need ssl::client_socket_base to be able to reconnect the server, or to open object pool in ssl::object_pool, you must define this macro.
