@@ -224,37 +224,21 @@ public:
 	bool is_recv_buffer_available() const {return recv_buffer.size_in_byte() < ST_ASIO_MAX_RECV_BUF;}
 
 	//don't use the packer but insert into send buffer directly
-	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false)
-		{return can_overflow || shrink_send_buffer() ? do_direct_send_msg(msg) : false;}
-	bool direct_send_msg(InMsgType& msg, bool can_overflow = false) //after this call, msg becomes empty, please note.
-		{return can_overflow || shrink_send_buffer() ? do_direct_send_msg(msg) : false;}
-	bool direct_send_msg(list<InMsgType>& msg_can, bool can_overflow = false)
-		{return can_overflow || shrink_send_buffer() ? do_direct_send_msg(msg_can) : false;}
-
-	//don't use the packer but insert into the front of the send buffer directly
-	bool resend_msg(const InMsgType& msg, bool can_overflow = false)
-		{return can_overflow || shrink_send_buffer() ? do_resend_msg(msg) : false;}
-	bool resend_msg(InMsgType& msg, bool can_overflow = false) //after this call, msg becomes empty, please note.
-		{return can_overflow || shrink_send_buffer() ? do_resend_msg(msg) : false;}
-	bool resend_msg(list<InMsgType>& msg_can, bool can_overflow = false)
-		{return can_overflow || shrink_send_buffer() ? do_resend_msg(msg_can) : false;}
+	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false, bool prior = false)
+		{return can_overflow || shrink_send_buffer() ? do_direct_send_msg(msg, prior) : false;}
+	bool direct_send_msg(InMsgType& msg, bool can_overflow = false, bool prior = false) //after this call, msg becomes empty, please note.
+		{return can_overflow || shrink_send_buffer() ? do_direct_send_msg(msg, prior) : false;}
+	bool direct_send_msg(list<InMsgType>& msg_can, bool can_overflow = false, bool prior = false)
+		{return can_overflow || shrink_send_buffer() ? do_direct_send_msg(msg_can, prior) : false;}
 
 #ifdef ST_ASIO_SYNC_SEND
 	//don't use the packer but insert into send buffer directly, then wait the sending to finish, unit of the duration is millisecond, 0 means wait infinitely
-	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false)
-		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
-	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //after this call, msg becomes empty, please note.
-		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
-	sync_call_result direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false)
-		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg_can, duration) : NOT_APPLICABLE;}
-
-	//don't use the packer but insert into the front of the send buffer directly, then wait the sending to finish, unit of the duration is millisecond, 0 means wait infinitely
-	sync_call_result sync_resend_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false)
-		{return can_overflow || shrink_send_buffer() ? do_sync_resend_msg(msg, duration) : NOT_APPLICABLE;}
-	sync_call_result sync_resend_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //after this call, msg becomes empty, please note.
-		{return can_overflow || shrink_send_buffer() ? do_sync_resend_msg(msg, duration) : NOT_APPLICABLE;}
-	sync_call_result sync_resend_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false)
-		{return can_overflow || shrink_send_buffer() ? do_sync_resend_msg(msg_can, duration) : NOT_APPLICABLE;}
+	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false)
+		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg, duration, prior) : NOT_APPLICABLE;}
+	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false) //after this call, msg becomes empty, please note.
+		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg, duration, prior) : NOT_APPLICABLE;}
+	sync_call_result direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false, bool prior = false)
+		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg_can, duration, prior) : NOT_APPLICABLE;}
 #endif
 
 #ifdef ST_ASIO_SYNC_RECV
@@ -500,24 +484,11 @@ protected:
 		return handled_msg();
 	}
 
-	bool do_direct_send_msg(const InMsgType& msg)
-	{
-		if (msg.empty())
-			unified_out::error_out("found an empty message, please check your packer.");
-		else if (send_buffer.enqueue(msg))
-			send_msg();
-
-		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
-		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
-		//the packer provider has the responsibility to write detailed reasons down when packing message failed.
-		return true;
-	}
-
-	bool do_direct_send_msg(InMsgType& msg)
+	bool do_direct_send_msg(const InMsgType& msg, bool prior = false)
 	{
 		if (msg.empty())
 			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
-		else if (send_buffer.enqueue(msg))
+		else if (prior ? send_buffer.enqueue_front(msg) : send_buffer.enqueue(msg))
 			send_msg();
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
@@ -526,7 +497,20 @@ protected:
 		return true;
 	}
 
-	bool do_direct_send_msg(list<InMsgType>& msg_can)
+	bool do_direct_send_msg(InMsgType& msg, bool prior = false)
+	{
+		if (msg.empty())
+			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
+		else if (prior ? send_buffer.enqueue_front(msg) : send_buffer.enqueue(msg))
+			send_msg();
+
+		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
+		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
+		//the packer provider has the responsibility to write detailed reasons down when packing message failed.
+		return true;
+	}
+
+	bool do_direct_send_msg(list<InMsgType>& msg_can, bool prior = false)
 	{
 		size_t size_in_byte = 0;
 		in_container_type temp_buffer;
@@ -535,55 +519,14 @@ protected:
 			size_in_byte += iter->size();
 			temp_buffer.emplace_back().swap(*iter); //with c++0x, this can be emplace_back(*iter)
 		}
-		send_buffer.move_items_in(temp_buffer, size_in_byte);
-		send_msg();
-
-		return true;
-	}
-
-	bool do_resend_msg(const InMsgType& msg)
-	{
-		if (msg.empty())
-			unified_out::error_out("found an empty message, please check your packer.");
-		else if (send_buffer.enqueue_front(msg))
-			send_msg();
-
-		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
-		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
-		//the packer provider has the responsibility to write detailed reasons down when packing message failed.
-		return true;
-	}
-
-	bool do_resend_msg(InMsgType& msg)
-	{
-		if (msg.empty())
-			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
-		else if (send_buffer.enqueue_front(msg))
-			send_msg();
-
-		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
-		//please think about the function safe_send_(native_)msg, if we keep returning false, it will enter a dead loop.
-		//the packer provider has the responsibility to write detailed reasons down when packing message failed.
-		return true;
-	}
-
-	bool do_resend_msg(list<InMsgType>& msg_can)
-	{
-		size_t size_in_byte = 0;
-		in_container_type temp_buffer;
-		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
-		{
-			size_in_byte += iter->size();
-			temp_buffer.emplace_back().swap(*iter); //with c++0x, this can be emplace_back(*iter)
-		}
-		send_buffer.move_items_in_front(temp_buffer, size_in_byte);
+		prior ? send_buffer.move_items_in_front(temp_buffer, size_in_byte) : send_buffer.move_items_in(temp_buffer, size_in_byte);
 		send_msg();
 
 		return true;
 	}
 
 #ifdef ST_ASIO_SYNC_SEND
-	sync_call_result do_direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0)
+	sync_call_result do_direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool prior = false)
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
@@ -597,7 +540,7 @@ protected:
 		BOOST_AUTO(p, unused.p);
 		typename in_msg::future f;
 		p->get_future().swap(f);
-		if (!send_buffer.enqueue(unused))
+		if (!(prior ? send_buffer.enqueue_front(unused) : send_buffer.enqueue(unused)))
 			return NOT_APPLICABLE;
 
 		send_msg();
@@ -608,13 +551,13 @@ protected:
 #endif
 	}
 
-	sync_call_result do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0)
+	sync_call_result do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool prior = false)
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
 		else if (msg.empty())
 		{
-			unified_out::error_out("found an empty message, please check your packer.");
+			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
 			return SUCCESS;
 		}
 
@@ -622,7 +565,7 @@ protected:
 		BOOST_AUTO(p, unused.p);
 		typename in_msg::future f;
 		p->get_future().swap(f);
-		if (!send_buffer.enqueue(unused))
+		if (!(prior ? send_buffer.enqueue_front(unused) : send_buffer.enqueue(unused)))
 			return NOT_APPLICABLE;
 
 		send_msg();
@@ -633,7 +576,7 @@ protected:
 #endif
 	}
 
-	sync_call_result do_direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0)
+	sync_call_result do_direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool prior = false)
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
@@ -652,86 +595,7 @@ protected:
 		BOOST_AUTO(p, temp_buffer.back().p);
 		typename in_msg::future f;
 		p->get_future().swap(f);
-		send_buffer.move_items_in(temp_buffer, size_in_byte);
-
-		send_msg();
-#ifdef BOOST_THREAD_USES_CHRONO
-		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
-#else
-		return 0 == duration || f.timed_wait(boost::posix_time::milliseconds(duration)) ? f.get() : TIMEOUT;
-#endif
-	}
-
-	sync_call_result do_sync_resend_msg(const InMsgType& msg, unsigned duration = 0)
-	{
-		if (stopped())
-			return NOT_APPLICABLE;
-		else if (msg.empty())
-		{
-			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
-			return SUCCESS;
-		}
-
-		in_msg unused(msg, true);
-		BOOST_AUTO(p, unused.p);
-		typename in_msg::future f;
-		p->get_future().swap(f);
-		if (!send_buffer.enqueue_front(unused))
-			return NOT_APPLICABLE;
-
-		send_msg();
-#ifdef BOOST_THREAD_USES_CHRONO
-		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
-#else
-		return 0 == duration || f.timed_wait(boost::posix_time::milliseconds(duration)) ? f.get() : TIMEOUT;
-#endif
-	}
-
-	sync_call_result do_sync_resend_msg(InMsgType& msg, unsigned duration = 0)
-	{
-		if (stopped())
-			return NOT_APPLICABLE;
-		else if (msg.empty())
-		{
-			unified_out::error_out("found an empty message, please check your packer.");
-			return SUCCESS;
-		}
-
-		in_msg unused(msg, true);
-		BOOST_AUTO(p, unused.p);
-		typename in_msg::future f;
-		p->get_future().swap(f);
-		if (!send_buffer.enqueue_front(unused))
-			return NOT_APPLICABLE;
-
-		send_msg();
-#ifdef BOOST_THREAD_USES_CHRONO
-		return 0 == duration || boost::future_status::ready == f.wait_for(boost::chrono::milliseconds(duration)) ? f.get() : TIMEOUT;
-#else
-		return 0 == duration || f.timed_wait(boost::posix_time::milliseconds(duration)) ? f.get() : TIMEOUT;
-#endif
-	}
-
-	sync_call_result do_sync_resend_msg(list<InMsgType>& msg_can, unsigned duration = 0)
-	{
-		if (stopped())
-			return NOT_APPLICABLE;
-		else if (msg_can.empty())
-			return SUCCESS;
-
-		size_t size_in_byte = 0;
-		in_container_type temp_buffer;
-		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
-		{
-			size_in_byte += iter->size();
-			temp_buffer.emplace_back().swap(*iter); //with c++0x, this can be emplace_back(*iter)
-		}
-
-		temp_buffer.back().check_and_create_promise(true);
-		BOOST_AUTO(p, temp_buffer.back().p);
-		typename in_msg::future f;
-		p->get_future().swap(f);
-		send_buffer.move_items_in_front(temp_buffer, size_in_byte);
+		prior ? send_buffer.move_items_in_front(temp_buffer, size_in_byte) : send_buffer.move_items_in(temp_buffer, size_in_byte);
 
 		send_msg();
 #ifdef BOOST_THREAD_USES_CHRONO

@@ -66,11 +66,11 @@ static bool check_msg;
 ///////////////////////////////////////////////////
 //msg sending interface
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
-bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
+bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false, bool prior = false) \
 { \
 	size_t index = (size_t) ((boost::uint64_t) rand() * (size() - 1) / RAND_MAX); \
 	BOOST_AUTO(socket_ptr, at(index)); \
-	return socket_ptr ? socket_ptr->SEND_FUNNAME(pstr, len, num, can_overflow) : false; \
+	return socket_ptr ? socket_ptr->SEND_FUNNAME(pstr, len, num, can_overflow, prior) : false; \
 } \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //msg sending interface
@@ -305,7 +305,7 @@ void thread_runtine(link_container& link_group, size_t msg_num, size_t msg_len, 
 	for (size_t i = 0; i < msg_num; ++i)
 	{
 		memcpy(buff, &i, sizeof(size_t)); //seq
-		st_asio_wrapper::do_something_to_all(link_group, boost::bind((bool (echo_socket::*)(const char*, size_t, bool)) &echo_socket::safe_send_msg, _1, buff, msg_len, false));
+		st_asio_wrapper::do_something_to_all(link_group, boost::bind((bool (echo_socket::*)(const char*, size_t, bool, bool)) &echo_socket::safe_send_msg, _1, buff, msg_len, false, false));
 		//can_overflow is false, it's important
 	}
 	delete[] buff;

@@ -116,7 +116,7 @@ protected:
 			send_msg(*iter, true);
 #else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
-		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, _1, true, false));
 #endif
 		msg_can.clear();
 
@@ -143,7 +143,7 @@ protected:
 			send_msg(*iter, true);
 #else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
-		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, _1, true, false));
 #endif
 		return tmp_can.size();
 		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
@@ -347,11 +347,11 @@ int main(int argc, const char* argv[])
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
-				normal_server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(msg), false));
+				normal_server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg, _1, boost::cref(msg), false, false));
 			*/
 			/*
 			//if demo client is using stream_unpacker
-			normal_server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
+			normal_server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false, false));
 			*/
 		}
 	}

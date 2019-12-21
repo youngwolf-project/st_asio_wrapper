@@ -12,9 +12,8 @@
  * license: www.boost.org/LICENSE_1_0.txt
  *
  * Overview:
- * 1. send_msg (series) means send_msg, send_native_msg, safe_send_msg, safe_send_native_msg,
- *    direct_send_msg, resend_msg, direct_sync_send_msg, sync_resend_msg,
- *    broadcast_msg, broadcast_native_msg, safe_broadcast_native_msg.
+ * 1. send_msg (series) means send_msg, send_native_msg, safe_send_msg, safe_send_native_msg, direct_send_msg, direct_sync_send_msg,
+ *    broadcast_msg, broadcast_native_msg, safe_broadcast_msg, safe_broadcast_native_msg.
  * 2. the top namespace (st_asio_wrapper) usually is omitted, for example, socket indicate st_asio_wrapper::socket, tcp::socket_base indicate st_asio_wrapper::tcp::socket_base.
  * 3. send_msg (series) success just means the message has been moved (or copied) to st_asio_wrapper, it will be sent in the future automatically.
  * 4. Messages being sent have been moved out from the input queue, so they cannot be fetched via get_pending_send_msg_size and
@@ -669,6 +668,7 @@
  * 2020.x.x            version 2.3.0
  *
  * SPECIAL ATTENTION (incompatible with old editions):
+ * Add a new parameter prior to send_msg (series) function (after can_overflow).
  * Delete macro ST_ASIO_ENHANCED_STABILITY, which means now we always have it, if you really don't want it, define macro ST_ASIO_NO_TRY_CATCH.
  * Change macro ST_ASIO_LLF from %lu or %llu to %ld or %lld, this can shorten the output during printing invalid ids ((boost::uint_fast64_t) -1).
  * Apply the same reconnecting mechanism for message unpacking error (before, we always disabled reconnecting mechanism).
@@ -678,7 +678,7 @@
  * HIGHLIGHT:
  * Support batch message sent notification, see new macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY for more details.
  * Support discarding oldest messages before sending message if the send buffer is insufficient, see macro ST_ASIO_SHRINK_SEND_BUFFER for more details.
- * Add resend_msg and sync_resend_msg interface to st_asio_wrapper::socket, it takes packed messages and insert them into the front of the send buffer.
+ * Add a new parameter prior to send_msg (series) function (after can_overflow), if set to true, message will be inserted into the front of the send buffer.
  *
  * FIX:
  * If defined macro ST_ASIO_WANT_MSG_SEND_NOTIFY, virtual function st_asio_wrapper::socket::on_msg_send(InMsgType& msg) must be implemented.
