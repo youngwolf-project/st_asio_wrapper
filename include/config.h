@@ -665,7 +665,7 @@
  * REPLACEMENTS:
  *
  * ===============================================================
- * 2020.x.x            version 2.3.0
+ * 2020.1.1            version 2.3.0
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Add a new parameter prior to send_msg (series) function (after can_overflow).
@@ -678,7 +678,18 @@
  * HIGHLIGHT:
  * Support batch message sent notification, see new macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY for more details.
  * Support discarding oldest messages before sending message if the send buffer is insufficient, see macro ST_ASIO_SHRINK_SEND_BUFFER for more details.
- * Add a new parameter prior to send_msg (series) function (after can_overflow), if set to true, message will be inserted into the front of the send buffer.
+ *  if you open this feature, you must not call following functions (from the packer) to pack messages:
+ *  virtual bool pack_msg(msg_type& msg, container_type& msg_can);
+ *  virtual bool pack_msg(msg_type& msg1, msg_type& msg2, container_type& msg_can);
+ *  virtual bool pack_msg(container_type& in, container_type& out);
+ *  or send_msg (series) functions which accept in_msg_type& or Packer::container_type& parameters to send messages.
+ * Add a new parameter 'prior' to send_msg (series) function (after can_overflow), it has default value 'false', so legacy code can be compiled
+ *  without any modifications and brings no impacts. if set to true, message will be inserted into the front of the send buffer, so you must
+ *  not call following functions (from the packer) to pack messages:
+ *  virtual bool pack_msg(msg_type& msg, container_type& msg_can);
+ *  virtual bool pack_msg(msg_type& msg1, msg_type& msg2, container_type& msg_can);
+ *  virtual bool pack_msg(container_type& in, container_type& out);
+ *  or send_msg (series) functions which accept in_msg_type& or Packer::container_type& parameters to send messages.
  *
  * FIX:
  * If defined macro ST_ASIO_WANT_MSG_SEND_NOTIFY, virtual function st_asio_wrapper::socket::on_msg_send(InMsgType& msg) must be implemented.
