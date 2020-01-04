@@ -38,6 +38,16 @@ typedef st_asio_wrapper::tcp::multi_client_base<client_socket> multi_client;
 typedef multi_client client;
 
 typedef st_asio_wrapper::tcp::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> server_socket;
+template <typename Server = st_asio_wrapper::tcp::i_server>
+class server_socket2 : public st_asio_wrapper::tcp::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server>
+{
+private:
+    typedef st_asio_wrapper::tcp::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server> super;
+
+public:
+    server_socket2(Server& server_) : super(server_) {}
+    template<typename Arg> server_socket2(Server& server_, Arg& arg) : super(server_, arg) {}
+};
 typedef st_asio_wrapper::tcp::server_base<server_socket> server;
 
 }}} //namespace

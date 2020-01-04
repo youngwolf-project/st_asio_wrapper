@@ -60,6 +60,7 @@ public:
 	virtual void reset() {status = BROKEN; sending_msgs.clear(); super::reset();}
 
 	//SOCKET status
+	link_status get_link_status() const {return status;}
 	bool is_broken() const {return BROKEN == status;}
 	bool is_connected() const {return CONNECTED == status;}
 	bool is_shutting_down() const {return FORCE_SHUTTING_DOWN == status || GRACEFUL_SHUTTING_DOWN == status;}
@@ -72,7 +73,7 @@ public:
 		{
 			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec));
 			if (!ec)
-				unified_out::info_out("%s (%s:%hu %s:%hu) %s", head,
+				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s", ST_THIS id(), head,
 					local_ep.address().to_string().data(), local_ep.port(),
 					remote_ep.address().to_string().data(), remote_ep.port(), tail);
 		}
@@ -86,7 +87,7 @@ public:
 		{
 			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec2));
 			if (!ec2)
-				unified_out::info_out("%s (%s:%hu %s:%hu) %s (%d %s)", head,
+				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s (%d %s)", ST_THIS id(), head,
 					local_ep.address().to_string().data(), local_ep.port(),
 					remote_ep.address().to_string().data(), remote_ep.port(), tail, ec.value(), ec.message().data());
 		}
@@ -157,7 +158,7 @@ protected:
 					boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
 				if (loop_num < 0) //graceful shutdown is impossible
 				{
-					unified_out::info_out("failed to graceful shutdown within %d seconds", ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
+					unified_out::info_out(ST_ASIO_LLF " failed to graceful shutdown within %d seconds", ST_THIS id(), ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
 					shutdown();
 				}
 			}
@@ -173,12 +174,26 @@ protected:
 		return super::do_start();
 	}
 
+#ifdef ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+	#ifdef _MSC_VER
+		#pragma message("macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY will not take effect with macro ST_ASIO_WANT_MSG_SEND_NOTIFY.")
+	#else
+		#warning macro ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY will not take effect with macro ST_ASIO_WANT_MSG_SEND_NOTIFY.
+	#endif
+#else
+	//some messages have been sent to the kernel buffer
+	//notice: messages are packed, using inconstant reference is for the ability of swapping
+	virtual void on_msg_send(typename super::in_container_type & msg_can) = 0;
+#endif
+#endif
+
 	//generally, you don't have to rewrite this to maintain the status of connections
 	//msg_can contains messages that were failed to send and tcp::socket_base will not hold them any more, if you want to re-send them in the future,
 	// you must take over them and re-send (at any time) them via direct_send_msg.
 	//DO NOT hold msg_can for future using, just swap its content with your own container in this virtual function.
 	virtual void on_send_error(const boost::system::error_code& ec, typename super::in_container_type& msg_can)
-		{unified_out::error_out("send msg error (%d %s)", ec.value(), ec.message().data());}
+		{unified_out::error_out(ST_ASIO_LLF " send msg error (%d %s)", ST_THIS id(), ec.value(), ec.message().data());}
 
 	virtual void on_recv_error(const boost::system::error_code& ec) = 0;
 
@@ -230,7 +245,7 @@ private:
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
 		assert(boost::asio::buffer_size(recv_buff) > 0);
 		if (0 == boost::asio::buffer_size(recv_buff))
-			unified_out::error_out("The unpacker returned an empty buffer, quit receiving!");
+			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
 		else
 		{
 #ifdef ST_ASIO_PASSIVE_RECV
@@ -255,7 +270,7 @@ private:
 			if (!unpack_ok)
 			{
 				on_unpack_error();
-				unpacker_->reset(); //use can get the left half-baked msg in unpacker's reset()
+				unpacker_->reset(); //user can get the left half-baked msg in unpacker's reset()
 			}
 
 #ifdef ST_ASIO_PASSIVE_RECV
@@ -325,10 +340,24 @@ private:
 #endif
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 			ST_THIS on_msg_send(sending_msgs.front());
+#elif defined(ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY)
+			on_msg_send(sending_msgs);
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 			if (send_buffer.empty())
+#if defined(ST_ASIO_WANT_MSG_SEND_NOTIFY) || !defined(ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY)
 				ST_THIS on_all_msg_send(sending_msgs.back());
+#else
+			{
+				if (!sending_msgs.empty())
+					ST_THIS on_all_msg_send(sending_msgs.back());
+				else //on_msg_send consumed all messages
+				{
+					in_msg_type msg;
+					ST_THIS on_all_msg_send(msg);
+				}
+			}
+#endif
 #endif
 			sending_msgs.clear();
 			if (!do_send_msg(true) && !send_buffer.empty()) //send msg in sequence
@@ -361,7 +390,7 @@ private:
 			}
 			else
 			{
-				unified_out::info_out("failed to graceful shutdown within %d seconds", ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
+				unified_out::info_out(ST_ASIO_LLF " failed to graceful shutdown within %d seconds", ST_THIS id(), ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
 				on_async_shutdown_error();
 			}
 		}

@@ -129,7 +129,11 @@ public:
 			scope_atomic_lock<> lock(start_atomic);
 			if (!started_ && lock.locked())
 				started_ = do_start();
+			else
+				unified_out::error_out(ST_ASIO_LLF " starting failed.", id());
 		}
+		else
+			unified_out::error_out(ST_ASIO_LLF " starting failed because of already stared or closing timer exists or service_pump stopped.", id());
 	}
 
 #ifdef ST_ASIO_PASSIVE_RECV
@@ -169,7 +173,9 @@ public:
 				if (!on_heartbeat_error())
 					return false;
 
+#ifndef ST_ASIO_ALWAYS_SEND_HEARTBEAT
 			if (!sending && now - stat.last_send_time >= interval) //don't need to send heartbeat if we're sending messages
+#endif
 				send_heartbeat();
 		}
 
@@ -195,7 +201,7 @@ public:
 	//get or change the packer at runtime
 	//changing packer at runtime is not thread-safe (if we're sending messages concurrently), please pay special attention,
 	//we can resolve this defect via mutex, but i think it's not worth, because this feature is not commonly needed and you know how to avoid
-	// race condition between message sending and packer replacement (because ascs never send messages automatically except with macro
+	// race condition between message sending and packer replacement (because st_asio_wrapper never send messages automatically except with macro
 	// ST_ASIO_HEARTBEAT_INTERVAL, please note).
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer() {return packer_;}
 	boost::shared_ptr<const i_packer<typename Packer::msg_type> > packer() const {return packer_;}
@@ -205,7 +211,7 @@ public:
 	boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> > unpacker() {return unpacker_;}
 	boost::shared_ptr<const i_unpacker<typename Unpacker::msg_type> > unpacker() const {return unpacker_;}
 #ifdef ST_ASIO_PASSIVE_RECV
-	//changing unpacker must before calling ascs::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
+	//changing unpacker must before calling st_asio_wrapper::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
 	void unpacker(const boost::shared_ptr<i_unpacker<typename Unpacker::msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
 #endif
 
@@ -218,21 +224,21 @@ public:
 	bool is_recv_buffer_available() const {return recv_buffer.size_in_byte() < ST_ASIO_MAX_RECV_BUF;}
 
 	//don't use the packer but insert into send buffer directly
-	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false)
-		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
-	bool direct_send_msg(InMsgType& msg, bool can_overflow = false) //after this call, msg becomes empty, please note.
-		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg) : false;}
-	bool direct_send_msg(list<InMsgType>& msg_can, bool can_overflow = false)
-		{return can_overflow || is_send_buffer_available() ? do_direct_send_msg(msg_can) : false;}
+	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false, bool prior = false)
+		{return can_overflow || shrink_send_buffer() ? do_direct_send_msg(msg, prior) : false;}
+	bool direct_send_msg(InMsgType& msg, bool can_overflow = false, bool prior = false) //after this call, msg becomes empty, please note.
+		{return can_overflow || shrink_send_buffer() ? do_direct_send_msg(msg, prior) : false;}
+	bool direct_send_msg(list<InMsgType>& msg_can, bool can_overflow = false, bool prior = false)
+		{return can_overflow || shrink_send_buffer() ? do_direct_send_msg(msg_can, prior) : false;}
 
 #ifdef ST_ASIO_SYNC_SEND
-	//don't use the packer but insert into send buffer directly, then wait for the sending to finish, unit of the duration is millisecond, 0 means wait infinitely
-	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false)
-		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
-	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false) //after this call, msg becomes empty, please note.
-		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg, duration) : NOT_APPLICABLE;}
-	sync_call_result direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false)
-		{return can_overflow || is_send_buffer_available() ? do_direct_sync_send_msg(msg_can, duration) : NOT_APPLICABLE;}
+	//don't use the packer but insert into send buffer directly, then wait the sending to finish, unit of the duration is millisecond, 0 means wait infinitely
+	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false)
+		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg, duration, prior) : NOT_APPLICABLE;}
+	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false) //after this call, msg becomes empty, please note.
+		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg, duration, prior) : NOT_APPLICABLE;}
+	sync_call_result direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false, bool prior = false)
+		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg_can, duration, prior) : NOT_APPLICABLE;}
 #endif
 
 #ifdef ST_ASIO_SYNC_RECV
@@ -293,17 +299,17 @@ protected:
 	// include user timers(created by set_timer()) and user async calls(started via post(), dispatch() or defer()), this means you can clean up any resource
 	// in this socket except this socket itself, because this socket maybe is being maintained by object_pool.
 	//otherwise (bigger than zero), socket simply call this callback ST_ASIO_DELAY_CLOSE seconds later after link down, no any guarantees.
-	virtual void on_close() {unified_out::info_out("on_close()");}
+	virtual void on_close() {unified_out::info_out(ST_ASIO_LLF " on_close()", id());}
 	virtual void after_close() {} //a good case for using this is to reconnect the server, please refer to client_socket_base.
 
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//return positive value if handled some messages (include all messages), if some msg left behind, socket will re-dispatch them asynchronously
-	//notice: using inconstant is for the convenience of swapping
+	//notice: using inconstant reference is for the ability of swapping
 	virtual size_t on_msg(list<OutMsgType>& msg_can)
 	{
 		//it's always thread safe in this virtual function, because it blocks message receiving
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
-			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
+			unified_out::debug_out(ST_ASIO_LLF " recv(" ST_ASIO_SF "): %s", id(), iter->size(), iter->data());
 		msg_can.clear(); //have handled all messages
 
 		return 1;
@@ -311,31 +317,63 @@ protected:
 #endif
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
 	//return positive value if handled some messages (include all messages), if some msg left behind, socket will re-dispatch them asynchronously
-	//notice: using inconstant is for the convenience of swapping
+	//notice: using inconstant reference is for the ability of swapping
 	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		out_container_type tmp_can;
 		msg_can.swap(tmp_can); //must be thread safe, or aovid race condition from your business logic
 
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
-			unified_out::debug_out("recv(" ST_ASIO_SF "): %s", iter->size(), iter->data());
+			unified_out::debug_out(ST_ASIO_LLF " recv(" ST_ASIO_SF "): %s", id(), iter->size(), iter->data());
 
 		return tmp_can.size();
 	}
 #else
 	//return true means msg been handled, false means msg cannot be handled right now, and socket will re-dispatch it asynchronously
-	virtual bool on_msg_handle(OutMsgType& msg) {unified_out::debug_out("recv(" ST_ASIO_SF "): %s", msg.size(), msg.data()); return true;}
+	virtual bool on_msg_handle(OutMsgType& msg)
+		{unified_out::debug_out(ST_ASIO_LLF " recv(" ST_ASIO_SF "): %s", id(), msg.size(), msg.data()); return true;}
 #endif
 
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 	//one msg has sent to the kernel buffer, msg is the right msg
-	//notice: the msg is packed, using inconstant is for the convenience of swapping
-	virtual void on_msg_send(InMsgType& msg) {}
+	//notice: the msg is packed, using inconstant reference is for the ability of swapping
+	virtual void on_msg_send(InMsgType& msg) = 0;
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
 	//send buffer goes empty
-	//notice: the msg is packed, using inconstant is for the convenience of swapping
-	virtual void on_all_msg_send(InMsgType& msg) {}
+	//notice: the msg is packed, using inconstant reference is for the ability of swapping
+	virtual void on_all_msg_send(InMsgType& msg) = 0;
+#endif
+
+	//return true means send buffer becomes available
+#ifdef ST_ASIO_SHRINK_SEND_BUFFER
+	virtual size_t calc_shrink_size(size_t current_size) {return current_size / 3;}
+	virtual void on_msg_discard(in_container_type& msg_can) {}
+
+	bool shrink_send_buffer()
+	{
+		send_buffer.lock();
+		size_t size = send_buffer.size_in_byte();
+		if (size < ST_ASIO_MAX_SEND_BUF)
+		{
+			send_buffer.unlock();
+			return true;
+		}
+		else if (0 == (size = calc_shrink_size(size)))
+		{
+			send_buffer.unlock();
+			return false;
+		}
+
+		in_container_type msg_can;
+		send_buffer.move_items_out_(size, msg_can);
+		send_buffer.unlock();
+
+		on_msg_discard(msg_can);
+		return true;
+	}
+#else
+	bool shrink_send_buffer() const {return is_send_buffer_available();}
 #endif
 
 	//subclass notify shutdown event
@@ -448,11 +486,11 @@ protected:
 		return handled_msg();
 	}
 
-	bool do_direct_send_msg(const InMsgType& msg)
+	bool do_direct_send_msg(const InMsgType& msg, bool prior = false)
 	{
 		if (msg.empty())
-			unified_out::error_out("found an empty message, please check your packer.");
-		else if (send_buffer.enqueue(msg))
+			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
+		else if (prior ? send_buffer.enqueue_front(msg) : send_buffer.enqueue(msg))
 			send_msg();
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
@@ -461,11 +499,11 @@ protected:
 		return true;
 	}
 
-	bool do_direct_send_msg(InMsgType& msg)
+	bool do_direct_send_msg(InMsgType& msg, bool prior = false)
 	{
 		if (msg.empty())
-			unified_out::error_out("found an empty message, please check your packer.");
-		else if (send_buffer.enqueue(msg))
+			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
+		else if (prior ? send_buffer.enqueue_front(msg) : send_buffer.enqueue(msg))
 			send_msg();
 
 		//even if we meet an empty message (because of too big message or insufficient memory, most likely), we still return true, why?
@@ -474,7 +512,7 @@ protected:
 		return true;
 	}
 
-	bool do_direct_send_msg(list<InMsgType>& msg_can)
+	bool do_direct_send_msg(list<InMsgType>& msg_can, bool prior = false)
 	{
 		size_t size_in_byte = 0;
 		in_container_type temp_buffer;
@@ -483,20 +521,20 @@ protected:
 			size_in_byte += iter->size();
 			temp_buffer.emplace_back().swap(*iter); //with c++0x, this can be emplace_back(*iter)
 		}
-		send_buffer.move_items_in(temp_buffer, size_in_byte);
+		prior ? send_buffer.move_items_in_front(temp_buffer, size_in_byte) : send_buffer.move_items_in(temp_buffer, size_in_byte);
 		send_msg();
 
 		return true;
 	}
 
 #ifdef ST_ASIO_SYNC_SEND
-	sync_call_result do_direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0)
+	sync_call_result do_direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool prior = false)
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
 		else if (msg.empty())
 		{
-			unified_out::error_out("found an empty message, please check your packer.");
+			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
 			return SUCCESS;
 		}
 
@@ -504,7 +542,7 @@ protected:
 		BOOST_AUTO(p, unused.p);
 		typename in_msg::future f;
 		p->get_future().swap(f);
-		if (!send_buffer.enqueue(unused))
+		if (!(prior ? send_buffer.enqueue_front(unused) : send_buffer.enqueue(unused)))
 			return NOT_APPLICABLE;
 
 		send_msg();
@@ -515,13 +553,13 @@ protected:
 #endif
 	}
 
-	sync_call_result do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0)
+	sync_call_result do_direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool prior = false)
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
 		else if (msg.empty())
 		{
-			unified_out::error_out("found an empty message, please check your packer.");
+			unified_out::error_out(ST_ASIO_LLF " found an empty message, please check your packer.", id());
 			return SUCCESS;
 		}
 
@@ -529,7 +567,7 @@ protected:
 		BOOST_AUTO(p, unused.p);
 		typename in_msg::future f;
 		p->get_future().swap(f);
-		if (!send_buffer.enqueue(unused))
+		if (!(prior ? send_buffer.enqueue_front(unused) : send_buffer.enqueue(unused)))
 			return NOT_APPLICABLE;
 
 		send_msg();
@@ -540,7 +578,7 @@ protected:
 #endif
 	}
 
-	sync_call_result do_direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0)
+	sync_call_result do_direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool prior = false)
 	{
 		if (stopped())
 			return NOT_APPLICABLE;
@@ -559,7 +597,7 @@ protected:
 		BOOST_AUTO(p, temp_buffer.back().p);
 		typename in_msg::future f;
 		p->get_future().swap(f);
-		send_buffer.move_items_in(temp_buffer, size_in_byte);
+		prior ? send_buffer.move_items_in_front(temp_buffer, size_in_byte) : send_buffer.move_items_in(temp_buffer, size_in_byte);
 
 		send_msg();
 #ifdef BOOST_THREAD_USES_CHRONO

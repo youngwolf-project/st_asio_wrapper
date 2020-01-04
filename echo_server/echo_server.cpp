@@ -7,7 +7,6 @@
 //#define ST_ASIO_FREE_OBJECT_INTERVAL 60 //it's useless if ST_ASIO_REUSE_OBJECT macro been defined
 //#define ST_ASIO_SYNC_DISPATCH //do not open this feature, see below for more details
 #define ST_ASIO_DISPATCH_BATCH_MSG
-#define ST_ASIO_ENHANCED_STABILITY
 //#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
 #define ST_ASIO_USE_STEADY_TIMER
 //#define ST_ASIO_USE_SYSTEM_TIMER
@@ -68,11 +67,13 @@ public:
 	virtual void test() = 0;
 };
 
-typedef server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, i_echo_server> echo_socket_base;
-class echo_socket : public echo_socket_base
+class echo_socket : public server_socket2<i_echo_server>
 {
+private:
+	typedef server_socket2<i_echo_server> super;
+
 public:
-	echo_socket(i_echo_server& server_) : echo_socket_base(server_)
+	echo_socket(i_echo_server& server_) : super(server_)
 	{
 		packer(global_packer);
 
@@ -85,7 +86,7 @@ public:
 	//because we use objects pool(REUSE_OBJECT been defined), so, strictly speaking, this virtual
 	//function must be rewrote, but we don't have member variables to initialize but invoke father's
 	//reset() directly, so, it can be omitted, but we keep it for possibly future using
-	virtual void reset() {echo_socket_base::reset();}
+	virtual void reset() { super::reset();}
 
 protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
@@ -93,7 +94,7 @@ protected:
 		//the type of tcp::server_socket_base::server now can be controlled by derived class(echo_socket),
 		//which is actually i_echo_server, so, we can invoke i_echo_server::test virtual function.
 		get_server().test();
-		echo_socket_base::on_recv_error(ec);
+		super::on_recv_error(ec);
 	}
 
 	//msg handling: send the original msg back(echo server)
@@ -115,7 +116,7 @@ protected:
 			send_msg(*iter, true);
 #else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
-		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, _1, true, false));
 #endif
 		msg_can.clear();
 
@@ -142,7 +143,7 @@ protected:
 			send_msg(*iter, true);
 #else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
-		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool)) &echo_socket::send_msg, this, _1, true));
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, _1, true, false));
 #endif
 		return tmp_can.size();
 		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
@@ -335,7 +336,7 @@ int main(int argc, const char* argv[])
 		{
 //			/*
 			//broadcast series functions call pack_msg for each client respectively, because clients may used different protocols(so different type of packers, of course)
-			normal_server_.broadcast_msg(str.data(), str.size() + 1, false);
+			normal_server_.broadcast_msg(str.data(), str.size() + 1);
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 //			*/
@@ -346,11 +347,15 @@ int main(int argc, const char* argv[])
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
-				normal_server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(msg), false));
+				((normal_server&) normal_server_).do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg,
+					_1, boost::cref(msg), false, false));
 			*/
 			/*
 			//if demo client is using stream_unpacker
-			normal_server_.do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool)) &normal_socket::direct_send_msg, _1, boost::cref(str), false));
+			((normal_server&) normal_server_).do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg,
+				_1, boost::cref(str), false, false));
+			//or
+			normal_server_.broadcast_native_msg(str);
 			*/
 		}
 	}

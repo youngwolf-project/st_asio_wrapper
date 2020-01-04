@@ -2,18 +2,18 @@
 #include <iostream>
 
 //configuration
-#define ST_ASIO_SERVER_PORT		5051
-#define ST_ASIO_RESTORE_OBJECT
-#define ST_ASIO_ENHANCED_STABILITY
-#define ST_ASIO_WANT_MSG_SEND_NOTIFY
-#define ST_ASIO_INPUT_QUEUE non_lock_queue
+//#define ST_ASIO_INPUT_QUEUE non_lock_queue
 //file_server / file_client is a responsive system, before file_server send each message (except talking message,
-//but file_server only receive talking message, not send talking message proactively), the previous message has been
+//but file_server only receive talking message, don't send talking message proactively), the previous message has been
 //sent to file_client, so sending buffer will always be empty, which means we will never operate sending buffer concurrently,
 //so need no locks.
 #define ST_ASIO_DEFAULT_PACKER	packer2<>
-#define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
-#define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
+//#define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
+//#define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
+//note, these two macro are not requisite, i'm just showing how to use them.
+
+//all other definitions are in the makefile, because we have two cpp files, defining them in more than one place is riskful (
+// we may define them to different values between the two cpp files)
 //configuration
 
 #include "file_socket.h"

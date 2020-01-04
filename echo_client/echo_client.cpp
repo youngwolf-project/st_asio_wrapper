@@ -66,12 +66,13 @@ static bool check_msg;
 ///////////////////////////////////////////////////
 //msg sending interface
 #define TCP_RANDOM_SEND_MSG(FUNNAME, SEND_FUNNAME) \
-void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow) \
+bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false, bool prior = false) \
 { \
 	size_t index = (size_t) ((boost::uint64_t) rand() * (size() - 1) / RAND_MAX); \
-	at(index)->SEND_FUNNAME(pstr, len, num, can_overflow); \
+	BOOST_AUTO(socket_ptr, at(index)); \
+	return socket_ptr ? socket_ptr->SEND_FUNNAME(pstr, len, num, can_overflow, prior) : false; \
 } \
-TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
+TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //msg sending interface
 ///////////////////////////////////////////////////
 
@@ -225,6 +226,8 @@ public:
 
 	///////////////////////////////////////////////////
 	//msg sending interface
+	TCP_RANDOM_SEND_MSG(random_send_msg, send_msg)
+	TCP_RANDOM_SEND_MSG(random_send_native_msg, send_native_msg)
 	//guarantee send msg successfully even if can_overflow is false, success at here just means putting the msg into tcp::socket's send buffer successfully
 	TCP_RANDOM_SEND_MSG(safe_random_send_msg, safe_send_msg)
 	TCP_RANDOM_SEND_MSG(safe_random_send_native_msg, safe_send_native_msg)
@@ -272,7 +275,7 @@ void send_msg_randomly(echo_client& client, size_t msg_num, size_t msg_len, char
 	{
 		memcpy(buff, &i, sizeof(size_t)); //seq
 
-		client.safe_random_send_msg(buff, msg_len, false); //can_overflow is false, it's important
+		client.safe_random_send_msg((const char*) buff, msg_len); //can_overflow is false, it's important
 		send_bytes += msg_len;
 
 		unsigned new_percent = (unsigned) (100 * send_bytes / total_msg_bytes);
@@ -302,7 +305,7 @@ void thread_runtine(link_container& link_group, size_t msg_num, size_t msg_len, 
 	for (size_t i = 0; i < msg_num; ++i)
 	{
 		memcpy(buff, &i, sizeof(size_t)); //seq
-		st_asio_wrapper::do_something_to_all(link_group, boost::bind((bool (echo_socket::*)(const char*, size_t, bool)) &echo_socket::safe_send_msg, _1, buff, msg_len, false));
+		st_asio_wrapper::do_something_to_all(link_group, boost::bind((bool (echo_socket::*)(const char*, size_t, bool, bool)) &echo_socket::safe_send_msg, _1, buff, msg_len, false, false));
 		//can_overflow is false, it's important
 	}
 	delete[] buff;
