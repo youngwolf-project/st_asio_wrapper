@@ -239,7 +239,7 @@ private:
 	virtual void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (reading)
+		if (reading || !is_ready())
 			return;
 #endif
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
@@ -259,7 +259,11 @@ private:
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
-		if (!ec && bytes_transferred > 0)
+#ifdef ST_ASIO_PASSIVE_RECV
+		reading = false; //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
+#endif
+		bool need_next_recv = false;
+		if (bytes_transferred > 0)
 		{
 			stat.last_recv_time = time(NULL);
 
@@ -273,25 +277,23 @@ private:
 				unpacker_->reset(); //user can get the left half-baked msg in unpacker's reset()
 			}
 
-#ifdef ST_ASIO_PASSIVE_RECV
-			reading = false; //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
-#endif
-			if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
-				do_recv_msg(); //receive msg in sequence
+			need_next_recv = handle_msg(); //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 		}
-		else
+		else if (!ec)
 		{
-#ifdef ST_ASIO_PASSIVE_RECV
-			reading = false; //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
-#endif
-			if (ec)
-			{
-				handle_error();
-				on_recv_error(ec);
-			}
-			else if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
-				do_recv_msg(); //receive msg in sequence
+			assert(false);
+			unified_out::error_out(ST_ASIO_LLF " read 0 byte without any errors which is unexpected, please check your unpacker!", ST_THIS id());
 		}
+
+		if (ec)
+		{
+			handle_error();
+			on_recv_error(ec);
+		}
+		//if you wrote an terrible unpacker whoes completion_condition always returns 0, it will cause st_asio_wrapper to occupies almost all CPU resources
+		// because of following do_recv_msg() invocation (rapidly and repeatedly), please note.
+		else if (need_next_recv)
+			do_recv_msg(); //receive msg in sequence
 	}
 
 	virtual bool do_send_msg(bool in_strand = false)
