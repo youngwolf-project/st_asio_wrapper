@@ -13,7 +13,7 @@ extern boost::atomic_int_fast64_t received_size;
 extern atomic<boost::int_fast64_t> received_size;
 #endif
 
-class file_unpacker : public i_unpacker<std::string>
+class file_unpacker : public i_unpacker<std::string>, public boost::noncopyable
 {
 public:
 	file_unpacker(FILE* file, fl_type total_len_)  : _file(file), total_len(total_len_)

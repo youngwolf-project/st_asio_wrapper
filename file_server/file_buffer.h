@@ -6,7 +6,7 @@ using namespace st_asio_wrapper;
 
 #include "common.h"
 
-class file_buffer : public i_buffer
+class file_buffer : public i_buffer, public boost::noncopyable
 {
 public:
 	file_buffer(FILE* file, fl_type total_len_) : _file(file), total_len(total_len_)
