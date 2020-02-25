@@ -379,11 +379,13 @@ protected:
 	//subclass notify shutdown event
 	bool close()
 	{
-		if (!started_)
-			return false;
-
 		scope_atomic_lock<> lock(start_atomic);
-		if (!started_ || !lock.locked())
+		while (!lock.locked())
+		{
+			boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+			lock.lock();
+		}
+		if (!started_)
 			return false;
 
 		started_ = false;
@@ -664,7 +666,7 @@ private:
 		return false;
 	}
 
-	//do not use dispatch_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
+	//do use dis_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
 	void dispatch_msg() {if (!dispatching) post_strand(dis_strand, boost::bind(&socket::do_dispatch_msg, this));}
 	void accumulate_dispatch_delay(const statistic::stat_time& begin_time, const out_msg& msg) {stat.dispatch_delay_sum += begin_time - msg.begin_time;}
 	void do_dispatch_msg()
