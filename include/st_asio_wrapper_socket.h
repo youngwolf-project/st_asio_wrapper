@@ -261,11 +261,13 @@ protected:
 	//subclass notify shutdown event
 	bool close()
 	{
-		if (!started_)
-			return false;
-
 		scope_atomic_lock<> lock(start_atomic);
-		if (!started_ || !lock.locked())
+		while (!lock.locked())
+		{
+			boost::this_thread::sleep(boost::get_system_time() + boost::posix_time::milliseconds(10));
+			lock.lock();
+		}
+		if (!started_)
 			return false;
 
 		started_ = false;
