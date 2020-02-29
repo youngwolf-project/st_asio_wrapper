@@ -56,6 +56,8 @@ protected:
 		started_ = false;
 		dispatching = false;
 		recv_idle_began = false;
+		send_buf_size_ = ST_ASIO_MAX_SEND_BUF;
+		recv_buf_size_ = ST_ASIO_MAX_RECV_BUF;
 		msg_resuming_interval_ = ST_ASIO_MSG_RESUMING_INTERVAL;
 		msg_handling_interval_ = ST_ASIO_MSG_HANDLING_INTERVAL;
 		start_atomic.store(0, boost::memory_order_relaxed);
@@ -186,6 +188,12 @@ public:
 	bool is_dispatching() const {return dispatching;}
 	bool is_recv_idle() const {return recv_idle_began;}
 
+	void send_buf_size(size_t size) {if (size > 0) send_buf_size_ = size;}
+	size_t send_buf_size() const {return send_buf_size_;}
+
+	void recv_buf_size(size_t size) {if (size > 0) recv_buf_size_ = size;}
+	size_t recv_buf_size() const {return recv_buf_size_; }
+
 	void msg_resuming_interval(unsigned interval) {msg_resuming_interval_ = interval;}
 	unsigned msg_resuming_interval() const {return msg_resuming_interval_;}
 
@@ -217,11 +225,11 @@ public:
 
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is overflow or not,
 	//this can exhaust all virtual memory, please pay special attentions.
-	bool is_send_buffer_available() const {return send_buffer.size_in_byte() < ST_ASIO_MAX_SEND_BUF;}
+	bool is_send_buffer_available() const {return send_buffer.size_in_byte() < send_buf_size_;}
 
 	//if you define macro ST_ASIO_PASSIVE_RECV and call recv_msg greedily, the receiving buffer may overflow, this can exhaust all virtual memory,
 	//to avoid this problem, call recv_msg only if is_recv_buffer_available() returns true.
-	bool is_recv_buffer_available() const {return recv_buffer.size_in_byte() < ST_ASIO_MAX_RECV_BUF;}
+	bool is_recv_buffer_available() const {return recv_buffer.size_in_byte() < recv_buf_size_;}
 
 	//don't use the packer but insert into send buffer directly
 	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false, bool prior = false)
@@ -354,7 +362,7 @@ protected:
 	{
 		send_buffer.lock();
 		size_t size = send_buffer.size_in_byte();
-		if (size < ST_ASIO_MAX_SEND_BUF)
+		if (size < send_buf_size_)
 		{
 			send_buffer.unlock();
 			return true;
@@ -795,6 +803,7 @@ private:
 	condition_variable sync_recv_cv;
 #endif
 
+	size_t send_buf_size_, recv_buf_size_;
 	unsigned msg_resuming_interval_, msg_handling_interval_;
 };
 

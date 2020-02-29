@@ -716,6 +716,25 @@
  * REPLACEMENTS:
  * Replace macro ST_ASIO_ENHANCED_STABILITY by ST_ASIO_NO_TRY_CATCH (antonymous).
  *
+ * ===============================================================
+ * 2020.x.x		version 2.3.1
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ *
+ * HIGHLIGHT:
+ * Support changing the send buffer and recv buffer at runtime.
+ *
+ * FIX:
+ *
+ * ENHANCEMENTS:
+ * Try parsing messages even errors occurred.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -725,8 +744,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20300	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.3.0"
+#define ST_ASIO_VER		20301	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.3.1"
 
 //#define ST_ASIO_HIDE_WARNINGS
 
@@ -823,14 +842,14 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //send buffer's maximum size (bytes), it will be expanded dynamically (not fixed) within this range.
 #ifndef ST_ASIO_MAX_SEND_BUF
 #define ST_ASIO_MAX_SEND_BUF		1048576 //1M
-#elif ST_ASIO_MAX_SEND_BUF <= 15
+#elif ST_ASIO_MAX_SEND_BUF <= 0
 	#error message capacity must be bigger than zero.
 #endif
 
 //recv buffer's maximum size (bytes), it will be expanded dynamically (not fixed) within this range.
 #ifndef ST_ASIO_MAX_RECV_BUF
 #define ST_ASIO_MAX_RECV_BUF		1048576 //1M
-#elif ST_ASIO_MAX_RECV_BUF <= 15
+#elif ST_ASIO_MAX_RECV_BUF <= 0
 	#error message capacity must be bigger than zero.
 #endif
 
