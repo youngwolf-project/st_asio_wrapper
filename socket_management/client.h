@@ -62,7 +62,7 @@ public:
 			if (add_socket(socket_ptr)) //exceed ST_ASIO_MAX_OBJECT_NUM
 			{
 				printf("add socket %s.\n", name.data());
-				link_map[name] = socket_ptr->id();
+				link_map[name] = socket_ptr;
 
 				return true;
 			}
@@ -71,38 +71,38 @@ public:
 		return false;
 	}
 
-	boost::uint_fast64_t find_link(const std::string& name)
+	object_type find_link(const std::string& name)
 	{
 		boost::lock_guard<boost::mutex> lock(link_map_mutex);
 		BOOST_AUTO(iter, link_map.find(name));
-		return iter != link_map.end() ? iter->second : -1;
+		return iter != link_map.end() ? iter->second : object_type();
 	}
 
-	boost::uint_fast64_t find_and_remove_link(const std::string& name)
+	object_type find_and_remove_link(const std::string& name)
 	{
-		boost::uint_fast64_t id = -1;
+		object_type socket_ptr;
 
 		boost::lock_guard<boost::mutex> lock(link_map_mutex);
 		BOOST_AUTO(iter, link_map.find(name));
 		if (iter != link_map.end())
 		{
-			id = iter->second;
+			socket_ptr = iter->second;
 			link_map.erase(iter);
 		}
 
-		return id;
+		return socket_ptr;
 	}
 
 	bool shutdown_link(const std::string& name)
 	{
-		BOOST_AUTO(socket_ptr, find(find_and_remove_link(name)));
+		BOOST_AUTO(socket_ptr, find_and_remove_link(name));
 		return socket_ptr ? (socket_ptr->force_shutdown(), true) : false;
 	}
 
 	bool send_msg(const std::string& name, const std::string& msg) {std::string unused(msg); return send_msg(name, unused);}
 	bool send_msg(const std::string& name, std::string& msg)
 	{
-		BOOST_AUTO(socket_ptr, find(find_link(name)));
+		BOOST_AUTO(socket_ptr, find_link(name));
 		return socket_ptr ?  socket_ptr->send_msg(msg) : false;
 	}
 
@@ -115,7 +115,7 @@ protected:
 	}
 
 private:
-	std::map<std::string, boost::uint_fast64_t> link_map;
+	std::map<std::string, object_type> link_map;
 	boost::mutex link_map_mutex;
 };
 
