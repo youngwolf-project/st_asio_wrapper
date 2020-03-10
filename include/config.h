@@ -728,6 +728,7 @@
  *
  * ENHANCEMENTS:
  * Try parsing messages even errors occurred.
+ * The usage of the send buffer and recv buffer now can be fetched via send_buf_usage(), recv_buf_usage() or show_status().
  *
  * DELETION:
  *

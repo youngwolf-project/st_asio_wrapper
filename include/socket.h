@@ -190,9 +190,11 @@ public:
 
 	void send_buf_size(size_t size) {if (size > 0) send_buf_size_ = size;}
 	size_t send_buf_size() const {return send_buf_size_;}
+	float send_buf_usage() const {return (float) send_buffer.size_in_byte() / send_buf_size_;}
 
 	void recv_buf_size(size_t size) {if (size > 0) recv_buf_size_ = size;}
-	size_t recv_buf_size() const {return recv_buf_size_; }
+	size_t recv_buf_size() const {return recv_buf_size_;}
+	float recv_buf_usage() const {return (float) recv_buffer.size_in_byte() / recv_buf_size_;}
 
 	void msg_resuming_interval(unsigned interval) {msg_resuming_interval_ = interval;}
 	unsigned msg_resuming_interval() const {return msg_resuming_interval_;}

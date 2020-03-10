@@ -104,12 +104,15 @@ public:
 #endif
 			"\n\tdispatching: %d"
 			"\n\tlink status: %d"
-			"\n\trecv suspended: %d",
+			"\n\trecv suspended: %d"
+			"\n\tsend buffer usage: %f"
+			"\n\trecv buffer usage: %f",
 			ST_THIS id(), ST_THIS started(), ST_THIS is_sending(),
 #ifdef ST_ASIO_PASSIVE_RECV
 			ST_THIS is_reading(),
 #endif
-			ST_THIS is_dispatching(), status, ST_THIS is_recv_idle());
+			ST_THIS is_dispatching(), status, ST_THIS is_recv_idle(),
+			ST_THIS send_buf_usage(), ST_THIS recv_buf_usage());
 	}
 
 	///////////////////////////////////////////////////
