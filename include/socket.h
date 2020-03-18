@@ -203,9 +203,11 @@ public:
 	size_t msg_handling_interval() const {return msg_handling_interval_;}
 
 	//in st_asio_wrapper, it's thread safe to access stat without mutex, because for a specific member of stat, st_asio_wrapper will never access it concurrently.
-	//but user can access stat out of st_asio_wrapper via get_statistic function, although user can only read it, there's still a potential risk,
-	//so whether it's thread safe or not depends on boost::chrono::system_clock::duration.
-	//i can make it thread safe in st_asio_wrapper, but is it worth to do so? this is a problem.
+	//but user can access stat out of st_asio_wrapper via get_statistic function, although user can only read it, there's still a potential risk (especially
+	// on 32 bit system, most likely, it will not be thread safe), so whether it's thread safe or not depends on boost::chrono::system_clock::duration.
+	//i can make it thread safe in st_asio_wrapper, but is it worth to do so? because it affect performance a lot, this is a problem.
+	//by the way, only with macro ST_ASIO_FULL_STATISTIC, above potential risk can happen, even it happens, it just corrupt data, not memory, so just
+	// logic error, no memory error (such as segment fault, bad memory, etc.) will occur.
 	const struct statistic& get_statistic() const {return stat;}
 
 	//get or change the packer at runtime

@@ -86,7 +86,7 @@ public:
 	//because we use objects pool(REUSE_OBJECT been defined), so, strictly speaking, this virtual
 	//function must be rewrote, but we don't have member variables to initialize but invoke father's
 	//reset() directly, so, it can be omitted, but we keep it for possibly future using
-	virtual void reset() { super::reset();}
+	virtual void reset() {super::reset();}
 
 protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
