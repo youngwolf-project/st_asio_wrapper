@@ -67,8 +67,11 @@ public:
 	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&socket_base::shutdown, this));}
 	void graceful_shutdown() {force_shutdown();}
 
-	void show_info(const char* head, const char* tail) const
-		{unified_out::info_out(ST_ASIO_LLF " %s %s:%hu %s", ST_THIS id(), head, local_addr.address().to_string().data(), local_addr.port(), tail);}
+	void show_info(const char* head = NULL, const char* tail = NULL) const
+	{
+		unified_out::info_out(ST_ASIO_LLF " %s %s:%hu %s",
+			ST_THIS id(), NULL == head ? "" : head, local_addr.address().to_string().data(), local_addr.port(), NULL == tail ? "" : tail);
+	}
 
 	void show_status() const
 	{

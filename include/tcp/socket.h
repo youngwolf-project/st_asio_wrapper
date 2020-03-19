@@ -65,7 +65,7 @@ public:
 	bool is_connected() const {return CONNECTED == status;}
 	bool is_shutting_down() const {return FORCE_SHUTTING_DOWN == status || GRACEFUL_SHUTTING_DOWN == status;}
 
-	void show_info(const char* head, const char* tail) const
+	void show_info(const char* head = NULL, const char* tail = NULL) const
 	{
 		boost::system::error_code ec;
 		BOOST_AUTO(local_ep, ST_THIS lowest_layer().local_endpoint(ec));
@@ -73,13 +73,13 @@ public:
 		{
 			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec));
 			if (!ec)
-				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s", ST_THIS id(), head,
+				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s", ST_THIS id(), NULL == head ? "" : head,
 					local_ep.address().to_string().data(), local_ep.port(),
-					remote_ep.address().to_string().data(), remote_ep.port(), tail);
+					remote_ep.address().to_string().data(), remote_ep.port(), NULL == tail ? "" : tail);
 		}
 	}
 
-	void show_info(const char* head, const char* tail, const boost::system::error_code& ec) const
+	void show_info(const boost::system::error_code& ec, const char* head = NULL, const char* tail = NULL) const
 	{
 		boost::system::error_code ec2;
 		BOOST_AUTO(local_ep, ST_THIS lowest_layer().local_endpoint(ec2));
@@ -87,9 +87,9 @@ public:
 		{
 			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec2));
 			if (!ec2)
-				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s (%d %s)", ST_THIS id(), head,
+				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s (%d %s)", ST_THIS id(), NULL == head ? "" : head,
 					local_ep.address().to_string().data(), local_ep.port(),
-					remote_ep.address().to_string().data(), remote_ep.port(), tail, ec.value(), ec.message().data());
+					remote_ep.address().to_string().data(), remote_ep.port(), NULL == tail ? "" : tail, ec.value(), ec.message().data());
 		}
 	}
 

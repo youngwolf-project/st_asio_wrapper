@@ -66,7 +66,7 @@ protected:
 	//do not forget to force_shutdown this socket(in del_socket(), there's a force_shutdown() invocation)
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
-		ST_THIS show_info("server link:", "broken/been shut down", ec);
+		ST_THIS show_info(ec, "server link:", "broken/been shut down");
 
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 		force_shutdown();
