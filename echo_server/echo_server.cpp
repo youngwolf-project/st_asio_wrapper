@@ -192,7 +192,7 @@ public:
 	normal_server(service_pump& service_pump_) : normal_server_base(service_pump_) {}
 
 protected:
-	virtual int async_accept_num() {return 1;} //this make on_accept to be called in single thread, because stop_listen() is not thread safe
+	virtual int async_accept_num() {return 1;}
 	virtual bool on_accept(object_ctype& socket_ptr) {stop_listen(); return true;}
 };
 

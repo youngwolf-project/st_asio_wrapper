@@ -49,6 +49,10 @@ public:
 
 	bool start_listen()
 	{
+		boost::lock_guard<boost::mutex> lock(mutex);
+		if (is_listening())
+			return false;
+
 		boost::system::error_code ec;
 		if (!acceptor.is_open()) {acceptor.open(server_addr.protocol(), ec); assert(!ec);} //user maybe has opened this acceptor (to set options for example)
 #ifndef ST_ASIO_NOT_REUSE_ADDRESS
@@ -88,7 +92,7 @@ public:
 		return true;
 	}
 	bool is_listening() const {return acceptor.is_open();}
-	void stop_listen() {boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
+	void stop_listen() {boost::lock_guard<boost::mutex> lock(mutex); boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
 
 	boost::asio::ip::tcp::acceptor& next_layer() {return acceptor;}
 	const boost::asio::ip::tcp::acceptor& next_layer() const {return acceptor;}
@@ -158,7 +162,7 @@ protected:
 	virtual void uninit() {ST_THIS stop(); stop_listen(); force_shutdown();} //if you wanna graceful shutdown, call graceful_shutdown before service_pump::stop_service invocation.
 
 	virtual bool on_accept(typename Pool::object_ctype& socket_ptr) {return true;}
-	virtual void start_next_accept() {do_async_accept(create_object());}
+	virtual void start_next_accept() {boost::lock_guard<boost::mutex> lock(mutex); do_async_accept(create_object());}
 
 	//if you want to ignore this error and continue to accept new connections immediately, return true in this virtual function;
 	//if you want to ignore this error and continue to accept new connections after a specific delay, start a timer immediately and return false (don't call stop_listen()),
@@ -216,6 +220,7 @@ private:
 private:
 	boost::asio::ip::tcp::endpoint server_addr;
 	boost::asio::ip::tcp::acceptor acceptor;
+	boost::mutex mutex;
 };
 
 }} //namespace

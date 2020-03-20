@@ -723,8 +723,10 @@
  *
  * HIGHLIGHT:
  * Support changing the send buffer and recv buffer at runtime.
+ * Make function server_base::start_listen() and server_base::stop_listen thread safe.
  *
  * FIX:
+ * Fix race condition during call acceptor::async_accept concurrently.
  *
  * ENHANCEMENTS:
  * Try parsing messages even errors occurred.
