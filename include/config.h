@@ -874,7 +874,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //now we have three ways to handle messages (sync_recv_msg, on_msg and on_msg_handle), the invocation order is the same as listed, if messages been successfully
 // dispatched to sync_recv_msg, then the second two will not be called, otherwise messages will be dispatched to on_msg, if on_msg only handled a part of (include
 // zero) the messages, then on_msg_handle will continue to dispatch the rest of them asynchronously, this will disorder messages because on_msg_handle and the next
-// on_msg (new messages arrived) can be invoked concurrently, please note. as before, on_msg will block the next receiving but only on current socket.
+// on_msg (new messages arrived) can be invoked concurrently, and on_msg will block the next receiving and sending, but only on current socket, please note.
 //if you cannot handle all of the messages in on_msg (like echo_server), you should not use sync message dispatching except you can bear message disordering.
 
 //configurations
