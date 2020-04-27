@@ -725,8 +725,6 @@ private:
 				dispatch_msg(); //dispatch msg in sequence
 			}
 		}
-		else if (!recv_buffer.empty()) //just make sure no pending msgs
-			dispatch_msg();
 	}
 
 	bool timer_handler(tid id)
