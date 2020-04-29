@@ -42,7 +42,8 @@ protected:
 	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
 		//if the type of out_msg_type and in_msg_type are not identical, the compilation will fail, then you should use send_native_msg instead.
-		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::direct_send_msg, this, _1, false, false));
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::direct_send_msg,
+			this, boost::placeholders::_1, false, false));
 		BOOST_AUTO(re, msg_can.size());
 		msg_can.clear(); //if we left behind some messages in msg_can, they will be dispatched via on_msg_handle asynchronously, which means it's
 		//possible that on_msg_handle be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.

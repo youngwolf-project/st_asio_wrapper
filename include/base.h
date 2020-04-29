@@ -21,12 +21,12 @@
 #include <sstream>
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
 #include <boost/chrono.hpp>
 #include <boost/thread.hpp>
 #include <boost/version.hpp>
 #include <boost/date_time.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/typeof/typeof.hpp>
 #include <boost/container/list.hpp>
 #include <boost/lambda/lambda.hpp>
@@ -723,7 +723,7 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 #define TCP_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false, bool prior = false) \
 	{ST_THIS do_something_to_all(boost::bind((bool (Socket::*)(const char* const[], const size_t[], size_t, bool, bool)) &Socket::SEND_FUNNAME, \
-		_1, pstr, len, num, can_overflow, prior));} \
+		boost::placeholders::_1, pstr, len, num, can_overflow, prior));} \
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, void)
 //TCP msg sending interface
 ///////////////////////////////////////////////////

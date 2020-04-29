@@ -423,7 +423,7 @@ protected:
 		else
 		{
 			set_async_calling(true);
-			set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, boost::bind(&socket::timer_handler, this, _1));
+			set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, boost::bind(&socket::timer_handler, this, boost::placeholders::_1));
 		}
 
 		return true;
@@ -688,7 +688,7 @@ private:
 		{
 			BOOST_AUTO(begin_time, statistic::now());
 #ifdef ST_ASIO_FULL_STATISTIC
-			recv_buffer.do_something_to_all(boost::bind(&socket::accumulate_dispatch_delay, this, boost::cref(begin_time), _1));
+			recv_buffer.do_something_to_all(boost::bind(&socket::accumulate_dispatch_delay, this, boost::cref(begin_time), boost::placeholders::_1));
 #endif
 			size_t re = on_msg_handle(recv_buffer);
 			BOOST_AUTO(end_time, statistic::now());
@@ -697,9 +697,9 @@ private:
 			if (0 == re) //dispatch failed, re-dispatch
 			{
 #ifdef ST_ASIO_FULL_STATISTIC
-				recv_buffer.do_something_to_all(boost::bind(&out_msg::restart, _1, boost::cref(end_time)));
+				recv_buffer.do_something_to_all(boost::bind(&out_msg::restart, boost::placeholders::_1, boost::cref(end_time)));
 #endif
-				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
+				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, boost::placeholders::_1)); //hold dispatching
 			}
 			else
 			{
@@ -715,7 +715,7 @@ private:
 			if (!re) //dispatch failed, re-dispatch
 			{
 				dispatching_msg.restart(end_time);
-				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
+				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, boost::placeholders::_1)); //hold dispatching
 			}
 			else
 			{

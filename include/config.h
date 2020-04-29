@@ -814,7 +814,11 @@
 
 #if BOOST_VERSION < 104900
 	#error st_asio_wrapper only support boost 1.49 or higher.
-#elif !defined(BOOST_THREAD_USES_CHRONO)
+#elif BOOST_VERSION < 106000
+	namespace boost {namespace placeholders {using ::_1; using ::_2;}}
+#endif
+
+#if !defined(BOOST_THREAD_USES_CHRONO)
 	namespace boost {namespace this_thread {static inline void sleep_for(const chrono::milliseconds& rel_time) {sleep(posix_time::milliseconds(rel_time.count()));}}}
 #endif
 
@@ -1081,7 +1085,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 	#error the interval of msg resuming must be bigger than or equal to zero.
 #endif
 //msg receiving
-//if receiving buffer is overflow, message receiving will stop and resume after the buffer becomes available, 
+//if receiving buffer is overflow, message receiving will stop and resume after the buffer becomes available,
 //this is the interval of receiving buffer checking.
 //this value can be changed via st_asio_wrapper::socket::msg_resuming_interval(size_t) at runtime.
 

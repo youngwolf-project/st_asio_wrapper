@@ -193,7 +193,7 @@ public:
 	object_type invalid_object_find(boost::uint_fast64_t id)
 	{
 		boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
-		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&Object::is_equal_to, _1, id)));
+		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&Object::is_equal_to, boost::placeholders::_1, id)));
 		return iter == invalid_object_can.end() ? object_type() : *iter;
 	}
 
@@ -209,7 +209,7 @@ public:
 	object_type invalid_object_pop(boost::uint_fast64_t id)
 	{
 		boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
-		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&Object::is_equal_to, _1, id)));
+		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&Object::is_equal_to, boost::placeholders::_1, id)));
 		if (iter != invalid_object_can.end() && (*iter).unique() && (*iter)->obsoleted())
 		{
 			BOOST_AUTO(object_ptr, *iter);
@@ -302,8 +302,8 @@ public:
 	}
 
 	statistic get_statistic() {statistic stat; do_something_to_all(stat += boost::lambda::bind(&Object::get_statistic, *boost::lambda::_1)); return stat;}
-	void list_all_status() {do_something_to_all(boost::bind(&Object::show_status, _1));}
-	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, _1, "", ""));}
+	void list_all_status() {do_something_to_all(boost::bind(&Object::show_status, boost::placeholders::_1));}
+	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, boost::placeholders::_1, "", ""));}
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred)
 		{ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex); for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter) __pred(iter->second);}

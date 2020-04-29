@@ -80,7 +80,7 @@ protected:
 			handle_msg(out_msg_type()); //we need empty message as a notification, it's just our business logic.
 		else
 		{
-			st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&file_socket::handle_msg, this, _1));
+			st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&file_socket::handle_msg, this, boost::placeholders::_1));
 			msg_can.clear();
 		}
 
@@ -99,7 +99,7 @@ protected:
 		out_container_type tmp_can;
 		msg_can.swap(tmp_can);
 
-		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&file_socket::handle_msg, this, _1));
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&file_socket::handle_msg, this, boost::placeholders::_1));
 
 		recv_msg(); //we always handled all messages, so calling recv_msg() at here is very reasonable.
 		return tmp_can.size();
@@ -259,7 +259,7 @@ private:
 				do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t (file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
 					boost::lambda::bind(&file_socket::get_file, *boost::lambda::_1, file_name)));
 				begin_time.start();
-				set_timer(UPDATE_PROGRESS, 50, boost::bind(&file_client::update_progress_handler, this, _1, -1));
+				set_timer(UPDATE_PROGRESS, 50, boost::bind(&file_client::update_progress_handler, this, boost::placeholders::_1, -1));
 
 				break;
 			}
@@ -290,7 +290,7 @@ private:
 				printf("\r%u%%", new_percent);
 				fflush(stdout);
 
-				change_timer_call_back(id, boost::bind(&file_client::update_progress_handler, this, _1, new_percent));
+				change_timer_call_back(id, boost::bind(&file_client::update_progress_handler, this, boost::placeholders::_1, new_percent));
 			}
 		}
 

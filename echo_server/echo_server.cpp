@@ -116,7 +116,7 @@ protected:
 			send_msg(*iter, true);
 #else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
-		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, _1, true, false));
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, boost::placeholders::_1, true, false));
 #endif
 		msg_can.clear();
 
@@ -143,7 +143,7 @@ protected:
 			send_msg(*iter, true);
 #else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
-		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, _1, true, false));
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, boost::placeholders::_1, true, false));
 #endif
 		return tmp_can.size();
 		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
@@ -235,7 +235,7 @@ class my_timer : public timer<tracked_executor>
 {
 public:
     my_timer(boost::asio::io_context& io_context_) :timer<tracked_executor>(io_context_) {}
-    void start() {set_timer(0, 10, boost::bind(&my_timer::handler, this, _1)); printf("after set_timer invocation, the aci ref is %ld\n", get_aci_ref());}
+    void start() {set_timer(0, 10, boost::bind(&my_timer::handler, this, boost::placeholders::_1)); printf("after set_timer invocation, the aci ref is %ld\n", get_aci_ref());}
 
 private:
     bool handler(tid id)
@@ -348,12 +348,12 @@ int main(int argc, const char* argv[])
 			//so need \0 character when printing it.
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
 				((normal_server&) normal_server_).do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg,
-					_1, boost::cref(msg), false, false));
+					boost::placeholders::_1, boost::cref(msg), false, false));
 			*/
 			/*
 			//if demo client is using stream_unpacker
 			((normal_server&) normal_server_).do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg,
-				_1, boost::cref(str), false, false));
+				boost::placeholders::_1, boost::cref(str), false, false));
 			//or
 			normal_server_.broadcast_native_msg(str);
 			*/

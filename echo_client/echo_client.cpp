@@ -113,7 +113,7 @@ protected:
 	//access msg_can freely within this callback, it's always thread safe.
 	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
-		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, boost::placeholders::_1));
 		msg_can.clear(); //if we left behind some messages in msg_can, they will be dispatched via on_msg_handle asynchronously, which means it's
 		//possible that on_msg_handle be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
 		//here we always consumed all messages, so we can use sync message dispatching, otherwise, we should not use sync message dispatching
@@ -133,7 +133,7 @@ protected:
 		out_container_type tmp_can;
 		msg_can.swap(tmp_can); //to consume a part of the messages in msg_can, see echo_server
 
-		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&echo_socket::handle_msg, this, _1));
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&echo_socket::handle_msg, this, boost::placeholders::_1));
 		return tmp_can.size();
 		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
 		//if we handled nothing, return a positive number is also okey but will very slightly impact performance, return 0 is suggested
@@ -193,7 +193,7 @@ public:
 	}
 
 	void clear_status() {do_something_to_all(boost::mem_fn(&echo_socket::clear_status));}
-	void begin(size_t msg_num, size_t msg_len, char msg_fill) {do_something_to_all(boost::bind(&echo_socket::begin, _1, msg_num, msg_len, msg_fill));}
+	void begin(size_t msg_num, size_t msg_len, char msg_fill) {do_something_to_all(boost::bind(&echo_socket::begin, boost::placeholders::_1, msg_num, msg_len, msg_fill));}
 
 	void shutdown_some_client(int n)
 	{
@@ -305,7 +305,8 @@ void thread_runtine(link_container& link_group, size_t msg_num, size_t msg_len, 
 	for (size_t i = 0; i < msg_num; ++i)
 	{
 		memcpy(buff, &i, sizeof(size_t)); //seq
-		st_asio_wrapper::do_something_to_all(link_group, boost::bind((bool (echo_socket::*)(const char*, size_t, bool, bool)) &echo_socket::safe_send_msg, _1, buff, msg_len, false, false));
+		st_asio_wrapper::do_something_to_all(link_group, boost::bind((bool (echo_socket::*)(const char*, size_t, bool, bool)) &echo_socket::safe_send_msg,
+			boost::placeholders::_1, buff, msg_len, false, false));
 		//can_overflow is false, it's important
 	}
 	delete[] buff;
@@ -345,7 +346,7 @@ void send_msg_concurrently(echo_client& client, size_t send_thread_num, size_t m
 	size_t this_group_link_num = 0;
 
 	std::vector<link_container> link_groups(group_num);
-	client.do_something_to_all(boost::bind(&group_links, _1, boost::ref(link_groups), group_link_num,
+	client.do_something_to_all(boost::bind(&group_links, boost::placeholders::_1, boost::ref(link_groups), group_link_num,
 		boost::ref(group_index), boost::ref(this_group_link_num), boost::ref(left_link_num)));
 
 	boost::timer::cpu_timer begin_time;
@@ -435,7 +436,7 @@ int main(int argc, const char* argv[])
 	//method #2, add clients first without any arguments, then set the server address.
 	for (size_t i = 1; i < link_num / 2; ++i)
 		client.add_socket();
-	client.do_something_to_all(boost::bind(&echo_socket::set_server_addr, _1, port, boost::ref(ip)));
+	client.do_something_to_all(boost::bind(&echo_socket::set_server_addr, boost::placeholders::_1, port, boost::ref(ip)));
 
 	//method #3, add clients and set server address in one invocation.
 	for (size_t i = std::max((size_t) 1, link_num / 2); i < link_num; ++i)

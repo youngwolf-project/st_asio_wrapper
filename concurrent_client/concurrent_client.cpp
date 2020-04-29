@@ -73,11 +73,11 @@ public:
 
 	void begin(float max_delay, size_t msg_len)
 	{
-		do_something_to_all(boost::bind(&echo_socket::begin, _1, msg_len));
+		do_something_to_all(boost::bind(&echo_socket::begin, boost::placeholders::_1, msg_len));
 		set_timer(TIMER_END, 5000, (boost::lambda::bind(&echo_client::check_delay, this, max_delay), true));
 	}
 
-	void check_delay(float max_delay) {do_something_to_all(boost::bind(&echo_socket::check_delay, _1, max_delay));}
+	void check_delay(float max_delay) {do_something_to_all(boost::bind(&echo_socket::check_delay, boost::placeholders::_1, max_delay));}
 };
 
 int main(int argc, const char* argv[])

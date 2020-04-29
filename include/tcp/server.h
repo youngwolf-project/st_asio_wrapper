@@ -88,7 +88,7 @@ public:
 #endif
 		if (ec) {unified_out::error_out("listen failed."); return false;}
 
-		st_asio_wrapper::do_something_to_all(sockets, boost::bind(&server_base::do_async_accept, this, _1));
+		st_asio_wrapper::do_something_to_all(sockets, boost::bind(&server_base::do_async_accept, this, boost::placeholders::_1));
 		return true;
 	}
 	bool is_listening() const {return acceptor.is_open();}
@@ -150,11 +150,12 @@ public:
 
 	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function.
 	void disconnect(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->disconnect();}
-	void disconnect() {ST_THIS do_something_to_all(boost::bind(&Socket::disconnect, _1));}
+	void disconnect() {ST_THIS do_something_to_all(boost::bind(&Socket::disconnect, boost::placeholders::_1));}
 	void force_shutdown(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->force_shutdown();}
-	void force_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::force_shutdown, _1));}
+	void force_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::force_shutdown, boost::placeholders::_1));}
 	void graceful_shutdown(typename Pool::object_ctype& socket_ptr, bool sync = false) {ST_THIS del_object(socket_ptr); socket_ptr->graceful_shutdown(sync);}
-	void graceful_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::graceful_shutdown, _1, false));} //parameter sync must be false (the default value), or dead lock will occur.
+	void graceful_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::graceful_shutdown, boost::placeholders::_1, false));}
+	//parameter sync must be false (the default value), or dead lock will occur.
 
 protected:
 	virtual int async_accept_num() {return ST_ASIO_ASYNC_ACCEPT_NUM;}

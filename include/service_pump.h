@@ -119,7 +119,7 @@ public:
 		temp_service_can.splice(temp_service_can.end(), service_can);
 		lock.unlock();
 
-		st_asio_wrapper::do_something_to_all(temp_service_can, boost::bind(&service_pump::stop_and_free, this, _1));
+		st_asio_wrapper::do_something_to_all(temp_service_can, boost::bind(&service_pump::stop_and_free, this, boost::placeholders::_1));
 	}
 
 	void start_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM) {if (!is_service_started()) do_service(thread_num);}
