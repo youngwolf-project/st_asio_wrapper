@@ -723,8 +723,8 @@
  * Rename function i_service::is_started() to i_service::service_started().
  *
  * HIGHLIGHT:
- * Support changing the send buffer and recv buffer at runtime.
- * Make function server_base::start_listen() and server_base::stop_listen thread safe.
+ * Support changing the size of send buffer and recv buffer at runtime.
+ * Make function server_base::start_listen() and server_base::stop_listen() thread safe.
  * packer2 now can customize the real message type (before, it's always string_buffer).
  * Optimize unpacker2.
  *
@@ -733,7 +733,7 @@
  *
  * ENHANCEMENTS:
  * Try parsing messages even errors occurred.
- * The usage of the send buffer and recv buffer now can be fetched via send_buf_usage(), recv_buf_usage() or show_status().
+ * The usage rate of send buffer and recv buffer now can be fetched via send_buf_usage(), recv_buf_usage() or show_status().
  *
  * DELETION:
  *

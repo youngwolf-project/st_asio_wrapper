@@ -209,9 +209,7 @@ public:
 	{
 		assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE);
 
-		BOOST_AUTO(raw_msg, new std::string());
-		raw_msg->assign(raw_buff.data(), bytes_transferred);
-		msg_can.emplace_back(raw_msg);
+		msg_can.emplace_back(new std::string(raw_buff.data(), bytes_transferred));
 		return true;
 	}
 
