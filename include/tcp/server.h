@@ -190,7 +190,6 @@ protected:
 		}
 
 		socket_ptr->show_info("client:", "been refused because of too many clients.");
-		socket_ptr->force_shutdown();
 		return false;
 	}
 
