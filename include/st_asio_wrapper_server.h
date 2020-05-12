@@ -147,7 +147,6 @@ protected:
 		}
 
 		client_ptr->show_info("client:", "been refused because of too many clients.");
-		client_ptr->force_shutdown();
 		return false;
 	}
 
