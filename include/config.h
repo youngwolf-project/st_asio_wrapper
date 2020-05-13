@@ -721,8 +721,14 @@
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Rename function i_service::is_started() to i_service::service_started().
+ * A additional parameter named 'init' is added to interface i_server::restore_socket, now it has following signature:
+ *  virtual bool i_server::restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id, bool init)
+ *  you use init = true to initialize the server_socket's id (use macro ST_ASIO_START_OBJECT_ID to separate your id rang from object_pool's id rang),
+ *  use init = false to restore a server_socket after client_socket reconnected to the server.
  *
  * HIGHLIGHT:
+ * Introduce new macro ST_ASIO_START_OBJECT_ID to set the start id that object_pool used to assign object ids, and the new function
+ *  object_pool::set_start_object_id(boost::uint_fast64_t) with the same purpose, please call it as immediately as possible.
  * Support changing the size of send buffer and recv buffer at runtime.
  * Make function server_base::start_listen() and server_base::stop_listen() thread safe.
  * packer2 now can customize the real message type (before, it's always string_buffer).
@@ -916,6 +922,11 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 
 //after sending buffer became empty, call st_asio_wrapper::socket::on_all_msg_send(InMsgType& msg)
 //#define ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
+
+//object_pool will asign object ids (used to distinguish objects) from this
+#ifndef ST_ASIO_START_OBJECT_ID
+#define ST_ASIO_START_OBJECT_ID	0
+#endif
 
 //max number of objects object_pool can hold.
 #ifndef ST_ASIO_MAX_OBJECT_NUM

@@ -113,24 +113,32 @@ public:
 		raw_socket_ptr->force_shutdown();
 		return ST_THIS del_object(raw_socket_ptr);
 	}
-	//restore the invalid socket whose id is equal to id, if successful, socket_ptr's take_over function will be invoked,
+	//restore the invalid socket whose id is equal to 'id', if successful, socket_ptr's take_over function will be invoked,
 	//you can restore the invalid socket to socket_ptr, everything can be restored except socket::next_layer_ (on the other
 	//hand, restore socket::next_layer_ doesn't make any sense).
-	virtual bool restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id)
+	virtual bool restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id, bool init)
 	{
 		BOOST_AUTO(raw_socket_ptr, boost::dynamic_pointer_cast<Socket>(socket_ptr));
 		if (!raw_socket_ptr)
 			return false;
 
 		BOOST_AUTO(this_id, raw_socket_ptr->id());
-		BOOST_AUTO(old_socket_ptr, ST_THIS change_object_id(raw_socket_ptr, id));
-		if (old_socket_ptr)
+		if (!init)
 		{
-			assert(raw_socket_ptr->id() == old_socket_ptr->id());
+			BOOST_AUTO(old_socket_ptr, ST_THIS change_object_id(raw_socket_ptr, id));
+			if (old_socket_ptr)
+			{
+				assert(raw_socket_ptr->id() == old_socket_ptr->id());
 
-			unified_out::info_out("object id " ST_ASIO_LLF " been reused, id " ST_ASIO_LLF " been discarded.", raw_socket_ptr->id(), this_id);
-			raw_socket_ptr->take_over(old_socket_ptr);
+				unified_out::info_out("object id " ST_ASIO_LLF " been reused, id " ST_ASIO_LLF " been discarded.", raw_socket_ptr->id(), this_id);
+				raw_socket_ptr->take_over(old_socket_ptr);
 
+				return true;
+			}
+		}
+		else if (ST_THIS init_object_id(raw_socket_ptr, id))
+		{
+			unified_out::info_out("object id " ST_ASIO_LLF " been set to " ST_ASIO_LLF, this_id, raw_socket_ptr->id());
 			return true;
 		}
 
@@ -195,8 +203,7 @@ protected:
 			return true;
 		}
 
-		socket_ptr->show_info("client:", "been refused because of too many clients.");
-		socket_ptr->force_shutdown();
+		socket_ptr->show_info("client:", "been refused because of too many clients or id conflict.");
 		return false;
 	}
 

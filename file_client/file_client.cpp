@@ -42,7 +42,7 @@ int main(int argc, const char* argv[])
 	file_client client(sp);
 
 	if (argc > 3)
-		link_num = std::min(256, std::max(atoi(argv[3]), 1));
+		link_num = std::min(256, std::max(atoi(argv[3]), 1)); //link number cannot exceed 500, becuase file_server's macro ST_ASIO_START_OBJECT_ID is defined as 500
 
 	for (int i = 0; i < link_num; ++i)
 	{
