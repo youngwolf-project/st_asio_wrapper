@@ -717,7 +717,7 @@
  * Replace macro ST_ASIO_ENHANCED_STABILITY by ST_ASIO_NO_TRY_CATCH (antonymous).
  *
  * ===============================================================
- * 2020.x.x		version 2.3.1
+ * 2020.5.24	version 2.3.1
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Rename function i_service::is_started() to i_service::service_started().
