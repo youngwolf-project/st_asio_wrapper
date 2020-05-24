@@ -68,7 +68,7 @@ int main(int argc, const char* argv[])
 //	sp.start_service();
 
 	//demonstrate how to change local address if the binding was failed.
-	if (!service.is_started())
+	if (!service.service_started())
 	{
 		service.set_local_addr(6666);
 		sp.start_service(&service);

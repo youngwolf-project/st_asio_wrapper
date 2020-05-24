@@ -24,15 +24,15 @@ public:
 	class i_service
 	{
 	protected:
-		i_service(service_pump& service_pump_) : sp(service_pump_), started(false), id_(0), data(NULL) {service_pump_.add(this);}
+		i_service(service_pump& service_pump_) : sp(service_pump_), started_(false), id_(0), data(NULL) {service_pump_.add(this);}
 		virtual ~i_service() {}
 
 	public:
 		//for the same i_service, start_service and stop_service are not thread safe,
 		//to resolve this defect, we must add a mutex member variable to i_service, it's not worth
-		void start_service() {if (!started) started = init();}
-		void stop_service() {if (started) uninit(); started = false;}
-		bool is_started() const {return started;}
+		void start_service() {if (!started_) started_ = init();}
+		void stop_service() {if (started_) uninit(); started_ = false;}
+		bool service_started() const {return started_;}
 
 		void id(int id) {id_ = id;}
 		int id() const {return id_;}
@@ -51,7 +51,7 @@ public:
 		service_pump& sp;
 
 	private:
-		bool started;
+		bool started_;
 		int id_;
 		void* data; //magic data, you can use it in any way
 	};
@@ -119,7 +119,7 @@ public:
 		temp_service_can.splice(temp_service_can.end(), service_can);
 		lock.unlock();
 
-		st_asio_wrapper::do_something_to_all(temp_service_can, boost::bind(&service_pump::stop_and_free, this, _1));
+		st_asio_wrapper::do_something_to_all(temp_service_can, boost::bind(&service_pump::stop_and_free, this, boost::placeholders::_1));
 	}
 
 	void start_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM) {if (!is_service_started()) do_service(thread_num);}

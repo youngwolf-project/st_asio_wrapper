@@ -129,7 +129,7 @@ public:
 	bool is_timer(tid id) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? timer_info::TIMER_STARTED == ti->status : false;}
 	bool start_timer(tid id) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? start_timer(*ti) : false;}
 	void stop_timer(tid id) {BOOST_AUTO(ti, find_timer(id)); if (NULL != ti) stop_timer(*ti);}
-	void stop_all_timer() {do_something_to_all(boost::bind((void (timer::*) (timer_info&)) &timer::stop_timer, this, _1));}
+	void stop_all_timer() {do_something_to_all(boost::bind((void (timer::*) (timer_info&)) &timer::stop_timer, this, boost::placeholders::_1));}
 	void stop_all_timer(tid excepted_id)
 	{
 		do_something_to_all(boost::lambda::if_then(excepted_id != boost::lambda::bind(&timer_info::id, boost::lambda::_1),

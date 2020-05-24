@@ -65,7 +65,7 @@ public:
 	bool is_connected() const {return CONNECTED == status;}
 	bool is_shutting_down() const {return FORCE_SHUTTING_DOWN == status || GRACEFUL_SHUTTING_DOWN == status;}
 
-	void show_info(const char* head, const char* tail) const
+	void show_info(const char* head = NULL, const char* tail = NULL) const
 	{
 		boost::system::error_code ec;
 		BOOST_AUTO(local_ep, ST_THIS lowest_layer().local_endpoint(ec));
@@ -73,13 +73,13 @@ public:
 		{
 			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec));
 			if (!ec)
-				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s", ST_THIS id(), head,
+				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s", ST_THIS id(), NULL == head ? "" : head,
 					local_ep.address().to_string().data(), local_ep.port(),
-					remote_ep.address().to_string().data(), remote_ep.port(), tail);
+					remote_ep.address().to_string().data(), remote_ep.port(), NULL == tail ? "" : tail);
 		}
 	}
 
-	void show_info(const char* head, const char* tail, const boost::system::error_code& ec) const
+	void show_info(const boost::system::error_code& ec, const char* head = NULL, const char* tail = NULL) const
 	{
 		boost::system::error_code ec2;
 		BOOST_AUTO(local_ep, ST_THIS lowest_layer().local_endpoint(ec2));
@@ -87,9 +87,9 @@ public:
 		{
 			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec2));
 			if (!ec2)
-				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s (%d %s)", ST_THIS id(), head,
+				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s (%d %s)", ST_THIS id(), NULL == head ? "" : head,
 					local_ep.address().to_string().data(), local_ep.port(),
-					remote_ep.address().to_string().data(), remote_ep.port(), tail, ec.value(), ec.message().data());
+					remote_ep.address().to_string().data(), remote_ep.port(), NULL == tail ? "" : tail, ec.value(), ec.message().data());
 		}
 	}
 
@@ -104,12 +104,15 @@ public:
 #endif
 			"\n\tdispatching: %d"
 			"\n\tlink status: %d"
-			"\n\trecv suspended: %d",
+			"\n\trecv suspended: %d"
+			"\n\tsend buffer usage: %.2f%%"
+			"\n\trecv buffer usage: %.2f%%",
 			ST_THIS id(), ST_THIS started(), ST_THIS is_sending(),
 #ifdef ST_ASIO_PASSIVE_RECV
 			ST_THIS is_reading(),
 #endif
-			ST_THIS is_dispatching(), status, ST_THIS is_recv_idle());
+			ST_THIS is_dispatching(), status, ST_THIS is_recv_idle(),
+			ST_THIS send_buf_usage() * 100.f, ST_THIS recv_buf_usage() * 100.f);
 	}
 
 	///////////////////////////////////////////////////
@@ -239,7 +242,7 @@ private:
 	virtual void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (reading)
+		if (reading || !is_ready())
 			return;
 #endif
 		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
@@ -259,7 +262,11 @@ private:
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
-		if (!ec && bytes_transferred > 0)
+#ifdef ST_ASIO_PASSIVE_RECV
+		reading = false; //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
+#endif
+		bool need_next_recv = false;
+		if (bytes_transferred > 0)
 		{
 			stat.last_recv_time = time(NULL);
 
@@ -273,25 +280,23 @@ private:
 				unpacker_->reset(); //user can get the left half-baked msg in unpacker's reset()
 			}
 
-#ifdef ST_ASIO_PASSIVE_RECV
-			reading = false; //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
-#endif
-			if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
-				do_recv_msg(); //receive msg in sequence
+			need_next_recv = handle_msg(); //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 		}
-		else
+		else if (!ec)
 		{
-#ifdef ST_ASIO_PASSIVE_RECV
-			reading = false; //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
-#endif
-			if (ec)
-			{
-				handle_error();
-				on_recv_error(ec);
-			}
-			else if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
-				do_recv_msg(); //receive msg in sequence
+			assert(false);
+			unified_out::error_out(ST_ASIO_LLF " read 0 byte without any errors which is unexpected, please check your unpacker!", ST_THIS id());
 		}
+
+		if (ec)
+		{
+			handle_error();
+			on_recv_error(ec);
+		}
+		//if you wrote an terrible unpacker whoes completion_condition always returns 0, it will cause st_asio_wrapper to occupies almost all CPU resources
+		// because of following do_recv_msg() invocation (rapidly and repeatedly), please note.
+		else if (need_next_recv)
+			do_recv_msg(); //receive msg in sequence
 	}
 
 	virtual bool do_send_msg(bool in_strand = false)

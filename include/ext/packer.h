@@ -142,7 +142,7 @@ public:
 
 //protocol: length + body
 //T can be auto_buffer or shared_buffer, the latter makes output messages seemingly copyable.
-template<typename T = auto_buffer<i_buffer> >
+template<typename T = auto_buffer<i_buffer>, typename C = string_buffer>
 class packer2 : public i_packer<T>
 {
 private:
@@ -155,7 +155,7 @@ public:
 		packer::msg_type str;
 		if (packer().pack_msg(str, pstr, len, num, native))
 		{
-			BOOST_AUTO(raw_msg, new string_buffer());
+			BOOST_AUTO(raw_msg, new C());
 			raw_msg->swap(str);
 			msg.raw_buffer(raw_msg);
 
@@ -171,7 +171,7 @@ public:
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
-		BOOST_AUTO(raw_msg, new string_buffer());
+		BOOST_AUTO(raw_msg, new C());
 		raw_msg->assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
 		msg_can.emplace_back(raw_msg);
 		msg_can.emplace_back().swap(msg);
@@ -185,7 +185,7 @@ public:
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
-		BOOST_AUTO(raw_msg, new string_buffer());
+		BOOST_AUTO(raw_msg, new C());
 		raw_msg->assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
 		msg_can.emplace_back(raw_msg);
 		msg_can.emplace_back().swap(msg1);
@@ -200,7 +200,7 @@ public:
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
-		BOOST_AUTO(raw_msg, new string_buffer());
+		BOOST_AUTO(raw_msg, new C());
 		raw_msg->assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
 		out.emplace_back(raw_msg);
 		out.splice(out.end(), in);
@@ -212,7 +212,7 @@ public:
 		packer::msg_type str;
 		if (packer().pack_heartbeat(str))
 		{
-			BOOST_AUTO(raw_msg, new string_buffer());
+			BOOST_AUTO(raw_msg, new C());
 			raw_msg->swap(str);
 			msg.raw_buffer(raw_msg);
 

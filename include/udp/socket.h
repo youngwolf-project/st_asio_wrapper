@@ -67,8 +67,11 @@ public:
 	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&socket_base::shutdown, this));}
 	void graceful_shutdown() {force_shutdown();}
 
-	void show_info(const char* head, const char* tail) const
-		{unified_out::info_out(ST_ASIO_LLF " %s %s:%hu %s", ST_THIS id(), head, local_addr.address().to_string().data(), local_addr.port(), tail);}
+	void show_info(const char* head = NULL, const char* tail = NULL) const
+	{
+		unified_out::info_out(ST_ASIO_LLF " %s %s:%hu %s",
+			ST_THIS id(), NULL == head ? "" : head, local_addr.address().to_string().data(), local_addr.port(), NULL == tail ? "" : tail);
+	}
 
 	void show_status() const
 	{
@@ -80,12 +83,15 @@ public:
 			"\n\treading: %d"
 #endif
 			"\n\tdispatching: %d"
-			"\n\trecv suspended: %d",
+			"\n\trecv suspended: %d"
+			"\n\tsend buffer usage: %.2f%%"
+			"\n\trecv buffer usage: %.2f%%",
 			ST_THIS id(), ST_THIS started(), ST_THIS is_sending(),
 #ifdef ST_ASIO_PASSIVE_RECV
 			ST_THIS is_reading(),
 #endif
-			ST_THIS is_dispatching(), ST_THIS is_recv_idle());
+			ST_THIS is_dispatching(), ST_THIS is_recv_idle(),
+			ST_THIS send_buf_usage() * 100.f, ST_THIS recv_buf_usage() * 100.f);
 	}
 
 	///////////////////////////////////////////////////

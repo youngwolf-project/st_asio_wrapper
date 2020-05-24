@@ -27,7 +27,7 @@
 //3-prefix and/or suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER packer2<>
+#define ST_ASIO_DEFAULT_PACKER packer2<auto_buffer<std::string>, std::string>
 #define ST_ASIO_DEFAULT_UNPACKER unpacker2<>
 #elif 2 == PACKER_UNPACKER_TYPE
 #undef ST_ASIO_HEARTBEAT_INTERVAL
@@ -86,7 +86,7 @@ public:
 	//because we use objects pool(REUSE_OBJECT been defined), so, strictly speaking, this virtual
 	//function must be rewrote, but we don't have member variables to initialize but invoke father's
 	//reset() directly, so, it can be omitted, but we keep it for possibly future using
-	virtual void reset() { super::reset();}
+	virtual void reset() {super::reset();}
 
 protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
@@ -116,7 +116,7 @@ protected:
 			send_msg(*iter, true);
 #else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
-		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, _1, true, false));
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, boost::placeholders::_1, true, false));
 #endif
 		msg_can.clear();
 
@@ -143,7 +143,7 @@ protected:
 			send_msg(*iter, true);
 #else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical, otherwise, the compilation will fail.
-		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, _1, true, false));
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, boost::placeholders::_1, true, false));
 #endif
 		return tmp_can.size();
 		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
@@ -192,7 +192,7 @@ public:
 	normal_server(service_pump& service_pump_) : normal_server_base(service_pump_) {}
 
 protected:
-	virtual int async_accept_num() {return 1;} //this make on_accept to be called in single thread, because stop_listen() is not thread safe
+	virtual int async_accept_num() {return 1;}
 	virtual bool on_accept(object_ctype& socket_ptr) {stop_listen(); return true;}
 };
 
@@ -235,7 +235,7 @@ class my_timer : public timer<tracked_executor>
 {
 public:
     my_timer(boost::asio::io_context& io_context_) :timer<tracked_executor>(io_context_) {}
-    void start() {set_timer(0, 10, boost::bind(&my_timer::handler, this, _1)); printf("after set_timer invocation, the aci ref is %ld\n", get_aci_ref());}
+    void start() {set_timer(0, 10, boost::bind(&my_timer::handler, this, boost::placeholders::_1)); printf("after set_timer invocation, the aci ref is %ld\n", get_aci_ref());}
 
 private:
     bool handler(tid id)
@@ -348,12 +348,12 @@ int main(int argc, const char* argv[])
 			//so need \0 character when printing it.
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
 				((normal_server&) normal_server_).do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg,
-					_1, boost::cref(msg), false, false));
+					boost::placeholders::_1, boost::cref(msg), false, false));
 			*/
 			/*
 			//if demo client is using stream_unpacker
 			((normal_server&) normal_server_).do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg,
-				_1, boost::cref(str), false, false));
+				boost::placeholders::_1, boost::cref(str), false, false));
 			//or
 			normal_server_.broadcast_native_msg(str);
 			*/

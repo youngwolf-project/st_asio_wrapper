@@ -57,7 +57,7 @@ protected:
 	//access msg_can freely within this callback, it's always thread safe.
 	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
-		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, _1));
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, boost::placeholders::_1));
 		BOOST_AUTO(re, msg_can.size());
 		msg_can.clear(); //if we left behind some messages in msg_can, they will be dispatched via on_msg_handle asynchronously, which means it's
 		//possible that on_msg_handle be invoked concurrently with the next on_msg (new messages arrived) and then disorder messages.
@@ -112,7 +112,7 @@ class echo_client : public multi_client_base<echo_socket>
 public:
 	echo_client(service_pump& service_pump_) : multi_client_base<echo_socket>(service_pump_) {}
 
-	void begin(size_t msg_num, const char* msg, size_t msg_len) {do_something_to_all(boost::bind(&echo_socket::begin, _1, msg_num, msg, msg_len));}
+	void begin(size_t msg_num, const char* msg, size_t msg_len) {do_something_to_all(boost::bind(&echo_socket::begin, boost::placeholders::_1, msg_num, msg, msg_len));}
 };
 
 int main(int argc, const char* argv[])

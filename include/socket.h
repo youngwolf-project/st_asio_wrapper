@@ -56,6 +56,8 @@ protected:
 		started_ = false;
 		dispatching = false;
 		recv_idle_began = false;
+		send_buf_size_ = ST_ASIO_MAX_SEND_BUF;
+		recv_buf_size_ = ST_ASIO_MAX_RECV_BUF;
 		msg_resuming_interval_ = ST_ASIO_MSG_RESUMING_INTERVAL;
 		msg_handling_interval_ = ST_ASIO_MSG_HANDLING_INTERVAL;
 		start_atomic.store(0, boost::memory_order_relaxed);
@@ -186,6 +188,14 @@ public:
 	bool is_dispatching() const {return dispatching;}
 	bool is_recv_idle() const {return recv_idle_began;}
 
+	void send_buf_size(size_t size) {if (size > 0) send_buf_size_ = size;}
+	size_t send_buf_size() const {return send_buf_size_;}
+	float send_buf_usage() const {return (float) send_buffer.size_in_byte() / send_buf_size_;}
+
+	void recv_buf_size(size_t size) {if (size > 0) recv_buf_size_ = size;}
+	size_t recv_buf_size() const {return recv_buf_size_;}
+	float recv_buf_usage() const {return (float) recv_buffer.size_in_byte() / recv_buf_size_;}
+
 	void msg_resuming_interval(unsigned interval) {msg_resuming_interval_ = interval;}
 	unsigned msg_resuming_interval() const {return msg_resuming_interval_;}
 
@@ -193,9 +203,11 @@ public:
 	size_t msg_handling_interval() const {return msg_handling_interval_;}
 
 	//in st_asio_wrapper, it's thread safe to access stat without mutex, because for a specific member of stat, st_asio_wrapper will never access it concurrently.
-	//but user can access stat out of st_asio_wrapper via get_statistic function, although user can only read it, there's still a potential risk,
-	//so whether it's thread safe or not depends on boost::chrono::system_clock::duration.
-	//i can make it thread safe in st_asio_wrapper, but is it worth to do so? this is a problem.
+	//but user can access stat out of st_asio_wrapper via get_statistic function, although user can only read it, there's still a potential risk (especially
+	// on 32 bit system, most likely, it will not be thread safe), so whether it's thread safe or not depends on boost::chrono::system_clock::duration.
+	//i can make it thread safe in st_asio_wrapper, but is it worth to do so? because it affect performance a lot, this is a problem.
+	//by the way, only with macro ST_ASIO_FULL_STATISTIC, above potential risk can happen, even it happens, it just corrupt data, not memory, so just
+	// logic error, no memory error (such as segment fault, bad memory, etc.) will occur.
 	const struct statistic& get_statistic() const {return stat;}
 
 	//get or change the packer at runtime
@@ -217,11 +229,11 @@ public:
 
 	//if you use can_overflow = true to invoke send_msg or send_native_msg, it will always succeed no matter the sending buffer is overflow or not,
 	//this can exhaust all virtual memory, please pay special attentions.
-	bool is_send_buffer_available() const {return send_buffer.size_in_byte() < ST_ASIO_MAX_SEND_BUF;}
+	bool is_send_buffer_available() const {return send_buffer.size_in_byte() < send_buf_size_;}
 
 	//if you define macro ST_ASIO_PASSIVE_RECV and call recv_msg greedily, the receiving buffer may overflow, this can exhaust all virtual memory,
 	//to avoid this problem, call recv_msg only if is_recv_buffer_available() returns true.
-	bool is_recv_buffer_available() const {return recv_buffer.size_in_byte() < ST_ASIO_MAX_RECV_BUF;}
+	bool is_recv_buffer_available() const {return recv_buffer.size_in_byte() < recv_buf_size_;}
 
 	//don't use the packer but insert into send buffer directly
 	bool direct_send_msg(const InMsgType& msg, bool can_overflow = false, bool prior = false)
@@ -354,7 +366,7 @@ protected:
 	{
 		send_buffer.lock();
 		size_t size = send_buffer.size_in_byte();
-		if (size < ST_ASIO_MAX_SEND_BUF)
+		if (size < send_buf_size_)
 		{
 			send_buffer.unlock();
 			return true;
@@ -411,7 +423,7 @@ protected:
 		else
 		{
 			set_async_calling(true);
-			set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, boost::bind(&socket::timer_handler, this, _1));
+			set_timer(TIMER_DELAY_CLOSE, ST_ASIO_DELAY_CLOSE * 1000 + 50, boost::bind(&socket::timer_handler, this, boost::placeholders::_1));
 		}
 
 		return true;
@@ -666,7 +678,7 @@ private:
 		return false;
 	}
 
-	//do not use dispatch_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
+	//do use dis_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
 	void dispatch_msg() {if (!dispatching) post_strand(dis_strand, boost::bind(&socket::do_dispatch_msg, this));}
 	void accumulate_dispatch_delay(const statistic::stat_time& begin_time, const out_msg& msg) {stat.dispatch_delay_sum += begin_time - msg.begin_time;}
 	void do_dispatch_msg()
@@ -676,7 +688,7 @@ private:
 		{
 			BOOST_AUTO(begin_time, statistic::now());
 #ifdef ST_ASIO_FULL_STATISTIC
-			recv_buffer.do_something_to_all(boost::bind(&socket::accumulate_dispatch_delay, this, boost::cref(begin_time), _1));
+			recv_buffer.do_something_to_all(boost::bind(&socket::accumulate_dispatch_delay, this, boost::cref(begin_time), boost::placeholders::_1));
 #endif
 			size_t re = on_msg_handle(recv_buffer);
 			BOOST_AUTO(end_time, statistic::now());
@@ -685,9 +697,9 @@ private:
 			if (0 == re) //dispatch failed, re-dispatch
 			{
 #ifdef ST_ASIO_FULL_STATISTIC
-				recv_buffer.do_something_to_all(boost::bind(&out_msg::restart, _1, boost::cref(end_time)));
+				recv_buffer.do_something_to_all(boost::bind(&out_msg::restart, boost::placeholders::_1, boost::cref(end_time)));
 #endif
-				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
+				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, boost::placeholders::_1)); //hold dispatching
 			}
 			else
 			{
@@ -703,7 +715,7 @@ private:
 			if (!re) //dispatch failed, re-dispatch
 			{
 				dispatching_msg.restart(end_time);
-				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, _1)); //hold dispatching
+				set_timer(TIMER_DISPATCH_MSG, msg_handling_interval_, boost::bind(&socket::timer_handler, this, boost::placeholders::_1)); //hold dispatching
 			}
 			else
 			{
@@ -713,8 +725,6 @@ private:
 				dispatch_msg(); //dispatch msg in sequence
 			}
 		}
-		else if (!recv_buffer.empty()) //just make sure no pending msgs
-			dispatch_msg();
 	}
 
 	bool timer_handler(tid id)
@@ -795,6 +805,7 @@ private:
 	condition_variable sync_recv_cv;
 #endif
 
+	size_t send_buf_size_, recv_buf_size_;
 	unsigned msg_resuming_interval_, msg_handling_interval_;
 };
 

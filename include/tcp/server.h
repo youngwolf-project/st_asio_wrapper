@@ -49,6 +49,10 @@ public:
 
 	bool start_listen()
 	{
+		boost::lock_guard<boost::mutex> lock(mutex);
+		if (is_listening())
+			return false;
+
 		boost::system::error_code ec;
 		if (!acceptor.is_open()) {acceptor.open(server_addr.protocol(), ec); assert(!ec);} //user maybe has opened this acceptor (to set options for example)
 #ifndef ST_ASIO_NOT_REUSE_ADDRESS
@@ -84,17 +88,17 @@ public:
 #endif
 		if (ec) {unified_out::error_out("listen failed."); return false;}
 
-		st_asio_wrapper::do_something_to_all(sockets, boost::bind(&server_base::do_async_accept, this, _1));
+		st_asio_wrapper::do_something_to_all(sockets, boost::bind(&server_base::do_async_accept, this, boost::placeholders::_1));
 		return true;
 	}
 	bool is_listening() const {return acceptor.is_open();}
-	void stop_listen() {boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
+	void stop_listen() {boost::lock_guard<boost::mutex> lock(mutex); boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
 
 	boost::asio::ip::tcp::acceptor& next_layer() {return acceptor;}
 	const boost::asio::ip::tcp::acceptor& next_layer() const {return acceptor;}
 
 	//implement i_server's pure virtual functions
-	virtual bool started() const {return ST_THIS is_started();}
+	virtual bool started() const {return ST_THIS service_started();}
 	virtual service_pump& get_service_pump() {return Pool::get_service_pump();}
 	virtual const service_pump& get_service_pump() const {return Pool::get_service_pump();}
 	virtual bool socket_exist(boost::uint_fast64_t id) {return ST_THIS exist(id);}
@@ -109,24 +113,32 @@ public:
 		raw_socket_ptr->force_shutdown();
 		return ST_THIS del_object(raw_socket_ptr);
 	}
-	//restore the invalid socket whose id is equal to id, if successful, socket_ptr's take_over function will be invoked,
+	//restore the invalid socket whose id is equal to 'id', if successful, socket_ptr's take_over function will be invoked,
 	//you can restore the invalid socket to socket_ptr, everything can be restored except socket::next_layer_ (on the other
 	//hand, restore socket::next_layer_ doesn't make any sense).
-	virtual bool restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id)
+	virtual bool restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id, bool init)
 	{
 		BOOST_AUTO(raw_socket_ptr, boost::dynamic_pointer_cast<Socket>(socket_ptr));
 		if (!raw_socket_ptr)
 			return false;
 
 		BOOST_AUTO(this_id, raw_socket_ptr->id());
-		BOOST_AUTO(old_socket_ptr, ST_THIS change_object_id(raw_socket_ptr, id));
-		if (old_socket_ptr)
+		if (!init)
 		{
-			assert(raw_socket_ptr->id() == old_socket_ptr->id());
+			BOOST_AUTO(old_socket_ptr, ST_THIS change_object_id(raw_socket_ptr, id));
+			if (old_socket_ptr)
+			{
+				assert(raw_socket_ptr->id() == old_socket_ptr->id());
 
-			unified_out::info_out("object id " ST_ASIO_LLF " been reused, id " ST_ASIO_LLF " been discarded.", raw_socket_ptr->id(), this_id);
-			raw_socket_ptr->take_over(old_socket_ptr);
+				unified_out::info_out("object id " ST_ASIO_LLF " been reused, id " ST_ASIO_LLF " been discarded.", raw_socket_ptr->id(), this_id);
+				raw_socket_ptr->take_over(old_socket_ptr);
 
+				return true;
+			}
+		}
+		else if (ST_THIS init_object_id(raw_socket_ptr, id))
+		{
+			unified_out::info_out("object id " ST_ASIO_LLF " been set to " ST_ASIO_LLF, this_id, raw_socket_ptr->id());
 			return true;
 		}
 
@@ -146,11 +158,12 @@ public:
 
 	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function.
 	void disconnect(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->disconnect();}
-	void disconnect() {ST_THIS do_something_to_all(boost::bind(&Socket::disconnect, _1));}
+	void disconnect() {ST_THIS do_something_to_all(boost::bind(&Socket::disconnect, boost::placeholders::_1));}
 	void force_shutdown(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->force_shutdown();}
-	void force_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::force_shutdown, _1));}
+	void force_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::force_shutdown, boost::placeholders::_1));}
 	void graceful_shutdown(typename Pool::object_ctype& socket_ptr, bool sync = false) {ST_THIS del_object(socket_ptr); socket_ptr->graceful_shutdown(sync);}
-	void graceful_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::graceful_shutdown, _1, false));} //parameter sync must be false (the default value), or dead lock will occur.
+	void graceful_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::graceful_shutdown, boost::placeholders::_1, false));}
+	//parameter sync must be false (the default value), or dead lock will occur.
 
 protected:
 	virtual int async_accept_num() {return ST_ASIO_ASYNC_ACCEPT_NUM;}
@@ -158,7 +171,7 @@ protected:
 	virtual void uninit() {ST_THIS stop(); stop_listen(); force_shutdown();} //if you wanna graceful shutdown, call graceful_shutdown before service_pump::stop_service invocation.
 
 	virtual bool on_accept(typename Pool::object_ctype& socket_ptr) {return true;}
-	virtual void start_next_accept() {do_async_accept(create_object());}
+	virtual void start_next_accept() {boost::lock_guard<boost::mutex> lock(mutex); do_async_accept(create_object());}
 
 	//if you want to ignore this error and continue to accept new connections immediately, return true in this virtual function;
 	//if you want to ignore this error and continue to accept new connections after a specific delay, start a timer immediately and return false (don't call stop_listen()),
@@ -190,7 +203,7 @@ protected:
 			return true;
 		}
 
-		socket_ptr->show_info("client:", "been refused because of too many clients.");
+		socket_ptr->show_info("client:", "been refused because of too many clients or id conflict.");
 		return false;
 	}
 
@@ -215,6 +228,7 @@ private:
 private:
 	boost::asio::ip::tcp::endpoint server_addr;
 	boost::asio::ip::tcp::acceptor acceptor;
+	boost::mutex mutex;
 };
 
 }} //namespace

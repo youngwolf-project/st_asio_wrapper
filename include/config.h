@@ -716,6 +716,37 @@
  * REPLACEMENTS:
  * Replace macro ST_ASIO_ENHANCED_STABILITY by ST_ASIO_NO_TRY_CATCH (antonymous).
  *
+ * ===============================================================
+ * 2020.5.24	version 2.3.1
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * Rename function i_service::is_started() to i_service::service_started().
+ * A additional parameter named 'init' is added to interface i_server::restore_socket, now it has following signature:
+ *  virtual bool i_server::restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id, bool init)
+ *  you use init = true to initialize the server_socket's id (use macro ST_ASIO_START_OBJECT_ID to separate your id rang from object_pool's id rang),
+ *  use init = false to restore a server_socket after client_socket reconnected to the server.
+ *
+ * HIGHLIGHT:
+ * Introduce new macro ST_ASIO_START_OBJECT_ID to set the start id that object_pool used to assign object ids, and the new function
+ *  object_pool::set_start_object_id(boost::uint_fast64_t) with the same purpose, please call it as immediately as possible.
+ * Support changing the size of send buffer and recv buffer at runtime.
+ * Make function server_base::start_listen() and server_base::stop_listen() thread safe.
+ * packer2 now can customize the real message type (before, it's always string_buffer).
+ * Optimize unpacker2.
+ *
+ * FIX:
+ * Fix race condition during call acceptor::async_accept concurrently.
+ *
+ * ENHANCEMENTS:
+ * Try parsing messages even errors occurred.
+ * The usage rate of send buffer and recv buffer now can be fetched via send_buf_usage(), recv_buf_usage() or show_status().
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -725,8 +756,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20300	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.3.0"
+#define ST_ASIO_VER		20301	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.3.1"
 
 //#define ST_ASIO_HIDE_WARNINGS
 
@@ -789,7 +820,11 @@
 
 #if BOOST_VERSION < 104900
 	#error st_asio_wrapper only support boost 1.49 or higher.
-#elif !defined(BOOST_THREAD_USES_CHRONO)
+#elif BOOST_VERSION < 106000
+	namespace boost {namespace placeholders {using ::_1; using ::_2;}}
+#endif
+
+#if !defined(BOOST_THREAD_USES_CHRONO)
 	namespace boost {namespace this_thread {static inline void sleep_for(const chrono::milliseconds& rel_time) {sleep(posix_time::milliseconds(rel_time.count()));}}}
 #endif
 
@@ -823,14 +858,14 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //send buffer's maximum size (bytes), it will be expanded dynamically (not fixed) within this range.
 #ifndef ST_ASIO_MAX_SEND_BUF
 #define ST_ASIO_MAX_SEND_BUF		1048576 //1M
-#elif ST_ASIO_MAX_SEND_BUF <= 15
+#elif ST_ASIO_MAX_SEND_BUF <= 0
 	#error message capacity must be bigger than zero.
 #endif
 
 //recv buffer's maximum size (bytes), it will be expanded dynamically (not fixed) within this range.
 #ifndef ST_ASIO_MAX_RECV_BUF
 #define ST_ASIO_MAX_RECV_BUF		1048576 //1M
-#elif ST_ASIO_MAX_RECV_BUF <= 15
+#elif ST_ASIO_MAX_RECV_BUF <= 0
 	#error message capacity must be bigger than zero.
 #endif
 
@@ -887,6 +922,11 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 
 //after sending buffer became empty, call st_asio_wrapper::socket::on_all_msg_send(InMsgType& msg)
 //#define ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
+
+//object_pool will asign object ids (used to distinguish objects) from this
+#ifndef ST_ASIO_START_OBJECT_ID
+#define ST_ASIO_START_OBJECT_ID	0
+#endif
 
 //max number of objects object_pool can hold.
 #ifndef ST_ASIO_MAX_OBJECT_NUM
@@ -1056,7 +1096,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 	#error the interval of msg resuming must be bigger than or equal to zero.
 #endif
 //msg receiving
-//if receiving buffer is overflow, message receiving will stop and resume after the buffer becomes available, 
+//if receiving buffer is overflow, message receiving will stop and resume after the buffer becomes available,
 //this is the interval of receiving buffer checking.
 //this value can be changed via st_asio_wrapper::socket::msg_resuming_interval(size_t) at runtime.
 

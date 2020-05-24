@@ -114,7 +114,7 @@ protected:
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); force_shutdown(need_reconnect);}
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
-		ST_THIS show_info("client link:", "broken/been shut down", ec);
+		ST_THIS show_info(ec, "client link:", "broken/been shut down");
 
 		force_shutdown(need_reconnect);
 		ST_THIS status = super::BROKEN;
