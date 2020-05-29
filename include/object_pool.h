@@ -14,7 +14,7 @@
 #ifndef ST_ASIO_OBJECT_POOL_H_
 #define ST_ASIO_OBJECT_POOL_H_
 
-#include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 
 #include "executor.h"
 #include "timer.h"
@@ -29,7 +29,18 @@ class object_pool : public service_pump::i_service, protected timer<executor>
 public:
 	typedef boost::shared_ptr<Object> object_type;
 	typedef const object_type object_ctype;
-	typedef boost::unordered::unordered_map<boost::uint_fast64_t, object_type> container_type;
+	struct object_hash
+	{
+		size_t operator()(object_ctype& obj) const {return boost::hash<boost::uint_fast64_t>()(obj->id());}
+		size_t operator()(boost::uint_fast64_t id) const {return boost::hash<boost::uint_fast64_t>()(id);}
+	};
+	struct object_equal_to
+	{
+		bool operator()(object_ctype& lhs, object_ctype& rhs) const {return lhs->id() == rhs->id();}
+		bool operator()(object_ctype& lhs, boost::uint_fast64_t id) const {return lhs->id() == id;}
+		bool operator()(boost::uint_fast64_t id, object_ctype& rhs) const {return id == rhs->id();}
+	};
+	typedef boost::unordered::unordered_set<object_type, object_hash, object_equal_to> container_type;
 
 	static const tid TIMER_BEGIN = timer<executor>::TIMER_END;
 	static const tid TIMER_FREE_SOCKET = TIMER_BEGIN;
@@ -61,7 +72,7 @@ protected:
 		assert(!object_ptr->is_equal_to(-1));
 
 		boost::lock_guard<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
-		return object_can.size() < max_size_ ? object_can.emplace(object_ptr->id(), object_ptr).second : false;
+		return object_can.size() < max_size_ ? object_can.emplace(object_ptr).second : false;
 	}
 
 	//only add object_ptr to invalid_object_can when it's in object_can, this can avoid duplicated items in invalid_object_can, because invalid_object_can is a list,
@@ -71,7 +82,7 @@ protected:
 		assert(object_ptr);
 
 		boost::unique_lock<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
-		bool exist = object_can.erase(object_ptr->id()) > 0;
+		bool exist = object_can.erase(object_ptr) > 0;
 		lock.unlock();
 
 		if (exist)
@@ -105,13 +116,13 @@ protected:
 			return true;
 
 		boost::lock_guard<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
-		BOOST_AUTO(&stub, object_can[id]);
-		if (stub)
+		if (object_can.end() != object_can.find(id, object_hash(), object_equal_to()))
 			return false;
 
-		object_can.erase(object_ptr->id());
+		//not as effecient as unordered_map, because we access object_can 3 times (unordered_map only needs 2 times).
+		object_can.erase(object_ptr);
 		object_ptr->id(id);
-		stub = object_ptr; //must succeed
+		object_can.insert(object_ptr); //must succeed
 
 		return true;
 	}
@@ -184,14 +195,14 @@ public:
 	bool exist(boost::uint_fast64_t id)
 	{
 		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
-		return object_can.count(id) > 0;
+		return object_can.end() != object_can.find(id, object_hash(), object_equal_to());
 	}
 
 	object_type find(boost::uint_fast64_t id)
 	{
 		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
-		BOOST_AUTO(iter, object_can.find(id));
-		return iter != object_can.end() ? iter->second : object_type();
+		BOOST_AUTO(iter, object_can.find(id, object_hash(), object_equal_to()));
+		return iter != object_can.end() ? *iter : object_type();
 	}
 
 	//this method has linear complexity, please note.
@@ -199,7 +210,7 @@ public:
 	{
 		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		assert(index < object_can.size());
-		return index < object_can.size() ? boost::next(object_can.begin(), index)->second : object_type();
+		return index < object_can.size() ? *boost::next(object_can.begin(), index) : object_type();
 	}
 
 	size_t invalid_object_size()
@@ -263,9 +274,9 @@ public:
 
 		boost::unique_lock<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end();)
-			if (iter->second->obsoleted())
+			if ((*iter)->obsoleted())
 			{
-				try {objects.emplace_back(iter->second);} catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what());}
+				try {objects.emplace_back(*iter);} catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what());}
 				iter = object_can.erase(iter);
 			}
 			else
@@ -325,15 +336,10 @@ public:
 	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, boost::placeholders::_1, "", ""));}
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred)
-		{ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex); for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter) __pred(iter->second);}
+		{ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex); st_asio_wrapper::do_something_to_all(object_can, __pred);}
 
 	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred)
-	{
-		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
-		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter)
-			if (__pred(iter->second))
-				break;
-	}
+		{ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex); st_asio_wrapper::do_something_to_one(object_can, __pred);}
 
 private:
 	atomic_uint_fast64 cur_id;
