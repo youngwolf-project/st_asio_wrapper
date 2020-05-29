@@ -40,7 +40,7 @@ public:
 	void set_start_object_id(boost::uint_fast64_t id) {cur_id.store(id - 1, boost::memory_order_relaxed);} //call this right after object_pool been constructed
 
 protected:
-	object_pool(service_pump& service_pump_) : i_service(service_pump_), timer<executor>(service_pump_), cur_id(-1), max_size_(ST_ASIO_MAX_OBJECT_NUM) {}
+	object_pool(service_pump& service_pump_) : i_service(service_pump_), timer<executor>(service_pump_), cur_id(ST_ASIO_START_OBJECT_ID - 1), max_size_(ST_ASIO_MAX_OBJECT_NUM) {}
 
 	void start()
 	{
