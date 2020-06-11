@@ -276,7 +276,9 @@ private:
 
 			if (!unpack_ok)
 			{
-				on_unpack_error();
+				if (!ec)
+					on_unpack_error();
+
 				unpacker_->reset(); //user can get the left half-baked msg in unpacker's reset()
 			}
 
