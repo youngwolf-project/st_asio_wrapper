@@ -19,11 +19,43 @@
 
 namespace st_asio_wrapper { namespace ext {
 
+class unpacker_helper
+{
+public:
+	static void dump_left_data(const char* data, size_t cur_msg_len, size_t remain_len)
+	{
+		if (NULL != data && remain_len > 0)
+		{
+			std::stringstream os;
+			for (size_t i = 0; i < remain_len; ++i, ++data)
+			{
+				if (i > 0)
+				{
+					if (0 == (i % 8))
+						os << std::endl;
+					else if (0 == (i % 4))
+						os << "  ";
+					else
+						os << ' ';
+				}
+
+				char buff[4];
+				snprintf(buff, sizeof(buff), "%02X", (unsigned char) *data);
+				os << buff;
+			}
+
+			if ((size_t) -1 == cur_msg_len)
+				cur_msg_len = 0; //shorten the logs
+			unified_out::error_out("unpacked data (current msg length is: " ST_ASIO_SF ") are:\n%s", cur_msg_len, os.str().data());
+		}
+	}
+};
+
 //protocol: length + body
 class unpacker : public i_unpacker<std::string>
 {
 public:
-	unpacker() {reset();}
+	unpacker() {cur_msg_len = -1; remain_len = 0;}
 	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means not available
 
 	bool parse_msg(size_t bytes_transferred, boost::container::list<std::pair<const char*, size_t> >& msg_can)
@@ -69,7 +101,7 @@ public:
 	}
 
 public:
-	virtual void reset() {cur_msg_len = -1; remain_len = 0;}
+	virtual void reset() {unpacker_helper::dump_left_data(raw_buff.data(), cur_msg_len, remain_len); cur_msg_len = -1; remain_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		boost::container::list<std::pair<const char*, size_t> > msg_pos_can;
@@ -242,11 +274,19 @@ public:
 	{
 		if (0 == step) //the head been received
 		{
-			assert(raw_buff.empty() && ST_ASIO_HEAD_LEN == bytes_transferred);
+			assert(raw_buff.empty());
+			if (ST_ASIO_HEAD_LEN != bytes_transferred)
+			{
+				unpacker_helper::dump_left_data((const char*) &head, ST_ASIO_HEAD_LEN, bytes_transferred);
+				return false;
+			}
 
 			size_t cur_msg_len = ST_ASIO_HEAD_N2H(head) - ST_ASIO_HEAD_LEN;
 			if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE - ST_ASIO_HEAD_LEN) //invalid size
+			{
+				unpacker_helper::dump_left_data((const char*) &head, cur_msg_len, bytes_transferred);
 				return false;
+			}
 			else if (cur_msg_len > 0) //exclude heartbeat
 			{
 				raw_buff.assign(cur_msg_len); assert(!raw_buff.empty());
@@ -255,7 +295,12 @@ public:
 		}
 		else if (1 == step) //the body been received
 		{
-			assert(!raw_buff.empty() && bytes_transferred == raw_buff.size());
+			assert(!raw_buff.empty());
+			if (bytes_transferred != raw_buff.size())
+			{
+				unpacker_helper::dump_left_data(raw_buff.data(), raw_buff.size(), bytes_transferred);
+				return false;
+			}
 
 			msg_can.emplace_back().swap(raw_buff);
 			step = 0;
@@ -324,7 +369,10 @@ public:
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		if (bytes_transferred != raw_buff.size())
+		{
+			unpacker_helper::dump_left_data(raw_buff.data(), raw_buff.size(), bytes_transferred);
 			return false;
+		}
 
 		msg_can.emplace_back().swap(raw_buff);
 		return true;
@@ -352,7 +400,7 @@ private:
 class prefix_suffix_unpacker : public i_unpacker<std::string>
 {
 public:
-	prefix_suffix_unpacker() {reset();}
+	prefix_suffix_unpacker() {cur_msg_len = -1; remain_len = 0;}
 
 	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < ST_ASIO_MSG_BUFFER_SIZE); _prefix = prefix; _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
@@ -406,7 +454,7 @@ public:
 	}
 
 public:
-	virtual void reset() {cur_msg_len = -1; remain_len = 0;}
+	virtual void reset() {unpacker_helper::dump_left_data(raw_buff.data(), cur_msg_len, remain_len); cur_msg_len = -1; remain_len = 0;}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		//length + msg
