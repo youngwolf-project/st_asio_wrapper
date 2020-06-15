@@ -46,7 +46,7 @@ public:
 
 			if ((size_t) -1 == cur_msg_len)
 				cur_msg_len = 0; //shorten the logs
-			unified_out::error_out("unpacked data (current msg length is: " ST_ASIO_SF ") are:\n%s", cur_msg_len, os.str().data());
+			unified_out::error_out("unparsed data (current msg length is: " ST_ASIO_SF ") are:\n%s", cur_msg_len, os.str().data());
 		}
 	}
 };
@@ -55,7 +55,7 @@ public:
 class unpacker : public i_unpacker<std::string>
 {
 public:
-	unpacker() {cur_msg_len = -1; remain_len = 0;}
+	unpacker() {reset();}
 	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means not available
 
 	bool parse_msg(size_t bytes_transferred, boost::container::list<std::pair<const char*, size_t> >& msg_can)
@@ -101,7 +101,8 @@ public:
 	}
 
 public:
-	virtual void reset() {unpacker_helper::dump_left_data(raw_buff.data(), cur_msg_len, remain_len); cur_msg_len = -1; remain_len = 0;}
+	virtual void reset() {cur_msg_len = -1; remain_len = 0;}
+	virtual void dump_left_data() const {unpacker_helper::dump_left_data(raw_buff.data(), cur_msg_len, remain_len);}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		boost::container::list<std::pair<const char*, size_t> > msg_pos_can;
@@ -199,6 +200,7 @@ private:
 
 public:
 	virtual void reset() {unpacker_.reset();}
+	virtual void dump_left_data() const {unpacker_.dump_left_data();}
 	virtual bool parse_msg(size_t bytes_transferred, typename super::container_type& msg_can)
 	{
 		unpacker::container_type tmp_can;
@@ -400,7 +402,7 @@ private:
 class prefix_suffix_unpacker : public i_unpacker<std::string>
 {
 public:
-	prefix_suffix_unpacker() {cur_msg_len = -1; remain_len = 0;}
+	prefix_suffix_unpacker() {reset();}
 
 	void prefix_suffix(const std::string& prefix, const std::string& suffix) {assert(!suffix.empty() && prefix.size() + suffix.size() < ST_ASIO_MSG_BUFFER_SIZE); _prefix = prefix; _suffix = suffix;}
 	const std::string& prefix() const {return _prefix;}
@@ -454,7 +456,8 @@ public:
 	}
 
 public:
-	virtual void reset() {unpacker_helper::dump_left_data(raw_buff.data(), cur_msg_len, remain_len); cur_msg_len = -1; remain_len = 0;}
+	virtual void reset() {cur_msg_len = -1; remain_len = 0;}
+	virtual void dump_left_data() const {unpacker_helper::dump_left_data(raw_buff.data(), cur_msg_len, remain_len);}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		//length + msg

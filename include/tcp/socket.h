@@ -47,7 +47,7 @@ public:
 	{
 		auto_duration dur(stat.pack_time_sum);
 		in_msg_type msg;
-		packer_->pack_heartbeat(msg);
+		ST_THIS packer()->pack_heartbeat(msg);
 		dur.end();
 		do_direct_send_msg(msg);
 	}
@@ -236,7 +236,7 @@ private:
 	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 		auto_duration dur(stat.unpack_time_sum);
-		return unpacker_->completion_condition(ec, bytes_transferred);
+		return ST_THIS unpacker()->completion_condition(ec, bytes_transferred);
 	}
 
 	virtual void do_recv_msg()
@@ -245,7 +245,7 @@ private:
 		if (reading || !is_ready())
 			return;
 #endif
-		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
+		BOOST_AUTO(recv_buff, ST_THIS unpacker()->prepare_next_recv());
 		assert(boost::asio::buffer_size(recv_buff) > 0);
 		if (0 == boost::asio::buffer_size(recv_buff))
 			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
@@ -271,7 +271,7 @@ private:
 			stat.last_recv_time = time(NULL);
 
 			auto_duration dur(stat.unpack_time_sum);
-			bool unpack_ok = unpacker_->parse_msg(bytes_transferred, temp_msg_can);
+			bool unpack_ok = ST_THIS unpacker()->parse_msg(bytes_transferred, temp_msg_can);
 			dur.end();
 
 			if (!unpack_ok)
@@ -279,7 +279,7 @@ private:
 				if (!ec)
 					on_unpack_error();
 
-				unpacker_->reset(); //user can get the left half-baked msg in unpacker's reset()
+				ST_THIS unpacker()->reset(); //user can get the left half-baked msg in unpacker's reset()
 			}
 
 			need_next_recv = handle_msg(); //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
@@ -410,8 +410,6 @@ protected:
 
 private:
 	using super::stat;
-	using super::packer_;
-	using super::unpacker_;
 	using super::temp_msg_can;
 
 	using super::send_buffer;

@@ -261,6 +261,7 @@ protected:
 
 public:
 	virtual void reset() = 0;
+	virtual void dump_left_data() const {}
 	//heartbeat must not be included in msg_can, otherwise you must handle heartbeat at where you handle normal messages.
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return 0;}
@@ -664,7 +665,7 @@ bool FUNNAME(in_msg_type& msg, bool can_overflow = false, bool prior = false) \
 		return do_direct_send_msg(msg, prior); \
 	typename Packer::container_type msg_can; \
 	auto_duration dur(stat.pack_time_sum); \
-	bool re = packer_->pack_msg(msg, msg_can); \
+	bool re = ST_THIS packer()->pack_msg(msg, msg_can); \
 	dur.end(); \
 	return re && do_direct_send_msg(msg_can, prior); \
 } \
@@ -679,7 +680,7 @@ bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false, bo
 		return do_direct_send_msg(msg_can, prior); \
 	} \
 	auto_duration dur(stat.pack_time_sum); \
-	bool re = packer_->pack_msg(msg1, msg2, msg_can); \
+	bool re = ST_THIS packer()->pack_msg(msg1, msg2, msg_can); \
 	dur.end(); \
 	return re && do_direct_send_msg(msg_can, prior); \
 } \
@@ -691,7 +692,7 @@ bool FUNNAME(typename Packer::container_type& msg_can, bool can_overflow = false
 		return do_direct_send_msg(msg_can, prior); \
 	typename Packer::container_type out; \
 	auto_duration dur(stat.pack_time_sum); \
-	bool re = packer_->pack_msg(msg_can, out); \
+	bool re = ST_THIS packer()->pack_msg(msg_can, out); \
 	dur.end(); \
 	return re && do_direct_send_msg(out, prior); \
 } \
@@ -701,7 +702,7 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 		return false; \
 	auto_duration dur(stat.pack_time_sum); \
 	in_msg_type msg; \
-	packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	ST_THIS packer()->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
 	return do_direct_send_msg(msg, prior); \
 } \
@@ -748,7 +749,7 @@ sync_call_result FUNNAME(in_msg_type& msg, unsigned duration = 0, bool can_overf
 		return do_direct_sync_send_msg(msg, duration, prior); \
 	typename Packer::container_type msg_can; \
 	auto_duration dur(stat.pack_time_sum); \
-	bool re = packer_->pack_msg(msg, msg_can); \
+	bool re = ST_THIS packer()->pack_msg(msg, msg_can); \
 	dur.end(); \
 	return re ? do_direct_sync_send_msg(msg_can, duration, prior) : NOT_APPLICABLE; \
 } \
@@ -763,7 +764,7 @@ sync_call_result FUNNAME(in_msg_type& msg1, in_msg_type& msg2, unsigned duration
 		return do_direct_sync_send_msg(msg_can, duration, prior); \
 	} \
 	auto_duration dur(stat.pack_time_sum); \
-	bool re = packer_->pack_msg(msg1, msg2, msg_can); \
+	bool re = ST_THIS packer()->pack_msg(msg1, msg2, msg_can); \
 	dur.end(); \
 	return re ? do_direct_sync_send_msg(msg_can, duration, prior) : NOT_APPLICABLE; \
 } \
@@ -775,7 +776,7 @@ sync_call_result FUNNAME(typename Packer::container_type& msg_can, unsigned dura
 		return do_direct_sync_send_msg(msg_can, duration, prior); \
 	typename Packer::container_type out; \
 	auto_duration dur(stat.pack_time_sum); \
-	bool re = packer_->pack_msg(msg_can, out); \
+	bool re = ST_THIS packer()->pack_msg(msg_can, out); \
 	dur.end(); \
 	return re ? do_direct_sync_send_msg(out, duration, prior) : NOT_APPLICABLE; \
 } \
@@ -785,7 +786,7 @@ sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t nu
 		return NOT_APPLICABLE; \
 	auto_duration dur(stat.pack_time_sum); \
 	in_msg_type msg; \
-	ST_THIS packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	ST_THIS packer()->pack_msg(msg, pstr, len, num, NATIVE); \
 	dur.end(); \
 	return do_direct_sync_send_msg(msg, duration, prior); \
 } \
@@ -832,7 +833,7 @@ bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const 
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return false; \
 	in_msg_type msg(peer_addr); \
-	packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	ST_THIS packer()->pack_msg(msg, pstr, len, num, NATIVE); \
 	return do_direct_send_msg(msg, prior); \
 } \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
@@ -874,7 +875,7 @@ sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const 
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return NOT_APPLICABLE; \
 	in_msg_type msg(peer_addr); \
-	packer_->pack_msg(msg, pstr, len, num, NATIVE); \
+	ST_THIS packer()->pack_msg(msg, pstr, len, num, NATIVE); \
 	return do_direct_sync_send_msg(msg, duration, prior); \
 } \
 UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
