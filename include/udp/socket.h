@@ -39,7 +39,7 @@ public:
 	virtual void send_heartbeat()
 	{
 		in_msg_type msg(peer_addr);
-		packer_->pack_heartbeat(msg);
+		ST_THIS packer()->pack_heartbeat(msg);
 		do_direct_send_msg(msg);
 	}
 	virtual const char* type_name() const {return "UDP";}
@@ -192,7 +192,7 @@ private:
 		if (reading)
 			return;
 #endif
-		BOOST_AUTO(recv_buff, unpacker_->prepare_next_recv());
+		BOOST_AUTO(recv_buff, ST_THIS unpacker()->prepare_next_recv());
 		assert(boost::asio::buffer_size(recv_buff) > 0);
 		if (0 == boost::asio::buffer_size(recv_buff))
 			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
@@ -213,7 +213,7 @@ private:
 			stat.last_recv_time = time(NULL);
 
 			typename Unpacker::container_type msg_can;
-			unpacker_->parse_msg(bytes_transferred, msg_can);
+			ST_THIS unpacker()->parse_msg(bytes_transferred, msg_can);
 
 #ifdef ST_ASIO_PASSIVE_RECV
 			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
@@ -327,8 +327,6 @@ private:
 
 private:
 	using super::stat;
-	using super::packer_;
-	using super::unpacker_;
 	using super::temp_msg_can;
 
 	using super::send_buffer;
