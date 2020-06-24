@@ -394,7 +394,7 @@ public:
 #endif
 
 private:
-	basic_buffer raw_buff;
+	msg_type raw_buff;
 	size_t _fixed_length;
 };
 
