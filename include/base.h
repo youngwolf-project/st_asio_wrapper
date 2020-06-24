@@ -132,7 +132,7 @@ public:
 	~auto_buffer() {clear();}
 
 	buffer_type raw_buffer() const {return buffer;}
-	void raw_buffer(buffer_type _buffer) {buffer = _buffer;}
+	void raw_buffer(buffer_type _buffer) {clear(); buffer = _buffer;}
 
 	//the following five functions are needed by st_asio_wrapper
 	bool empty() const {return NULL == buffer || buffer->empty();}
