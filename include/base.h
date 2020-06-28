@@ -128,57 +128,47 @@ public:
 };
 
 //convert '->' operation to '.' operation
-//user need to allocate object, and auto_buffer will free it
-template<typename T> class auto_buffer : public boost::noncopyable
+//user needs to allocate object, and object_buffer will free it
+//A can be std::scoped_ptr or std::shared_ptr
+//T is the object that represent a buffer (a buffer must at least has those interfaces in i_buffer, or inherit from i_buffer).
+template<template<typename T> class A, typename T> class object_buffer
 {
 public:
-	typedef T* buffer_type;
+	typedef A<T> buffer_type;
 	typedef const buffer_type buffer_ctype;
 
-	auto_buffer() : buffer(NULL) {}
-	auto_buffer(buffer_type _buffer) : buffer(_buffer) {}
-	~auto_buffer() {clear();}
+	object_buffer() {}
+	object_buffer(T* _buffer) : buffer(_buffer) {}
 
-	buffer_type raw_buffer() const {return buffer;}
-	void raw_buffer(buffer_type _buffer) {clear(); buffer = _buffer;}
-
-	//the following five functions are needed by st_asio_wrapper
-	bool empty() const {return NULL == buffer || buffer->empty();}
-	size_t size() const {return NULL == buffer ? 0 : buffer->size();}
-	const char* data() const {return NULL == buffer ? NULL : buffer->data();}
-	void swap(auto_buffer& other) {std::swap(buffer, other.buffer);}
-	void clear() {delete buffer; buffer = NULL;}
-
-protected:
-	buffer_type buffer;
-};
-
-//convert '->' operation to '.' operation
-//user need to allocate object, and shared_buffer will free it
-//not like auto_buffer, shared_buffer is copyable (seemingly), but auto_buffer is a bit more efficient.
-template<typename T> class shared_buffer
-{
-public:
-	typedef boost::shared_ptr<T> buffer_type;
-	typedef const buffer_type buffer_ctype;
-
-	shared_buffer() {}
-	shared_buffer(T* _buffer) {buffer.reset(_buffer);}
-	shared_buffer(buffer_type _buffer) : buffer(_buffer) {}
-
-	buffer_type raw_buffer() const {return buffer;}
+	buffer_ctype& raw_buffer() const {return buffer;}
 	void raw_buffer(T* _buffer) {buffer.reset(_buffer);}
-	void raw_buffer(buffer_ctype _buffer) {buffer = _buffer;}
+	void raw_buffer(buffer_ctype& _buffer) {buffer = _buffer;}
+	void raw_buffer(buffer_type& _buffer) {clear(); boost::swap(buffer, _buffer);}
 
 	//the following five functions are needed by st_asio_wrapper
 	bool empty() const {return !buffer || buffer->empty();}
 	size_t size() const {return !buffer ? 0 : buffer->size();}
 	const char* data() const {return !buffer ? NULL : buffer->data();}
-	void swap(shared_buffer& other) {buffer.swap(other.buffer);}
+	void swap(object_buffer& other) {boost::swap(buffer, other.buffer);}
 	void clear() {buffer.reset();}
 
 protected:
 	buffer_type buffer;
+};
+
+template<typename T> class unique_buffer : public object_buffer<boost::scoped_ptr, T>
+{
+public:
+	unique_buffer() {}
+	unique_buffer(T* _buffer) : object_buffer<boost::scoped_ptr, T>(_buffer) {}
+};
+
+//unlike unique_buffer, shared_buffer is copyable (seemingly), but unique_buffer is a bit more efficient.
+template<typename T> class shared_buffer : public object_buffer<boost::shared_ptr, T>
+{
+public:
+	shared_buffer() {}
+	shared_buffer(T* _buffer) : object_buffer<boost::shared_ptr, T>(_buffer) {}
 };
 
 //st_asio_wrapper requires that container must take one and only one template argument
@@ -515,7 +505,7 @@ template<typename T> struct obj_with_begin_time : public T
 	obj_with_begin_time(const T& obj) : T(obj) {restart();}
 	obj_with_begin_time(T& obj) {T::swap(obj); restart();} //after this call, obj becomes empty, please note.
 	obj_with_begin_time& operator=(const T& obj) {T::operator=(obj); restart(); return *this;}
-	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, obj becomes empty, please note.
+	obj_with_begin_time& operator=(T& obj) {T::clear(); T::swap(obj); restart(); return *this;} //after this call, obj becomes empty, please note.
 	obj_with_begin_time(const obj_with_begin_time& other) : T(other), begin_time(other.begin_time) {}
 	obj_with_begin_time(obj_with_begin_time& other) {swap(other);} //after this call, other becomes empty, please note.
 	obj_with_begin_time& operator=(const obj_with_begin_time& other) {T::operator=(other); begin_time = other.begin_time; return *this;}

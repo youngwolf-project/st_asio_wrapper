@@ -141,8 +141,8 @@ public:
 };
 
 //protocol: length + body
-//T can be auto_buffer or shared_buffer, the latter makes output messages seemingly copyable.
-template<typename T = auto_buffer<i_buffer>, typename C = string_buffer>
+//T can be unique_buffer or shared_buffer, the latter makes output messages seemingly copyable.
+template<typename T = unique_buffer<i_buffer>, typename C = string_buffer>
 class packer2 : public i_packer<T>
 {
 private:

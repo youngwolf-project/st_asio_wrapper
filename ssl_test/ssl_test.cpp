@@ -5,7 +5,7 @@
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_REUSE_SSL_STREAM
-//#define ST_ASIO_DEFAULT_PACKER packer2<auto_buffer<std::string>, std::string>
+//#define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<std::string>, std::string>
 //#define ST_ASIO_DEFAULT_UNPACKER unpacker2<>
 #define ST_ASIO_HEARTBEAT_INTERVAL 5 //SSL has supported heartbeat because we used user data instead of OOB to implement
 									 //heartbeat since 1.4.0
