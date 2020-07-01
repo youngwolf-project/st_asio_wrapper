@@ -95,6 +95,31 @@ public:
 
 	void show_status() const
 	{
+		std::stringstream s;
+
+		if (stat.establish_time > stat.break_time)
+		{
+			s << "\n\testablish time: ";
+			log_formater::to_time_str(stat.establish_time, s);
+		}
+		else if (stat.break_time > 0)
+		{
+			s << "\n\tbreak time: ";
+			log_formater::to_time_str(stat.break_time, s);
+		}
+
+		if (stat.last_send_time > 0)
+		{
+			s << "\n\tlast send time: ";
+			log_formater::to_time_str(stat.last_send_time, s);
+		}
+
+		if (stat.last_recv_time > 0)
+		{
+			s << "\n\tlast recv time: ";
+			log_formater::to_time_str(stat.last_recv_time, s);
+		}
+
 		unified_out::info_out(
 			"\n\tid: " ST_ASIO_LLF
 			"\n\tstarted: %d"
@@ -106,13 +131,14 @@ public:
 			"\n\tlink status: %d"
 			"\n\trecv suspended: %d"
 			"\n\tsend buffer usage: %.2f%%"
-			"\n\trecv buffer usage: %.2f%%",
+			"\n\trecv buffer usage: %.2f%%"
+			"%s",
 			ST_THIS id(), ST_THIS started(), ST_THIS is_sending(),
 #ifdef ST_ASIO_PASSIVE_RECV
 			ST_THIS is_reading(),
 #endif
 			ST_THIS is_dispatching(), status, ST_THIS is_recv_idle(),
-			ST_THIS send_buf_usage() * 100.f, ST_THIS recv_buf_usage() * 100.f);
+			ST_THIS send_buf_usage() * 100.f, ST_THIS recv_buf_usage() * 100.f, s.str().data());
 	}
 
 	///////////////////////////////////////////////////

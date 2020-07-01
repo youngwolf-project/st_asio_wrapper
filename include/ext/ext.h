@@ -43,7 +43,7 @@
 
 namespace st_asio_wrapper { namespace ext {
 
-//implement i_buffer interface, then protocol can be changed at runtime, see file_server and file_client for more details.
+//implement i_buffer interface, then protocol can be changed at runtime, see demo file_server for more details.
 class string_buffer : public std::string, public i_buffer
 {
 public:

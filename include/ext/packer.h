@@ -97,7 +97,7 @@ public:
 	virtual bool pack_msg(msg_type& msg, container_type& msg_can)
 	{
 		size_t len = msg.size();
-		if (len > packer::get_max_msg_size())
+		if (len > get_max_msg_size())
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
@@ -109,7 +109,7 @@ public:
 	virtual bool pack_msg(msg_type& msg1, msg_type& msg2, container_type& msg_can)
 	{
 		size_t len = msg1.size() + msg2.size();
-		if (len > packer::get_max_msg_size()) //not considered overflow
+		if (len > get_max_msg_size()) //not considered overflow
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
@@ -122,7 +122,7 @@ public:
 	virtual bool pack_msg(container_type& in, container_type& out)
 	{
 		size_t len = st_asio_wrapper::get_size_in_byte(in);
-		if (len > packer::get_max_msg_size()) //not considered overflow
+		if (len > get_max_msg_size()) //not considered overflow
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
@@ -141,14 +141,16 @@ public:
 };
 
 //protocol: length + body
-//T can be auto_buffer or shared_buffer, the latter makes output messages seemingly copyable.
-template<typename T = auto_buffer<i_buffer>, typename C = string_buffer>
+//T can be unique_buffer or shared_buffer, the latter makes output messages seemingly copyable.
+template<typename T = unique_buffer<i_buffer>, typename C = string_buffer>
 class packer2 : public i_packer<T>
 {
 private:
 	typedef i_packer<T> super;
 
 public:
+	static size_t get_max_msg_size() {return packer::get_max_msg_size();}
+
 	using super::pack_msg;
 	virtual bool pack_msg(typename super::msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
@@ -167,7 +169,7 @@ public:
 	virtual bool pack_msg(typename super::msg_type& msg, typename super::container_type& msg_can)
 	{
 		size_t len = msg.size();
-		if (len > packer::get_max_msg_size())
+		if (len > get_max_msg_size())
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
@@ -181,7 +183,7 @@ public:
 	virtual bool pack_msg(typename super::msg_type& msg1, typename super::msg_type& msg2, typename super::container_type& msg_can)
 	{
 		size_t len = msg1.size() + msg2.size();
-		if (len > packer::get_max_msg_size()) //not considered overflow
+		if (len > get_max_msg_size()) //not considered overflow
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
@@ -196,7 +198,7 @@ public:
 	virtual bool pack_msg(typename super::container_type& in, typename super::container_type& out)
 	{
 		size_t len = st_asio_wrapper::get_size_in_byte(in);
-		if (len > packer::get_max_msg_size()) //not considered overflow
+		if (len > get_max_msg_size()) //not considered overflow
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);

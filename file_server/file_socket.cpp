@@ -33,7 +33,7 @@ bool file_socket::on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 void file_socket::on_msg_send(in_msg_type& msg)
 {
-	BOOST_AUTO(buffer, dynamic_cast<file_buffer*>(msg.raw_buffer()));
+	BOOST_AUTO(buffer, dynamic_cast<file_buffer*>(msg.raw_buffer().get()));
 	if (NULL != buffer)
 	{
 		buffer->read();

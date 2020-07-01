@@ -30,8 +30,8 @@
 //3-prefix and/or suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER packer2<auto_buffer<std::string>, std::string>
-#define ST_ASIO_DEFAULT_UNPACKER unpacker2<>
+#define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<std::string>, std::string>
+#define ST_ASIO_DEFAULT_UNPACKER unpacker2<unique_buffer<std::string> >
 #elif 2 == PACKER_UNPACKER_TYPE
 #undef ST_ASIO_HEARTBEAT_INTERVAL
 #define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat

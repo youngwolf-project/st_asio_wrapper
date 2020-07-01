@@ -105,14 +105,11 @@ protected:
 			return true;
 
 		boost::lock_guard<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
-		BOOST_AUTO(&stub, object_can[id]);
-		if (stub)
+		if (!object_can.emplace(id, object_ptr).second)
 			return false;
 
 		object_can.erase(object_ptr->id());
 		object_ptr->id(id);
-		stub = object_ptr; //must succeed
-
 		return true;
 	}
 

@@ -128,57 +128,47 @@ public:
 };
 
 //convert '->' operation to '.' operation
-//user need to allocate object, and auto_buffer will free it
-template<typename T> class auto_buffer : public boost::noncopyable
+//user needs to allocate object, and object_buffer will free it
+//A can be std::scoped_ptr or std::shared_ptr
+//T is the object that represent a buffer (a buffer must at least has those interfaces in i_buffer, or inherit from i_buffer).
+template<template<typename T> class A, typename T> class object_buffer
 {
 public:
-	typedef T* buffer_type;
+	typedef A<T> buffer_type;
 	typedef const buffer_type buffer_ctype;
 
-	auto_buffer() : buffer(NULL) {}
-	auto_buffer(buffer_type _buffer) : buffer(_buffer) {}
-	~auto_buffer() {clear();}
+	object_buffer() {}
+	object_buffer(T* _buffer) : buffer(_buffer) {}
 
-	buffer_type raw_buffer() const {return buffer;}
-	void raw_buffer(buffer_type _buffer) {clear(); buffer = _buffer;}
-
-	//the following five functions are needed by st_asio_wrapper
-	bool empty() const {return NULL == buffer || buffer->empty();}
-	size_t size() const {return NULL == buffer ? 0 : buffer->size();}
-	const char* data() const {return NULL == buffer ? NULL : buffer->data();}
-	void swap(auto_buffer& other) {std::swap(buffer, other.buffer);}
-	void clear() {delete buffer; buffer = NULL;}
-
-protected:
-	buffer_type buffer;
-};
-
-//convert '->' operation to '.' operation
-//user need to allocate object, and shared_buffer will free it
-//not like auto_buffer, shared_buffer is copyable (seemingly), but auto_buffer is a bit more efficient.
-template<typename T> class shared_buffer
-{
-public:
-	typedef boost::shared_ptr<T> buffer_type;
-	typedef const buffer_type buffer_ctype;
-
-	shared_buffer() {}
-	shared_buffer(T* _buffer) {buffer.reset(_buffer);}
-	shared_buffer(buffer_type _buffer) : buffer(_buffer) {}
-
-	buffer_type raw_buffer() const {return buffer;}
+	buffer_ctype& raw_buffer() const {return buffer;}
 	void raw_buffer(T* _buffer) {buffer.reset(_buffer);}
-	void raw_buffer(buffer_ctype _buffer) {buffer = _buffer;}
+	void raw_buffer(buffer_ctype& _buffer) {buffer = _buffer;}
+	void raw_buffer(buffer_type& _buffer) {clear(); boost::swap(buffer, _buffer);}
 
 	//the following five functions are needed by st_asio_wrapper
 	bool empty() const {return !buffer || buffer->empty();}
 	size_t size() const {return !buffer ? 0 : buffer->size();}
 	const char* data() const {return !buffer ? NULL : buffer->data();}
-	void swap(shared_buffer& other) {buffer.swap(other.buffer);}
+	void swap(object_buffer& other) {boost::swap(buffer, other.buffer);}
 	void clear() {buffer.reset();}
 
 protected:
 	buffer_type buffer;
+};
+
+template<typename T> class unique_buffer : public object_buffer<boost::scoped_ptr, T>
+{
+public:
+	unique_buffer() {}
+	unique_buffer(T* _buffer) : object_buffer<boost::scoped_ptr, T>(_buffer) {}
+};
+
+//unlike unique_buffer, shared_buffer is copyable (seemingly), but unique_buffer is a bit more efficient.
+template<typename T> class shared_buffer : public object_buffer<boost::shared_ptr, T>
+{
+public:
+	shared_buffer() {}
+	shared_buffer(T* _buffer) : object_buffer<boost::shared_ptr, T>(_buffer) {}
 };
 
 //st_asio_wrapper requires that container must take one and only one template argument
@@ -374,11 +364,11 @@ struct statistic
 		recv_msg_sum = 0;
 		recv_byte_sum = 0;
 
-		last_send_time = 0;
-		last_recv_time = 0;
-
 		establish_time = 0;
 		break_time = 0;
+
+		last_send_time = 0;
+		last_recv_time = 0;
 	}
 
 #ifdef ST_ASIO_FULL_STATISTIC
@@ -453,11 +443,11 @@ struct statistic
 	std::string to_string() const
 	{
 		std::ostringstream s;
-		s << "send corresponding statistic:\nmessage sum: " << send_msg_sum << std::endl << "size in bytes: " << send_byte_sum << std::endl
+		s << "send relevant statistic:\nmessage sum: " << send_msg_sum << std::endl << "size in bytes: " << send_byte_sum << std::endl
 #ifdef ST_ASIO_FULL_STATISTIC
 			<< "send delay: " << send_delay_sum << std::endl << "send duration: " << send_time_sum << std::endl << "pack duration: " << pack_time_sum << std::endl
 #endif
-			<< "\nrecv corresponding statistic:\nmessage sum: " << recv_msg_sum << std::endl << "size in bytes: " << recv_byte_sum
+			<< "\nrecv relevant statistic:\nmessage sum: " << recv_msg_sum << std::endl << "size in bytes: " << recv_byte_sum
 #ifdef ST_ASIO_FULL_STATISTIC
 			<< "\ndispatch delay: " << dispatch_delay_sum << std::endl << "recv idle duration: " << recv_idle_sum << std::endl
 			<< "msg handling duration: " << handle_time_sum << std::endl << "unpack duration: " << unpack_time_sum
@@ -465,7 +455,7 @@ struct statistic
 		;return s.str();
 	}
 
-	//send corresponding statistic
+	//send relevant statistic
 	boost::uint_fast64_t send_msg_sum; //not counted msgs in sending buffer
 	boost::uint_fast64_t send_byte_sum; //include data added by packer, not counted msgs in sending buffer
 	stat_duration send_delay_sum; //from send_(native_)msg (exclude msg packing) to boost::asio::async_write
@@ -473,7 +463,7 @@ struct statistic
 	//above two items indicate your network's speed or load
 	stat_duration pack_time_sum; //udp::socket_base will not gather this item
 
-	//recv corresponding statistic
+	//recv relevant statistic
 	boost::uint_fast64_t recv_msg_sum; //msgs returned by i_unpacker::parse_msg
 	boost::uint_fast64_t recv_byte_sum; //msgs (in bytes) returned by i_unpacker::parse_msg
 	stat_duration dispatch_delay_sum; //from parse_msg(exclude msg unpacking) to on_msg_handle
@@ -481,11 +471,11 @@ struct statistic
 	stat_duration handle_time_sum; //on_msg_handle (and on_msg) consumed time, this indicate the efficiency of msg handling
 	stat_duration unpack_time_sum; //udp::socket_base will not gather this item
 
-	time_t last_send_time; //include heartbeat
-	time_t last_recv_time; //include heartbeat
-
 	time_t establish_time; //time of link establishment
 	time_t break_time; //time of link broken
+
+	time_t last_send_time; //include heartbeat
+	time_t last_recv_time; //include heartbeat
 };
 
 class auto_duration
@@ -515,7 +505,7 @@ template<typename T> struct obj_with_begin_time : public T
 	obj_with_begin_time(const T& obj) : T(obj) {restart();}
 	obj_with_begin_time(T& obj) {T::swap(obj); restart();} //after this call, obj becomes empty, please note.
 	obj_with_begin_time& operator=(const T& obj) {T::operator=(obj); restart(); return *this;}
-	obj_with_begin_time& operator=(T& obj) {T::swap(obj); restart(); return *this;} //after this call, obj becomes empty, please note.
+	obj_with_begin_time& operator=(T& obj) {T::clear(); T::swap(obj); restart(); return *this;} //after this call, obj becomes empty, please note.
 	obj_with_begin_time(const obj_with_begin_time& other) : T(other), begin_time(other.begin_time) {}
 	obj_with_begin_time(obj_with_begin_time& other) {swap(other);} //after this call, other becomes empty, please note.
 	obj_with_begin_time& operator=(const obj_with_begin_time& other) {T::operator=(other); begin_time = other.begin_time; return *this;}
@@ -897,6 +887,22 @@ UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 class log_formater
 {
 public:
+	static void to_time_str(time_t time, std::stringstream& os)
+	{
+		char time_buff[64];
+#ifdef _MSC_VER
+		ctime_s(time_buff, sizeof(time_buff), &time);
+#else
+		ctime_r(&time, time_buff);
+#endif
+		size_t len = strlen(time_buff);
+		assert(len > 0);
+		if ('\n' == *boost::next(time_buff, --len))
+			*boost::next(time_buff, len) = '\0';
+
+		os << time_buff;
+	}
+
 	static void all_out(const char* head, char* buff, size_t buff_len, const char* fmt, va_list& ap)
 	{
 		assert(NULL != buff && buff_len > 0);
@@ -906,27 +912,15 @@ public:
 
 		if (NULL != head)
 			os << '[' << head << "] ";
-
 		os << '[' << boost::this_thread::get_id() << "] ";
 
-		char time_buff[64];
-		time_t now = time(NULL);
-#ifdef _MSC_VER
-		ctime_s(time_buff, sizeof(time_buff), &now);
-#else
-		ctime_r(&now, time_buff);
-#endif
-		size_t len = strlen(time_buff);
-		assert(len > 0);
-		if ('\n' == *boost::next(time_buff, --len))
-			*boost::next(time_buff, len) = '\0';
-
-		os << time_buff << " -> ";
+		to_time_str(time(NULL), os);
+		os << " -> ";
 
 #if defined _MSC_VER || (defined __unix__ && !defined __linux__)
 		os.rdbuf()->sgetn(buff, buff_len);
 #endif
-		len = (size_t) os.tellp();
+		size_t len = (size_t) os.tellp();
 		if (len >= buff_len)
 			*boost::next(buff, buff_len - 1) = '\0';
 		else

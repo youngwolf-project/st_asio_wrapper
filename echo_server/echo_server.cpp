@@ -27,8 +27,8 @@
 //3-prefix and/or suffix packer and unpacker
 
 #if 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER packer2<auto_buffer<std::string>, std::string>
-#define ST_ASIO_DEFAULT_UNPACKER unpacker2<>
+#define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<std::string>, std::string>
+#define ST_ASIO_DEFAULT_UNPACKER unpacker2<unique_buffer<std::string> >
 #elif 2 == PACKER_UNPACKER_TYPE
 #undef ST_ASIO_HEARTBEAT_INTERVAL
 #define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat
@@ -58,7 +58,7 @@ using namespace st_asio_wrapper::ext::tcp;
 //under the default behavior, each tcp::socket has their own packer, and cause memory waste
 //at here, we make each echo_socket use the same global packer for memory saving
 //notice: do not do this for unpacker, because unpacker has member variables and can't share each other
-BOOST_AUTO(global_packer, boost::make_shared<ST_ASIO_DEFAULT_PACKER>());
+boost::shared_ptr<ST_ASIO_DEFAULT_PACKER> global_packer = boost::make_shared<ST_ASIO_DEFAULT_PACKER>();
 
 //demonstrate how to control the type of tcp::server_socket_base::server from template parameter
 class i_echo_server : public i_server
