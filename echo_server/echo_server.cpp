@@ -146,8 +146,8 @@ protected:
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind((bool (echo_socket::*)(in_msg_type&, bool, bool)) &echo_socket::send_msg, this, boost::placeholders::_1, true, false));
 #endif
 		return tmp_can.size();
-		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
-		//if we handled nothing, return a positive number is also okey but will very slightly impact performance, return 0 is suggested
+		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number), else, return 0
+		//if we handled nothing, but want to re-dispatch messages immediately, return 1
 	}
 #else
 	//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
