@@ -17,23 +17,23 @@
 
 namespace st_asio_wrapper { namespace tcp {
 
-template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket,
+template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket, typename Family = boost::asio::ip::tcp,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class server_socket_base : public socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>,
-	public boost::enable_shared_from_this<server_socket_base<Packer, Unpacker, Server, Socket, InQueue, InContainer, OutQueue, OutContainer> >
+class generic_server_socket : public socket_base<Socket, Family, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>,
+	public boost::enable_shared_from_this<generic_server_socket<Packer, Unpacker, Server, Socket, Family, InQueue, InContainer, OutQueue, OutContainer> >
 {
 private:
-	typedef socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket_base<Socket, Family, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	server_socket_base(Server& server_) : super(server_.get_service_pump()), server(server_) {}
-	template<typename Arg> server_socket_base(Server& server_, Arg& arg) : super(server_.get_service_pump(), arg), server(server_) {}
+	generic_server_socket(Server& server_) : super(server_.get_service_pump()), server(server_) {}
+	template<typename Arg> generic_server_socket(Server& server_, Arg& arg) : super(server_.get_service_pump(), arg), server(server_) {}
 
 	virtual const char* type_name() const {return "TCP (server endpoint)";}
 	virtual int type_id() const {return 2;}
 
-	virtual void take_over(boost::shared_ptr<server_socket_base> socket_ptr) {} //restore this socket from socket_ptr
+	virtual void take_over(boost::shared_ptr<generic_server_socket> socket_ptr) {} //restore this socket from socket_ptr
 
 	void disconnect() {force_shutdown();}
 	void force_shutdown()
@@ -82,6 +82,33 @@ protected:
 private:
 	Server& server;
 };
+
+template<typename Packer, typename Unpacker, typename Server = i_server, typename Socket = boost::asio::ip::tcp::socket,
+	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class server_socket_base : public generic_server_socket<Packer, Unpacker, Server, Socket, boost::asio::ip::tcp, InQueue, InContainer, OutQueue, OutContainer>
+{
+private:
+	typedef generic_server_socket<Packer, Unpacker, Server, Socket, boost::asio::ip::tcp, InQueue, InContainer, OutQueue, OutContainer> super;
+
+public:
+	server_socket_base(Server& server_) : super(server_) {}
+	template<typename Arg> server_socket_base(Server& server_, Arg& arg) : super(server_, arg) {}
+};
+
+#ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
+template <typename Packer, typename Unpacker, typename Server = i_server,
+	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class unix_server_socket_base : public generic_server_socket<Packer, Unpacker, Server, boost::asio::local::stream_protocol::socket, boost::asio::local::stream_protocol, InQueue, InContainer, OutQueue, OutContainer>
+{
+private:
+	typedef generic_server_socket<Packer, Unpacker, Server, boost::asio::local::stream_protocol::socket, boost::asio::local::stream_protocol, InQueue, InContainer, OutQueue, OutContainer> super;
+
+public:
+	unix_server_socket_base(Server& server_) : super(server_) {}
+};
+#endif
 
 }} //namespace
 

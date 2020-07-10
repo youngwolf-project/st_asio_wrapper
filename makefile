@@ -20,6 +20,8 @@ release debug clean :
 	cd concurrent_server && ${ST_MAKE}
 	cd concurrent_client && ${ST_MAKE}
 	cd socket_management && ${ST_MAKE}
+	cd unix_socket && ${ST_MAKE}
 	cd udp_test && ${ST_MAKE}
+	cd unix_udp_test && ${ST_MAKE}
 	cd ssl_test && ${ST_MAKE}
 

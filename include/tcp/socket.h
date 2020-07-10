@@ -17,9 +17,9 @@
 
 namespace st_asio_wrapper { namespace tcp {
 
-template <typename Socket, typename Packer, typename Unpacker,
+template <typename Socket, typename Family, typename Packer, typename Unpacker,
 	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
-class socket_base : public socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
+class socket_base : public socket<Socket, Family, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -28,7 +28,7 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 private:
-	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket<Socket, Family, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 protected:
 	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN};
@@ -65,6 +65,11 @@ public:
 	bool is_connected() const {return CONNECTED == status;}
 	bool is_shutting_down() const {return FORCE_SHUTTING_DOWN == status || GRACEFUL_SHUTTING_DOWN == status;}
 
+	std::string endpoint_to_string(const boost::asio::ip::tcp::endpoint& ep) const {return ep.address().to_string() + ':' + boost::to_string(ep.port());}
+#ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
+	std::string endpoint_to_string(const boost::asio::local::stream_protocol::endpoint& ep) const {return ep.path();}
+#endif
+
 	void show_info(const char* head = NULL, const char* tail = NULL) const
 	{
 		boost::system::error_code ec;
@@ -73,9 +78,8 @@ public:
 		{
 			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec));
 			if (!ec)
-				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s", ST_THIS id(), NULL == head ? "" : head,
-					local_ep.address().to_string().data(), local_ep.port(),
-					remote_ep.address().to_string().data(), remote_ep.port(), NULL == tail ? "" : tail);
+				unified_out::info_out(ST_ASIO_LLF " %s (%s %s) %s", ST_THIS id(), NULL == head ? "" : head,
+					endpoint_to_string(local_ep).data(), endpoint_to_string(remote_ep).data(), NULL == tail ? "" : tail);
 		}
 	}
 
@@ -87,9 +91,8 @@ public:
 		{
 			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec2));
 			if (!ec2)
-				unified_out::info_out(ST_ASIO_LLF " %s (%s:%hu %s:%hu) %s (%d %s)", ST_THIS id(), NULL == head ? "" : head,
-					local_ep.address().to_string().data(), local_ep.port(),
-					remote_ep.address().to_string().data(), remote_ep.port(), NULL == tail ? "" : tail, ec.value(), ec.message().data());
+				unified_out::info_out(ST_ASIO_LLF " %s (%s %s) %s (%d %s)", ST_THIS id(), NULL == head ? "" : head,
+					endpoint_to_string(local_ep).data(), endpoint_to_string(remote_ep).data(), NULL == tail ? "" : tail, ec.value(), ec.message().data());
 		}
 	}
 
@@ -174,7 +177,7 @@ protected:
 			status = GRACEFUL_SHUTTING_DOWN;
 
 			boost::system::error_code ec;
-			ST_THIS lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+			ST_THIS lowest_layer().shutdown(Family::socket::shutdown_send, ec);
 			if (ec) //graceful shutdown is impossible
 				shutdown();
 			else if (!sync)
@@ -213,7 +216,7 @@ protected:
 #else
 	//some messages have been sent to the kernel buffer
 	//notice: messages are packed, using inconstant reference is for the ability of swapping
-	virtual void on_msg_send(typename super::in_container_type & msg_can) = 0;
+	virtual void on_msg_send(typename super::in_container_type& msg_can) = 0;
 #endif
 #endif
 

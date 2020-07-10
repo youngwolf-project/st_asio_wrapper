@@ -24,15 +24,16 @@ class single_socket_service : public service_pump::i_service, public Socket
 {
 public:
 	single_socket_service(service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
-	template<typename Arg>
-	single_socket_service(service_pump& service_pump_, Arg& arg) : i_service(service_pump_), Socket(service_pump_, arg) {}
+	template<typename Arg> single_socket_service(service_pump& service_pump_, Arg& arg) : i_service(service_pump_), Socket(service_pump_, arg) {}
+
+	using Socket::id; //release these functions
 
 protected:
 	virtual bool init() {ST_THIS start(); return Socket::started();}
 	virtual void uninit() {ST_THIS graceful_shutdown();} //if you wanna force shutdown, call force_shutdown before service_pump::stop_service invocation.
 
 private:
-	using Socket::get_matrix;
+	using Socket::get_matrix; //hide this function
 };
 
 template<typename Socket, typename Pool, typename Matrix>

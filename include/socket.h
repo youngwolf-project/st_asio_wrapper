@@ -20,7 +20,7 @@
 namespace st_asio_wrapper
 {
 
-template<typename Socket, typename Packer, typename Unpacker, typename InMsgType, typename OutMsgType,
+template<typename Socket, typename Family, typename Packer, typename Unpacker, typename InMsgType, typename OutMsgType,
 	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
 class socket : public timer<tracked_executor>
 {
@@ -333,7 +333,7 @@ protected:
 	virtual size_t on_msg_handle(out_queue_type& msg_can)
 	{
 		out_container_type tmp_can;
-		msg_can.swap(tmp_can); //must be thread safe, or aovid race condition from your business logic
+		msg_can.swap(tmp_can); //must be thread safe, or avoid race condition from your business logic
 
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
 			unified_out::debug_out(ST_ASIO_LLF " recv(" ST_ASIO_SF "): %s", id(), iter->size(), iter->data());
@@ -409,7 +409,7 @@ protected:
 		if (lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
-			lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+			lowest_layer().shutdown(Family::socket::shutdown_both, ec);
 
 			stat.break_time = time(NULL);
 		}
@@ -626,7 +626,8 @@ private:
 
 	//please do not change id at runtime via the following function, except this socket is not managed by object_pool,
 	//it should only be used by object_pool when reusing or creating new socket.
-	template<typename Object> friend class object_pool;
+	template<typename> friend class object_pool;
+	template<typename> friend class single_socket_service;
 	void id(boost::uint_fast64_t id) {_id = id;}
 
 #ifdef ST_ASIO_SYNC_RECV

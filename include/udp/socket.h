@@ -17,23 +17,47 @@
 
 namespace st_asio_wrapper { namespace udp {
 
-template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::udp::socket,
+template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::udp::socket, typename Family = boost::asio::ip::udp,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class socket_base : public socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type>, udp_msg<typename Unpacker::msg_type>, InQueue, InContainer, OutQueue, OutContainer>
+class generic_socket : public socket<Socket, Family, Packer, Unpacker, udp_msg<typename Packer::msg_type, Family>, udp_msg<typename Unpacker::msg_type, Family>, InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
-	typedef udp_msg<typename Packer::msg_type> in_msg_type;
+	typedef udp_msg<typename Packer::msg_type, Family> in_msg_type;
 	typedef const in_msg_type in_msg_ctype;
-	typedef udp_msg<typename Unpacker::msg_type> out_msg_type;
+	typedef udp_msg<typename Unpacker::msg_type, Family> out_msg_type;
 	typedef const out_msg_type out_msg_ctype;
 
 private:
-	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket<Socket, Family, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	socket_base(boost::asio::io_context& io_context_) : super(io_context_), has_bound(false), matrix(NULL) {}
-	socket_base(Matrix& matrix_) : super(matrix_.get_service_pump()), has_bound(false), matrix(&matrix_) {}
+	static bool set_addr(boost::asio::ip::udp::endpoint& endpoint, unsigned short port, const std::string& ip)
+	{
+		if (ip.empty())
+			endpoint = boost::asio::ip::udp::endpoint(ST_ASIO_UDP_DEFAULT_IP_VERSION, port);
+		else
+		{
+			boost::system::error_code ec;
+#if BOOST_ASIO_VERSION >= 101100
+			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec)); assert(!ec);
+#else
+			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec)); assert(!ec);
+#endif
+			if (ec)
+			{
+				unified_out::error_out("invalid IP address %s.", ip.data());
+				return false;
+			}
+
+			endpoint = boost::asio::ip::udp::endpoint(addr, port);
+		}
+
+		return true;
+	}
+
+	generic_socket(boost::asio::io_context& io_context_) : super(io_context_), has_bound(false), matrix(NULL) {}
+	generic_socket(Matrix& matrix_) : super(matrix_.get_service_pump()), has_bound(false), matrix(&matrix_) {}
 
 	virtual bool is_ready() {return has_bound;}
 	virtual void send_heartbeat()
@@ -59,18 +83,26 @@ public:
 	}
 
 	bool set_local_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(local_addr, port, ip);}
-	const boost::asio::ip::udp::endpoint& get_local_addr() const {return local_addr;}
+	bool set_local_addr(const std::string& file_name) {local_addr = typename Family::endpoint(file_name); return true;}
+	const typename Family::endpoint& get_local_addr() const {return local_addr;}
+
 	bool set_peer_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(peer_addr, port, ip);}
-	const boost::asio::ip::udp::endpoint& get_peer_addr() const {return peer_addr;}
+	bool set_peer_addr(const std::string& file_name) {peer_addr = typename Family::endpoint(file_name); return true;}
+	const typename Family::endpoint& get_peer_addr() const {return peer_addr;}
 
 	void disconnect() {force_shutdown();}
-	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&socket_base::shutdown, this));}
+	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&generic_socket::shutdown, this));}
 	void graceful_shutdown() {force_shutdown();}
+
+	std::string endpoint_to_string(const boost::asio::ip::udp::endpoint& ep) const {return ep.address().to_string() + ':' + boost::to_string(ep.port());}
+#ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
+	std::string endpoint_to_string(const boost::asio::local::datagram_protocol::endpoint& ep) const {return ep.path();}
+#endif
 
 	void show_info(const char* head = NULL, const char* tail = NULL) const
 	{
-		unified_out::info_out(ST_ASIO_LLF " %s %s:%hu %s",
-			ST_THIS id(), NULL == head ? "" : head, local_addr.address().to_string().data(), local_addr.port(), NULL == tail ? "" : tail);
+		unified_out::info_out(ST_ASIO_LLF " %s %s %s",
+			ST_THIS id(), NULL == head ? "" : head, endpoint_to_string(local_addr).data(), NULL == tail ? "" : tail);
 	}
 
 	void show_status() const
@@ -116,7 +148,7 @@ public:
 	UDP_SEND_MSG(send_msg, false) //use the packer with native = false to pack the msgs
 	UDP_SEND_MSG(send_native_msg, true) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
-	//success at here just means put the msg into udp::socket_base's send buffer
+	//success at here just means put the msg into udp::generic_socket's send buffer
 	UDP_SAFE_SEND_MSG(safe_send_msg, send_msg)
 	UDP_SAFE_SEND_MSG(safe_send_native_msg, send_native_msg)
 
@@ -124,7 +156,7 @@ public:
 	UDP_SYNC_SEND_MSG(sync_send_msg, false) //use the packer with native = false to pack the msgs
 	UDP_SYNC_SEND_MSG(sync_send_native_msg, true) //use the packer with native = true to pack the msgs
 	//guarantee send msg successfully even if can_overflow equal to false
-	//success at here just means put the msg into udp::socket_base's send buffer
+	//success at here just means put the msg into udp::generic_socket's send buffer
 	UDP_SYNC_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
 	UDP_SYNC_SAFE_SEND_MSG(sync_safe_send_native_msg, sync_send_native_msg)
 #endif
@@ -134,6 +166,8 @@ public:
 protected:
 	Matrix* get_matrix() {return matrix;}
 	const Matrix* get_matrix() const {return matrix;}
+
+	virtual bool bind(const typename Family::endpoint& local_addr) {return true;}
 
 	virtual bool do_start()
 	{
@@ -153,21 +187,13 @@ protected:
 #endif
 		}
 
-		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
-		{
-			boost::system::error_code ec;
-			lowest_object.bind(local_addr, ec);
-			if (ec && boost::asio::error::invalid_argument != ec)
-			{
-				unified_out::error_out("cannot bind socket: %s", ec.message().data());
-				return (has_bound = false);
-			}
-		}
+		if (!bind(local_addr))
+			return (has_bound = false);
 
 		return (has_bound = true) && super::do_start();
 	}
 
-	//msg was failed to send and udp::socket_base will not hold it any more, if you want to re-send it in the future,
+	//msg was failed to send and udp::generic_socket will not hold it any more, if you want to re-send it in the future,
 	// you must take over it and re-send (at any time) it via direct_send_msg.
 	//DO NOT hold msg for future using, just swap its content with your own message in this virtual function.
 	virtual void on_send_error(const boost::system::error_code& ec, typename super::in_msg& msg)
@@ -182,7 +208,7 @@ protected:
 	virtual bool on_heartbeat_error()
 	{
 		stat.last_recv_time = time(NULL); //avoid repetitive warnings
-		unified_out::warning_out(ST_ASIO_LLF " %s:%hu is not available", ST_THIS id(), peer_addr.address().to_string().data(), peer_addr.port());
+		unified_out::warning_out(ST_ASIO_LLF " %s is not available", ST_THIS id(), endpoint_to_string(peer_addr).data());
 		return true;
 	}
 
@@ -217,7 +243,7 @@ private:
 			reading = true;
 #endif
 			ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(rw_strand,
-				ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+				ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 		}
 	}
 
@@ -268,7 +294,7 @@ private:
 
 			sending_msg.restart();
 			ST_THIS next_layer().async_send_to(boost::asio::buffer(sending_msg.data(), sending_msg.size()), sending_msg.peer_addr, make_strand_handler(rw_strand,
-				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+				ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
 
@@ -316,30 +342,6 @@ private:
 			do_send_msg(true); //just make sure no pending msgs
 	}
 
-	bool set_addr(boost::asio::ip::udp::endpoint& endpoint, unsigned short port, const std::string& ip)
-	{
-		if (ip.empty())
-			endpoint = boost::asio::ip::udp::endpoint(ST_ASIO_UDP_DEFAULT_IP_VERSION, port);
-		else
-		{
-			boost::system::error_code ec;
-#if BOOST_ASIO_VERSION >= 101100
-			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec)); assert(!ec);
-#else
-			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec)); assert(!ec);
-#endif
-			if (ec)
-			{
-				unified_out::error_out("invalid IP address %s.", ip.data());
-				return false;
-			}
-
-			endpoint = boost::asio::ip::udp::endpoint(addr, port);
-		}
-
-		return true;
-	}
-
 private:
 	using super::stat;
 	using super::temp_msg_can;
@@ -354,12 +356,71 @@ private:
 
 	bool has_bound;
 	typename super::in_msg sending_msg;
-	boost::asio::ip::udp::endpoint local_addr;
-	boost::asio::ip::udp::endpoint temp_addr; //used when receiving messages
-	boost::asio::ip::udp::endpoint peer_addr;
+	typename Family::endpoint local_addr;
+	typename Family::endpoint temp_addr; //used when receiving messages
+	typename Family::endpoint peer_addr;
 
 	Matrix* matrix;
 };
+
+template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::udp::socket,
+	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class socket_base : public generic_socket<Packer, Unpacker, Matrix, Socket, boost::asio::ip::udp, InQueue, InContainer, OutQueue, OutContainer>
+{
+private:
+	typedef generic_socket<Packer, Unpacker, Matrix, Socket, boost::asio::ip::udp, InQueue, InContainer, OutQueue, OutContainer> super;
+
+public:
+	socket_base(boost::asio::io_context& io_context_) : super(io_context_) {}
+	socket_base(Matrix& matrix_) : super(matrix_) {}
+
+protected:
+	virtual bool bind(const boost::asio::ip::udp::endpoint& local_addr)
+	{
+		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
+		{
+			boost::system::error_code ec;
+			ST_THIS lowest_layer().bind(local_addr, ec);
+			if (ec && boost::asio::error::invalid_argument != ec)
+			{
+				unified_out::error_out("cannot bind socket: %s", ec.message().data());
+				return false;
+			}
+		}
+
+		return true;
+	}
+};
+
+#ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
+template <typename Packer, typename Unpacker, typename Matrix = i_matrix,
+	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class unix_socket_base : public generic_socket<Packer, Unpacker, Matrix, boost::asio::local::datagram_protocol::socket, boost::asio::local::datagram_protocol, InQueue, InContainer, OutQueue, OutContainer>
+{
+private:
+	typedef generic_socket<Packer, Unpacker, Matrix, boost::asio::local::datagram_protocol::socket, boost::asio::local::datagram_protocol, InQueue, InContainer, OutQueue, OutContainer> super;
+
+public:
+	unix_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {}
+	unix_socket_base(Matrix& matrix_) : super(matrix_) {}
+
+protected:
+	virtual bool bind(const boost::asio::local::datagram_protocol::endpoint& local_addr)
+	{
+		boost::system::error_code ec;
+		ST_THIS lowest_layer().bind(local_addr, ec);
+		if (ec && boost::asio::error::invalid_argument != ec)
+		{
+			unified_out::error_out("cannot bind socket: %s", ec.message().data());
+			return false;
+		}
+
+		return true;
+	}
+};
+#endif
 
 }} //namespace
 

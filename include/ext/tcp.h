@@ -50,6 +50,25 @@ public:
 };
 typedef st_asio_wrapper::tcp::server_base<server_socket> server;
 
+#ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
+typedef st_asio_wrapper::tcp::unix_client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> unix_client_socket;
+typedef st_asio_wrapper::tcp::single_client_base<unix_client_socket> unix_single_client;
+typedef st_asio_wrapper::tcp::multi_client_base<unix_client_socket> unix_multi_client;
+
+typedef st_asio_wrapper::tcp::unix_server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> unix_server_socket;
+template<typename Server = st_asio_wrapper::tcp::i_server>
+class unix_server_socket2 : public st_asio_wrapper::tcp::unix_server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server>
+{
+private:
+    typedef st_asio_wrapper::tcp::unix_server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server> super;
+
+public:
+    unix_server_socket2(Server& server_) : super(server_) {}
+    template<typename Arg> unix_server_socket2(Server& server_, Arg& arg) : super(server_, arg) {}
+};
+typedef st_asio_wrapper::tcp::unix_server_base<unix_server_socket> unix_server;
+#endif
+
 }}} //namespace
 
 #endif /* ST_ASIO_EXT_TCP_H_ */
