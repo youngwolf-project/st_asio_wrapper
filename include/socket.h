@@ -389,7 +389,7 @@ protected:
 #endif
 
 	//subclass notify shutdown event
-	bool close(bool use_close= false) //if not use_close, shutdown (both direction) will be used
+	bool close(bool use_close = false) //if not use_close, shutdown (both direction) will be used
 	{
 		scope_atomic_lock<> lock(start_atomic);
 		while (!lock.locked())
