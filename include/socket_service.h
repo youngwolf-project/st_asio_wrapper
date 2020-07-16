@@ -41,7 +41,7 @@ class multi_socket_service : public Matrix, public Pool
 {
 protected:
 	multi_socket_service(service_pump& service_pump_) : Pool(service_pump_) {}
-	template<typename Arg> multi_socket_service(service_pump& service_pump_, Arg arg) : Pool(service_pump_, arg) {}
+	template<typename Arg> multi_socket_service(service_pump& service_pump_, const Arg& arg) : Pool(service_pump_, arg) {}
 
 	virtual bool init()
 	{

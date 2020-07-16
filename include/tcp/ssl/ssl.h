@@ -173,7 +173,7 @@ private:
 	typedef st_asio_wrapper::object_pool<Object> super;
 
 public:
-	object_pool(service_pump& service_pump_, boost::asio::ssl::context::method m) : super(service_pump_), ctx(m) {}
+	object_pool(service_pump& service_pump_, const boost::asio::ssl::context::method& m) : super(service_pump_), ctx(m) {}
 	boost::asio::ssl::context& context() {return ctx;}
 
 protected:
@@ -230,7 +230,7 @@ private:
 template<typename Socket, typename Pool = object_pool<Socket>, typename Server = tcp::i_server> class server_base : public tcp::server_base<Socket, Pool, Server>
 {
 public:
-	server_base(service_pump& service_pump_, boost::asio::ssl::context::method m) : tcp::server_base<Socket, Pool, Server>(service_pump_, m) {}
+	server_base(service_pump& service_pump_, const boost::asio::ssl::context::method& m) : tcp::server_base<Socket, Pool, Server>(service_pump_, m) {}
 };
 template<typename Socket> class single_client_base : public tcp::single_client_base<Socket>
 {
@@ -240,7 +240,7 @@ public:
 template<typename Socket, typename Pool = object_pool<Socket> > class multi_client_base : public tcp::multi_client_base<Socket, Pool>
 {
 public:
-	multi_client_base(service_pump& service_pump_, boost::asio::ssl::context::method m) : tcp::multi_client_base<Socket, Pool>(service_pump_, m) {}
+	multi_client_base(service_pump& service_pump_, const boost::asio::ssl::context::method& m) : tcp::multi_client_base<Socket, Pool>(service_pump_, m) {}
 };
 
 }} //namespace

@@ -33,7 +33,7 @@ private:
 
 public:
 	multi_client_base(service_pump& service_pump_) : super(service_pump_) {}
-	template<typename Arg> multi_client_base(service_pump& service_pump_, Arg arg) : super(service_pump_, arg) {}
+	template<typename Arg> multi_client_base(service_pump& service_pump_, const Arg& arg) : super(service_pump_, arg) {}
 
 	//connected link size, may smaller than total object size (object_pool::size)
 	size_t valid_size()

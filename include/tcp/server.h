@@ -239,8 +239,7 @@ private:
 
 public:
 	server_base(service_pump& service_pump_) : super(service_pump_) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT);}
-	template<typename Arg>
-	server_base(service_pump& service_pump_, const Arg& arg) : super(service_pump_, arg) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT);}
+	template<typename Arg> server_base(service_pump& service_pump_, const Arg& arg) : super(service_pump_, arg) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT);}
 };
 
 #ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
