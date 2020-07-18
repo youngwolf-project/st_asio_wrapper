@@ -97,7 +97,7 @@ protected:
 			unified_out::error_out("create object failed!");
 	}
 
-	bool init_object_id(object_ctype& object_ptr, uint_fast64_t id)
+	bool init_object_id(object_ctype& object_ptr, boost::uint_fast64_t id)
 	{
 		assert(object_ptr && !object_ptr->is_equal_to(-1));
 

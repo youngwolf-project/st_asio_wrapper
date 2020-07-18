@@ -38,10 +38,7 @@ public:
 					else
 						os << ' ';
 				}
-
-				char buff[4];
-				snprintf(buff, sizeof(buff), "%02X", (unsigned char) *data);
-				os << buff;
+				os << std::setfill('0') << std::setw(2) << std::hex << (unsigned char) *data;
 			}
 
 			if ((size_t) -1 == cur_msg_len)
