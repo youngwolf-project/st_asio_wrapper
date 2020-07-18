@@ -17,24 +17,48 @@
 
 namespace st_asio_wrapper { namespace tcp {
 
-template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::tcp::socket,
+template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::tcp::socket, typename Family = boost::asio::ip::tcp,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class client_socket_base : public socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>
+class generic_client_socket : public socket_base<Socket, Family, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>
 {
 private:
-	typedef socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket_base<Socket, Family, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	static const typename super::tid TIMER_BEGIN = super::TIMER_END;
 	static const typename super::tid TIMER_CONNECT = TIMER_BEGIN;
 	static const typename super::tid TIMER_END = TIMER_BEGIN + 5;
 
-	client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {first_init();}
-	template<typename Arg> client_socket_base(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {first_init();}
+	static bool set_addr(boost::asio::ip::tcp::endpoint& endpoint, unsigned short port, const std::string& ip)
+	{
+		if (ip.empty())
+			endpoint = boost::asio::ip::tcp::endpoint(ST_ASIO_TCP_DEFAULT_IP_VERSION, port);
+		else
+		{
+			boost::system::error_code ec;
+#if BOOST_ASIO_VERSION >= 101100
+			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec)); assert(!ec);
+#else
+			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec)); assert(!ec);
+#endif
+			if (ec)
+			{
+				unified_out::error_out("invalid IP address %s.", ip.data());
+				return false;
+			}
 
-	client_socket_base(Matrix& matrix_) : super(matrix_.get_service_pump()) {first_init(&matrix_);}
-	template<typename Arg> client_socket_base(Matrix& matrix_, Arg& arg) : super(matrix_.get_service_pump(), arg) {first_init(&matrix_);}
+			endpoint = boost::asio::ip::tcp::endpoint(addr, port);
+		}
+
+		return true;
+	}
+
+	generic_client_socket(boost::asio::io_context& io_context_) : super(io_context_) {first_init();}
+	template<typename Arg> generic_client_socket(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {first_init();}
+
+	generic_client_socket(Matrix& matrix_) : super(matrix_.get_service_pump()) {first_init(&matrix_);}
+	template<typename Arg> generic_client_socket(Matrix& matrix_, Arg& arg) : super(matrix_.get_service_pump(), arg) {first_init(&matrix_);}
 
 	virtual const char* type_name() const {return "TCP (client endpoint)";}
 	virtual int type_id() const {return 1;}
@@ -42,9 +66,8 @@ public:
 	virtual void reset() {need_reconnect = ST_ASIO_RECONNECT; super::reset();}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip);}
-	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
-	bool set_local_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(local_addr, port, ip);}
-	const boost::asio::ip::tcp::endpoint& get_local_addr() const {return local_addr;}
+	bool set_server_addr(const std::string& file_name) {server_addr = typename Family::endpoint(file_name); return true;}
+	const typename Family::endpoint& get_server_addr() const {return server_addr;}
 
 	//if you don't want to reconnect to the server after link broken, define macro ST_ASIO_RECONNECT as false, call close_reconnect() in on_connect()
 	// or rewrite after_close() virtual function and do nothing in it.
@@ -55,7 +78,7 @@ public:
 	void open_reconnect() {need_reconnect = true;}
 	void close_reconnect() {need_reconnect = false;}
 
-	//if the connection is broken unexpectedly, client_socket_base will try to reconnect to the server automatically (if need_reconnect is true).
+	//if the connection is broken unexpectedly, generic_client_socket will try to reconnect to the server automatically (if need_reconnect is true).
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false)
 	{
@@ -89,7 +112,7 @@ public:
 
 protected:
 	//helper function, just call it in constructor
-	void first_init(Matrix* matrix_ = NULL) {need_reconnect = ST_ASIO_RECONNECT; matrix = matrix_; set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
+	void first_init(Matrix* matrix_ = NULL) {need_reconnect = ST_ASIO_RECONNECT; matrix = matrix_;}
 
 	Matrix* get_matrix() {return matrix;}
 	const Matrix* get_matrix() const {return matrix;}
@@ -97,7 +120,7 @@ protected:
 	virtual bool do_start() //connect
 	{
 		assert(!ST_THIS is_connected());
-		return ST_THIS set_timer(TIMER_CONNECT, 50, (boost::lambda::bind(&client_socket_base::connect, this), false));
+		return ST_THIS set_timer(TIMER_CONNECT, 50, (boost::lambda::bind(&generic_client_socket::connect, this), false));
 	}
 
 	virtual void connect_handler(const boost::system::error_code& ec)
@@ -108,7 +131,7 @@ protected:
 			prepare_next_reconnect(ec);
 	}
 
-	//after how much time (ms), client_socket_base will try to reconnect the server, negative value means give up.
+	//after how much time (ms), generic_client_socket will try to reconnect the server, negative value means give up.
 	virtual int prepare_reconnect(const boost::system::error_code& ec) {return ST_ASIO_RECONNECT_INTERVAL;}
 	virtual void on_connect() {unified_out::info_out(ST_ASIO_LLF " connecting success.", ST_THIS id());}
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); force_shutdown(need_reconnect);}
@@ -134,12 +157,75 @@ protected:
 	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
 	virtual void after_close() {if (need_reconnect) ST_THIS start();}
 
+	virtual bool bind() {return true;}
+
 private:
 	bool connect()
 	{
-		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
+		if (!bind())
+			return false;
+
+		ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&generic_client_socket::connect_handler, this, boost::asio::placeholders::error)));
+		return true;
+	}
+
+	bool prepare_next_reconnect(const boost::system::error_code& ec)
+	{
+		if (need_reconnect && ST_THIS started() && !ST_THIS stopped())
+		{
+#ifdef _WIN32
+			if (boost::asio::error::connection_refused != ec && boost::asio::error::network_unreachable != ec && boost::asio::error::timed_out != ec)
+#endif
+			{
+				boost::system::error_code ec;
+				ST_THIS lowest_layer().close(ec);
+			}
+
+			int delay = prepare_reconnect(ec);
+			if (delay < 0)
+				need_reconnect = false;
+			else if (ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&generic_client_socket::connect, this), false)))
+				return true;
+		}
+
+		unified_out::info_out(ST_ASIO_LLF " reconnectiong abandon.", ST_THIS id());
+		super::force_shutdown();
+		return false;
+	}
+
+private:
+	bool need_reconnect;
+	typename Family::endpoint server_addr;
+
+	Matrix* matrix;
+};
+
+template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::tcp::socket,
+	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class client_socket_base : public generic_client_socket<Packer, Unpacker, Matrix, Socket, boost::asio::ip::tcp, InQueue, InContainer, OutQueue, OutContainer>
+{
+private:
+	typedef generic_client_socket<Packer, Unpacker, Matrix, Socket, boost::asio::ip::tcp, InQueue, InContainer, OutQueue, OutContainer> super;
+
+public:
+	client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {}
+	template<typename Arg>
+	client_socket_base(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
+
+	client_socket_base(Matrix& matrix_) : super(matrix_) {}
+	template<typename Arg> client_socket_base(Matrix& matrix_, Arg& arg) : super(matrix_, arg) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
+
+	bool set_local_addr(unsigned short port, const std::string& ip = std::string()) {return super::set_addr(local_addr, port, ip);}
+	const boost::asio::ip::tcp::endpoint& get_local_addr() const {return local_addr;}
+
+protected:
+	virtual bool bind()
+	{
 		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
 		{
+			BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
+
 			boost::system::error_code ec;
 			if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
 			{
@@ -159,65 +245,27 @@ private:
 			}
 		}
 
-		lowest_object.async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&client_socket_base::connect_handler, this, boost::asio::placeholders::error)));
-		return true;
-	}
-
-	bool prepare_next_reconnect(const boost::system::error_code& ec)
-	{
-		if (need_reconnect && ST_THIS started() && !ST_THIS stopped())
-		{
-#ifdef _WIN32
-			if (boost::asio::error::connection_refused != ec && boost::asio::error::network_unreachable != ec && boost::asio::error::timed_out != ec)
-#endif
-			{
-				boost::system::error_code ec;
-				ST_THIS lowest_layer().close(ec);
-			}
-
-			int delay = prepare_reconnect(ec);
-			if (delay < 0)
-				need_reconnect = false;
-			else if (ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&client_socket_base::connect, this), false)))
-				return true;
-		}
-
-		unified_out::info_out(ST_ASIO_LLF " reconnectiong abandon.", ST_THIS id());
-		super::force_shutdown();
-		return false;
-	}
-
-	bool set_addr(boost::asio::ip::tcp::endpoint& endpoint, unsigned short port, const std::string& ip)
-	{
-		if (ip.empty())
-			endpoint = boost::asio::ip::tcp::endpoint(ST_ASIO_TCP_DEFAULT_IP_VERSION, port);
-		else
-		{
-			boost::system::error_code ec;
-#if BOOST_ASIO_VERSION >= 101100
-			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec)); assert(!ec);
-#else
-			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec)); assert(!ec);
-#endif
-			if (ec)
-			{
-				unified_out::error_out("invalid IP address %s.", ip.data());
-				return false;
-			}
-
-			endpoint = boost::asio::ip::tcp::endpoint(addr, port);
-		}
-
 		return true;
 	}
 
 private:
-	bool need_reconnect;
-	boost::asio::ip::tcp::endpoint server_addr;
 	boost::asio::ip::tcp::endpoint local_addr;
-
-	Matrix* matrix;
 };
+
+#ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
+template <typename Packer, typename Unpacker, typename Matrix = i_matrix,
+	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
+	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
+class unix_client_socket_base : public generic_client_socket<Packer, Unpacker, Matrix, boost::asio::local::stream_protocol::socket, boost::asio::local::stream_protocol, InQueue, InContainer, OutQueue, OutContainer>
+{
+private:
+	typedef generic_client_socket<Packer, Unpacker, Matrix, boost::asio::local::stream_protocol::socket, boost::asio::local::stream_protocol, InQueue, InContainer, OutQueue, OutContainer> super;
+
+public:
+	unix_client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {}
+	unix_client_socket_base(Matrix& matrix_) : super(matrix_) {}
+};
+#endif
 
 }} //namespace
 

@@ -131,7 +131,7 @@ public:
 //user needs to allocate object, and object_buffer will free it
 //A can be std::scoped_ptr or std::shared_ptr
 //T is the object that represent a buffer (a buffer must at least has those interfaces in i_buffer, or inherit from i_buffer).
-template<template<typename T> class A, typename T> class object_buffer
+template<template<typename> class A, typename T> class object_buffer
 {
 public:
 	typedef A<T> buffer_type;
@@ -268,16 +268,16 @@ private:
 
 namespace udp
 {
-	template<typename MsgType>
+	template<typename MsgType, typename Family = boost::asio::ip::udp>
 	class udp_msg : public MsgType
 	{
 	public:
-		boost::asio::ip::udp::endpoint peer_addr;
+		typename Family::endpoint peer_addr;
 
 		udp_msg() {}
-		udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr) : peer_addr(_peer_addr) {}
-		udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr, const MsgType& msg) : MsgType(msg), peer_addr(_peer_addr) {}
-		udp_msg(const boost::asio::ip::udp::endpoint& _peer_addr, MsgType& msg) : peer_addr(_peer_addr) {MsgType::swap(msg);} //after this call, msg becomes empty, please note.
+		udp_msg(const typename Family::endpoint& _peer_addr) : peer_addr(_peer_addr) {}
+		udp_msg(const typename Family::endpoint& _peer_addr, const MsgType& msg) : MsgType(msg), peer_addr(_peer_addr) {}
+		udp_msg(const typename Family::endpoint& _peer_addr, MsgType& msg) : peer_addr(_peer_addr) {MsgType::swap(msg);} //after this call, msg becomes empty, please note.
 
 		using MsgType::operator=;
 		using MsgType::swap;
@@ -807,18 +807,18 @@ TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 #define UDP_SEND_MSG_CALL_SWITCH(FUNNAME, TYPE) \
 TYPE FUNNAME(const char* pstr, size_t len, bool can_overflow = false, bool prior = false) {return FUNNAME(peer_addr, pstr, len, can_overflow, prior);} \
 TYPE FUNNAME(char* pstr, size_t len, bool can_overflow = false, bool prior = false) {return FUNNAME(peer_addr, pstr, len, can_overflow, prior);} \
-TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false, bool prior = false) \
+TYPE FUNNAME(const typename Family::endpoint& peer_addr, const char* pstr, size_t len, bool can_overflow = false, bool prior = false) \
     {return FUNNAME(peer_addr, &pstr, &len, 1, can_overflow, prior);} \
-TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, char* pstr, size_t len, bool can_overflow = false, bool prior = false) \
+TYPE FUNNAME(const typename Family::endpoint& peer_addr, char* pstr, size_t len, bool can_overflow = false, bool prior = false) \
     {return FUNNAME(peer_addr, &pstr, &len, 1, can_overflow, prior);} \
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, bool can_overflow = false, bool prior = false) {return FUNNAME(peer_addr, buffer, can_overflow, prior);} \
-template<typename Buffer> TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const Buffer& buffer, bool can_overflow = false, bool prior = false) \
+template<typename Buffer> TYPE FUNNAME(const typename Family::endpoint& peer_addr, const Buffer& buffer, bool can_overflow = false, bool prior = false) \
 	{return FUNNAME(peer_addr, buffer.data(), buffer.size(), can_overflow, prior);}
 
 #define UDP_SEND_MSG(FUNNAME, NATIVE) \
 bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false, bool prior = false) \
 	{return FUNNAME(peer_addr, pstr, len, num, can_overflow, prior);} \
-bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false, bool prior = false) \
+bool FUNNAME(const typename Family::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false, bool prior = false) \
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return false; \
@@ -831,9 +831,10 @@ UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //guarantee send msg successfully even if can_overflow equal to false, success at here just means putting the msg into udp::socket_base's send buffer successfully
 //if can_overflow equal to false and the buffer is not available, will wait until it becomes available
 #define UDP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
-bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false)  {return FUNNAME(peer_addr, pstr, len, num, can_overflow);} \
-bool FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false) \
-	{while (!SEND_FUNNAME(peer_addr, pstr, len, num, can_overflow)) SAFE_SEND_MSG_CHECK(false) return true;} \
+bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false, bool prior = false) \
+	{return FUNNAME(peer_addr, pstr, len, num, can_overflow, prior);} \
+bool FUNNAME(const typename Family::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false, bool prior = false) \
+	{while (!SEND_FUNNAME(peer_addr, pstr, len, num, can_overflow, prior)) SAFE_SEND_MSG_CHECK(false) return true;} \
 UDP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 //UDP msg sending interface
 ///////////////////////////////////////////////////
@@ -846,20 +847,20 @@ TYPE FUNNAME(const char* pstr, size_t len, unsigned duration = 0, bool can_overf
 	{return FUNNAME(peer_addr, pstr, len, duration, can_overflow, prior);} \
 TYPE FUNNAME(char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{return FUNNAME(peer_addr, pstr, len, duration, can_overflow, prior);} \
-TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
+TYPE FUNNAME(const typename Family::endpoint& peer_addr, const char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{return FUNNAME(peer_addr, &pstr, &len, 1, duration, can_overflow, prior);} \
-TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
+TYPE FUNNAME(const typename Family::endpoint& peer_addr, char* pstr, size_t len, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{return FUNNAME(peer_addr, &pstr, &len, 1, duration, can_overflow, prior);} \
 template<typename Buffer> TYPE FUNNAME(const Buffer& buffer, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{return FUNNAME(peer_addr, buffer, duration, can_overflow, prior);} \
 template<typename Buffer> \
-TYPE FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const Buffer& buffer, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
+TYPE FUNNAME(const typename Family::endpoint& peer_addr, const Buffer& buffer, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{return FUNNAME(peer_addr, buffer.data(), buffer.size(), duration, can_overflow, prior);}
 
 #define UDP_SYNC_SEND_MSG(FUNNAME, NATIVE) \
 sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{return FUNNAME(peer_addr, pstr, len, num, duration, can_overflow, prior);} \
-sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
+sync_call_result FUNNAME(const typename Family::endpoint& peer_addr, const char* const pstr[], const size_t len[], size_t num, \
 	unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
@@ -875,7 +876,7 @@ UDP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 #define UDP_SYNC_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 sync_call_result FUNNAME(const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{return FUNNAME(peer_addr, pstr, len, num, duration, can_overflow, prior);} \
-sync_call_result FUNNAME(const boost::asio::ip::udp::endpoint& peer_addr, \
+sync_call_result FUNNAME(const typename Family::endpoint& peer_addr, \
 	const char* const pstr[], const size_t len[], size_t num, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{while (SUCCESS != SEND_FUNNAME(peer_addr, pstr, len, num, duration, can_overflow, prior)) \
 		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \

@@ -17,10 +17,10 @@
 
 namespace st_asio_wrapper { namespace udp {
 
-template<typename Socket, typename Pool = object_pool<Socket> > class service_base : public multi_service_base<Socket, Pool>
+template<typename Socket, typename Pool = object_pool<Socket>, typename Matrix = i_matrix> class service_base : public multi_socket_service_base<Socket, Pool, Matrix>
 {
 public:
-	service_base(service_pump& service_pump_) : multi_service_base<Socket, Pool>(service_pump_) {}
+	service_base(service_pump& service_pump_) : multi_socket_service_base<Socket, Pool, Matrix>(service_pump_) {}
 };
 
 }} //namespace

@@ -135,8 +135,8 @@ protected:
 
 		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&echo_socket::handle_msg, this, boost::placeholders::_1));
 		return tmp_can.size();
-		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
-		//if we handled nothing, return a positive number is also okey but will very slightly impact performance, return 0 is suggested
+		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number), else, return 0
+		//if we handled nothing, but want to re-dispatch messages immediately, return 1
 	}
 #else
 	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}

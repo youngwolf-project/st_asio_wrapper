@@ -294,7 +294,7 @@
  * Avoid decreasing the number of service thread to less than one.
  * Add a helper function object_pool::get_statistic.
  * Add another overload of function object_pool::invalid_object_pop.
- * Introduce asio::defer to object, be careful to use it.
+ * Introduce boost::asio::defer to object, be careful to use it.
  * Add link's break time and establish time to the statistic object.
  * Move virtual function client_socket_base::on_connect to tcp::socket_base, so server_socket_base will have it too (and ssl sockets).
  *
@@ -540,7 +540,7 @@
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Socket used by tcp::multi_client_base, ssl::multi_client_base and udp::multi_socket_service needs to provide a constructor which accept
- *  a reference of i_matrix instead of a reference of asio::io_context.
+ *  a reference of i_matrix instead of a reference of boost::asio::io_context.
  * Limit send and recv buffers by actual utilization (in byte) rather than message number before, so macro ST_ASIO_MAX_MSG_NUM been renamed to
  *  ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF, and unit been changed to byte.
  * statistic.send_msg_sum may be bigger than before (but statistic.send_byte_sum will be the same), see ENHANCEMENTS section for more details.
@@ -735,11 +735,14 @@
  * Make function server_base::start_listen() and server_base::stop_listen() thread safe.
  * packer2 now can customize the real message type (before, it's always string_buffer).
  * Optimize unpacker2.
+ * Support UNIX domain socket.
+ * Introduce new demo unix_socket and unix_udp_test.
  *
  * FIX:
  * Fix race condition during call acceptor::async_accept concurrently.
  * Fix possibility of memory leaks for unique_buffer.
  * Supplement packer2's static function -- get_max_msg_size().
+ * Fix alias.
  *
  * ENHANCEMENTS:
  * Try parsing messages even errors occurred.
@@ -747,6 +750,7 @@
  * Show establishment time, broken time, last send time and last recv time in show_status().
  * Standardize unique_buffer and shared_buffer.
  * Enhance basic_buffer to support pre-allocated buffers.
+ * Release st_asio_wrapper::socket's function void id(uint_fast64_t id) for single client (both tcp and udp).
  *
  * DELETION:
  *
@@ -1120,13 +1124,13 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //#define ST_ASIO_EXPOSE_SEND_INTERFACE
 //for some reason (i still not met yet), the message sending has stopped but some messages left behind in the sending buffer, they won't be
 // sent until new messages come in, define this macro to expose send_msg() interface, then you can call it manually to fix this situation.
-//during message sending, calling send_msg() will fail, this is by design to avoid asio::io_context using up all virtual memory, this also
+//during message sending, calling send_msg() will fail, this is by design to avoid boost::asio::io_context using up all virtual memory, this also
 // means that before the sending really started, you can greedily call send_msg() and may exhaust all virtual memory, please note.
 
 //#define ST_ASIO_PASSIVE_RECV
 //to gain the ability of changing the unpacker at runtime, with this macro, st_asio_wrapper will not do message receiving automatically (except the firt one),
 // so you need to manually call recv_msg(), if you need to change the unpacker, do it before recv_msg() invocation, please note.
-//during async message receiving, calling recv_msg() will fail, this is by design to avoid asio::io_context using up all virtual memory, this also
+//during async message receiving, calling recv_msg() will fail, this is by design to avoid boost::asio::io_context using up all virtual memory, this also
 // means that before the receiving really started, you can greedily call recv_msg() and may exhaust all virtual memory, please note.
 //because user can greedily call recv_msg(), it's your responsibility to keep the recv buffer from overflowed, please pay special attention.
 //this macro also makes you to be able to pause message receiving, then, if there's no other tasks (like timers), service_pump will stop itself,

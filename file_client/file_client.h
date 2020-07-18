@@ -103,8 +103,8 @@ protected:
 
 		recv_msg(); //we always handled all messages, so calling recv_msg() at here is very reasonable.
 		return tmp_can.size();
-		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number)
-		//if we handled nothing, return a positive number is also okey but will very slightly impact performance, return 0 is suggested
+		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number), else, return 0
+		//if we handled nothing, but want to re-dispatch messages immediately, return a positive number
 	}
 #else
 	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); if (0 == get_pending_recv_msg_size()) recv_msg(); return true;}
