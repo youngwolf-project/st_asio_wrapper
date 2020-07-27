@@ -20,10 +20,11 @@ namespace st_asio_wrapper { namespace tcp {
 template<typename Socket, typename Family = boost::asio::ip::tcp, typename Pool = object_pool<Socket>, typename Server = i_server>
 class generic_server : public Server, public Pool
 {
-public:
+protected:
 	generic_server(service_pump& service_pump_) : Pool(service_pump_), acceptor(service_pump_) {}
 	template<typename Arg> generic_server(service_pump& service_pump_, const Arg& arg) : Pool(service_pump_, arg), acceptor(service_pump_) {}
 
+public:
 	bool set_server_addr(unsigned short port, const std::string& ip = std::string())
 	{
 		if (ip.empty())
@@ -250,7 +251,7 @@ private:
 	typedef generic_server<Socket, boost::asio::local::stream_protocol, Pool, Server> super;
 
 public:
-	unix_server_base(service_pump& service_pump_) : super(service_pump_) {}
+	unix_server_base(service_pump& service_pump_) : super(service_pump_) {ST_THIS set_server_addr("./st-unix-socket");}
 };
 #endif
 

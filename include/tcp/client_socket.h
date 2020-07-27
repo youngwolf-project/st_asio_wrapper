@@ -54,12 +54,14 @@ public:
 		return true;
 	}
 
+protected:
 	generic_client_socket(boost::asio::io_context& io_context_) : super(io_context_) {first_init();}
 	template<typename Arg> generic_client_socket(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {first_init();}
 
 	generic_client_socket(Matrix& matrix_) : super(matrix_.get_service_pump()) {first_init(&matrix_);}
 	template<typename Arg> generic_client_socket(Matrix& matrix_, Arg& arg) : super(matrix_.get_service_pump(), arg) {first_init(&matrix_);}
 
+public:
 	virtual const char* type_name() const {return "TCP (client endpoint)";}
 	virtual int type_id() const {return 1;}
 
@@ -209,11 +211,11 @@ private:
 	typedef generic_client_socket<Packer, Unpacker, Matrix, Socket, boost::asio::ip::tcp, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {}
+	client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 	template<typename Arg>
 	client_socket_base(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 
-	client_socket_base(Matrix& matrix_) : super(matrix_) {}
+	client_socket_base(Matrix& matrix_) : super(matrix_) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 	template<typename Arg> client_socket_base(Matrix& matrix_, Arg& arg) : super(matrix_, arg) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
 
 	bool set_local_addr(unsigned short port, const std::string& ip = std::string()) {return super::set_addr(local_addr, port, ip);}
@@ -262,8 +264,8 @@ private:
 	typedef generic_client_socket<Packer, Unpacker, Matrix, boost::asio::local::stream_protocol::socket, boost::asio::local::stream_protocol, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
-	unix_client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {}
-	unix_client_socket_base(Matrix& matrix_) : super(matrix_) {}
+	unix_client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {ST_THIS set_server_addr("./st-unix-socket");}
+	unix_client_socket_base(Matrix& matrix_) : super(matrix_) {ST_THIS set_server_addr("./st-unix-socket");}
 };
 #endif
 
