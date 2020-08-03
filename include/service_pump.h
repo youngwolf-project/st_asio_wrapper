@@ -220,7 +220,7 @@ protected:
 	virtual void free(object_type i_service_) {} //if needed, rewrite this to free the service
 
 #ifndef ST_ASIO_NO_TRY_CATCH
-	virtual bool on_exception(const boost::system::system_error& e)
+	virtual bool on_exception(const std::exception& e)
 	{
 		unified_out::error_out("service pump exception: %s.", e.what());
 		return true; //continue, if needed, rewrite this to decide whether to continue or not
@@ -256,7 +256,7 @@ protected:
 #ifdef ST_ASIO_NO_TRY_CATCH
 			this_n = boost::asio::io_context::run_one();
 #else
-			try {this_n = boost::asio::io_context::run_one();} catch (const boost::system::system_error& e) {if (!on_exception(e)) break;}
+			try {this_n = boost::asio::io_context::run_one();} catch (const std::exception& e) {if (!on_exception(e)) break;}
 #endif
 			if (this_n > 0)
 				n += this_n; //n can overflow, please note.
@@ -273,7 +273,7 @@ protected:
 		return n;
 	}
 #elif !defined(ST_ASIO_NO_TRY_CATCH)
-	size_t run() {while (true) {try {return boost::asio::io_context::run();} catch (const boost::system::system_error& e) {if (!on_exception(e)) return 0;}}}
+	size_t run() {while (true) {try {return boost::asio::io_context::run();} catch (const std::exception& e) {if (!on_exception(e)) return 0;}}}
 #endif
 
 	DO_SOMETHING_TO_ALL_MUTEX(service_can, service_can_mutex)
