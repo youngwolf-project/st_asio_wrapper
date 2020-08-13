@@ -339,7 +339,7 @@ protected:
 #endif
 
 	//subclass notify shutdown event
-	bool close()
+	bool close(bool use_close = false) //if not use_close, shutdown (both direction) will be used
 	{
 		scope_atomic_lock<> lock(start_atomic);
 		while (!lock.locked())
@@ -359,7 +359,7 @@ protected:
 		if (lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
-			lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+			use_close ? lowest_layer().close(ec) : lowest_layer().shutdown(boost::asio::socket_base::shutdown_both, ec);
 
 			stat.break_time = time(NULL);
 		}
@@ -684,8 +684,7 @@ private:
 		switch (id)
 		{
 		case TIMER_DISPATCH_MSG:
-			dispatching = false;
-			dispatch_msg();
+			post_strand(dis_strand, boost::bind(&socket::do_dispatch_msg, this));
 			break;
 		case TIMER_DELAY_CLOSE:
 			{

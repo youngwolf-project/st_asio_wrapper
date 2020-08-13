@@ -177,7 +177,7 @@ private:
 	using super::do_direct_sync_send_msg;
 #endif
 
-	void shutdown() {close();}
+	void shutdown() {close(true);}
 
 	virtual void do_recv_msg()
 	{
