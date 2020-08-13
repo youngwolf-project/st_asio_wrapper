@@ -733,8 +733,7 @@ private:
 		switch (id)
 		{
 		case TIMER_DISPATCH_MSG:
-			dispatching = false;
-			dispatch_msg();
+			post_strand(dis_strand, boost::bind(&socket::do_dispatch_msg, this));
 			break;
 		case TIMER_DELAY_CLOSE:
 			{

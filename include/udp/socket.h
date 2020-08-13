@@ -219,6 +219,7 @@ protected:
 #endif
 
 private:
+	using super::close;
 	using super::handle_error;
 	using super::handle_msg;
 	using super::do_direct_send_msg;
@@ -226,7 +227,7 @@ private:
 	using super::do_direct_sync_send_msg;
 #endif
 
-	virtual void shutdown() {ST_THIS close();}
+	void shutdown() {close(true);}
 
 	virtual void do_recv_msg()
 	{
@@ -392,9 +393,6 @@ protected:
 
 		return true;
 	}
-
-private:
-	using super::close;
 };
 
 #ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
@@ -426,10 +424,6 @@ protected:
 
 		return true;
 	}
-
-private:
-	using super::close;
-	virtual void shutdown() {close(true);}
 };
 #endif
 
