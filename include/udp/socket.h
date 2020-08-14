@@ -93,7 +93,7 @@ public:
 	const typename Family::endpoint& get_peer_addr() const {return peer_addr;}
 
 	void disconnect() {force_shutdown();}
-	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&generic_socket::close, this, true));}
+	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&generic_socket::shutdown, this));}
 	void graceful_shutdown() {force_shutdown();}
 
 	std::string endpoint_to_string(const boost::asio::ip::udp::endpoint& ep) const {return ep.address().to_string() + ':' + boost::to_string(ep.port());}
@@ -226,6 +226,8 @@ private:
 #ifdef ST_ASIO_SYNC_SEND
 	using super::do_direct_sync_send_msg;
 #endif
+
+	void shutdown() {close(true);}
 
 	virtual void do_recv_msg()
 	{
