@@ -38,7 +38,7 @@ public:
 					else
 						os << ' ';
 				}
-				os << std::setfill('0') << std::setw(2) << std::hex << (unsigned char) *data;
+				os << std::setfill('0') << std::setw(2) << std::hex << (int) (unsigned char) *data;
 			}
 
 			if ((size_t) -1 == cur_msg_len)
