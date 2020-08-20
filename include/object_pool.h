@@ -83,6 +83,28 @@ protected:
 		return exist;
 	}
 
+	bool del_object(boost::uint_fast64_t id)
+	{
+		BOOST_AUTO(object_ptr, object_type());
+
+		boost::unique_lock<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
+		BOOST_AUTO(iter, object_can.find(id));
+		if (iter != object_can.end())
+		{
+			object_ptr = iter->second;
+			object_can.erase(iter);
+		}
+		lock.unlock();
+
+		if (object_ptr)
+		{
+			boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
+			try {invalid_object_can.emplace_back(object_ptr);} catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what());}
+		}
+
+		return !!object_ptr;
+	}
+
 	//you can do some statistic about object creations at here
 	virtual void on_create(object_ctype& object_ptr) {}
 

@@ -205,6 +205,10 @@ protected:
 	{
 		if (boost::asio::error::operation_aborted != ec)
 			unified_out::error_out(ST_ASIO_LLF " recv msg error (%d %s)", ST_THIS id(), ec.value(), ec.message().data());
+#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
+		else if (NULL != matrix)
+			matrix->del_socket(ST_THIS id());
+#endif
 	}
 
 	virtual bool on_heartbeat_error()

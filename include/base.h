@@ -105,6 +105,7 @@ public:
 
 	virtual bool socket_exist(boost::uint_fast64_t id) = 0;
 	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) = 0;
+	virtual bool del_socket(boost::uint_fast64_t id) = 0;
 };
 
 namespace tcp
@@ -112,7 +113,7 @@ namespace tcp
 	class i_server : public i_matrix
 	{
 	public:
-		virtual bool del_socket(const boost::shared_ptr<tracked_executor>& socket_ptr) = 0;
+		virtual bool del_socket(const boost::shared_ptr<tracked_executor>& socket_ptr) = 0; //hide i_matrix::del_socket
 		virtual bool restore_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, boost::uint_fast64_t id, bool init) = 0;
 	};
 } //namespace

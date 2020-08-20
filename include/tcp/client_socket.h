@@ -143,6 +143,11 @@ protected:
 
 		force_shutdown(need_reconnect);
 		ST_THIS status = super::BROKEN;
+
+#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
+		if (!need_reconnect && NULL != matrix)
+			matrix->del_socket(ST_THIS id());
+#endif
 	}
 
 	virtual void on_async_shutdown_error() {force_shutdown(need_reconnect);}

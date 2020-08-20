@@ -102,8 +102,10 @@ public:
 	virtual bool started() const {return ST_THIS service_started();}
 	virtual service_pump& get_service_pump() {return Pool::get_service_pump();}
 	virtual const service_pump& get_service_pump() const {return Pool::get_service_pump();}
+
 	virtual bool socket_exist(boost::uint_fast64_t id) {return ST_THIS exist(id);}
 	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return ST_THIS find(id);}
+	virtual bool del_socket(boost::uint_fast64_t id) {unified_out::error_out("use bool del_socket(const boost::shared_ptr<tracked_executor>&) please."); assert(false); return false;}
 
 	virtual bool del_socket(const boost::shared_ptr<tracked_executor>& socket_ptr)
 	{
