@@ -77,6 +77,9 @@ public:
 	//success at here just means put the msg into tcp::socket_base's send buffer
 	TCP_BROADCAST_MSG(safe_broadcast_msg, safe_send_msg)
 	TCP_BROADCAST_MSG(safe_broadcast_native_msg, safe_send_native_msg)
+
+	template<typename T> void direct_broadcast_msg(const T& msg, bool can_overflow = false, bool prior = false)
+		{ST_THIS do_something_to_all(boost::bind((bool (Socket::*)(const T&, bool, bool)) &Socket::direct_send_msg, boost::placeholders::_1, boost::cref(msg), can_overflow, prior));}
 	//msg sending interface
 	///////////////////////////////////////////////////
 
