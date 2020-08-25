@@ -27,6 +27,10 @@ template<typename Object>
 class object_pool : public service_pump::i_service, protected timer<executor>
 {
 public:
+	typedef typename Object::in_msg_type in_msg_type;
+	typedef typename Object::in_msg_ctype in_msg_ctype;
+	typedef typename Object::out_msg_type out_msg_type;
+	typedef typename Object::out_msg_ctype out_msg_ctype;
 	typedef boost::shared_ptr<Object> object_type;
 	typedef const object_type object_ctype;
 	typedef boost::unordered::unordered_map<boost::uint_fast64_t, object_type> container_type;

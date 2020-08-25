@@ -356,8 +356,6 @@ int main(int argc, const char* argv[])
 				boost::placeholders::_1, boost::cref(str), false, false));
 			//or
 			normal_server_.broadcast_native_msg(str);
-			//or
-			normal_server_.direct_broadcast_msg(str);
 			*/
 		}
 	}

@@ -218,6 +218,8 @@ public:
 
 	bool pack_msg(msg_type& msg, const char* pstr, size_t len, bool native = false) {return pack_msg(msg, &pstr, &len, 1, native);}
 	bool pack_msg(msg_type& msg, const std::string& str, bool native = false) {return pack_msg(msg, str.data(), str.size(), native);}
+	bool pack_msg(msg_ctype& msg, container_type& msg_can) {msg_type stub(msg); return pack_msg(stub, msg_can);}
+	bool pack_msg(msg_ctype& msg1, msg_ctype& msg2, container_type& msg_can) {msg_type stub1(msg1), stub2(msg2); return pack_msg(stub1, stub2, msg_can);}
 };
 //packer concept
 
@@ -660,6 +662,18 @@ bool FUNNAME(in_msg_type& msg, bool can_overflow = false, bool prior = false) \
 	dur.end(); \
 	return re && do_direct_send_msg(msg_can, prior); \
 } \
+bool FUNNAME(in_msg_ctype& msg, bool can_overflow = false, bool prior = false) \
+{ \
+	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
+		return false; \
+	else if (NATIVE) \
+		return do_direct_send_msg(msg, prior); \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = ST_THIS packer()->pack_msg(msg, msg_can); \
+	dur.end(); \
+	return re && do_direct_send_msg(msg_can, prior); \
+} \
 bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false, bool prior = false) \
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
@@ -675,7 +689,22 @@ bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false, bo
 	dur.end(); \
 	return re && do_direct_send_msg(msg_can, prior); \
 } \
-bool FUNNAME(typename Packer::container_type& msg_can, bool can_overflow = false, bool prior = false)  \
+bool FUNNAME(in_msg_ctype& msg1, in_msg_ctype& msg2, bool can_overflow = false, bool prior = false) \
+{ \
+	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
+		return false; \
+	typename Packer::container_type msg_can; \
+	if (NATIVE) \
+	{ \
+		msg_can.emplace_back(msg1); msg_can.emplace_back(msg2); \
+		return do_direct_send_msg(msg_can, prior); \
+	} \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = ST_THIS packer()->pack_msg(msg1, msg2, msg_can); \
+	dur.end(); \
+	return re && do_direct_send_msg(msg_can, prior); \
+} \
+bool FUNNAME(typename Packer::container_type& msg_can, bool can_overflow = false, bool prior = false) \
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return false; \
@@ -704,7 +733,11 @@ TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 #define TCP_SAFE_SEND_MSG(FUNNAME, SEND_FUNNAME) \
 bool FUNNAME(in_msg_type& msg, bool can_overflow = false, bool prior = false) \
 	{while (!SEND_FUNNAME(msg, can_overflow, prior)) SAFE_SEND_MSG_CHECK(false) return true;} \
+bool FUNNAME(in_msg_ctype& msg, bool can_overflow = false, bool prior = false) \
+	{while (!SEND_FUNNAME(msg, can_overflow, prior)) SAFE_SEND_MSG_CHECK(false) return true;} \
 bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false, bool prior = false) \
+	{while (!SEND_FUNNAME(msg1, msg2, can_overflow, prior)) SAFE_SEND_MSG_CHECK(false) return true;} \
+bool FUNNAME(in_msg_ctype& msg1, in_msg_ctype& msg2, bool can_overflow = false, bool prior = false) \
 	{while (!SEND_FUNNAME(msg1, msg2, can_overflow, prior)) SAFE_SEND_MSG_CHECK(false) return true;} \
 bool FUNNAME(typename Packer::container_type& msg_can, bool can_overflow = false, bool prior = false) \
 	{while (!SEND_FUNNAME(msg_can, can_overflow, prior)) SAFE_SEND_MSG_CHECK(false) return true;} \
@@ -713,6 +746,12 @@ bool FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_
 TCP_SEND_MSG_CALL_SWITCH(FUNNAME, bool)
 
 #define TCP_BROADCAST_MSG(FUNNAME, SEND_FUNNAME) \
+void FUNNAME(typename Pool::in_msg_ctype& msg, bool can_overflow = false, bool prior = false) \
+	{ST_THIS do_something_to_all(boost::bind((bool (Socket::*)(typename Pool::in_msg_ctype&, bool, bool)) &Socket::SEND_FUNNAME, \
+		boost::placeholders::_1, boost::cref(msg), can_overflow, prior));} \
+void FUNNAME(typename Pool::in_msg_ctype& msg1, typename Pool::in_msg_ctype& msg2, bool can_overflow = false, bool prior = false) \
+	{ST_THIS do_something_to_all(boost::bind((bool (Socket::*)(typename Pool::in_msg_ctype&, typename Pool::in_msg_ctype&, bool, bool)) &Socket::SEND_FUNNAME, \
+		boost::placeholders::_1, boost::cref(msg1), boost::cref(msg2), can_overflow, prior));} \
 void FUNNAME(const char* const pstr[], const size_t len[], size_t num, bool can_overflow = false, bool prior = false) \
 	{ST_THIS do_something_to_all(boost::bind((bool (Socket::*)(const char* const[], const size_t[], size_t, bool, bool)) &Socket::SEND_FUNNAME, \
 		boost::placeholders::_1, pstr, len, num, can_overflow, prior));} \
@@ -744,6 +783,18 @@ sync_call_result FUNNAME(in_msg_type& msg, unsigned duration = 0, bool can_overf
 	dur.end(); \
 	return re ? do_direct_sync_send_msg(msg_can, duration, prior) : NOT_APPLICABLE; \
 } \
+sync_call_result FUNNAME(in_msg_ctype& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
+{ \
+	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
+		return NOT_APPLICABLE; \
+	else if (NATIVE) \
+		return do_direct_sync_send_msg(msg, duration, prior); \
+	typename Packer::container_type msg_can; \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = ST_THIS packer()->pack_msg(msg, msg_can); \
+	dur.end(); \
+	return re ? do_direct_sync_send_msg(msg_can, duration, prior) : NOT_APPLICABLE; \
+} \
 sync_call_result FUNNAME(in_msg_type& msg1, in_msg_type& msg2, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
@@ -752,6 +803,21 @@ sync_call_result FUNNAME(in_msg_type& msg1, in_msg_type& msg2, unsigned duration
 	if (NATIVE) \
 	{ \
 		msg_can.emplace_back().swap(msg1); msg_can.emplace_back().swap(msg2); \
+		return do_direct_sync_send_msg(msg_can, duration, prior); \
+	} \
+	auto_duration dur(stat.pack_time_sum); \
+	bool re = ST_THIS packer()->pack_msg(msg1, msg2, msg_can); \
+	dur.end(); \
+	return re ? do_direct_sync_send_msg(msg_can, duration, prior) : NOT_APPLICABLE; \
+} \
+sync_call_result FUNNAME(in_msg_ctype& msg1, in_msg_ctype& msg2, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
+{ \
+	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
+		return NOT_APPLICABLE; \
+	typename Packer::container_type msg_can; \
+	if (NATIVE) \
+	{ \
+		msg_can.emplace_back(msg1); msg_can.emplace_back(msg2); \
 		return do_direct_sync_send_msg(msg_can, duration, prior); \
 	} \
 	auto_duration dur(stat.pack_time_sum); \
@@ -789,7 +855,13 @@ TCP_SYNC_SEND_MSG_CALL_SWITCH(FUNNAME, sync_call_result)
 sync_call_result FUNNAME(in_msg_type& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{while (SUCCESS != SEND_FUNNAME(msg, duration, can_overflow, prior)) \
 		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
+sync_call_result FUNNAME(in_msg_ctype& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
+	{while (SUCCESS != SEND_FUNNAME(msg, duration, can_overflow, prior)) \
+		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
 sync_call_result FUNNAME(in_msg_type& msg1, in_msg_type& msg2, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
+	{while (SUCCESS != SEND_FUNNAME(msg1, msg2, duration, can_overflow, prior)) \
+		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
+sync_call_result FUNNAME(in_msg_ctype& msg1, in_msg_ctype& msg2, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
 	{while (SUCCESS != SEND_FUNNAME(msg1, msg2, duration, can_overflow, prior)) \
 		SAFE_SEND_MSG_CHECK(NOT_APPLICABLE) return SUCCESS;} \
 sync_call_result FUNNAME(typename Packer::container_type& msg_can, unsigned duration = 0, bool can_overflow = false, bool prior = false) \
