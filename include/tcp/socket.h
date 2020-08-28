@@ -242,7 +242,7 @@ protected:
 
 	virtual void on_connect() {}
 	//msg can not be unpacked
-	//the socket is still available, so don't need to shutdown this tcp::socket_base
+	//the socket is still available, so don't need to shutdown this tcp::socket_base if the unpacker can continue to work.
 	virtual void on_unpack_error() = 0;
 	virtual void on_async_shutdown_error() = 0;
 
