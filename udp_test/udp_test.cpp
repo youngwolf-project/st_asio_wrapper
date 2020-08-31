@@ -2,9 +2,6 @@
 #include <iostream>
 
 //configuration
-#define ST_ASIO_DELAY_CLOSE 1 //this demo not used object pool and doesn't need life cycle management,
-							  //so, define this to avoid hooks for async call (and slightly improve efficiency),
-							  //any value which is bigger than zero is okay.
 #define ST_ASIO_NOT_REUSE_ADDRESS
 #define ST_ASIO_SYNC_RECV
 #define ST_ASIO_SYNC_SEND
