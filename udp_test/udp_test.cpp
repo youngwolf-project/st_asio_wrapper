@@ -2,9 +2,6 @@
 #include <iostream>
 
 //configuration
-#define ST_ASIO_DELAY_CLOSE 1 //this demo not used object pool and doesn't need life cycle management,
-							  //so, define this to avoid hooks for async call (and slightly improve efficiency),
-							  //any value which is bigger than zero is okay.
 #define ST_ASIO_SYNC_RECV
 #define ST_ASIO_SYNC_SEND
 #define ST_ASIO_PASSIVE_RECV //if you annotate this definition, this demo will use mix model to receive messages, which means
