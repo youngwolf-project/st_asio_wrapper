@@ -3,9 +3,6 @@
 
 //configuration
 #define ST_ASIO_SERVER_PORT		9528
-#define ST_ASIO_DELAY_CLOSE		1 //this demo not used object pool and doesn't need life cycle management,
-								  //so, define this to avoid hooks for async call (and slightly improve efficiency),
-								  //any value which is bigger than zero is okay.
 #define ST_ASIO_SYNC_SEND
 #define ST_ASIO_SYNC_RECV
 //#define ST_ASIO_PASSIVE_RECV //because we not defined this macro, this demo will use mix model to receive messages, which means
