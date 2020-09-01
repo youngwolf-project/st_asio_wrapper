@@ -43,6 +43,7 @@ using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
 using namespace st_asio_wrapper::ext::tcp;
+using namespace st_asio_wrapper::ext::tcp::proxy;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
@@ -50,10 +51,10 @@ using namespace st_asio_wrapper::ext::tcp;
 #define STATISTIC		"statistic"
 
 //we only want close reconnecting mechanism on this socket, so we don't define macro ST_ASIO_RECONNECT
-class short_connection : public client_socket
+class short_connection : public socks4::client_socket
 {
 public:
-	short_connection(i_matrix& matrix_) : client_socket(matrix_) {}
+	short_connection(i_matrix& matrix_) : socks4::client_socket(matrix_) {}
 
 protected:
 	virtual void on_connect() {close_reconnect(); client_socket::on_connect();} //close reconnecting mechanism
@@ -71,7 +72,12 @@ public:
 	bool send_msg(std::string& msg, unsigned short port, const std::string& ip)
 	{
 		BOOST_AUTO(socket_ptr, add_socket(port, ip));
-		return socket_ptr ? socket_ptr->send_msg(msg) : false;
+		if (!socket_ptr)
+			return false;
+
+		//without following setting, socks4::client_socket will be downgraded to normal client_socket
+		//socket_ptr->set_target_addr(6000, "127.0.0.1"); //target server address, original server address becomes SOCK4 server address
+		return socket_ptr->send_msg(msg);
 	}
 
 private:
@@ -79,7 +85,7 @@ private:
 	std::string ip;
 };
 
-void sync_recv_thread(single_client& client)
+void sync_recv_thread(client_socket& client)
 {
 	ST_ASIO_DEFAULT_UNPACKER::container_type msg_can;
 	sync_call_result re = SUCCESS;
@@ -105,7 +111,7 @@ int main(int argc, const char* argv[])
 		puts("type " QUIT_COMMAND " to end.");
 
 	//demonstrate how to use single_service_pump
-	single_service_pump<single_client> client;
+	single_service_pump<socks5::single_client> client;
 	//singel_service_pump also is a service_pump, this let us to control client2 via client
 	short_client client2(client); //without single_client, we need to define ST_ASIO_AVOID_AUTO_STOP_SERVICE macro to forbid service_pump stopping services automatically
 
@@ -119,6 +125,9 @@ int main(int argc, const char* argv[])
 		ip = argv[2];
 
 	client.set_server_addr(port, ip);
+	//without following setting, socks5::single_client will be downgraded to normal single_client
+	//client.set_target_addr(6000, "127.0.0.1"); //target server address, original server address becomes SOCK5 server address
+	//client.set_auth("st_asio", "st_asio"); //can be omitted if the SOCKS5 server support non-auth
 	client2.set_server_addr(port + 100, ip);
 
 	client.start_service();

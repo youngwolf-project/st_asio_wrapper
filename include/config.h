@@ -743,6 +743,7 @@
  * Fix bug: shutdown operation causes async_connect invocation to return successful.
  * Fix the closure of UDP socket.
  * Fix race condition during call acceptor::async_accept concurrently.
+ * Fix race condition during closing and ssl handshaking.
  * Fix possibility of memory leaks for unique_buffer.
  * Supplement packer2's static function -- get_max_msg_size().
  * Fix alias.

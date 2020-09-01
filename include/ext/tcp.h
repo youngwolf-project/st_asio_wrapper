@@ -16,6 +16,7 @@
 #include "packer.h"
 #include "unpacker.h"
 #include "../tcp/client_socket.h"
+#include "../tcp/proxy/socks.h"
 #include "../tcp/client.h"
 #include "../tcp/server_socket.h"
 #include "../tcp/server.h"
@@ -68,6 +69,26 @@ public:
 };
 typedef st_asio_wrapper::tcp::unix_server_base<unix_server_socket> unix_server;
 #endif
+
+namespace proxy {
+
+namespace socks4 {
+	typedef st_asio_wrapper::tcp::proxy::socks4::client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> client_socket;
+	typedef client_socket connector;
+	typedef st_asio_wrapper::tcp::single_client_base<client_socket> single_client;
+	typedef st_asio_wrapper::tcp::multi_client_base<client_socket> multi_client;
+	typedef multi_client client;
+}
+
+namespace socks5 {
+	typedef st_asio_wrapper::tcp::proxy::socks5::client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> client_socket;
+	typedef client_socket connector;
+	typedef st_asio_wrapper::tcp::single_client_base<client_socket> single_client;
+	typedef st_asio_wrapper::tcp::multi_client_base<client_socket> multi_client;
+	typedef multi_client client;
+}
+
+}
 
 }}} //namespace
 
