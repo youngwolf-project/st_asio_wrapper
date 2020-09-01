@@ -32,7 +32,7 @@ private:
 	typedef socket<Socket, Packer, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 protected:
-	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN};
+	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN, HANDSHAKING};
 
 	socket_base(boost::asio::io_context& io_context_) : super(io_context_), strand(io_context_) {first_init();}
 	template<typename Arg> socket_base(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg), strand(io_context_) {first_init();}
@@ -223,7 +223,7 @@ private:
 	void shutdown()
 	{
 		if (is_broken())
-			close(true);
+			ST_THIS dispatch_strand(strand, boost::bind(&socket_base::close, this, true));
 		else
 		{
 			status = FORCE_SHUTTING_DOWN; //not thread safe because of this assignment

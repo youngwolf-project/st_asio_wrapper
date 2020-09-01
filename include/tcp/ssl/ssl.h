@@ -40,7 +40,7 @@ protected:
 #ifndef ST_ASIO_REUSE_SSL_STREAM
 		if (ST_THIS is_ready())
 		{
-			status = Socket::GRACEFUL_SHUTTING_DOWN;
+			ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN;
 			ST_THIS show_info("ssl link:", "been shut down.");
 			boost::system::error_code ec;
 			ST_THIS next_layer().shutdown(ec);
@@ -69,7 +69,7 @@ protected:
 			return;
 		}
 
-		status = Socket::GRACEFUL_SHUTTING_DOWN;
+		ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN;
 
 		if (!sync)
 		{
@@ -93,9 +93,6 @@ private:
 		if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
 			unified_out::info_out("async shutdown ssl link failed (maybe intentionally because of reusing)");
 	}
-
-private:
-	using Socket::status;
 };
 
 template <typename Packer, typename Unpacker, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
@@ -131,8 +128,11 @@ private:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
 	{
 		if (!ec)
+		{
+			ST_THIS status = super::HANDSHAKING;
 			ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client,
 				ST_THIS make_handler_error(boost::bind(&client_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+		}
 		else
 			super::connect_handler(ec);
 	}
@@ -191,6 +191,7 @@ public:
 protected:
 	virtual bool do_start() //intercept tcp::server_socket_base::do_start (to add handshake)
 	{
+		ST_THIS status = super::HANDSHAKING;
 		ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::server,
 			ST_THIS make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
 		return true;
