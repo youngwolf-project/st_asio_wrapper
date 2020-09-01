@@ -123,8 +123,11 @@ protected:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
 	{
 		if (!ec)
+		{
+			ST_THIS status = super::HANDSHAKING;
 			ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client,
 				ST_THIS make_handler_error(boost::bind(&client_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+		}
 		else
 			super::connect_handler(ec);
 	}
@@ -184,8 +187,9 @@ public:
 protected:
 	virtual bool do_start() //intercept tcp::server_socket_base::do_start (to add handshake)
 	{
-			ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::server,
-				ST_THIS make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+		ST_THIS status = super::HANDSHAKING;
+		ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::server,
+			ST_THIS make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
 		return true;
 	}
 
