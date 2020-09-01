@@ -247,9 +247,12 @@ protected:
 private:
 	void shutdown()
 	{
-		if (!is_broken())
-			status = FORCE_SHUTTING_DOWN; //not thread safe because of this assignment
-		ST_THIS close();
+		if (is_broken())
+			ST_THIS close(true);
+		else
+		{	status = FORCE_SHUTTING_DOWN; //not thread safe because of this assignment
+			ST_THIS close();
+		}
 	}
 
 	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
