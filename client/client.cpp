@@ -76,7 +76,7 @@ public:
 			return false;
 
 		//without following setting, socks4::client_socket will be downgraded to normal client_socket
-		//socket_ptr->set_target_addr(6000, "127.0.0.1"); //target server address, original server address becomes SOCK4 server address
+		//socket_ptr->set_target_addr(9527, "172.27.0.14"); //target server address, original server address becomes SOCK4 server address
 		return socket_ptr->send_msg(msg);
 	}
 
@@ -126,8 +126,8 @@ int main(int argc, const char* argv[])
 
 	client.set_server_addr(port, ip);
 	//without following setting, socks5::single_client will be downgraded to normal single_client
-	//client.set_target_addr(6000, "127.0.0.1"); //target server address, original server address becomes SOCK5 server address
-	//client.set_auth("st_asio", "st_asio"); //can be omitted if the SOCKS5 server support non-auth
+	//client.set_target_addr(9527, "172.27.0.14"); //target server address, original server address becomes SOCK5 server address
+	//client.set_auth("st_asio_wrapper", "st_asio_wrapper"); //can be omitted if the SOCKS5 server support non-auth
 	client2.set_server_addr(port + 100, ip);
 
 	client.start_service();

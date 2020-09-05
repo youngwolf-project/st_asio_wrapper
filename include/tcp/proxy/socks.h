@@ -40,11 +40,11 @@ public:
 		if (0 == port || ip.empty() || !super::set_addr(target_addr, port, ip) || !target_addr.address().is_v4())
 			return false;
 
-		req[0] = 4;
-		req[1] = 1;
-		*((unsigned short*) boost::next(req, 2)) = htons(target_addr.port());
-		memcpy(boost::next(req, 4), target_addr.address().to_v4().to_bytes().data(), 4);
-		memcpy(boost::next(req, 8), "st_asio", sizeof("st_asio"));
+		buff[0] = 4;
+		buff[1] = 1;
+		*((unsigned short*) boost::next(buff, 2)) = htons(target_addr.port());
+		memcpy(boost::next(buff, 4), target_addr.address().to_v4().to_bytes().data(), 4);
+		memcpy(boost::next(buff, 8), "st_asio", sizeof("st_asio"));
 		req_len = 8 + sizeof("st_asio");
 
 		return true;
@@ -59,7 +59,7 @@ private:
 
 		unified_out::info_out("connected to the proxy server, begin to negotiate with it.");
 		ST_THIS status = super::HANDSHAKING;
-		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(req, req_len),
+		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len),
 			ST_THIS make_handler_error_size(boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
@@ -71,20 +71,20 @@ private:
 			ST_THIS force_shutdown(false);
 		}
 		else
-			boost::asio::async_read(ST_THIS next_layer(), boost::asio::buffer(res, sizeof(res)),
+			boost::asio::async_read(ST_THIS next_layer(), boost::asio::buffer(buff, 8),
 				ST_THIS make_handler_error_size(boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
-		if (ec || sizeof(res) != bytes_transferred)
+		if (ec || 8 != bytes_transferred)
 		{
 			unified_out::error_out(ST_ASIO_LLF " socks4 read error", ST_THIS id());
 			ST_THIS force_shutdown(false);
 		}
-		else if (90 != res[1])
+		else if (90 != buff[1])
 		{
-			unified_out::info_out(ST_ASIO_LLF " socks4 server error: %d", ST_THIS id(), (int) (unsigned char) res[1]);
+			unified_out::info_out(ST_ASIO_LLF " socks4 server error: %d", ST_THIS id(), (int) (unsigned char) buff[1]);
 			ST_THIS force_shutdown(false);
 		}
 		else
@@ -92,7 +92,7 @@ private:
 	}
 
 private:
-	char req[16], res[8];
+	char buff[16];
 	size_t req_len;
 
 	boost::asio::ip::tcp::endpoint target_addr;
@@ -135,7 +135,15 @@ public:
 	}
 	const boost::asio::ip::tcp::endpoint& get_target_addr() const {return target_addr;}
 
-	void set_auth(const std::string& usr, const std::string& pwd) {username = usr, password = pwd;}
+	bool set_auth(const std::string& usr, const std::string& pwd)
+	{
+		if (usr.empty() || pwd.empty() || usr.size() + pwd.size() > 60)
+			return false;
+
+		username = usr;
+		password = pwd;
+		return true;
+	}
 
 private:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
@@ -153,21 +161,21 @@ private:
 	{
 		res_len = 0;
 
-		req[0] = 5;
+		buff[0] = 5;
 		if (username.empty() && password.empty())
 		{
-			req[1] = 1;
+			buff[1] = 1;
 			req_len = 3;
 		}
 		else
 		{
-			req[1] = 2;
-			req[3] = 2;
+			buff[1] = 2;
+			buff[3] = 2;
 			req_len = 4;
 		}
-		req[2] = 0;
+		buff[2] = 0;
 
-		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(req, req_len),
+		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len),
 			ST_THIS make_handler_error_size(boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
@@ -175,14 +183,14 @@ private:
 	{
 		res_len = 0;
 
-		req[0] = 1;
-		req[1] = (char) std::min(username.size(), (size_t) 8);
-		memcpy(boost::next(req, 2), username.data(), (size_t) req[1]);
-		req[2 + req[1]] = (char) std::min(password.size(), (size_t) 8);
-		memcpy(boost::next(req, 3 + req[1]), password.data(), (size_t) req[2 + req[1]]);
-		req_len = 2 + req[1] + 1 + req[2 + req[1]];
+		buff[0] = 1;
+		buff[1] = (char) username.size();
+		memcpy(boost::next(buff, 2), username.data(), username.size());
+		buff[2 + username.size()] = (char) password.size();
+		memcpy(boost::next(buff, 3 + username.size()), password.data(), password.size());
+		req_len = 1 + 1 + username.size() + 1 + password.size();
 
-		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(req, req_len),
+		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len),
 			ST_THIS make_handler_error_size(boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
@@ -190,33 +198,33 @@ private:
 	{
 		res_len = 0;
 
-		req[0] = 5;
-		req[1] = 1;
-		req[2] = 0;
+		buff[0] = 5;
+		buff[1] = 1;
+		buff[2] = 0;
 		if (!target_domain.empty())
 		{
-			req[3] = 3;
-			req[4] = (char) std::min(target_domain.size(), sizeof(req) - 7);
-			memcpy(boost::next(req, 5), target_domain.data(), (size_t) req[4]);
-			*((unsigned short*) boost::next(req, 5 + req[4])) = htons(target_port);
-			req_len = 7 + req[4];
+			buff[3] = 3;
+			buff[4] = (char) std::min(target_domain.size(), sizeof(buff) - 7);
+			memcpy(boost::next(buff, 5), target_domain.data(), (size_t) buff[4]);
+			*((unsigned short*) boost::next(buff, 5 + buff[4])) = htons(target_port);
+			req_len = 7 + buff[4];
 		}
 		else if (target_addr.address().is_v4())
 		{
-			req[3] = 1;
-			memcpy(boost::next(req, 4), target_addr.address().to_v4().to_bytes().data(), 4);
-			*((unsigned short*) boost::next(req, 8)) = htons(target_addr.port());
+			buff[3] = 1;
+			memcpy(boost::next(buff, 4), target_addr.address().to_v4().to_bytes().data(), 4);
+			*((unsigned short*) boost::next(buff, 8)) = htons(target_addr.port());
 			req_len = 10;
 		}
 		else //ipv6
 		{
-			req[3] = 4;
-			memcpy(boost::next(req, 4), target_addr.address().to_v6().to_bytes().data(), 16);
-			*((unsigned short*) boost::next(req, 20)) = htons(target_addr.port());
+			buff[3] = 4;
+			memcpy(boost::next(buff, 4), target_addr.address().to_v6().to_bytes().data(), 16);
+			*((unsigned short*) boost::next(buff, 20)) = htons(target_addr.port());
 			req_len = 22;
 		}
 
-		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(req, req_len),
+		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len),
 			ST_THIS make_handler_error_size(boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
@@ -230,7 +238,7 @@ private:
 		else
 		{
 			++step;
-			ST_THIS next_layer().async_read_some(boost::asio::buffer(res, sizeof(res)),
+			ST_THIS next_layer().async_read_some(boost::asio::buffer(buff, sizeof(buff)),
 				ST_THIS make_handler_error_size(boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
 	}
@@ -256,16 +264,16 @@ private:
 					unified_out::info_out(ST_ASIO_LLF " socks5 server error", ST_THIS id());
 					succ = false;
 				}
-				else if (0 == res[1])
+				else if (0 == buff[1])
 				{
 					++step; //skip auth step
 					return send_request();
 				}
-				else if (2 == res[1])
+				else if (2 == buff[1])
 					return send_auth();
 				else
 				{
-					unified_out::error_out(ST_ASIO_LLF " unsupported socks5 auth %d", ST_THIS id(), (int) (unsigned char) res[1]);
+					unified_out::error_out(ST_ASIO_LLF " unsupported socks5 auth %d", ST_THIS id(), (int) (unsigned char) buff[1]);
 					succ = false;
 				}
 			}
@@ -278,7 +286,7 @@ private:
 					unified_out::info_out(ST_ASIO_LLF " socks5 server error", ST_THIS id());
 					succ = false;
 				}
-				else if (0 == res[1])
+				else if (0 == buff[1])
 					return send_request();
 				else
 				{
@@ -291,13 +299,13 @@ private:
 				size_t len = 6;
 				if (res_len < len)
 					continue_read = true;
-				else if (0 == res[1])
+				else if (0 == buff[1])
 				{
-					if (1 == res[3])
+					if (1 == buff[3])
 						len += 4;
-					else if (3 == res[3])
-						len += 1 + res[4];
-					else if (4 == res[3])
+					else if (3 == buff[3])
+						len += 1 + buff[4];
+					else if (4 == buff[3])
 						len += 16;
 
 					if (res_len < len)
@@ -322,16 +330,21 @@ private:
 
 			if (!succ)
 				ST_THIS force_shutdown(false);
-			else if (continue_read)
-				ST_THIS next_layer().async_read_some(boost::asio::buffer(res, sizeof(res) + res_len),
-					ST_THIS make_handler_error_size(boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
-			else
+			else if (!continue_read)
 				super::connect_handler(ec);
+			else if (res_len >= sizeof(buff))
+			{
+				unified_out::info_out(ST_ASIO_LLF " socks5 server error", ST_THIS id());
+				ST_THIS force_shutdown(false);
+			}
+			else
+				ST_THIS next_layer().async_read_some(boost::asio::buffer(buff, sizeof(buff)) + res_len,
+					ST_THIS make_handler_error_size(boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
 	}
 
 private:
-	char req[24], res[24];
+	char buff[64];
 	size_t req_len, res_len;
 	int step;
 
