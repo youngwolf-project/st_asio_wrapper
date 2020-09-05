@@ -347,7 +347,7 @@ private:
 				ST_THIS force_shutdown(false);
 			}
 			else
-				ST_THIS next_layer().async_read_some(boost::asio::buffer(buff, sizeof(buff)) + res_len,
+				ST_THIS next_layer().async_read_some(boost::asio::buffer(boost::next(buff, res_len), sizeof(buff) - res_len),
 					ST_THIS make_handler_error_size(boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
 	}
