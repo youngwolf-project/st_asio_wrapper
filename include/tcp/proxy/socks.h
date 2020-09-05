@@ -124,6 +124,12 @@ public:
 			return false;
 		else if (!super::set_addr(target_addr, port, ip))
 		{
+			if (ip.size() > sizeof(buff) - 7)
+			{
+				unified_out::error_out("too long (must <= " ST_ASIO_SF ") target domain %s", sizeof(buff) - 7, ip.data());
+				return false;
+			}
+
 			target_domain = ip;
 			target_port = port;
 		}
@@ -138,7 +144,10 @@ public:
 	bool set_auth(const std::string& usr, const std::string& pwd)
 	{
 		if (usr.empty() || pwd.empty() || usr.size() + pwd.size() > 60)
+		{
+			unified_out::error_out("usr and pwd must not be empty and the sum of them must <= 60 characters.");
 			return false;
+		}
 
 		username = usr;
 		password = pwd;
