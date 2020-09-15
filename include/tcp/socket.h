@@ -255,10 +255,11 @@ private:
 	using super::do_direct_sync_send_msg;
 #endif
 
+	void close_() {close(true);} //workaround for old compilers, otherwise, we can bind to close directly in dispatch_strand
 	void shutdown()
 	{
 		if (is_broken())
-			ST_THIS dispatch_strand(rw_strand, boost::bind(&socket_base::close, this, true));
+			ST_THIS dispatch_strand(rw_strand, boost::bind(&socket_base::close_, this));
 		else
 		{
 			status = FORCE_SHUTTING_DOWN; //not thread safe because of this assignment
