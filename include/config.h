@@ -768,9 +768,13 @@
  * 2020.10.1	version 2.3.2
  *
  * SPECIAL ATTENTION (incompatible with old editions):
+ * UDP socket will remove itself (in on_recv_error) from udp::multi_socket_service_base if it is created by the latter and the error_code is
+ *  not abort, which means is not caused by intentionally shutdown.
+ * TCP client socket will remove itself (in on_recv_error) from tcp::multi_client_base if it is created by the latter and reconnecting is closed.
  *
  * HIGHLIGHT:
- * Add SOCKS4 and SOCKS5 proxy support.
+ * Introduce del_socket to i_matrix, so socket can remove itself from the container (object_pool and its subclasses) who created it.
+ * Add SOCKS4 and SOCKS5 proxy support, demo client demonstrated how to use them (been commented out).
  *
  * FIX:
  * Call the unpacker's dump_left_data() for SSL socket too.
@@ -778,7 +782,9 @@
  *
  * ENHANCEMENTS:
  * server_base and multi_client_base support directly broadcast messages (via broadcast_native_msg).
- * A small optimization for message sending (use message replication rather than parsing message).
+ * A small optimization for message sending (use message replication rather than parsing message if available).
+ * In object_pool, object's in_msg_type, in_msg_ctype, out_msg_type and out_msg_ctype now are visible, you may need them in multi_client_base,
+ *  server_base and udp::multi_socket_service_base.
  *
  * DELETION:
  *
