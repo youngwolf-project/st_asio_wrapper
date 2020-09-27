@@ -242,7 +242,7 @@ protected:
 
 	virtual void on_connect() {}
 	//msg can not be unpacked
-	//the socket is still available, so don't need to shutdown this tcp::socket_base
+	//the socket is still available, so don't need to shutdown this tcp::socket_base if the unpacker can continue to work.
 	virtual void on_unpack_error() = 0;
 	virtual void on_async_shutdown_error() = 0;
 
@@ -255,10 +255,11 @@ private:
 	using super::do_direct_sync_send_msg;
 #endif
 
+	void close_() {close(true);} //workaround for old compilers, otherwise, we can bind to close directly in dispatch_strand
 	void shutdown()
 	{
 		if (is_broken())
-			ST_THIS dispatch_strand(rw_strand, boost::bind(&socket_base::close, this, true));
+			ST_THIS dispatch_strand(rw_strand, boost::bind(&socket_base::close_, this));
 		else
 		{
 			status = FORCE_SHUTTING_DOWN; //not thread safe because of this assignment

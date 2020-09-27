@@ -134,7 +134,7 @@ protected:
 #else
 protected:
 #endif
-	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS force_shutdown();}
+	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); ST_THIS force_shutdown();}
 
 private:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
@@ -212,7 +212,7 @@ protected:
 		return true;
 	}
 
-	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS force_shutdown();}
+	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); ST_THIS force_shutdown();}
 
 private:
 	void handle_handshake(const boost::system::error_code& ec)

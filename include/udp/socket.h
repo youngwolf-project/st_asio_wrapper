@@ -93,7 +93,7 @@ public:
 	const typename Family::endpoint& get_peer_addr() const {return peer_addr;}
 
 	void disconnect() {force_shutdown();}
-	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&generic_socket::shutdown, this));}
+	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&generic_socket::close_, this));}
 	void graceful_shutdown() {force_shutdown();}
 
 	std::string endpoint_to_string(const boost::asio::ip::udp::endpoint& ep) const {return ep.address().to_string() + ':' + boost::to_string(ep.port());}
@@ -205,6 +205,10 @@ protected:
 	{
 		if (boost::asio::error::operation_aborted != ec)
 			unified_out::error_out(ST_ASIO_LLF " recv msg error (%d %s)", ST_THIS id(), ec.value(), ec.message().data());
+#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
+		else if (NULL != matrix)
+			matrix->del_socket(ST_THIS id());
+#endif
 	}
 
 	virtual bool on_heartbeat_error()
@@ -227,7 +231,7 @@ private:
 	using super::do_direct_sync_send_msg;
 #endif
 
-	void shutdown() {close(true);}
+	void close_() {close(true);} //workaround for old compilers, otherwise, we can bind to close directly in dispatch_strand
 
 	virtual void do_recv_msg()
 	{

@@ -62,7 +62,7 @@ public:
 	void graceful_shutdown() {ST_THIS do_something_to_all(boost::mem_fn(&Socket::graceful_shutdown));}
 
 protected:
-	virtual void uninit() {ST_THIS stop(); graceful_shutdown();}
+	virtual void uninit() {ST_THIS stop(); force_shutdown();}
 };
 
 }} //namespace

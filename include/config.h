@@ -739,7 +739,11 @@
  * Introduce new demo unix_socket and unix_udp_test.
  *
  * FIX:
+ * Fix fatal bug: message can be lost during normal dispatching (one by one).
+ * Fix bug: shutdown operation causes async_connect invocation to return successful.
+ * Fix the closure of UDP socket.
  * Fix race condition during call acceptor::async_accept concurrently.
+ * Fix race condition during closing and ssl handshaking.
  * Fix possibility of memory leaks for unique_buffer.
  * Supplement packer2's static function -- get_max_msg_size().
  * Fix alias.
@@ -751,11 +755,40 @@
  * Standardize unique_buffer and shared_buffer.
  * Enhance basic_buffer to support pre-allocated buffers.
  * Release st_asio_wrapper::socket's function void id(uint_fast64_t id) for single client (both tcp and udp).
+ * Catch more general exceptions (std::exception instead of boost::asio::system_error) in service_pump.
  *
  * DELETION:
  *
  * REFACTORING:
  * unique_buffer and shared_buffer.
+ *
+ * REPLACEMENTS:
+ *
+ * ===============================================================
+ * 2020.10.1	version 2.3.2
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * UDP socket will remove itself (in on_recv_error) from udp::multi_socket_service_base if it is created by the latter and the error_code is
+ *  not abort, which means is not caused by intentionally shutdown.
+ * TCP client socket will remove itself (in on_recv_error) from tcp::multi_client_base if it is created by the latter and reconnecting is closed.
+ *
+ * HIGHLIGHT:
+ * Introduce del_socket to i_matrix, so socket can remove itself from the container (object_pool and its subclasses) who created it.
+ * Add SOCKS4 and SOCKS5 proxy support, demo client demonstrated how to use them (been commented out).
+ *
+ * FIX:
+ * Call the unpacker's dump_left_data() for SSL socket too.
+ * Fix hex printing in function dump_left_data.
+ *
+ * ENHANCEMENTS:
+ * server_base and multi_client_base support directly broadcast messages (via broadcast_native_msg).
+ * A small optimization for message sending (use message replication rather than parsing message if available).
+ * In object_pool, object's in_msg_type, in_msg_ctype, out_msg_type and out_msg_ctype now are visible, you may need them in multi_client_base,
+ *  server_base and udp::multi_socket_service_base.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
  *
  * REPLACEMENTS:
  *
@@ -768,8 +801,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20301	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.3.1"
+#define ST_ASIO_VER		20302	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.3.2"
 
 //#define ST_ASIO_HIDE_WARNINGS
 
