@@ -71,8 +71,8 @@ protected:
 #ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 		force_shutdown();
 #else
-		ST_THIS status = super::BROKEN;
 		server.del_socket(ST_THIS shared_from_this());
+		ST_THIS status = super::BROKEN;
 #endif
 	}
 
