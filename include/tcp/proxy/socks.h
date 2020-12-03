@@ -1,5 +1,5 @@
 /*
- * socks4.h
+ * socks.h
  *
  *  Created on: 2020-8-25
  *      Author: youngwolf
