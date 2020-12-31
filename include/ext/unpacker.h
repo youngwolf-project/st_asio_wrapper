@@ -168,6 +168,192 @@ protected:
 	size_t remain_len; //half-baked msg
 };
 
+//protocol: length + body
+//this unpacker has a fixed buffer (4000 bytes), if messages can be held in it, then this unpacker works just as the default unpacker,
+// otherwise, a dynamic std::string will be created to hold big messages, then this unpacker works just as the non_copy_unpacker.
+class flexible_unpacker : public i_unpacker<std::string>
+{
+public:
+	flexible_unpacker() {reset();}
+	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means not available
+
+	bool parse_msg(boost::container::list<std::pair<const char*, size_t> >& msg_can)
+	{
+		const char* pnext = raw_buff.begin();
+		bool unpack_ok = true;
+		while (unpack_ok) //considering sticky package problem, we need a loop
+			if ((size_t) -1 != cur_msg_len)
+			{
+				if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE || cur_msg_len < ST_ASIO_HEAD_LEN)
+					unpack_ok = false;
+				else if (remain_len >= cur_msg_len) //one msg received
+				{
+					msg_can.emplace_back(pnext, cur_msg_len);
+					remain_len -= cur_msg_len;
+					std::advance(pnext, cur_msg_len);
+					cur_msg_len = -1;
+				}
+				else
+					break;
+			}
+			else if (remain_len >= ST_ASIO_HEAD_LEN) //the msg's head been received, sticky package found
+			{
+				ST_ASIO_HEAD_TYPE head;
+				memcpy(&head, pnext, ST_ASIO_HEAD_LEN);
+				cur_msg_len = ST_ASIO_HEAD_N2H(head);
+#ifdef ST_ASIO_HUGE_MSG
+				if ((size_t)-1 == cur_msg_len) //avoid dead loop on 32bit system with macro ST_ASIO_HUGE_MSG
+					unpack_ok = false;
+#endif
+			}
+			else
+				break;
+
+		if (pnext == raw_buff.begin()) //we should have at least got one msg.
+			unpack_ok = false;
+
+		return unpack_ok;
+	}
+
+public:
+	virtual void reset() {big_msg.clear(); cur_msg_len = -1; remain_len = 0;}
+	virtual void dump_left_data() const {unpacker_helper::dump_left_data(big_msg.empty() ? raw_buff.data() : big_msg.data(), cur_msg_len, remain_len);}
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
+	{
+		//length + msg
+		remain_len += bytes_transferred;
+		assert(remain_len <= std::max(raw_buff.size(), big_msg.size()));
+
+		if (!big_msg.empty())
+		{
+			if (remain_len != big_msg.size())
+				return false;
+
+			msg_can.emplace_back().swap(big_msg);
+			reset();
+			return true;
+		}
+
+		if ((size_t) -1 == cur_msg_len && remain_len >= ST_ASIO_HEAD_LEN) //the msg's head been received
+		{
+			ST_ASIO_HEAD_TYPE head;
+			memcpy(&head, raw_buff.begin(), ST_ASIO_HEAD_LEN);
+			cur_msg_len = ST_ASIO_HEAD_N2H(head);
+		}
+
+		if (cur_msg_len <= ST_ASIO_MSG_BUFFER_SIZE && cur_msg_len > raw_buff.size()) //big message
+		{
+			extern_buffer();
+			return true;
+		}
+
+		boost::container::list<std::pair<const char*, size_t> > msg_pos_can;
+		bool unpack_ok = parse_msg(msg_pos_can);
+		for (BOOST_AUTO(iter, msg_pos_can.begin()); iter != msg_pos_can.end(); ++iter)
+			if (iter->second > ST_ASIO_HEAD_LEN) //ignore heartbeat
+			{
+				if (stripped())
+					msg_can.emplace_back(boost::next(iter->first, ST_ASIO_HEAD_LEN), iter->second - ST_ASIO_HEAD_LEN);
+				else
+					msg_can.emplace_back(iter->first, iter->second);
+			}
+
+		if (remain_len > 0 && !msg_pos_can.empty())
+		{
+			const char* pnext = boost::next(msg_pos_can.back().first, msg_pos_can.back().second);
+			memmove(raw_buff.begin(), pnext, remain_len); //left behind unparsed data
+		}
+
+		if (unpack_ok && (size_t) -1 != cur_msg_len && cur_msg_len > raw_buff.size()) //big message
+			extern_buffer();
+
+		//if unpacking failed, successfully parsed msgs will still returned via msg_can(sticky package), please note.
+		return unpack_ok;
+	}
+
+	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
+	//of bytes to be read on the next call to the stream's async_read_some function. ---asio::async_read
+	//read as many as possible to reduce asynchronous call-back, and don't forget to handle sticky package carefully in parse_msg function.
+	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
+	{
+		if (ec)
+			return 0;
+
+		size_t data_len = remain_len + bytes_transferred;
+		assert(data_len <= ST_ASIO_MSG_BUFFER_SIZE);
+
+		if ((size_t)-1 == cur_msg_len && data_len >= ST_ASIO_HEAD_LEN) //the msg's head been received
+		{
+			ST_ASIO_HEAD_TYPE head;
+			memcpy(&head, raw_buff.begin(), ST_ASIO_HEAD_LEN);
+			cur_msg_len = ST_ASIO_HEAD_N2H(head);
+			if (cur_msg_len > ST_ASIO_MSG_BUFFER_SIZE || cur_msg_len < ST_ASIO_HEAD_LEN || //invalid msg, stop reading
+				cur_msg_len > raw_buff.size()) //big message
+				return 0;
+		}
+
+		return data_len >= cur_msg_len ? 0 : (big_msg.empty() ? raw_buff.size() : big_msg.size());
+		//read as many as possible except that we have already got an entire msg
+	}
+
+#ifdef ST_ASIO_SCATTERED_RECV_BUFFER
+	//this is just to satisfy the compiler, it's not a real scatter-gather buffer,
+	//if you introduce a ring buffer, then you will have the chance to provide a real scatter-gather buffer.
+	virtual buffer_type prepare_next_recv()
+	{
+		assert(remain_len < cur_msg_len);
+		if (big_msg.empty())
+			return buffer_type(1, boost::asio::buffer(raw_buff) + remain_len);
+
+		return buffer_type(1, boost::asio::buffer(const_cast<char*>(big_msg.data()), big_msg.size()) + remain_len);
+	}
+#elif BOOST_ASIO_VERSION < 101100
+	virtual buffer_type prepare_next_recv()
+	{
+		assert(remain_len < cur_msg_len);
+		if (big_msg.empty())
+			return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
+
+		return boost::asio::buffer(boost::asio::buffer(const_cast<char*>(big_msg.data()), big_msg.size()) + remain_len);
+	}
+#else
+	virtual buffer_type prepare_next_recv()
+	{
+		assert(remain_len < cur_msg_len);
+		if (big_msg.empty())
+			return boost::asio::buffer(raw_buff) + remain_len;
+
+		return boost::asio::buffer(const_cast<char*>(big_msg.data()), big_msg.size()) + remain_len;
+	}
+#endif
+
+	//msg must has been unpacked by this unpacker
+	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(stripped() ? msg.data() : boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
+	virtual const char* raw_data(msg_ctype& msg) const {return stripped() ? msg.data() : boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
+	virtual size_t raw_data_len(msg_ctype& msg) const {return stripped() ? msg.size() : msg.size() - ST_ASIO_HEAD_LEN;}
+
+private:
+	void extern_buffer()
+	{
+		int step = 0;
+		if (this->stripped())
+		{
+			cur_msg_len -= ST_ASIO_HEAD_LEN;
+			remain_len -= ST_ASIO_HEAD_LEN;
+			step = ST_ASIO_HEAD_LEN;
+		}
+
+		big_msg.resize(cur_msg_len); //this will fill big_msg, which is totally not necessary, but this is the only way to change std::string's size.
+		memcpy(const_cast<char*>(big_msg.data()), boost::next(raw_buff.data(), step), remain_len);
+	}
+
+protected:
+	boost::array<char, 4000> raw_buff;
+	msg_type big_msg;
+	size_t cur_msg_len; //-1 means head not received, so msg length is not available.
+	size_t remain_len; //half-baked msg
+};
+
 //protocol: UDP has message boundary, so we don't need a specific protocol to unpack it.
 //this unpacker doesn't support heartbeat, please note.
 class udp_unpacker : public i_unpacker<std::string>

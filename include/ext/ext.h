@@ -22,8 +22,8 @@
 //if you customized the packer and unpacker, the above principle maybe not right anymore, it should depends on your implementations.
 #ifndef ST_ASIO_MSG_BUFFER_SIZE
 #define ST_ASIO_MSG_BUFFER_SIZE	4000
-#elif ST_ASIO_MSG_BUFFER_SIZE <= 0
-	#error message buffer size must be bigger than zero.
+#elif ST_ASIO_MSG_BUFFER_SIZE > 100 * 1024 * 1024
+	#error invalid message buffer size.
 #endif
 
 //#define ST_ASIO_SCATTERED_RECV_BUFFER
@@ -34,10 +34,16 @@
 #define ST_ASIO_HEAD_TYPE	boost::uint32_t
 #define ST_ASIO_HEAD_H2N	htonl
 #define ST_ASIO_HEAD_N2H	ntohl
+#if ST_ASIO_MSG_BUFFER_SIZE < 4
+	#error invalid message buffer size.
+#endif
 #else
 #define ST_ASIO_HEAD_TYPE	boost::uint16_t
 #define ST_ASIO_HEAD_H2N	htons
 #define ST_ASIO_HEAD_N2H	ntohs
+#if ST_ASIO_MSG_BUFFER_SIZE < 2
+	#error invalid message buffer size.
+#endif
 #endif
 #define ST_ASIO_HEAD_LEN	(sizeof(ST_ASIO_HEAD_TYPE))
 

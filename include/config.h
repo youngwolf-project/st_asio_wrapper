@@ -902,14 +902,14 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 
 //send buffer's maximum size (bytes), it will be expanded dynamically (not fixed) within this range.
 #ifndef ST_ASIO_MAX_SEND_BUF
-#define ST_ASIO_MAX_SEND_BUF		1048576 //1M
+#define ST_ASIO_MAX_SEND_BUF		(1024 * 1024) //1M, 1048576
 #elif ST_ASIO_MAX_SEND_BUF <= 0
 	#error message capacity must be bigger than zero.
 #endif
 
 //recv buffer's maximum size (bytes), it will be expanded dynamically (not fixed) within this range.
 #ifndef ST_ASIO_MAX_RECV_BUF
-#define ST_ASIO_MAX_RECV_BUF		1048576 //1M
+#define ST_ASIO_MAX_RECV_BUF		(1024 * 1024) //1M, 1048576
 #elif ST_ASIO_MAX_RECV_BUF <= 0
 	#error message capacity must be bigger than zero.
 #endif
