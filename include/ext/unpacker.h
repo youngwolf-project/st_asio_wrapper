@@ -377,7 +377,7 @@ protected:
 
 //protocol: length + body
 //T can be unique_buffer<std::string> or shared_buffer<std::string>, the latter makes output messages seemingly copyable.
-template<typename T = shared_buffer<std::string> >
+template<typename T = shared_buffer<std::string>, typename Unpacker = unpacker>
 class unpacker2 : public st_asio_wrapper::i_unpacker<T>
 {
 private:
@@ -388,7 +388,7 @@ public:
 	virtual void dump_left_data() const {unpacker_.dump_left_data();}
 	virtual bool parse_msg(size_t bytes_transferred, typename super::container_type& msg_can)
 	{
-		unpacker::container_type tmp_can;
+		typename Unpacker::container_type tmp_can;
 		unpacker_.stripped(ST_THIS stripped());
 		bool unpack_ok = unpacker_.parse_msg(bytes_transferred, tmp_can);
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter)
@@ -411,7 +411,7 @@ public:
 	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return ST_THIS stripped() ? msg.size() : msg.size() - ST_ASIO_HEAD_LEN;}
 
 protected:
-	unpacker unpacker_;
+	Unpacker unpacker_;
 };
 
 //protocol: UDP has message boundary, so we don't need a specific protocol to unpack it.

@@ -26,7 +26,15 @@
 //2-fixed length packer and unpacker
 //3-prefix and/or suffix packer and unpacker
 
-#if 1 == PACKER_UNPACKER_TYPE
+#if 0 == PACKER_UNPACKER_TYPE
+#define ST_ASIO_HUGE_MSG
+#define ST_ASIO_MSG_BUFFER_SIZE 1000000
+#define ST_ASIO_MAX_SEND_BUF (10 * ST_ASIO_MSG_BUFFER_SIZE)
+#define ST_ASIO_MAX_RECV_BUF (10 * ST_ASIO_MSG_BUFFER_SIZE)
+#define ST_ASIO_DEFAULT_UNPACKER flexible_unpacker
+//this unpacker only pre-allocated a buffer of 4000 bytes, but it can parse messages up to ST_ASIO_MSG_BUFFER_SIZE (here is 1000000) bytes,
+//it works as the default unpacker for messages <= 4000, otherwise, it works as non_copy_unpacker
+#elif 1 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<std::string>, std::string>
 #define ST_ASIO_DEFAULT_UNPACKER unpacker2<unique_buffer<std::string> >
 #elif 2 == PACKER_UNPACKER_TYPE
