@@ -202,7 +202,7 @@ public:
 				memcpy(&head, pnext, ST_ASIO_HEAD_LEN);
 				cur_msg_len = ST_ASIO_HEAD_N2H(head);
 #ifdef ST_ASIO_HUGE_MSG
-				if ((size_t)-1 == cur_msg_len) //avoid dead loop on 32bit system with macro ST_ASIO_HUGE_MSG
+				if ((size_t) -1 == cur_msg_len) //avoid dead loop on 32bit system with macro ST_ASIO_HUGE_MSG
 					unpack_ok = false;
 #endif
 			}
@@ -282,7 +282,7 @@ public:
 		size_t data_len = remain_len + bytes_transferred;
 		assert(data_len <= ST_ASIO_MSG_BUFFER_SIZE);
 
-		if ((size_t)-1 == cur_msg_len && data_len >= ST_ASIO_HEAD_LEN) //the msg's head been received
+		if ((size_t) -1 == cur_msg_len && data_len >= ST_ASIO_HEAD_LEN) //the msg's head been received
 		{
 			ST_ASIO_HEAD_TYPE head;
 			memcpy(&head, raw_buff.begin(), ST_ASIO_HEAD_LEN);
@@ -407,9 +407,9 @@ public:
 	virtual typename super::buffer_type prepare_next_recv() {return unpacker_.prepare_next_recv();}
 
 	//msg must has been unpacked by this unpacker
-	virtual char* raw_data(typename super::msg_type& msg) const {return const_cast<char*>(super::stripped() ? msg.data() : boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
-	virtual const char* raw_data(typename super::msg_ctype& msg) const {return super::stripped() ? msg.data() : boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
-	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return super::stripped() ? msg.size() : msg.size() - ST_ASIO_HEAD_LEN;}
+	virtual char* raw_data(typename super::msg_type& msg) const {return unpacker_.raw_data(*msg.raw_buffer());}
+	virtual const char* raw_data(typename super::msg_ctype& msg) const {return unpacker_.raw_data(*msg.raw_buffer());}
+	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return unpacker_.raw_data_len(*msg.raw_buffer());}
 
 protected:
 	Unpacker unpacker_;
