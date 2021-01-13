@@ -22,8 +22,8 @@
 //if you customized the packer and unpacker, the above principle maybe not right anymore, it should depends on your implementations.
 #ifndef ST_ASIO_MSG_BUFFER_SIZE
 #define ST_ASIO_MSG_BUFFER_SIZE	4000
-#elif ST_ASIO_MSG_BUFFER_SIZE <= 0
-	#error message buffer size must be bigger than zero.
+#elif ST_ASIO_MSG_BUFFER_SIZE > 100 * 1024 * 1024
+	#error invalid message buffer size.
 #endif
 
 //#define ST_ASIO_SCATTERED_RECV_BUFFER
@@ -34,10 +34,16 @@
 #define ST_ASIO_HEAD_TYPE	boost::uint32_t
 #define ST_ASIO_HEAD_H2N	htonl
 #define ST_ASIO_HEAD_N2H	ntohl
+#if ST_ASIO_MSG_BUFFER_SIZE < 4
+	#error invalid message buffer size.
+#endif
 #else
 #define ST_ASIO_HEAD_TYPE	boost::uint16_t
 #define ST_ASIO_HEAD_H2N	htons
 #define ST_ASIO_HEAD_N2H	ntohs
+#if ST_ASIO_MSG_BUFFER_SIZE < 2
+	#error invalid message buffer size.
+#endif
 #endif
 #define ST_ASIO_HEAD_LEN	(sizeof(ST_ASIO_HEAD_TYPE))
 
@@ -52,34 +58,59 @@ public:
 	virtual const char* data() const {return std::string::data();}
 };
 
+//a substitute of std::string (just for unpacking scenario, many features are missing according to std::string), because std::string
+// has a small defect which is terrible for unpacking scenario, it cannot change its size without fill its buffer.
+//please note that basic_buffer won't append '\0' to the end of the string (std::string will do), you cannot treat it as a string and
+// print it with "%s" format even all characters in it are printable (because no '\0' appended to them).
 class basic_buffer : public boost::noncopyable
 {
 public:
 	basic_buffer() {do_detach();}
-	basic_buffer(size_t len) {do_detach(); assign(len);}
-	~basic_buffer() {clear();}
+	basic_buffer(size_t len) {do_assign(len);}
+	basic_buffer(const char* _buff, size_t len) {do_assign(len); memcpy(buff, _buff, len);}
+	virtual ~basic_buffer() {clear();}
 
-	void assign(size_t len) {clear(); do_attach(new char[len], len, len);}
+	void resize(size_t _len) //won't fill the extended buffer
+	{
+		if (_len <= cap)
+			len = _len;
+		else
+		{
+			const char* old_buff = buff;
+			unsigned old_len = len;
+
+			do_assign(_len);
+			if (NULL != old_buff)
+			{
+				memcpy(buff, old_buff, old_len);
+				delete[] old_buff;
+			}
+		}
+	}
+	void reserve(size_t len) {if (len > cap) resize(len);}
+	void assign(size_t len) {resize(len);}
+
+	size_t max_size() const {return (unsigned) -1;}
+	size_t capacity() const {return cap;}
 
 	//the following five functions are needed by st_asio_wrapper
 	bool empty() const {return 0 == len || NULL == buff;}
 	size_t size() const {return NULL == buff ? 0 : len;}
 	const char* data() const {return buff;}
-	void swap(basic_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len); std::swap(buff_len, other.buff_len);}
+	void swap(basic_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len); std::swap(cap, other.cap);}
 	void clear() {delete[] buff; do_detach();}
 
 	//functions needed by packer and unpacker
 	char* data() {return buff;}
-	bool shrink_size(size_t _len) {assert(_len <= buff_len); return (_len <= buff_len) ? (len = _len, true) : false;}
-	size_t buffer_size() const {return NULL == buff ? 0 : buff_len;}
 
 protected:
-	void do_attach(char* _buff, size_t _len, size_t _buff_len) {buff = _buff; len = _len; buff_len = _buff_len;}
-	void do_detach() {buff = NULL; len = buff_len = 0;}
+	void do_assign(size_t len) {do_attach(new char[len], len, len);}
+	void do_attach(char* _buff, size_t _len, size_t capacity) {buff = _buff; len = (unsigned) _len; cap = (unsigned) capacity;}
+	void do_detach() {buff = NULL; len = cap = 0;}
 
 protected:
 	char* buff;
-	size_t len, buff_len;
+	unsigned len, cap;
 };
 
 }} //namespace

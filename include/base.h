@@ -248,14 +248,14 @@ public:
 	typedef list<msg_type> container_type;
 	typedef ST_ASIO_RECV_BUFFER_TYPE buffer_type;
 
-	bool stripped() const {return _stripped;}
-	void stripped(bool stripped_) {_stripped = stripped_;}
-
 protected:
 	i_unpacker() : _stripped(true) {}
 	virtual ~i_unpacker() {}
 
 public:
+	bool stripped() const {return _stripped;}
+	virtual void stripped(bool stripped_) {_stripped = stripped_;}
+
 	virtual void reset() = 0;
 	virtual void dump_left_data() const {}
 	//heartbeat must not be included in msg_can, otherwise you must handle heartbeat at where you handle normal messages.
@@ -488,7 +488,7 @@ class auto_duration
 {
 public:
 	auto_duration(statistic::stat_duration& duration_) : started(true), begin_time(statistic::now()), duration(duration_) {}
-	~auto_duration() {end();}
+	virtual ~auto_duration() {end();}
 
 	void end() {if (started) duration += statistic::now() - begin_time; started = false;}
 
