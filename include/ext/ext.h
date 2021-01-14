@@ -67,13 +67,27 @@ class basic_buffer : public boost::noncopyable
 public:
 	basic_buffer() {do_detach();}
 	basic_buffer(size_t len) {do_assign(len);}
-	basic_buffer(const char* _buff, size_t len) {do_assign(len); memcpy(buff, _buff, len);}
+	basic_buffer(const char* buff, size_t len) {do_detach(); append(buff, len);}
 	virtual ~basic_buffer() {clear();}
+
+	basic_buffer& append(const char* _buff, size_t _len)
+	{
+		if (NULL != _buff && _len > 0)
+		{
+			if (len + _len > cap) //no optimization for memory re-allocation, please reserve enough memory before appending data
+				reserve(len + _len);
+
+			memcpy(boost::next(buff, len), _buff, _len);
+			len += (unsigned) _len;
+		}
+
+		return *this;
+	}
 
 	void resize(size_t _len) //won't fill the extended buffer
 	{
 		if (_len <= cap)
-			len = _len;
+			len = (unsigned) _len;
 		else
 		{
 			const char* old_buff = buff;
@@ -87,8 +101,19 @@ public:
 			}
 		}
 	}
-	void reserve(size_t len) {if (len > cap) resize(len);}
+
 	void assign(size_t len) {resize(len);}
+	void assign(const char* buff, size_t len) {resize(0); append(buff, len);}
+
+	void reserve(size_t _len)
+	{
+		if (_len > cap)
+		{
+			unsigned old_len = len;
+			resize(_len);
+			len = old_len;
+		}
+	}
 
 	size_t max_size() const {return (unsigned) -1;}
 	size_t capacity() const {return cap;}

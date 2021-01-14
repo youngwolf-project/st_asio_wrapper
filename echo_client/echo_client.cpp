@@ -34,12 +34,12 @@
 #define ST_ASIO_MSG_BUFFER_SIZE 1000000
 #define ST_ASIO_MAX_SEND_BUF (10 * ST_ASIO_MSG_BUFFER_SIZE)
 #define ST_ASIO_MAX_RECV_BUF (10 * ST_ASIO_MSG_BUFFER_SIZE)
-#define ST_ASIO_DEFAULT_UNPACKER flexible_unpacker<>
+#define ST_ASIO_DEFAULT_UNPACKER flexible_unpacker<std::string>
 //this unpacker only pre-allocated a buffer of 4000 bytes, but it can parse messages up to ST_ASIO_MSG_BUFFER_SIZE (here is 1000000) bytes,
 //it works as the default unpacker for messages <= 4000, otherwise, it works as non_copy_unpacker
 #elif 1 == PACKER_UNPACKER_TYPE
 #define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<std::string>, std::string>
-#define ST_ASIO_DEFAULT_UNPACKER unpacker2<unique_buffer, std::string, flexible_unpacker<> >
+#define ST_ASIO_DEFAULT_UNPACKER unpacker2<unique_buffer<std::string>, std::string, flexible_unpacker<std::string> >
 #elif 2 == PACKER_UNPACKER_TYPE
 #undef ST_ASIO_HEARTBEAT_INTERVAL
 #define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat
@@ -535,7 +535,7 @@ int main(int argc, const char* argv[])
 			if (iter != parameters.end()) msg_num = std::max((size_t) atoi(iter++->data()), (size_t) 1);
 
 #if 0 == PACKER_UNPACKER_TYPE || 1 == PACKER_UNPACKER_TYPE
-			if (iter != parameters.end()) msg_len = std::min(packer::get_max_msg_size(),
+			if (iter != parameters.end()) msg_len = std::min(packer<>::get_max_msg_size(),
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq
 #elif 2 == PACKER_UNPACKER_TYPE
 			if (iter != parameters.end()) ++iter;

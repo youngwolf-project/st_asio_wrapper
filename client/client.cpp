@@ -15,8 +15,8 @@
 //#define ST_ASIO_DEFAULT_UNPACKER stream_unpacker
 
 //the following two macros demonstrate how to support huge msg(exceed 65535 - 2).
-//#define ST_ASIO_HUGE_MSG
-//#define ST_ASIO_MSG_BUFFER_SIZE (1024 * 1024) //should not bigger than ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF, please note
+#define ST_ASIO_HUGE_MSG
+#define ST_ASIO_MSG_BUFFER_SIZE	1000000
 #define ST_ASIO_HEARTBEAT_INTERVAL 5 //if use stream_unpacker, heartbeat messages will be treated as normal messages,
 									 //because stream_unpacker doesn't support heartbeat
 //configuration

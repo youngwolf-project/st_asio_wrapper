@@ -56,13 +56,18 @@ public:
 };
 
 //protocol: length + body
-class packer : public i_packer<std::string>
+//T can be std::string or basic_buffer
+template<typename T = std::string>
+class packer : public i_packer<T>
 {
+private:
+	typedef i_packer<T> super;
+
 public:
 	static size_t get_max_msg_size() {return ST_ASIO_MSG_BUFFER_SIZE - ST_ASIO_HEAD_LEN;}
 
-	using i_packer<msg_type>::pack_msg;
-	virtual bool pack_msg(msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
+	using i_packer<typename super::msg_type>::pack_msg;
+	virtual bool pack_msg(typename super::msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		msg.clear();
 		size_t pre_len = native ? 0 : ST_ASIO_HEAD_LEN;
@@ -94,7 +99,7 @@ public:
 
 		return true;
 	}
-	virtual bool pack_msg(msg_type& msg, container_type& msg_can)
+	virtual bool pack_msg(typename super::msg_type& msg, typename super::container_type& msg_can)
 	{
 		size_t len = msg.size();
 		if (len > get_max_msg_size())
@@ -106,7 +111,7 @@ public:
 
 		return true;
 	}
-	virtual bool pack_msg(msg_type& msg1, msg_type& msg2, container_type& msg_can)
+	virtual bool pack_msg(typename super::msg_type& msg1, typename super::msg_type& msg2, typename super::container_type& msg_can)
 	{
 		size_t len = msg1.size() + msg2.size();
 		if (len > get_max_msg_size()) //not considered overflow
@@ -119,7 +124,7 @@ public:
 
 		return true;
 	}
-	virtual bool pack_msg(container_type& in, container_type& out)
+	virtual bool pack_msg(typename super::container_type& in, typename super::container_type& out)
 	{
 		size_t len = st_asio_wrapper::get_size_in_byte(in);
 		if (len > get_max_msg_size()) //not considered overflow
@@ -131,33 +136,35 @@ public:
 
 		return true;
 	}
-	virtual bool pack_heartbeat(msg_type& msg)
+	virtual bool pack_heartbeat(typename super::msg_type& msg)
 		{ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(0); msg.assign((const char*) &head_len, ST_ASIO_HEAD_LEN); return true;}
 
 	//msg must has been packed by this packer with native == false
-	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
-	virtual const char* raw_data(msg_ctype& msg) const {return boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
-	virtual size_t raw_data_len(msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
+	virtual char* raw_data(typename super::msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
+	virtual const char* raw_data(typename super::msg_ctype& msg) const {return boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
+	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
 };
 
 //protocol: length + body
-//T can be unique_buffer or shared_buffer, the latter makes output messages seemingly copyable.
-template<typename T = unique_buffer<i_buffer>, typename C = string_buffer>
-class packer2 : public i_packer<T>
+//Buffer can be unique_buffer<XXXX> or shared_buffer<XXXX>, the latter makes output messages seemingly copyable.
+//T is XXXX or a class that inherit from XXXX (because XXXX can be a virtual interface).
+//Packer is the real packer who packs messages, which means packer2 is just a wrapper.
+template<typename Buffer = unique_buffer<i_buffer>, typename T = string_buffer, typename Packer = packer<> >
+class packer2 : public i_packer<Buffer>
 {
 private:
-	typedef i_packer<T> super;
+	typedef i_packer<Buffer> super;
 
 public:
-	static size_t get_max_msg_size() {return packer::get_max_msg_size();}
+	static size_t get_max_msg_size() {return Packer::get_max_msg_size();}
 
 	using super::pack_msg;
 	virtual bool pack_msg(typename super::msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
-		packer::msg_type str;
-		if (packer().pack_msg(str, pstr, len, num, native))
+		typename Packer::msg_type str;
+		if (Packer().pack_msg(str, pstr, len, num, native))
 		{
-			BOOST_AUTO(raw_msg, new C());
+			BOOST_AUTO(raw_msg, new T());
 			raw_msg->swap(str);
 			msg.raw_buffer(raw_msg);
 
@@ -173,7 +180,7 @@ public:
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
-		BOOST_AUTO(raw_msg, new C());
+		BOOST_AUTO(raw_msg, new T());
 		raw_msg->assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
 		msg_can.emplace_back(raw_msg);
 		msg_can.emplace_back().swap(msg);
@@ -187,7 +194,7 @@ public:
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
-		BOOST_AUTO(raw_msg, new C());
+		BOOST_AUTO(raw_msg, new T());
 		raw_msg->assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
 		msg_can.emplace_back(raw_msg);
 		msg_can.emplace_back().swap(msg1);
@@ -202,7 +209,7 @@ public:
 			return false;
 
 		ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(len);
-		BOOST_AUTO(raw_msg, new C());
+		BOOST_AUTO(raw_msg, new T());
 		raw_msg->assign((const char*) &head_len, ST_ASIO_HEAD_LEN);
 		out.emplace_back(raw_msg);
 		out.splice(out.end(), in);
@@ -211,10 +218,10 @@ public:
 	}
 	virtual bool pack_heartbeat(typename super::msg_type& msg)
 	{
-		packer::msg_type str;
-		if (packer().pack_heartbeat(str))
+		typename Packer::msg_type str;
+		if (Packer().pack_heartbeat(str))
 		{
-			BOOST_AUTO(raw_msg, new C());
+			BOOST_AUTO(raw_msg, new T());
 			raw_msg->swap(str);
 			msg.raw_buffer(raw_msg);
 
@@ -231,7 +238,7 @@ public:
 };
 
 //protocol: fixed length
-class fixed_length_packer : public packer
+class fixed_length_packer : public packer<>
 {
 public:
 	using packer::pack_msg;
