@@ -31,12 +31,13 @@
 #define ST_ASIO_MSG_BUFFER_SIZE 1000000
 #define ST_ASIO_MAX_SEND_BUF (10 * ST_ASIO_MSG_BUFFER_SIZE)
 #define ST_ASIO_MAX_RECV_BUF (10 * ST_ASIO_MSG_BUFFER_SIZE)
-#define ST_ASIO_DEFAULT_UNPACKER flexible_unpacker<basic_buffer>
+#define ST_ASIO_DEFAULT_UNPACKER flexible_unpacker<>
 //this unpacker only pre-allocated a buffer of 4000 bytes, but it can parse messages up to ST_ASIO_MSG_BUFFER_SIZE (here is 1000000) bytes,
 //it works as the default unpacker for messages <= 4000, otherwise, it works as non_copy_unpacker
 #elif 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<basic_buffer>, basic_buffer, packer<basic_buffer> >
-#define ST_ASIO_DEFAULT_UNPACKER unpacker2<unique_buffer, basic_buffer, flexible_unpacker<basic_buffer> >
+#define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<basic_buffer>, basic_buffer, ext::packer<basic_buffer> >
+//sometime, the default packer brings name conflict with the socket's packer member function, prefix namespace can resolve this conflict.
+#define ST_ASIO_DEFAULT_UNPACKER unpacker2<unique_buffer<basic_buffer>, basic_buffer, flexible_unpacker<> >
 #elif 2 == PACKER_UNPACKER_TYPE
 #undef ST_ASIO_HEARTBEAT_INTERVAL
 #define ST_ASIO_HEARTBEAT_INTERVAL	0 //not support heartbeat
@@ -176,7 +177,7 @@ protected:
 };
 
 #if ST_ASIO_HEARTBEAT_INTERVAL > 0
-typedef server_socket_base<packer, unpacker> normal_socket;
+typedef server_socket_base<packer<>, unpacker<> > normal_socket;
 #else
 //demonstrate how to open heartbeat function without defining macro ST_ASIO_HEARTBEAT_INTERVAL
 typedef server_socket_base<packer<>, unpacker<> > normal_socket_base;

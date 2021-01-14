@@ -177,7 +177,7 @@ protected:
 //this unpacker has a fixed buffer (4000 bytes), if messages can be held in it, then this unpacker works just as the default unpacker,
 // otherwise, a dynamic std::string will be created to hold big messages, then this unpacker works just as the non_copy_unpacker.
 //T can be std::string or basic_buffer, the latter will not fill its buffer in resize invocation, so is more efficient.
-template<typename T = std::string>
+template<typename T = basic_buffer>
 class flexible_unpacker : public i_unpacker<T>
 {
 private:
@@ -386,14 +386,14 @@ protected:
 };
 
 //protocol: length + body
-//Buffer can be unique_buffer or shared_buffer, the latter makes output messages seemingly copyable.
-//T can be std::string or basic_buffer, and the output message type will be Buffer<T>.
+//Buffer can be unique_buffer<XXXX> or shared_buffer<XXXX>, the latter makes output messages seemingly copyable.
+//T is XXXX or a class that inherit from XXXX (because XXXX can be a virtual interface).
 //Unpacker can be the default unpacker or flexible_unpacker, which means unpacker2 is just a wrapper.
-template<template<typename> class Buffer = shared_buffer, typename T = std::string, typename Unpacker = unpacker<> >
-class unpacker2 : public i_unpacker<Buffer<T> >
+template<typename Buffer = shared_buffer<std::string>, typename T = std::string, typename Unpacker = unpacker<> >
+class unpacker2 : public i_unpacker<Buffer>
 {
 private:
-	typedef i_unpacker<Buffer<T> > super;
+	typedef i_unpacker<Buffer> super;
 
 public:
 	virtual void stripped(bool stripped_) {super::stripped(stripped_); unpacker_.stripped(stripped_);}
