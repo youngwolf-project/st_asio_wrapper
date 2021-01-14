@@ -20,7 +20,7 @@
 #include "../single_service_pump.h"
 
 #ifndef ST_ASIO_DEFAULT_PACKER
-#define ST_ASIO_DEFAULT_PACKER st_asio_wrapper::ext::packer
+#define ST_ASIO_DEFAULT_PACKER st_asio_wrapper::ext::packer<>
 #endif
 
 #ifndef ST_ASIO_DEFAULT_UDP_UNPACKER

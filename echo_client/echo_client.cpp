@@ -535,7 +535,7 @@ int main(int argc, const char* argv[])
 			if (iter != parameters.end()) msg_num = std::max((size_t) atoi(iter++->data()), (size_t) 1);
 
 #if 0 == PACKER_UNPACKER_TYPE || 1 == PACKER_UNPACKER_TYPE
-			if (iter != parameters.end()) msg_len = std::min(packer::get_max_msg_size(),
+			if (iter != parameters.end()) msg_len = std::min(packer<>::get_max_msg_size(),
 				std::max((size_t) atoi(iter++->data()), sizeof(size_t))); //include seq
 #elif 2 == PACKER_UNPACKER_TYPE
 			if (iter != parameters.end()) ++iter;

@@ -23,11 +23,11 @@
 #include "../single_service_pump.h"
 
 #ifndef ST_ASIO_DEFAULT_PACKER
-#define ST_ASIO_DEFAULT_PACKER st_asio_wrapper::ext::packer
+#define ST_ASIO_DEFAULT_PACKER st_asio_wrapper::ext::packer<>
 #endif
 
 #ifndef ST_ASIO_DEFAULT_UNPACKER
-#define ST_ASIO_DEFAULT_UNPACKER st_asio_wrapper::ext::unpacker
+#define ST_ASIO_DEFAULT_UNPACKER st_asio_wrapper::ext::unpacker<>
 #endif
 
 namespace st_asio_wrapper { namespace ext { namespace tcp {

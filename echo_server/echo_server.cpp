@@ -35,7 +35,7 @@
 //this unpacker only pre-allocated a buffer of 4000 bytes, but it can parse messages up to ST_ASIO_MSG_BUFFER_SIZE (here is 1000000) bytes,
 //it works as the default unpacker for messages <= 4000, otherwise, it works as non_copy_unpacker
 #elif 1 == PACKER_UNPACKER_TYPE
-#define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<std::string>, std::string>
+#define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<basic_buffer>, basic_buffer, packer<basic_buffer> >
 #define ST_ASIO_DEFAULT_UNPACKER unpacker2<unique_buffer, basic_buffer, flexible_unpacker<basic_buffer> >
 #elif 2 == PACKER_UNPACKER_TYPE
 #undef ST_ASIO_HEARTBEAT_INTERVAL
@@ -179,7 +179,7 @@ protected:
 typedef server_socket_base<packer, unpacker> normal_socket;
 #else
 //demonstrate how to open heartbeat function without defining macro ST_ASIO_HEARTBEAT_INTERVAL
-typedef server_socket_base<packer, unpacker> normal_socket_base;
+typedef server_socket_base<packer<>, unpacker<> > normal_socket_base;
 class normal_socket : public normal_socket_base
 {
 public:
@@ -204,7 +204,7 @@ protected:
 	virtual bool on_accept(object_ctype& socket_ptr) {stop_listen(); return true;}
 };
 
-typedef server_socket_base<packer, unpacker> short_socket_base;
+typedef server_socket_base<packer<>, unpacker<> > short_socket_base;
 class short_connection : public short_socket_base
 {
 public:
