@@ -771,16 +771,27 @@
  * UDP socket will remove itself (in on_recv_error) from udp::multi_socket_service_base if it is created by the latter and the error_code is
  *  not abort, which means is not caused by intentionally shutdown.
  * TCP client socket will remove itself (in on_recv_error) from tcp::multi_client_base if it is created by the latter and reconnecting is closed.
+ * Make function void i_unpacker::stripped(bool) to be virtual.
+ * To use the original default packer and unpacker, now you must write them as packer<> and unpacker<>.
  *
  * HIGHLIGHT:
  * Introduce del_socket to i_matrix, so socket can remove itself from the container (object_pool and its subclasses) who created it.
  * Add SOCKS4 and SOCKS5 proxy support, demo client demonstrated how to use them (been commented out).
+ * Add flexible_unpacker--an unpacker which support huge messages but with a limited pre-allocated buffer (4000 bytes).
+ * Introduce resize, reserve and append concept to basic_buffer (as the std::string), basic_buffer is expected to be a substitute of std::string
+ *  as a receive buffer in unpackers, as a receive buffer, std::string has a defect, we cannot extend its size without fill the buffer, reserve
+ *  will not fill the buffer, but will not change the size neither, resize will change the size, but will fill the buffer too.
  *
  * FIX:
  * Call the unpacker's dump_left_data() for SSL socket too.
  * Fix hex printing in function dump_left_data.
+ * Make the destructor of class auto_duration to be virtual.
+ * Make the destructor of class basic_buffer to be virtual.
  *
  * ENHANCEMENTS:
+ * Optimize unpackers (return a value as big as possible to read data as much as possible in just one reading invocation).
+ * Enhance the default packer and unpacker to support basic_buffer as their output message type.
+ * Enhance packer2 and unpacker2 to support unique_buffer<basic_buffer> and shared_buffer<basic_buffer> as their output message type.
  * server_base and multi_client_base support directly broadcast messages (via broadcast_native_msg).
  * A small optimization for message sending (use message replication rather than parsing message if available).
  * In object_pool, object's in_msg_type, in_msg_ctype, out_msg_type and out_msg_ctype now are visible, you may need them in multi_client_base,
