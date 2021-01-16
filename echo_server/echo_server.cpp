@@ -31,7 +31,7 @@
 #define ST_ASIO_MSG_BUFFER_SIZE 1000000
 #define ST_ASIO_MAX_SEND_BUF (10 * ST_ASIO_MSG_BUFFER_SIZE)
 #define ST_ASIO_MAX_RECV_BUF (10 * ST_ASIO_MSG_BUFFER_SIZE)
-#define ST_ASIO_DEFAULT_UNPACKER flexible_unpacker<>
+#define ST_ASIO_DEFAULT_UNPACKER flexible_unpacker<std::string>
 //this unpacker only pre-allocated a buffer of 4000 bytes, but it can parse messages up to ST_ASIO_MSG_BUFFER_SIZE (here is 1000000) bytes,
 //it works as the default unpacker for messages <= 4000, otherwise, it works as non_copy_unpacker
 #elif 1 == PACKER_UNPACKER_TYPE
@@ -120,13 +120,8 @@ protected:
 		//1. we can not use safe_send_msg as i said many times, we should not block service threads.
 		//2. if we use true can_overflow to call send_msg, then buffer usage will be out of control, we should not take this risk.
 
-#if 2 == PACKER_UNPACKER_TYPE //the type of out_msg_type and in_msg_type are not identical
-		for (BOOST_AUTO(iter, msg_can.end()); iter != msg_can.end(); ++iter)
-			send_msg(*iter, true);
-#else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
 		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter) send_msg(*iter, true);
-#endif
 		msg_can.clear();
 
 		return 1;

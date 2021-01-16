@@ -58,10 +58,10 @@ public:
 	virtual const char* data() const {return std::string::data();}
 };
 
-//a substitute of std::string (just for unpacking scenario, many features are missing according to std::string), because std::string
+//a substitute of std::string (just for unpacking scenario, many features are missing against std::string), because std::string
 // has a small defect which is terrible for unpacking scenario, it cannot change its size without fill its buffer.
-//please note that basic_buffer won't append '\0' to the end of the string (std::string will do), you cannot treat it as a string and
-// print it with "%s" format even all characters in it are printable (because no '\0' appended to them).
+//please note that basic_buffer won't append '\0' to the end of the string (std::string will do), you must appen '\0' characters
+// by your own if you want to print it via "%s" formatter, e.g. basic_buffer("123", 4), bb.append("abc", 4).
 class basic_buffer : public boost::noncopyable
 {
 public:
