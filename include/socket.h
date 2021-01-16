@@ -301,7 +301,9 @@ protected:
 		start_heartbeat(ST_ASIO_HEARTBEAT_INTERVAL);
 #endif
 		send_msg(); //send buffer may have msgs, send them
+#if !defined(ST_ASIO_PASSIVE_RECV) || !defined(ST_ASIO_SYNC_RECV)
 		recv_msg();
+#endif
 
 		return true;
 	}
