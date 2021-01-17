@@ -41,10 +41,6 @@
 #define ST_ASIO_DEFAULT_PACKER prefix_suffix_packer
 #define ST_ASIO_DEFAULT_UNPACKER prefix_suffix_unpacker
 #endif
-
-#if defined(ST_ASIO_WANT_MSG_SEND_NOTIFY) && (!defined(ST_ASIO_HEARTBEAT_INTERVAL) || ST_ASIO_HEARTBEAT_INTERVAL <= 0)
-#define ST_ASIO_INPUT_QUEUE non_lock_queue //we will never operate sending buffer concurrently, so need no locks.
-#endif
 //configuration
 
 #include "../include/ext/tcp.h"

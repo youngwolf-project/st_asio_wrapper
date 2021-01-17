@@ -6,8 +6,6 @@
 #define ST_ASIO_SERVER_PORT		5051
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 #define ST_ASIO_PASSIVE_RECV
-//#define ST_ASIO_INPUT_QUEUE non_lock_queue
-//we cannot use non_lock_queue, because we also send messages (talking messages) out of st_asio_wrapper::socket::on_msg_send().
 #define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
 #define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
 //configuration
