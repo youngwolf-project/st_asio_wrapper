@@ -775,6 +775,7 @@
  * To use the original default packer and unpacker, now you must write them as packer<> and unpacker<>.
  * If both macro ST_ASIO_PASSIVE_RECV and ST_ASIO_SYNC_RECV been defined, the first invocation (right after the connection been established)
  *  of recv_msg() will be omitted too, see the two macro for more details.
+ * non_lock_queue needs its container to be thread safe even in pingpong test.
  *
  * HIGHLIGHT:
  * Introduce del_socket to i_matrix, so socket can remove itself from the container (object_pool and its subclasses) who created it.

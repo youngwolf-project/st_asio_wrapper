@@ -144,6 +144,7 @@ public:
 #else
 private:
 	void recv_msg() {dispatch_strand(rw_strand, boost::bind(&socket::do_recv_msg, this));}
+public:
 #endif
 #ifndef ST_ASIO_EXPOSE_SEND_INTERFACE
 private:

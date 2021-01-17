@@ -162,6 +162,9 @@ public:
 	UDP_SYNC_SAFE_SEND_MSG(sync_safe_send_msg, sync_send_msg)
 	UDP_SYNC_SAFE_SEND_MSG(sync_safe_send_native_msg, sync_send_native_msg)
 #endif
+#ifdef ST_ASIO_EXPOSE_SEND_INTERFACE
+	using super::send_msg;
+#endif
 	//msg sending interface
 	///////////////////////////////////////////////////
 
