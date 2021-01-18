@@ -142,13 +142,8 @@ protected:
 		out_container_type tmp_can;
 		msg_can.move_items_out(tmp_can, 10); //don't be too greedy, here is in a service thread, we should not block this thread for a long time
 
-#if 2 == PACKER_UNPACKER_TYPE //the type of out_msg_type and in_msg_type are not identical
-		for (BOOST_AUTO(iter, tmp_can.end()); iter != tmp_can.end(); ++iter)
-			send_msg(*iter, true);
-#else
 		//following statement can avoid one memory replication if the type of out_msg_type and in_msg_type are identical.
 		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter) send_msg(*iter, true);
-#endif
 		return tmp_can.size();
 		//if we indeed handled some messages, do return the actual number of handled messages (or a positive number), else, return 0
 		//if we handled nothing, but want to re-dispatch messages immediately, return 1
