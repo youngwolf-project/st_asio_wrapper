@@ -9,7 +9,6 @@
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 //#define ST_ASIO_FORCE_TO_USE_MSG_RECV_BUFFER
 #define ST_ASIO_MSG_BUFFER_SIZE	1024
-#define ST_ASIO_INPUT_QUEUE		non_lock_queue //we will never operate sending buffer concurrently, so need no locks
 #define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //configuration
 
