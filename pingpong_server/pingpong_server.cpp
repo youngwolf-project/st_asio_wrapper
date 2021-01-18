@@ -7,13 +7,6 @@
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 #define ST_ASIO_SYNC_DISPATCH
 #define ST_ASIO_MSG_BUFFER_SIZE	65536
-#define ST_ASIO_INPUT_QUEUE non_lock_queue
-//if pingpong_client only send message in on_msg_handle(), which means a responsive system, a real pingpong test,
-//then, before pingpong_server send each message, the previous message has been sent to pingpong_client,
-//so sending buffer will always be empty, which means we will never operate sending buffer concurrently, so need no locks.
-//
-//if pingpong_client send message in on_msg_send(), then using non_lock_queue as input queue in pingpong_server will lead
-//undefined behavior, please note.
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol
 #define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //configuration
