@@ -11,9 +11,6 @@
 //#define ST_ASIO_CLEAR_OBJECT_INTERVAL 1
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
 #define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
-#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-#define ST_ASIO_INPUT_QUEUE non_lock_queue //we will never operate sending buffer concurrently, so need no locks.
-#endif
 //#define ST_ASIO_MAX_MSG_NUM		16
 //if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_MSG_NUM macro.
 //please think about if we have 512 links, how much memory we can accupy at most with default ST_ASIO_MAX_MSG_NUM?
