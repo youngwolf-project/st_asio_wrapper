@@ -8,6 +8,11 @@
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 #define ST_ASIO_MSG_BUFFER_SIZE	1024
+#define ST_ASIO_SYNC_DISPATCH
+#ifdef ST_ASIO_SYNC_DISPATCH
+	#define ST_ASIO_INPUT_QUEUE	non_lock_queue
+	#define ST_ASIO_OUTPUT_QUEUE non_lock_queue
+#endif
 #define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //configuration
 
@@ -50,7 +55,29 @@ protected:
 	}
 
 	//msg handling
+#ifdef ST_ASIO_SYNC_DISPATCH
+	virtual size_t on_msg(list<out_msg_type>& msg_can)
+	{
+		st_asio_wrapper::do_something_to_all(msg_can, boost::bind(&echo_socket::handle_msg, this, boost::placeholders::_1));
+		msg_can.clear();
+
+		return 1;
+	}
+#endif
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	virtual size_t on_msg_handle(out_queue_type& msg_can)
+	{
+		assert(!msg_can.empty());
+		out_container_type tmp_can;
+		msg_can.swap(tmp_can);
+
+		st_asio_wrapper::do_something_to_all(tmp_can, boost::bind(&echo_socket::handle_msg, this, boost::placeholders::_1));
+		return tmp_can.size();
+	}
+#else
 	virtual bool on_msg_handle(out_msg_type& msg) {handle_msg(msg); return true;}
+#endif
+	//msg handling end
 
 private:
 	void handle_msg(out_msg_type& msg)
