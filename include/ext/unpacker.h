@@ -232,7 +232,7 @@ public:
 	{
 		//length + msg
 		remain_len += bytes_transferred;
-		assert(remain_len <= std::max(raw_buff.size(), big_msg.size()));
+		assert(remain_len <= std::max<size_t>(raw_buff.size(), big_msg.size()));
 
 		if (!big_msg.empty())
 		{
