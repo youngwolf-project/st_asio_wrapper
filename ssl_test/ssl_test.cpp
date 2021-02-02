@@ -37,7 +37,7 @@ int main(int argc, const char* argv[])
 	server_.context().load_verify_file("client_certs/server.crt");
 	server_.context().use_certificate_chain_file("certs/server.crt");
 	server_.context().use_private_key_file("certs/server.key", boost::asio::ssl::context::pem);
-	server_.context().use_tmp_dh_file("certs/dh1024.pem");
+	server_.context().use_tmp_dh_file("certs/dh2048.pem");
 
 ///*
 	//method #1
@@ -47,7 +47,7 @@ int main(int argc, const char* argv[])
 	client_.context().load_verify_file("certs/server.crt");
 	client_.context().use_certificate_chain_file("client_certs/server.crt");
 	client_.context().use_private_key_file("client_certs/server.key", boost::asio::ssl::context::pem);
-	client_.context().use_tmp_dh_file("client_certs/dh1024.pem");
+	client_.context().use_tmp_dh_file("client_certs/dh2048.pem");
 
 	//please config the ssl context before creating any clients.
 	client_.add_socket();
