@@ -213,7 +213,7 @@ private:
 		if (!target_domain.empty())
 		{
 			buff[3] = 3;
-			buff[4] = (char) std::min(target_domain.size(), sizeof(buff) - 7);
+			buff[4] = (char) std::min<size_t>(target_domain.size(), sizeof(buff) - 7);
 			memcpy(boost::next(buff, 5), target_domain.data(), (size_t) buff[4]);
 			*((unsigned short*) boost::next(buff, 5 + buff[4])) = htons(target_port);
 			req_len = 7 + buff[4];

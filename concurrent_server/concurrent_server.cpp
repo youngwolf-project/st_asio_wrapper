@@ -8,6 +8,11 @@
 #define ST_ASIO_REUSE_OBJECT //use objects pool
 #define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
 #define ST_ASIO_MSG_BUFFER_SIZE	1024
+#define ST_ASIO_SYNC_DISPATCH
+#ifdef ST_ASIO_SYNC_DISPATCH
+	#define ST_ASIO_INPUT_QUEUE	non_lock_queue
+	#define ST_ASIO_OUTPUT_QUEUE non_lock_queue
+#endif
 #define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //configuration
 
@@ -30,8 +35,29 @@ public:
 	//other heavy things can be done in the constructor too, because we pre-created ST_ASIO_ASYNC_ACCEPT_NUM echo_socket objects
 
 protected:
-	//msg handling: send the original msg back (echo server)
+	//msg handling
+#ifdef ST_ASIO_SYNC_DISPATCH
+	virtual size_t on_msg(list<out_msg_type>& msg_can)
+	{
+		for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter) direct_send_msg(*iter, true);
+		msg_can.clear();
+
+		return 1;
+	}
+#endif
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	virtual size_t on_msg_handle(out_queue_type& msg_can)
+	{
+		assert(!msg_can.empty());
+		out_container_type tmp_can;
+		msg_can.swap(tmp_can);
+
+		for (BOOST_AUTO(iter, tmp_can.begin()); iter != tmp_can.end(); ++iter) direct_send_msg(*iter, true);
+		return tmp_can.size();
+	}
+#else
 	virtual bool on_msg_handle(out_msg_type& msg) {direct_send_msg(msg, true); return true;}
+#endif
 	//msg handling end
 };
 
