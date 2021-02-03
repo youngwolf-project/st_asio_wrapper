@@ -62,7 +62,7 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 	switch (*msg.data())
 	{
 	case 0:
-		if (TRANS_IDLE == state)
+		if (TRANS_IDLE == state && !is_sending()) //avoid accessing the send queue concurrently, because we used non_lock_queue
 		{
 			trans_end();
 
