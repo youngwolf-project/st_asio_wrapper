@@ -17,7 +17,7 @@ public:
 
 public:
 	//because we don't use objects pool(we don't defined ST_ASIO_REUSE_OBJECT), so this virtual function will
-	//not be invoked, and can be omitted, but we keep it for possibly future using
+	//not be invoked, and can be omitted, but we keep it for the possibility of using it in the future
 	virtual void reset();
 	virtual void take_over(boost::shared_ptr<generic_server_socket<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> > socket_ptr); //move socket_ptr into this socket
 //	virtual void take_over(boost::shared_ptr<file_socket> socket_ptr); //this works too, but brings warnings with -Woverloaded-virtual option.

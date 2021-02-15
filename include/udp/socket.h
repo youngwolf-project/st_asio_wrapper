@@ -200,7 +200,7 @@ protected:
 
 	//msg was failed to send and udp::generic_socket will not hold it any more, if you want to re-send it in the future,
 	// you must take over it and re-send (at any time) it via direct_send_msg.
-	//DO NOT hold msg for future using, just swap its content with your own message in this virtual function.
+	//DO NOT hold msg for further usage, just swap its content with your own message in this virtual function.
 	virtual void on_send_error(const boost::system::error_code& ec, typename super::in_msg& msg)
 		{unified_out::error_out(ST_ASIO_LLF " send msg error (%d %s)", ST_THIS id(), ec.value(), ec.message().data());}
 
