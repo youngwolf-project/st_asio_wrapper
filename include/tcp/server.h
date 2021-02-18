@@ -57,7 +57,7 @@ public:
 		boost::system::error_code ec;
 		if (!acceptor.is_open()) {acceptor.open(server_addr.protocol(), ec); assert(!ec);} //user maybe has opened this acceptor (to set options for example)
 #ifndef ST_ASIO_NOT_REUSE_ADDRESS
-		acceptor.set_option(typename Family::acceptor::reuse_address(true), ec); assert(!ec);
+		acceptor.set_option(typename boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
 #endif
 		acceptor.bind(server_addr, ec); assert(!ec);
 		if (ec) {unified_out::error_out("bind failed."); return false;}
@@ -83,9 +83,9 @@ public:
 			unified_out::info_out("finished pre-creating server sockets.");
 
 #if BOOST_ASIO_VERSION >= 101100
-		acceptor.listen(Family::acceptor::max_listen_connections, ec); assert(!ec);
+		acceptor.listen(boost::asio::socket_base::max_listen_connections, ec); assert(!ec);
 #else
-		acceptor.listen(Family::acceptor::max_connections, ec); assert(!ec);
+		acceptor.listen(boost::asio::socket_base::max_connections, ec); assert(!ec);
 #endif
 		if (ec) {unified_out::error_out("listen failed."); return false;}
 

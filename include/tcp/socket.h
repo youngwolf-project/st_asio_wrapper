@@ -17,9 +17,9 @@
 
 namespace st_asio_wrapper { namespace tcp {
 
-template <typename Socket, typename Family, typename Packer, typename Unpacker,
+template <typename Socket, typename Packer, typename Unpacker,
 	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
-class socket_base : public socket<Socket, Family, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
+class socket_base : public socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -28,7 +28,7 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 private:
-	typedef socket<Socket, Family, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 protected:
 	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN, HANDSHAKING};
@@ -180,7 +180,7 @@ protected:
 			status = GRACEFUL_SHUTTING_DOWN;
 
 			boost::system::error_code ec;
-			ST_THIS lowest_layer().shutdown(Family::socket::shutdown_send, ec);
+			ST_THIS lowest_layer().shutdown(boost::asio::socket_base::shutdown_send, ec);
 			if (ec) //graceful shutdown is impossible
 				shutdown();
 			else if (!sync)

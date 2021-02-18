@@ -20,7 +20,7 @@
 namespace st_asio_wrapper
 {
 
-template<typename Socket, typename Family, typename Packer, typename Unpacker, typename InMsgType, typename OutMsgType,
+template<typename Socket, typename Packer, typename Unpacker, typename InMsgType, typename OutMsgType,
 	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
 class socket : public timer<tracked_executor>
 {
@@ -412,7 +412,7 @@ protected:
 		if (lowest_layer().is_open())
 		{
 			boost::system::error_code ec;
-			use_close ? lowest_layer().close(ec) : lowest_layer().shutdown(Family::socket::shutdown_both, ec);
+			use_close ? lowest_layer().close(ec) : lowest_layer().shutdown(boost::asio::socket_base::shutdown_both, ec);
 
 			stat.break_time = time(NULL);
 		}
