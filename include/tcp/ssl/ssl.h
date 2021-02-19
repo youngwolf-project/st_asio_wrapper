@@ -82,7 +82,7 @@ protected:
 		if (!sync)
 		{
 			ST_THIS show_info("ssl link:", "been shutting down.");
-			ST_THIS next_layer().async_shutdown(ST_THIS make_handler_error(boost::bind(&socket::async_shutdown_handler, this, boost::asio::placeholders::error)));
+			ST_THIS next_layer().async_shutdown(ST_THIS make_handler_error(boost::bind(&socket::shutdown_handler, this, boost::asio::placeholders::error)));
 		}
 		else
 		{
@@ -96,7 +96,7 @@ protected:
 	}
 
 private:
-	void async_shutdown_handler(const boost::system::error_code& ec)
+	void shutdown_handler(const boost::system::error_code& ec)
 	{
 		if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
 			unified_out::info_out(ST_ASIO_LLF " async shutdown ssl link failed (maybe intentionally because of reusing)", ST_THIS id());

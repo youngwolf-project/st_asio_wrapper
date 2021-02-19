@@ -184,7 +184,7 @@ protected:
 			if (ec) //graceful shutdown is impossible
 				shutdown();
 			else if (!sync)
-				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::async_shutdown_handler, this,
+				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this,
 					ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100), true, false));
 			else
 			{
@@ -421,14 +421,14 @@ private:
 		}
 	}
 
-	bool async_shutdown_handler(size_t loop_num)
+	bool shutdown_handler(size_t loop_num)
 	{
 		if (GRACEFUL_SHUTTING_DOWN == status)
 		{
 			--loop_num;
 			if (loop_num > 0)
 			{
-				ST_THIS change_timer_call_back(TIMER_ASYNC_SHUTDOWN, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::async_shutdown_handler, this,
+				ST_THIS change_timer_call_back(TIMER_ASYNC_SHUTDOWN, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this,
 					loop_num), true, false));
 				return true;
 			}
