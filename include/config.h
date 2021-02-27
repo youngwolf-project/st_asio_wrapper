@@ -828,6 +828,10 @@
 	#ifndef ST_ASIO_MIN_ACI_REF
 		#if BOOST_VERSION < 105500
 			#define ST_ASIO_MIN_ACI_REF 3
+		#elif BOOST_VERSION < 107000
+			#define ST_ASIO_MIN_ACI_REF 2
+		#elif BOOST_VERSION < 107400
+			#define ST_ASIO_MIN_ACI_REF 3
 		#else
 			#define ST_ASIO_MIN_ACI_REF 2
 		#endif
@@ -855,10 +859,14 @@
 			#define ST_ASIO_MIN_ACI_REF 3
 		#elif BOOST_VERSION < 107000
 			#define ST_ASIO_MIN_ACI_REF 2
-		#elif defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L
-			#define ST_ASIO_MIN_ACI_REF 2
+		#elif BOOST_VERSION < 107400
+			#if defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L
+				#define ST_ASIO_MIN_ACI_REF 2
+			#else
+				#define ST_ASIO_MIN_ACI_REF 3
+			#endif
 		#else
-			#define ST_ASIO_MIN_ACI_REF 3
+			#define ST_ASIO_MIN_ACI_REF 2
 		#endif
 	#endif
 
