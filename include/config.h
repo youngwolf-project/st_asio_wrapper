@@ -838,7 +838,7 @@
 	#endif
 
 	#if _MSC_VER < 1700
-		#define ST_THIS //workaround to make up the BOOST_AUTO's defect on vc2008 and compiler crush before vc2012
+		#define ST_THIS //workaround to make up the defect of BOOST_AUTO on vc2008 and fix compiler crush before vc2012
 	#else
 		#define ST_THIS this->
 		#if !defined(ST_ASIO_HIDE_WARNINGS) && _MSC_VER >= 1800
