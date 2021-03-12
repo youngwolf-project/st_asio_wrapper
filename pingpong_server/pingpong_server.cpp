@@ -30,7 +30,7 @@ public:
 
 protected:
 	//msg handling: send the original msg back(echo server), must define macro ST_ASIO_SYNC_DISPATCH
-	//do not hold msg_can for further using, access msg_can and return from on_msg as quickly as possible
+	//do not hold msg_can for further usage, access msg_can and return from on_msg as quickly as possible
 	//access msg_can freely within this callback, it's always thread safe.
 	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{

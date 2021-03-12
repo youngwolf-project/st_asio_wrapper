@@ -20,10 +20,10 @@ namespace st_asio_wrapper { namespace tcp {
 template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::tcp::socket, typename Family = boost::asio::ip::tcp,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class generic_client_socket : public socket_base<Socket, Family, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>
+class generic_client_socket : public socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>
 {
 private:
-	typedef socket_base<Socket, Family, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	static const typename super::tid TIMER_BEGIN = super::TIMER_END;

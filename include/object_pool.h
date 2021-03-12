@@ -326,7 +326,7 @@ public:
 			//	//in this function without unique() checking.
 			//	socket_ptr->set_timer(...);
 			//}
-			//then in the future, when invoking the timer handler, the socket has been freed and it's this pointer already became wild.
+			//then in the future, when invoke the timer handler, the socket has been freed and its this pointer already became wild.
 			if ((*iter).unique() && (*iter)->obsoleted())
 			{
 				--num;

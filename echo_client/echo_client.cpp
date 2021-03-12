@@ -113,7 +113,7 @@ public:
 protected:
 	//msg handling
 #ifdef ST_ASIO_SYNC_DISPATCH
-	//do not hold msg_can for further using, return from on_msg as quickly as possible
+	//do not hold msg_can for further usage, return from on_msg as quickly as possible
 	//access msg_can freely within this callback, it's always thread safe.
 	virtual size_t on_msg(list<out_msg_type>& msg_can)
 	{
@@ -129,7 +129,7 @@ protected:
 	}
 #endif
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
-	//do not hold msg_can for further using, access msg_can and return from on_msg_handle as quickly as possible
+	//do not hold msg_can for further usage, access msg_can and return from on_msg_handle as quickly as possible
 	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
 	// that new messages will not come until we returned from this callback (for example, pingpong test).
 	virtual size_t on_msg_handle(out_queue_type& msg_can)

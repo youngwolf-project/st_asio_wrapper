@@ -17,9 +17,9 @@
 
 namespace st_asio_wrapper { namespace tcp {
 
-template <typename Socket, typename Family, typename Packer, typename Unpacker,
+template <typename Socket, typename Packer, typename Unpacker,
 	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
-class socket_base : public socket<Socket, Family, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
+class socket_base : public socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -28,7 +28,7 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 private:
-	typedef socket<Socket, Family, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
 protected:
 	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN, HANDSHAKING};
@@ -180,11 +180,11 @@ protected:
 			status = GRACEFUL_SHUTTING_DOWN;
 
 			boost::system::error_code ec;
-			ST_THIS lowest_layer().shutdown(Family::socket::shutdown_send, ec);
+			ST_THIS lowest_layer().shutdown(boost::asio::socket_base::shutdown_send, ec);
 			if (ec) //graceful shutdown is impossible
 				shutdown();
 			else if (!sync)
-				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::async_shutdown_handler, this,
+				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this,
 					ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100), true, false));
 			else
 			{
@@ -226,7 +226,7 @@ protected:
 	//generally, you don't have to rewrite this to maintain the status of connections
 	//msg_can contains messages that were failed to send and tcp::socket_base will not hold them any more, if you want to re-send them in the future,
 	// you must take over them and re-send (at any time) them via direct_send_msg.
-	//DO NOT hold msg_can for future using, just swap its content with your own container in this virtual function.
+	//DO NOT hold msg_can for further usage, just swap its content with your own container in this virtual function.
 	virtual void on_send_error(const boost::system::error_code& ec, typename super::in_container_type& msg_can)
 		{unified_out::error_out(ST_ASIO_LLF " send msg error (%d %s)", ST_THIS id(), ec.value(), ec.message().data());}
 
@@ -421,14 +421,14 @@ private:
 		}
 	}
 
-	bool async_shutdown_handler(size_t loop_num)
+	bool shutdown_handler(size_t loop_num)
 	{
 		if (GRACEFUL_SHUTTING_DOWN == status)
 		{
 			--loop_num;
 			if (loop_num > 0)
 			{
-				ST_THIS change_timer_call_back(TIMER_ASYNC_SHUTDOWN, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::async_shutdown_handler, this,
+				ST_THIS change_timer_call_back(TIMER_ASYNC_SHUTDOWN, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this,
 					loop_num), true, false));
 				return true;
 			}
