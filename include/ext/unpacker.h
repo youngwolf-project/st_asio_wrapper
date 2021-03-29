@@ -232,7 +232,7 @@ public:
 	{
 		//length + msg
 		remain_len += bytes_transferred;
-		assert(remain_len <= std::max<size_t>(raw_buff.size(), big_msg.size()));
+		assert(remain_len <= (big_msg.empty() ? raw_buff.size() : big_msg.size()));
 
 		if (!big_msg.empty())
 		{
@@ -290,7 +290,7 @@ public:
 			return 0;
 
 		size_t data_len = remain_len + bytes_transferred;
-		assert(data_len <= ST_ASIO_MSG_BUFFER_SIZE);
+		assert(data_len <= (big_msg.empty() ? raw_buff.size() : big_msg.size()));
 
 		if ((size_t) -1 == cur_msg_len && data_len >= ST_ASIO_HEAD_LEN) //the msg's head been received
 		{
@@ -311,7 +311,7 @@ public:
 	//if you introduce a ring buffer, then you will have the chance to provide a real scatter-gather buffer.
 	virtual typename super::buffer_type prepare_next_recv()
 	{
-		assert(remain_len < cur_msg_len);
+		assert(remain_len < (big_msg.empty() ? raw_buff.size() : big_msg.size()));
 		if (big_msg.empty())
 			return typename super::buffer_type(1, boost::asio::buffer(raw_buff) + remain_len);
 
@@ -320,7 +320,7 @@ public:
 #elif BOOST_ASIO_VERSION < 101100
 	virtual typename super::buffer_type prepare_next_recv()
 	{
-		assert(remain_len < cur_msg_len);
+		assert(remain_len < (big_msg.empty() ? raw_buff.size() : big_msg.size()));
 		if (big_msg.empty())
 			return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);
 
@@ -329,7 +329,7 @@ public:
 #else
 	virtual typename super::buffer_type prepare_next_recv()
 	{
-		assert(remain_len < cur_msg_len);
+		assert(remain_len < (big_msg.empty() ? raw_buff.size() : big_msg.size()));
 		if (big_msg.empty())
 			return boost::asio::buffer(raw_buff) + remain_len;
 
