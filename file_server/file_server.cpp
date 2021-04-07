@@ -21,7 +21,7 @@
 
 int main(int argc, const char* argv[])
 {
-	puts("this is a file transfer server.");
+	puts("this is a file transmission server.");
 	printf("usage: %s [<port=%d> [ip=0.0.0.0]]\n", argv[0], ST_ASIO_SERVER_PORT);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;

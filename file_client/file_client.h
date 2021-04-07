@@ -253,7 +253,7 @@ private:
 			file_size = -1;
 			received_size = 0;
 
-			printf("transfer %s begin.\n", file_name.data());
+			printf("transmit %s begin.\n", file_name.data());
 			if (find(0)->get_file(file_name))
 			{
 				do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t (file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
@@ -264,7 +264,7 @@ private:
 				break;
 			}
 			else
-				printf("transfer %s failed!\n", file_name.data());
+				printf("transmit %s failed!\n", file_name.data());
 		}
 	}
 
