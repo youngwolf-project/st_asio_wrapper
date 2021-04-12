@@ -520,13 +520,13 @@
  * HIGHLIGHT:
  *
  * FIX:
- * If give up connecting (prepare_reconnect returns -1 or call close_reconnect), st_asio_wrapper::socket::started() still returns true (should be false).
+ * If give up connecting (prepare_reconnect returns -1 or call set_reconnect(false)), st_asio_wrapper::socket::started() still returns true (should be false).
  *
  * ENHANCEMENTS:
  * Expose server_base's acceptor via next_layer().
  * Prefix suffix packer and unpacker support heartbeat.
  * New demo socket_management demonstrates how to manage sockets if you use other keys rather than the original id.
- * Control reconnecting more flexibly, see function client_socket_base::open_reconnect and client_socket_base::close_reconnect for more details.
+ * Control reconnecting more flexibly, see function client_socket_base::set_reconnect and client_socket_base::is_reconnect for more details.
  * client_socket_base support binding to a specific local address.
  *
  * DELETION:
@@ -801,6 +801,28 @@
  *  server_base and udp::multi_socket_service_base.
  *
  * DELETION:
+ *
+ * REFACTORING:
+ *
+ * REPLACEMENTS:
+ *
+ * ===============================================================
+ * 2021.x.x		version 2.4.0
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ *
+ * HIGHLIGHT:
+ * Support connected UDP socket, set macro ST_ASIO_UDP_CONNECT_MODE to true to open it, you must also provide peer's ip address via set_peer_addr,
+ *  function set_connect_mode can open it too (before start_service). For connected UDP socket, the peer_addr parameter in send_msg (series)
+ *  will be ignored, please note.
+ *
+ * FIX:
+ *
+ * ENHANCEMENTS:
+ * Enhance the reusability of st_asio_wrapper's ssl sockets, now they can be reused (include reconnecting) just as normal socket.
+ *
+ * DELETION:
+ * Delete macro ST_ASIO_REUSE_SSL_STREAM, now st_asio_wrapper's ssl sockets can be reused just as normal socket.
  *
  * REFACTORING:
  *
@@ -1098,6 +1120,10 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #define ST_ASIO_UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
 #endif
 
+#ifndef ST_ASIO_UDP_CONNECT_MODE
+#define ST_ASIO_UDP_CONNECT_MODE false
+#endif
+
 //close port reuse
 //#define ST_ASIO_NOT_REUSE_ADDRESS
 
@@ -1144,12 +1170,6 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 
 //#define ST_ASIO_ALWAYS_SEND_HEARTBEAT
 //always send heartbeat in each ST_ASIO_HEARTBEAT_INTERVAL seconds without checking if we're sending other messages or not.
-
-//#define ST_ASIO_REUSE_SSL_STREAM
-//if you need ssl::client_socket_base to be able to reconnect the server, or to open object pool in ssl::object_pool, you must define this macro.
-//I tried many ways, only one way can make boost::asio::ssl::stream reusable, which is:
-// don't call any shutdown functions of boost::asio::ssl::stream, just call boost::asio::ip::tcp::socket's shutdown function,
-// this seems not a normal procedure, but it works, I believe that asio's defect caused this problem.
 
 //#define ST_ASIO_AVOID_AUTO_STOP_SERVICE
 //wrap service_pump with boost::asio::io_service::work (boost::asio::executor_work_guard), then it will never run out until you explicitly call stop_service().

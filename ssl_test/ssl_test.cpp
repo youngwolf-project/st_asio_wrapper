@@ -4,7 +4,6 @@
 //configuration
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
-#define ST_ASIO_REUSE_SSL_STREAM
 //#define ST_ASIO_DEFAULT_PACKER packer2<unique_buffer<std::string>, std::string>
 //#define ST_ASIO_DEFAULT_UNPACKER unpacker2<>
 #define ST_ASIO_HEARTBEAT_INTERVAL 5 //SSL has supported heartbeat because we used user data instead of OOB to implement
@@ -32,6 +31,8 @@ int main(int argc, const char* argv[])
 	service_pump sp;
 
 	server server_(sp, boost::asio::ssl::context::sslv23_server);
+	server_.set_start_object_id(1000);
+
 	server_.context().set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
 	server_.context().set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
 	server_.context().load_verify_file("client_certs/server.crt");
@@ -62,7 +63,7 @@ int main(int argc, const char* argv[])
 	ctx.load_verify_file("certs/server.crt");
 	ctx.use_certificate_chain_file("client_certs/server.crt");
 	ctx.use_private_key_file("client_certs/server.key", boost::asio::ssl::context::pem);
-	ctx.use_tmp_dh_file("client_certs/dh1024.pem");
+	ctx.use_tmp_dh_file("client_certs/dh2048.pem");
 
 	single_client client_(sp, ctx);
 */
@@ -89,22 +90,6 @@ int main(int argc, const char* argv[])
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n", client_.size(), client_.valid_size(), client_.invalid_object_size());
 			client_.list_all_object();
 		}
-#ifndef ST_ASIO_REUSE_SSL_STREAM
-		else if (RESTART_COMMAND == str || RECONNECT == str)
-			puts("please define macro ST_ASIO_REUSE_SSL_STREAM to test this feature.");
-		else if (SHUTDOWN_LINK == str)
-//			server_.at(0)->graceful_shutdown();
-//			server_.at(0)->graceful_shutdown(true);
-//			server_.at(0)->force_shutdown();
-
-			client_.graceful_shutdown(client_.at(0));
-//			client_.graceful_shutdown(client_.at(0), false);
-//			client_.force_shutdown(client_.at(0));
-
-//			client_.graceful_shutdown(); //if you used single_client
-//			client_.graceful_shutdown(false, false); //if you used single_client
-//			client_.force_shutdown(); //if you used single_client
-#else
 		else if (RESTART_COMMAND == str)
 		{
 			sp.stop_service(&client_);
@@ -145,7 +130,6 @@ int main(int argc, const char* argv[])
 //			client_.at(0)->graceful_shutdown(false, false);
 //			client_.graceful_shutdown(client_.at(0), false);
 //			client_.graceful_shutdown(false, false); //if you used single_client
-#endif
 		else
 			server_.broadcast_msg(str);
 	}

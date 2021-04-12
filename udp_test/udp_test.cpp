@@ -11,6 +11,7 @@
 							 //you will see them cross together on the receiver's screen.
 							 //with this macro, if heartbeat not applied, macro ST_ASIO_AVOID_AUTO_STOP_SERVICE must be defined to avoid the service_pump run out.
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
+//#define ST_ASIO_UDP_CONNECT_MODE true
 //#define ST_ASIO_HEARTBEAT_INTERVAL 5 //neither udp_unpacker nor udp_unpacker2 support heartbeat message, so heartbeat will be treated as normal message.
 //#define ST_ASIO_DEFAULT_UDP_UNPACKER udp_unpacker2<>
 //configuration

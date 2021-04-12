@@ -63,6 +63,11 @@ protected:
 		start_atomic.store(0, boost::memory_order_relaxed);
 	}
 
+	//guarantee no operations (include asynchronous operations) be performed on this socket during call following two functions.
+	void reset_next_layer(boost::asio::io_context& io_context_) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(io_context_);}
+	template<typename Arg>
+	void reset_next_layer(boost::asio::io_context& io_context_, Arg& arg) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(io_context_, arg);}
+
 	void reset()
 	{
 		bool need_clean_up = is_timer(TIMER_DELAY_CLOSE);
