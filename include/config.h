@@ -810,6 +810,7 @@
  * 2021.x.x		version 2.4.0
  *
  * SPECIAL ATTENTION (incompatible with old editions):
+ * client_socket's function open_reconnect and close_reconnect have been replaced by function set_reconnect(bool).
  *
  * HIGHLIGHT:
  * Support connected UDP socket, set macro ST_ASIO_UDP_CONNECT_MODE to true to open it, you must also provide peer's ip address via set_peer_addr,
@@ -817,6 +818,7 @@
  *  will be ignored, please note.
  *
  * FIX:
+ * single_service_pump support ssl single_client(_base).
  *
  * ENHANCEMENTS:
  * Enhance the reusability of st_asio_wrapper's ssl sockets, now they can be reused (include reconnecting) just as normal socket.
@@ -825,8 +827,10 @@
  * Delete macro ST_ASIO_REUSE_SSL_STREAM, now st_asio_wrapper's ssl sockets can be reused just as normal socket.
  *
  * REFACTORING:
+ * Re-implement the reusability (object reuse and reconnecting) of ascs' ssl sockets.
  *
  * REPLACEMENTS:
+ * client_socket's function open_reconnect and close_reconnect have been replaced by function set_reconnect(bool).
  *
  */
 

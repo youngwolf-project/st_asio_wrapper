@@ -24,8 +24,8 @@ public:
 	class i_service
 	{
 	protected:
-		i_service(service_pump& service_pump_) : sp(service_pump_), started_(false), id_(0), data(NULL) {service_pump_.add(this);}
-		virtual ~i_service() {}
+		i_service(service_pump& service_pump_) : sp(service_pump_), started_(false), id_(0), data(NULL) {sp.add(this);}
+		virtual ~i_service() {sp.remove(this);}
 
 	public:
 		//for the same i_service, start_service and stop_service are not thread safe,
