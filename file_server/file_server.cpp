@@ -19,22 +19,57 @@
 #define STATISTIC		"statistic"
 #define LIST_ALL_CLIENT	"list all client"
 
+#if !defined(_MSC_VER) && !defined(__MINGW64__) && !defined(__MINGW32__)
+void signal_handler(service_pump& sp, boost::asio::signal_set& signal_receiver, const boost::system::error_code& ec, int signal_number)
+{
+	if (!ec)
+		return sp.end_service();
+
+	signal_receiver.async_wait(boost::bind(&signal_handler, boost::ref(sp), boost::ref(signal_receiver), boost::placeholders::_1, boost::placeholders::_2));
+}
+#endif
+
 int main(int argc, const char* argv[])
 {
 	puts("this is a file transmission server.");
+#if defined(_MSC_VER) || defined(__MINGW64__) || defined(__MINGW32__)
 	printf("usage: %s [<port=%d> [ip=0.0.0.0]]\n", argv[0], ST_ASIO_SERVER_PORT);
+#else
+	printf("usage: %s [-d] [<port=%d> [ip=0.0.0.0]]\n", argv[0], ST_ASIO_SERVER_PORT);
+#endif
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
+	int index = 0;
+	if (argc >= 2 && 0 == strcmp(argv[1], "-d"))
+	{
+#if defined(_MSC_VER) || defined(__MINGW64__) || defined(__MINGW32__)
+		puts("on windows, -d is not supported!");
+		return 1;
+#endif
+		index = 1;
+	}
+
 	service_pump sp;
 	server_base<file_socket> file_server_(sp);
 
-	if (argc > 2)
-		file_server_.set_server_addr(atoi(argv[1]), argv[2]);
-	else if (argc > 1)
-		file_server_.set_server_addr(atoi(argv[1]));
+	if (argc > 2 + index)
+		file_server_.set_server_addr(atoi(argv[1 + index]), argv[2 + index]);
+	else if (argc > 1 + index)
+		file_server_.set_server_addr(atoi(argv[1 + index]));
+
+#if !defined(_MSC_VER) && !defined(__MINGW64__) && !defined(__MINGW32__)
+	if (1 == index)
+	{
+		boost::asio::signal_set signal_receiver(sp, SIGINT, SIGTERM);
+		signal_receiver.async_wait(boost::bind(&signal_handler, boost::ref(sp), boost::ref(signal_receiver), boost::placeholders::_1, boost::placeholders::_2));
+
+		sp.run_service();
+		return 0;
+	}
+#endif
 
 	sp.start_service();
 	while(sp.is_running())
