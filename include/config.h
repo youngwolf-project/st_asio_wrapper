@@ -1206,6 +1206,11 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 //during message sending, calling send_msg() will fail, this is by design to avoid boost::asio::io_context using up all virtual memory, this also
 // means that before the sending really started, you can greedily call send_msg() and may exhaust all virtual memory, please note.
 
+//#define ST_ASIO_ARBITRARY_SEND
+//dispatch an async do_send_msg invocation for each message, this feature brings 2 behaviors:
+// 1. it can also fix the situation i described for macro ST_ASIO_EXPOSE_SEND_INTERFACE,
+// 2. it brings better effeciency for specific ENV, try to find them by you own.
+
 //#define ST_ASIO_PASSIVE_RECV
 //to gain the ability of changing the unpacker at runtime, with this macro, st_asio_wrapper will not do message receiving automatically (except
 // the first one, if macro ST_ASIO_SYNC_RECV been defined, the first one will be omitted too), so you need to manually call recv_msg(),

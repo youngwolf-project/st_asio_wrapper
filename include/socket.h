@@ -154,7 +154,11 @@ public:
 #ifndef ST_ASIO_EXPOSE_SEND_INTERFACE
 private:
 #endif
+#ifdef ST_ASIO_ARBITRARY_SEND
+	void send_msg() {dispatch_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}
+#else
 	void send_msg() {if (!sending && is_ready()) dispatch_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}
+#endif
 
 public:
 	void start_heartbeat(int interval, int max_absence = ST_ASIO_HEARTBEAT_MAX_ABSENCE)

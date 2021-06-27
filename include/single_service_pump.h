@@ -32,7 +32,7 @@ public:
 		service_pump(concurrency_hint), Service(boost::ref(*(service_pump*) this), arg) {}
 #else
 	single_service_pump() : Service(boost::ref(*(service_pump*) this)) {}
-	template<typename Arg> single_service_pump() : Service(boost::ref(*(service_pump*) this), arg) {}
+	template<typename Arg> single_service_pump(Arg& arg) : Service(boost::ref(*(service_pump*) this), arg) {}
 #endif
 };
 

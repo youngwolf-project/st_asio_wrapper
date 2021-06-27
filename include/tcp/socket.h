@@ -404,7 +404,9 @@ private:
 #endif
 #endif
 			sending_msgs.clear();
+#ifndef ST_ASIO_ARBITRARY_SEND
 			if (!do_send_msg(true) && !send_buffer.empty()) //send msg in sequence
+#endif
 				do_send_msg(true); //just make sure no pending msgs
 		}
 		else
