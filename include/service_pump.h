@@ -276,8 +276,8 @@ protected:
 	size_t run() {while (true) {try {return boost::asio::io_context::run();} catch (const std::exception& e) {if (!on_exception(e)) return 0;}}}
 #endif
 
-	DO_SOMETHING_TO_ALL_MUTEX(service_can, service_can_mutex)
-	DO_SOMETHING_TO_ONE_MUTEX(service_can, service_can_mutex)
+	DO_SOMETHING_TO_ALL_MUTEX(service_can, service_can_mutex, boost::lock_guard<boost::mutex>)
+	DO_SOMETHING_TO_ONE_MUTEX(service_can, service_can_mutex, boost::lock_guard<boost::mutex>)
 
 private:
 	void add(object_type i_service_)

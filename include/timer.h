@@ -136,8 +136,8 @@ public:
 			boost::lambda::bind((void (timer::*) (timer_info&)) &timer::stop_timer, this, boost::lambda::_1)));
 	}
 
-	DO_SOMETHING_TO_ALL_MUTEX(timer_can, timer_can_mutex)
-	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex)
+	DO_SOMETHING_TO_ALL_MUTEX(timer_can, timer_can_mutex, boost::lock_guard<boost::mutex>)
+	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex, boost::lock_guard<boost::mutex>)
 
 protected:
 	bool start_timer(timer_info& ti, unsigned interval_ms)

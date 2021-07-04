@@ -475,7 +475,7 @@ protected:
 				return true;
 		}
 		else
-			unified_out::error_out("invalid peer ip address");
+			unified_out::error_out("invalid peer path");
 
 		return false;
 	}

@@ -579,20 +579,20 @@ template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_
 #endif
 
 //free functions, used to do something to any container(except map and multimap) optionally with any mutex
-template<typename _Can, typename _Mutex, typename _Predicate>
+template<typename _Can, typename _Mutex, typename _Predicate, template<typename> class LockType>
 void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 {
-	boost::lock_guard<boost::mutex> lock(__mutex);
+	LockType<_Mutex> lock(__mutex);
 	for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);
 }
 
 template<typename _Can, typename _Predicate>
 void do_something_to_all(_Can& __can, const _Predicate& __pred) {for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);}
 
-template<typename _Can, typename _Mutex, typename _Predicate>
+template<typename _Can, typename _Mutex, typename _Predicate, template<typename> class LockType>
 void do_something_to_one(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 {
-	boost::lock_guard<boost::mutex> lock(__mutex);
+	LockType<_Mutex> lock(__mutex);
 	for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) if (__pred(*iter)) break;
 }
 
@@ -608,22 +608,22 @@ size_t get_size_in_byte(const _Can& __can)
 }
 
 //member functions, used to do something to any member container(except map and multimap) optionally with any member mutex
-#define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX)
+#define DO_SOMETHING_TO_ALL_MUTEX(CAN, MUTEX, LOCKTYPE) DO_SOMETHING_TO_ALL_MUTEX_NAME(do_something_to_all, CAN, MUTEX, LOCKTYPE)
 #define DO_SOMETHING_TO_ALL(CAN) DO_SOMETHING_TO_ALL_NAME(do_something_to_all, CAN)
 
-#define DO_SOMETHING_TO_ALL_MUTEX_NAME(NAME, CAN, MUTEX) \
-template<typename _Predicate> void NAME(const _Predicate& __pred) {boost::lock_guard<boost::mutex> lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter);}
+#define DO_SOMETHING_TO_ALL_MUTEX_NAME(NAME, CAN, MUTEX, LOCKTYPE) \
+template<typename _Predicate> void NAME(const _Predicate& __pred) {LOCKTYPE lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter);}
 
 #define DO_SOMETHING_TO_ALL_NAME(NAME, CAN) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) {for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter);} \
 template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) __pred(*iter);}
 
-#define DO_SOMETHING_TO_ONE_MUTEX(CAN, MUTEX) DO_SOMETHING_TO_ONE_MUTEX_NAME(do_something_to_one, CAN, MUTEX)
+#define DO_SOMETHING_TO_ONE_MUTEX(CAN, MUTEX, LOCKTYPE) DO_SOMETHING_TO_ONE_MUTEX_NAME(do_something_to_one, CAN, MUTEX, LOCKTYPE)
 #define DO_SOMETHING_TO_ONE(CAN) DO_SOMETHING_TO_ONE_NAME(do_something_to_one, CAN)
 
-#define DO_SOMETHING_TO_ONE_MUTEX_NAME(NAME, CAN, MUTEX) \
+#define DO_SOMETHING_TO_ONE_MUTEX_NAME(NAME, CAN, MUTEX, LOCKTYPE) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) \
-	{boost::lock_guard<boost::mutex> lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;}
+	{LOCKTYPE lock(MUTEX); for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;}
 
 #define DO_SOMETHING_TO_ONE_NAME(NAME, CAN) \
 template<typename _Predicate> void NAME(const _Predicate& __pred) {for (BOOST_AUTO(iter, CAN.begin()); iter != CAN.end(); ++iter) if (__pred(*iter)) break;} \
