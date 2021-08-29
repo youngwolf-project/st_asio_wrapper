@@ -43,7 +43,11 @@ public:
 		buff[0] = 4;
 		buff[1] = 1;
 		*((unsigned short*) boost::next(buff, 2)) = htons(target_addr.port());
+#if BOOST_ASIO_VERSION == 101100
+		memcpy(boost::next(buff, 4), boost::asio::ip::address_cast<boost::asio::ip::address_v4>(target_addr.address()).to_bytes().data(), 4);
+#else
 		memcpy(boost::next(buff, 4), target_addr.address().to_v4().to_bytes().data(), 4);
+#endif
 		memcpy(boost::next(buff, 8), "st_asio", sizeof("st_asio"));
 		req_len = 8 + sizeof("st_asio");
 
@@ -221,14 +225,22 @@ private:
 		else if (target_addr.address().is_v4())
 		{
 			buff[3] = 1;
+#if BOOST_ASIO_VERSION == 101100
+			memcpy(boost::next(buff, 4), boost::asio::ip::address_cast<boost::asio::ip::address_v4>(target_addr.address()).to_bytes().data(), 4);
+#else
 			memcpy(boost::next(buff, 4), target_addr.address().to_v4().to_bytes().data(), 4);
+#endif
 			*((unsigned short*) boost::next(buff, 8)) = htons(target_addr.port());
 			req_len = 10;
 		}
 		else //ipv6
 		{
 			buff[3] = 4;
+#if BOOST_ASIO_VERSION == 101100
+			memcpy(boost::next(buff, 4), boost::asio::ip::address_cast<boost::asio::ip::address_v6>(target_addr.address()).to_bytes().data(), 16);
+#else
 			memcpy(boost::next(buff, 4), target_addr.address().to_v6().to_bytes().data(), 16);
+#endif
 			*((unsigned short*) boost::next(buff, 20)) = htons(target_addr.port());
 			req_len = 22;
 		}

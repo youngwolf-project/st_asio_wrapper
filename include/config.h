@@ -813,6 +813,8 @@
  * client_socket's function open_reconnect and close_reconnect have been replaced by function set_reconnect(bool).
  *
  * HIGHLIGHT:
+ * service_pump support multiple io_context, just needs the number of service thread to be bigger than or equal to the number of io_context.
+ * Support reliable UDP (based on KCP -- https://github.com/skywind3000/kcp.git).
  * Support connected UDP socket, set macro ST_ASIO_UDP_CONNECT_MODE to true to open it, you must also provide peer's ip address via set_peer_addr,
  *  function set_connect_mode can open it too (before start_service). For connected UDP socket, the peer_addr parameter in send_msg (series)
  *  will be ignored, please note.
@@ -841,8 +843,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20302	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.3.2"
+#define ST_ASIO_VER		20400	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.4.0"
 
 //#define ST_ASIO_HIDE_WARNINGS
 
@@ -922,10 +924,16 @@
 #endif
 
 #if BOOST_ASIO_VERSION < 101100
-namespace boost {namespace asio {typedef io_service io_context;}}
-#define make_strand_handler(S, F) S.wrap(F)
+	namespace boost {namespace asio {typedef io_service io_context; typedef io_context execution_context;}}
+	#define make_strand_handler(S, F) S.wrap(F)
+#elif BOOST_ASIO_VERSION == 101100
+	namespace boost {namespace asio {typedef io_service io_context;}}
+	#define make_strand_handler(S, F) boost::asio::wrap(S, F)
+#elif BOOST_ASIO_VERSION < 101700
+	namespace boost {namespace asio {typedef executor any_io_executor;}}
+	#define make_strand_handler(S, F) boost::asio::bind_executor(S, F)
 #else
-#define make_strand_handler(S, F) boost::asio::bind_executor(S, F)
+	#define make_strand_handler(S, F) boost::asio::bind_executor(S, F)
 #endif
 //boost and compiler check
 
@@ -1149,7 +1157,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 
 //buffer type used when receiving messages (unpacker's prepare_next_recv() need to return this type)
 #ifndef ST_ASIO_RECV_BUFFER_TYPE
-	#if BOOST_ASIO_VERSION >= 101100
+	#if BOOST_ASIO_VERSION > 101100
 	#define ST_ASIO_RECV_BUFFER_TYPE boost::asio::mutable_buffer
 	#else
 	#define ST_ASIO_RECV_BUFFER_TYPE boost::asio::mutable_buffers_1

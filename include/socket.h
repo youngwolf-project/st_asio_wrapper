@@ -64,9 +64,27 @@ protected:
 	}
 
 	//guarantee no operations (include asynchronous operations) be performed on this socket during call following two functions.
-	void reset_next_layer(boost::asio::io_context& io_context_) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(io_context_);}
+#if BOOST_ASIO_VERSION <= 101100
+	void reset_next_layer() {reset_next_layer(next_layer_.get_io_service());}
+	template<typename Arg> void reset_next_layer(Arg& arg) {reset_next_layer(next_layer_.get_io_service(), arg);}
+#elif BOOST_ASIO_VERSION < 101300
+	void reset_next_layer() {reset_next_layer(static_cast<boost::asio::io_context&>(next_layer_.get_executor().context()));}
 	template<typename Arg>
-	void reset_next_layer(boost::asio::io_context& io_context_, Arg& arg) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(io_context_, arg);}
+	void reset_next_layer(Arg& arg) {reset_next_layer(static_cast<boost::asio::io_context&>(next_layer_.get_executor().context()), arg);}
+#else
+	void reset_next_layer() {reset_next_layer((const boost::asio::any_io_executor&) next_layer_.get_executor());}
+	template<typename Arg> void reset_next_layer(Arg& arg) {reset_next_layer(next_layer_.get_executor(), arg);}
+#endif
+
+#if BOOST_ASIO_VERSION < 101300
+	void reset_next_layer(boost::asio::io_context& io_context) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(io_context);}
+	template<typename Arg>
+	void reset_next_layer(boost::asio::io_context& io_context, Arg& arg) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(io_context, arg);}
+#else
+	void reset_next_layer(const boost::asio::any_io_executor& executor) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(executor);}
+	template<typename Arg>
+	void reset_next_layer(const boost::asio::any_io_executor& executor, Arg& arg) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(executor, arg);}
+#endif
 
 	void reset()
 	{
@@ -324,7 +342,7 @@ protected:
 	// in this socket except this socket itself, because this socket maybe is being maintained by object_pool.
 	//otherwise (bigger than zero), socket simply call this callback ST_ASIO_DELAY_CLOSE seconds later after link down, no any guarantees.
 	virtual void on_close() {unified_out::info_out(ST_ASIO_LLF " on_close()", id());}
-	virtual void after_close() {} //a good case for using this is to reconnect the server, please refer to client_socket_base.
+	virtual void after_close() = 0; //a good case for using this is to reconnect the server (please refer to client_socket_base) and return io_context to service_pump.
 
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//return positive value if handled some messages (include all messages), if some msg left behind, socket will re-dispatch them asynchronously

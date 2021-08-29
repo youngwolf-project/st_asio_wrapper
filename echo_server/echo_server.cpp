@@ -259,6 +259,12 @@ int main(int argc, const char* argv[])
 	context.run();
 */
 	service_pump sp;
+#ifndef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+	//if you want to decrease service thread at runtime, then you cannot use multiple io_context, if somebody indeed needs it, please let me know.
+	//with multiple io_context, the number of service thread must be bigger than or equal to the number of io_context, please note.
+	//with multiple io_context, please also define macro ST_ASIO_AVOID_AUTO_STOP_SERVICE.
+	sp.set_io_context_num(4);
+#endif
 	echo_server echo_server_(sp); //echo server
 
 	//demonstrate how to use singel_service
@@ -329,8 +335,10 @@ int main(int argc, const char* argv[])
 		}
 		else if (INCREASE_THREAD == str)
 			sp.add_service_thread(1);
+#ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 		else if (DECREASE_THREAD == str)
 			sp.del_service_thread(1);
+#endif
 		else
 		{
 //			/*

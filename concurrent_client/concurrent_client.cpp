@@ -96,11 +96,7 @@ protected:
 	//msg handling end
 
 private:
-	void handle_msg(out_msg_type& msg)
-	{
-		if (check_delay(true))
-			direct_send_msg(msg, true);
-	}
+	void handle_msg(out_msg_type& msg) {if (check_delay(true)) direct_send_msg(msg, true);}
 
 private:
 	float max_delay;

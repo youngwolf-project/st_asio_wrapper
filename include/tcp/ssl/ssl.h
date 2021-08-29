@@ -83,8 +83,8 @@ private:
 	typedef socket<tcp::client_socket_base<Packer, Unpacker, Matrix, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, InQueue, InContainer, OutQueue, OutContainer> > super;
 
 public:
-	client_socket_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx_) : super(io_context_, ctx_), io_context(io_context_), ctx(ctx_) {}
-	client_socket_base(Matrix& matrix_, boost::asio::ssl::context& ctx_) : super(matrix_, ctx_), io_context(matrix_.get_service_pump()), ctx(ctx_) {}
+	client_socket_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx_) : super(io_context_, ctx_), ctx(ctx_) {}
+	client_socket_base(Matrix& matrix_, boost::asio::ssl::context& ctx_) : super(matrix_, ctx_), ctx(ctx_) {}
 
 	virtual const char* type_name() const {return "SSL (client endpoint)";}
 	virtual int type_id() const {return 3;}
@@ -107,7 +107,7 @@ protected:
 	virtual void after_close()
 	{
 		if (ST_THIS is_reconnect())
-			ST_THIS reset_next_layer(io_context, ctx);
+			ST_THIS reset_next_layer(ctx);
 
 		super::after_close();
 	}
@@ -138,7 +138,6 @@ private:
 	using super::shutdown_ssl;
 
 private:
-	boost::asio::io_context& io_context;
 	boost::asio::ssl::context& ctx;
 };
 
@@ -175,7 +174,7 @@ public:
 
 	virtual void reset()
 	{
-		ST_THIS reset_next_layer(ST_THIS get_server().get_service_pump(), ctx);
+		ST_THIS reset_next_layer(ctx);
 		super::reset();
 	}
 

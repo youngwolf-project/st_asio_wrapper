@@ -156,7 +156,7 @@ public:
 	//this is just to satisfy the compiler, it's not a real scatter-gather buffer,
 	//if you introduce a ring buffer, then you will have the chance to provide a real scatter-gather buffer.
 	virtual typename super::buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return typename super::buffer_type(1, boost::asio::buffer(raw_buff) + remain_len);}
-#elif BOOST_ASIO_VERSION < 101100
+#elif BOOST_ASIO_VERSION <= 101100
 	virtual typename super::buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);}
 #else
 	virtual typename super::buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return boost::asio::buffer(raw_buff) + remain_len;}
@@ -317,7 +317,7 @@ public:
 
 		return typename super::buffer_type(1, boost::asio::buffer(const_cast<char*>(big_msg.data()), big_msg.size()) + remain_len);
 	}
-#elif BOOST_ASIO_VERSION < 101100
+#elif BOOST_ASIO_VERSION <= 101100
 	virtual typename super::buffer_type prepare_next_recv()
 	{
 		assert(remain_len < (big_msg.empty() ? raw_buff.size() : big_msg.size()));
@@ -710,7 +710,7 @@ public:
 	//if you introduce a ring buffer, then you will have the chance to provide a real scatter-gather buffer.
 #ifdef ST_ASIO_SCATTERED_RECV_BUFFER
 	virtual buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return buffer_type(1, boost::asio::buffer(raw_buff) + remain_len);}
-#elif BOOST_ASIO_VERSION < 101100
+#elif BOOST_ASIO_VERSION <= 101100
 	virtual buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return boost::asio::buffer(boost::asio::buffer(raw_buff) + remain_len);}
 #else
 	virtual buffer_type prepare_next_recv() {assert(remain_len < ST_ASIO_MSG_BUFFER_SIZE); return boost::asio::buffer(raw_buff) + remain_len;}

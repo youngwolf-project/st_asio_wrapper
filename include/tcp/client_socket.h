@@ -65,7 +65,17 @@ public:
 	virtual const char* type_name() const {return "TCP (client endpoint)";}
 	virtual int type_id() const {return 1;}
 
-	virtual void reset() {need_reconnect = ST_ASIO_RECONNECT; super::reset();}
+	virtual void reset()
+	{
+		need_reconnect = ST_ASIO_RECONNECT;
+		if (NULL != matrix)
+#if BOOST_ASIO_VERSION < 101100
+			matrix->get_service_pump().assign_io_context(ST_THIS next_layer().get_io_service());
+#else
+			matrix->get_service_pump().assign_io_context(ST_THIS next_layer().get_executor().context());
+#endif
+		super::reset();
+	}
 
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip);}
 	bool set_server_addr(const std::string& file_name) {server_addr = typename Family::endpoint(file_name); return true;}
@@ -162,7 +172,17 @@ protected:
 	//reconnect at here rather than in on_recv_error to make sure no async invocations performed on this socket before reconnecting.
 	//if you don't want to reconnect the server after link broken, rewrite this virtual function and do nothing in it or call close_reconnt().
 	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
-	virtual void after_close() {if (need_reconnect) ST_THIS start();}
+	virtual void after_close()
+	{
+		if (need_reconnect)
+			ST_THIS start();
+		else if (NULL != matrix)
+#if BOOST_ASIO_VERSION < 101100
+			matrix->get_service_pump().return_io_context(ST_THIS next_layer().get_io_service());
+#else
+			matrix->get_service_pump().return_io_context(ST_THIS next_layer().get_executor().context());
+#endif
+	}
 
 	virtual bool bind() {return true;}
 

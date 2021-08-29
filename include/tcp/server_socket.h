@@ -33,6 +33,15 @@ public:
 	virtual const char* type_name() const {return "TCP (server endpoint)";}
 	virtual int type_id() const {return 2;}
 
+	virtual void reset()
+	{
+#if BOOST_ASIO_VERSION < 101100
+		server.get_service_pump().assign_io_context(ST_THIS lowest_layer().get_io_service());
+#else
+		server.get_service_pump().assign_io_context(ST_THIS lowest_layer().get_executor().context());
+#endif
+		super::reset();
+	}
 	virtual void take_over(boost::shared_ptr<generic_server_socket> socket_ptr) {} //restore this socket from socket_ptr
 
 	void disconnect() {force_shutdown();}
@@ -78,6 +87,11 @@ protected:
 
 	virtual void on_async_shutdown_error() {force_shutdown();}
 	virtual bool on_heartbeat_error() {ST_THIS show_info("server link:", "broke unexpectedly."); force_shutdown(); return false;}
+#if BOOST_ASIO_VERSION < 101100
+	virtual void after_close() {server.get_service_pump().return_io_context(ST_THIS lowest_layer().get_io_service());}
+#else
+	virtual void after_close() {server.get_service_pump().return_io_context(ST_THIS lowest_layer().get_executor().context());}
+#endif
 
 private:
 	Server& server;
