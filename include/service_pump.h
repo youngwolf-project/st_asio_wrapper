@@ -296,8 +296,32 @@ public:
 	bool is_service_started() const {return started;}
 
 	//not thread safe
-	void add_service_thread(int thread_num, bool block = false)
+#if BOOST_ASIO_VERSION >= 101200
+	void add_service_thread(int thread_num, bool block = false, int io_context_num = 0, int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE)
+#else
+	void add_service_thread(int thread_num, bool block = false, int io_context_num = 0)
+#endif
 	{
+		if (io_context_num > 0)
+		{
+			if (thread_num < io_context_num)
+			{
+				unified_out::error_out("thread_num must be bigger than or equal to io_context_num.");
+				return;
+			}
+			else
+			{
+				single_io_context = false;
+				boost::lock_guard<boost::mutex> lock(context_can_mutex);
+#if BOOST_ASIO_VERSION >= 101200
+				for (int i = 0; i < io_context_num; ++i)
+					context_can.emplace_back(concurrency_hint);
+#else
+				context_can.resize((size_t) io_context_num + context_can.size());
+#endif
+			}
+		}
+
 		for (int i = 0; i < thread_num; ++i)
 		{
 			BOOST_AUTO(ctx, assign_thread());
@@ -320,7 +344,7 @@ protected:
 	{
 		if (thread_num <= 0 || (size_t) thread_num < context_can.size())
 		{
-			unified_out::error_out("thread_num must be bigger than zero and bigger than or equal to io_context_num.");
+			unified_out::error_out("thread_num must be bigger than or equal to io_context_num.");
 			return;
 		}
 
