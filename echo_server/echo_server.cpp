@@ -12,7 +12,7 @@
 //#define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
-#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+//#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //#define ST_ASIO_MAX_SEND_BUF	65536
 //#define ST_ASIO_MAX_RECV_BUF	65536
 //if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF macro.
@@ -243,7 +243,7 @@ private:
 */
 int main(int argc, const char* argv[])
 {
-	printf("usage: %s [<service thread number=1> [<port=%d> [ip=0.0.0.0]]]\n", argv[0], ST_ASIO_SERVER_PORT);
+	printf("usage: %s [<service thread number=4> [<port=%d> [ip=0.0.0.0]]]\n", argv[0], ST_ASIO_SERVER_PORT);
 	puts("normal server's port will be 100 larger.");
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
@@ -292,7 +292,7 @@ int main(int argc, const char* argv[])
 	global_packer->prefix_suffix("begin", "end");
 #endif
 
-	sp.start_service(thread_num);
+	sp.start_service(std::max(thread_num, sp.get_io_context_num()));
 	normal_server_.start_service(1);
 	short_server.start_service(1);
 	while(sp.is_running())

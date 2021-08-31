@@ -80,6 +80,7 @@ protected:
 			, work(io_context.get_executor())
 #else
 			, work(boost::make_shared<boost::asio::io_service::work>(boost::ref(io_context)))
+			//this wrapper boost::ref (and many others in st_asio_wrapper) is just for gcc 4.7, terrible gcc 4.7
 #endif
 #endif
 		{}
