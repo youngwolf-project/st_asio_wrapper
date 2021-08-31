@@ -49,7 +49,9 @@ public:
 		in_msg_type msg;
 		ST_THIS packer()->pack_heartbeat(msg);
 		dur.end();
-		do_direct_send_msg(msg);
+
+		if (!msg.empty())
+			do_direct_send_msg(msg);
 	}
 
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
