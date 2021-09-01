@@ -341,8 +341,9 @@ protected:
 	// include user timers(created by set_timer()) and user async calls(started via post(), dispatch() or defer()), this means you can clean up any resource
 	// in this socket except this socket itself, because this socket maybe is being maintained by object_pool.
 	//otherwise (bigger than zero), socket simply call this callback ST_ASIO_DELAY_CLOSE seconds later after link down, no any guarantees.
+	//if you overwrote this callback, do not forget to call parent class' on_close at the end.
 	virtual void on_close() {unified_out::info_out(ST_ASIO_LLF " on_close()", id());}
-	virtual void after_close() = 0; //a good case for using this is to reconnect the server (please refer to client_socket_base) and return io_context to service_pump.
+	virtual void after_close() {} //a good case for using this is to reconnect the server, please refer to client_socket_base.
 
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//return positive value if handled some messages (include all messages), if some msg left behind, socket will re-dispatch them asynchronously

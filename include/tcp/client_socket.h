@@ -169,20 +169,21 @@ protected:
 		return false;
 	}
 
-	//reconnect at here rather than in on_recv_error to make sure no async invocations performed on this socket before reconnecting.
-	//if you don't want to reconnect the server after link broken, rewrite this virtual function and do nothing in it or call close_reconnt().
-	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
-	virtual void after_close()
+	virtual void on_close()
 	{
-		if (need_reconnect)
-			ST_THIS start();
-		else if (NULL != matrix)
+		if (!need_reconnect && NULL != matrix)
 #if BOOST_ASIO_VERSION < 101100
 			matrix->get_service_pump().return_io_context(ST_THIS next_layer().get_io_service());
 #else
 			matrix->get_service_pump().return_io_context(ST_THIS next_layer().get_executor().context());
 #endif
+		super::on_close();
 	}
+
+	//reconnect at here rather than in on_recv_error to make sure no async invocations performed on this socket before reconnecting.
+	//if you don't want to reconnect the server after link broken, rewrite this virtual function and do nothing in it or call close_reconnt().
+	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
+	virtual void after_close() {if (need_reconnect) ST_THIS start();}
 
 	virtual bool bind() {return true;}
 

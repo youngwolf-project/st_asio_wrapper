@@ -234,14 +234,20 @@ protected:
 		return true;
 	}
 
+	virtual void on_close()
+	{
 #ifdef ST_ASIO_SYNC_SEND
-	virtual void on_close() {if (sending_msg.p) sending_msg.p->set_value(NOT_APPLICABLE); super::on_close();}
+		if (sending_msg.p)
+			sending_msg.p->set_value(NOT_APPLICABLE);
 #endif
+		if (NULL != matrix)
 #if BOOST_ASIO_VERSION < 101100
-	virtual void after_close() {if (NULL != matrix) matrix->get_service_pump().return_io_context(ST_THIS lowest_layer().get_io_service());}
+			matrix->get_service_pump().return_io_context(ST_THIS lowest_layer().get_io_service());
 #else
-	virtual void after_close() {if (NULL != matrix) matrix->get_service_pump().return_io_context(ST_THIS lowest_layer().get_executor().context());};
+			matrix->get_service_pump().return_io_context(ST_THIS lowest_layer().get_executor().context());
 #endif
+		 super::on_close();
+	}
 
 private:
 	using super::close;
