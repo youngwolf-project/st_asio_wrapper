@@ -112,6 +112,15 @@ protected:
 		super::after_close();
 	}
 
+	virtual bool change_io_context()
+	{
+		if (NULL == ST_THIS get_matrix())
+			return false;
+
+		ST_THIS reset_next_layer(ST_THIS get_matrix()->get_service_pump().assign_io_context(), ctx);
+		return true;
+	}
+
 private:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
 	{
@@ -172,12 +181,6 @@ public:
 	virtual const char* type_name() const {return "SSL (server endpoint)";}
 	virtual int type_id() const {return 4;}
 
-	virtual void reset()
-	{
-		ST_THIS reset_next_layer(ctx);
-		super::reset();
-	}
-
 	void disconnect() {force_shutdown();}
 	void force_shutdown() {graceful_shutdown();} //must with async mode (the default value), because server_base::uninit will call this function
 	void graceful_shutdown(bool sync = false) {if (ST_THIS is_ready()) shutdown_ssl(sync); else super::force_shutdown();}
@@ -192,6 +195,8 @@ protected:
 	}
 
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); ST_THIS force_shutdown();}
+
+	virtual bool change_io_context() {ST_THIS reset_next_layer(ST_THIS get_server().get_service_pump().assign_io_context(), ctx); return true;}
 
 private:
 	void handle_handshake(const boost::system::error_code& ec)

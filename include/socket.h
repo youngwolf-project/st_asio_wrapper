@@ -63,7 +63,7 @@ protected:
 		start_atomic.store(0, boost::memory_order_relaxed);
 	}
 
-	//guarantee no operations (include asynchronous operations) be performed on this socket during call following two functions.
+	//guarantee no operations (include asynchronous operations) be performed on this socket during call following reset_next_layer functions.
 #if BOOST_ASIO_VERSION <= 101100
 	void reset_next_layer() {reset_next_layer(next_layer_.get_io_service());}
 	template<typename Arg> void reset_next_layer(Arg& arg) {reset_next_layer(next_layer_.get_io_service(), arg);}
@@ -76,11 +76,10 @@ protected:
 	template<typename Arg> void reset_next_layer(Arg& arg) {reset_next_layer(next_layer_.get_executor(), arg);}
 #endif
 
-#if BOOST_ASIO_VERSION < 101300
 	void reset_next_layer(boost::asio::io_context& io_context) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(io_context);}
 	template<typename Arg>
 	void reset_next_layer(boost::asio::io_context& io_context, Arg& arg) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(io_context, arg);}
-#else
+#if BOOST_ASIO_VERSION >= 101300
 	void reset_next_layer(const boost::asio::any_io_executor& executor) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(executor);}
 	template<typename Arg>
 	void reset_next_layer(const boost::asio::any_io_executor& executor, Arg& arg) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(executor, arg);}
@@ -344,6 +343,19 @@ protected:
 	//if you overwrote this callback, do not forget to call parent class' on_close at the end.
 	virtual void on_close() {unified_out::info_out(ST_ASIO_LLF " on_close()", id());}
 	virtual void after_close() {} //a good case for using this is to reconnect the server, please refer to client_socket_base.
+
+	//reused socket still based on previous io_context, and may break the balance of io_context, if you want to balance io_context strictly,
+	// re-write this virtual function to re-create the next_layer base on the io_context which has the least references and return true, like:
+	//virtual bool change_io_context() {ST_THIS reset_next_layer(ST_THIS get_server().get_service_pump().assign_io_context()); return true;} or
+	//virtual bool change_io_context()
+	//{
+	//	if (NULL == ST_THIS get_matrix())
+	//		return false;
+	//
+	//	ST_THIS reset_next_layer(ST_THIS get_matrix()->get_service_pump().assign_io_context());
+	//	return true;
+	//}
+	virtual bool change_io_context() {return false;}
 
 #ifdef ST_ASIO_SYNC_DISPATCH
 	//return positive value if handled some messages (include all messages), if some msg left behind, socket will re-dispatch them asynchronously

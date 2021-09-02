@@ -82,10 +82,11 @@ public:
 		sending_msg.clear();
 
 		if (NULL != matrix)
+			if (!ST_THIS change_io_context())
 #if BOOST_ASIO_VERSION < 101100
-			matrix->get_service_pump().assign_io_context(ST_THIS lowest_layer().get_io_service());
+				matrix->get_service_pump().assign_io_context(ST_THIS lowest_layer().get_io_service());
 #else
-			matrix->get_service_pump().assign_io_context(ST_THIS lowest_layer().get_executor().context());
+				matrix->get_service_pump().assign_io_context(ST_THIS lowest_layer().get_executor().context());
 #endif
 		super::reset();
 	}
