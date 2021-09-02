@@ -165,6 +165,16 @@ protected:
 	}
 #endif
 
+	//demonstrate strict reference balance between multiple io_context.
+	virtual bool change_io_context()
+	{
+		if (NULL == get_matrix())
+			return false;
+
+		reset_next_layer(get_matrix()->get_service_pump().assign_io_context());
+		return true;
+	}
+
 private:
 	void handle_msg(out_msg_ctype& msg)
 	{

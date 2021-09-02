@@ -344,7 +344,7 @@ protected:
 	virtual void on_close() {unified_out::info_out(ST_ASIO_LLF " on_close()", id());}
 	virtual void after_close() {} //a good case for using this is to reconnect the server, please refer to client_socket_base.
 
-	//reused socket still based on previous io_context, and may break the balance of io_context, if you want to balance io_context strictly,
+	//reused socket still based on previous io_context, and may break the reference balance of multiple io_context, if you want to balance it strictly,
 	// re-write this virtual function to re-create the next_layer base on the io_context which has the least references and return true, like:
 	//virtual bool change_io_context() {ST_THIS reset_next_layer(ST_THIS get_server().get_service_pump().assign_io_context()); return true;} or
 	//virtual bool change_io_context()

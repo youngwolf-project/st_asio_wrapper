@@ -153,6 +153,9 @@ protected:
 	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg);}
 #endif
 	//msg handling end
+
+	//demonstrate strict reference balance between multiple io_context.
+	virtual bool change_io_context() {reset_next_layer(get_server().get_service_pump().assign_io_context()); return true;}
 };
 
 typedef server_base<echo_socket, object_pool<echo_socket>, i_echo_server> echo_server_base;
