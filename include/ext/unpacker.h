@@ -372,6 +372,7 @@ public:
 	virtual void reset() {}
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 		{assert(bytes_transferred <= ST_ASIO_MSG_BUFFER_SIZE); msg_can.emplace_back(raw_buff.data(), bytes_transferred); return true;}
+	virtual void compose_msg(const char* data, size_t size, container_type& msg_can) {assert(NULL != data && size > 0); msg_can.emplace_back(data, size);}
 
 #ifdef ST_ASIO_SCATTERED_RECV_BUFFER
 	//this is just to satisfy the compiler, it's not a real scatter-gather buffer,
@@ -444,6 +445,8 @@ public:
 		msg_can.emplace_back(new std::string(raw_buff.data(), bytes_transferred));
 		return true;
 	}
+	virtual void compose_msg(const char* data, size_t size, typename super::container_type& msg_can)
+		{assert(NULL != data && size > 0); msg_can.emplace_back(new std::string(data, size));}
 
 #ifdef ST_ASIO_SCATTERED_RECV_BUFFER
 	//this is just to satisfy the compiler, it's not a real scatter-gather buffer,

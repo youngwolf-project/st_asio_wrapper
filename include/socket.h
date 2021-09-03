@@ -169,7 +169,7 @@ private:
 public:
 #endif
 #ifndef ST_ASIO_EXPOSE_SEND_INTERFACE
-private:
+protected:
 #endif
 #ifdef ST_ASIO_ARBITRARY_SEND
 	void send_msg() {dispatch_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}

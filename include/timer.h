@@ -106,7 +106,7 @@ public:
 		{BOOST_AUTO(unused, call_back); return create_or_update_timer(id, interval, unused, start);}
 
 	bool change_timer_status(tid id, typename timer_info::timer_status status) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->status = status, true : false;}
-	bool change_timer_interval(tid id, size_t interval) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->interval_ms = interval, true : false;}
+	bool change_timer_interval(tid id, unsigned interval) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->interval_ms = interval, true : false;}
 
 	//after this call, call_back cannot be used again, please note.
 	bool change_timer_call_back(tid id, boost::function<bool(tid)>& call_back) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->call_back.swap(call_back), true : false;}

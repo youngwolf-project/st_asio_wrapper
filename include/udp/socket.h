@@ -247,8 +247,15 @@ protected:
 #else
 			matrix->get_service_pump().return_io_context(ST_THIS lowest_layer().get_executor().context());
 #endif
-		 super::on_close();
+		super::on_close();
 	}
+
+	//reliable UDP socket needs following virtual functions to specify different behaviors.
+	virtual bool check_send_cc() {return true;} //congestion control, return true means can continue to send messages
+	virtual bool do_send_msg(const typename super::in_msg& sending_msg) {return false;} //customize message sending, for connected socket only
+	virtual void pre_handle_msg(typename Unpacker::container_type& msg_can) {}
+
+	void resume_sending() {sending = false; super::send_msg();} //for reliable UDP socket only
 
 private:
 	using super::close;
@@ -294,6 +301,9 @@ private:
 			typename Unpacker::container_type msg_can;
 			ST_THIS unpacker()->parse_msg(bytes_transferred, msg_can);
 
+			if (is_connected)
+				pre_handle_msg(msg_can);
+
 #ifdef ST_ASIO_PASSIVE_RECV
 			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
@@ -326,15 +336,19 @@ private:
 		if (!in_strand && sending)
 			return true;
 
-		if ((sending = send_buffer.try_dequeue(sending_msg)))
+		if (is_connected && !check_send_cc())
+			sending = true;
+		else if ((sending = send_buffer.try_dequeue(sending_msg)))
 		{
 			stat.send_delay_sum += statistic::now() - sending_msg.begin_time;
 			sending_msg.restart();
-			if (is_connected)
-				ST_THIS next_layer().async_send(boost::asio::buffer(sending_msg.data(), sending_msg.size()), make_strand_handler(rw_strand,
-					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
-			else
+			if (!is_connected)
 				ST_THIS next_layer().async_send_to(boost::asio::buffer(sending_msg.data(), sending_msg.size()), sending_msg.peer_addr, make_strand_handler(rw_strand,
+					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+			else if (do_send_msg(sending_msg))
+				ST_THIS post_strand(rw_strand, boost::bind(&generic_socket::send_handler, this, boost::system::error_code(), sending_msg.size()));
+			else
+				ST_THIS next_layer().async_send(boost::asio::buffer(sending_msg.data(), sending_msg.size()), make_strand_handler(rw_strand,
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}

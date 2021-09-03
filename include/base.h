@@ -260,6 +260,7 @@ public:
 	virtual void dump_left_data() const {}
 	//heartbeat must not be included in msg_can, otherwise you must handle heartbeat at where you handle normal messages.
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) = 0;
+	virtual void compose_msg(const char* data, size_t size, container_type& msg_can) {} //reliable UDP socket needs this
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred) {return 0;}
 	virtual buffer_type prepare_next_recv() = 0;
 

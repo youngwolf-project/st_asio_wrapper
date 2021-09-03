@@ -818,7 +818,8 @@
  *  this is because after a socket been reused, its next_layer still based on previous io_context, this may break the reference balance of
  *  multiple io_context, re-write this virtual function to re-create the next_layer base on the io_context which has the least references.
  *  ssl's server_socket_base and client_socket_base already did this, please note.
- * Support reliable UDP (based on KCP -- https://github.com/skywind3000/kcp.git).
+ * Support reliable UDP (based on KCP -- https://github.com/skywind3000/kcp.git), thus introduce new macro ST_ASIO_RELIABLE_UDP_NSND_QUE to
+ *  specify the default value of the max size of ikcpcb::nsnd_que (congestion control).
  * Support connected UDP socket, set macro ST_ASIO_UDP_CONNECT_MODE to true to open it, you must also provide peer's ip address via set_peer_addr,
  *  function set_connect_mode can open it too (before start_service). For connected UDP socket, the peer_addr parameter in send_msg (series)
  *  will be ignored, please note.
@@ -1139,6 +1140,13 @@
 
 #ifndef ST_ASIO_UDP_CONNECT_MODE
 #define ST_ASIO_UDP_CONNECT_MODE false
+#endif
+
+//max value that ikcpcb::nsnd_que can get to, then st_asio_wrapper will suspend message sending (congestion control).
+#ifndef ST_ASIO_RELIABLE_UDP_NSND_QUE
+#define ST_ASIO_RELIABLE_UDP_NSND_QUE 1024
+#elif ST_ASIO_RELIABLE_UDP_NSND_QUE < 0
+	#error kcp send queue must be bigger than or equal to zero.
 #endif
 
 //close port reuse
