@@ -39,7 +39,7 @@ public:
 	~reliable_socket_base() {release_kcp();}
 
 	ikcpcb* get_kcpcb() {return kcp;}
-	ikcpcb* create_kcpcb(IUINT32 conv, void* user) {release_kcp(); return (kcp = ikcp_create(conv, user));}
+	ikcpcb* create_kcpcb(IUINT32 conv, void* user) {if (ST_THIS started()) return NULL; release_kcp(); return (kcp = ikcp_create(conv, user));}
 
 	IUINT32 get_max_nsnd_que() const {return max_nsnd_que;}
 	void set_max_nsnd_que(IUINT32 max_nsnd_que_) {max_nsnd_que = max_nsnd_que_;}
@@ -105,7 +105,7 @@ protected:
 		return super::do_start();
 	}
 
-	virtual void on_close() {if (NULL != kcp) ikcp_release(kcp); kcp = NULL; super::on_close();}
+	virtual void on_close() {release_kcp(); super::on_close();}
 
 	virtual bool check_send_cc() //congestion control, return true means can continue to send messages
 	{
@@ -163,8 +163,7 @@ private:
 	IUINT32 kcp_check()
 	{
 		IUINT32 now = iclock();
-		IUINT32 cp = ikcp_check(kcp, now);
-		return cp >= now ? cp - now : (IUINT32) -1 - now + 1 + cp; //consider overflow for 32bit interger
+		return ikcp_check(kcp, now) - now;
 	}
 
 	bool timer_handler(typename super::tid id)
