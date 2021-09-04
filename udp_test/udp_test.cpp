@@ -22,13 +22,13 @@ using namespace st_asio_wrapper;
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 
-void sync_recv_thread(ext::udp::single_reliable_socket_service& service)
+void sync_recv_thread(ext::udp::reliable_socket& socket)
 {
-	list<ext::udp::single_reliable_socket_service::out_msg_type> msg_can;
+	list<ext::udp::reliable_socket::out_msg_type> msg_can;
 	sync_call_result re = SUCCESS;
 	do
 	{
-		re = service.sync_recv_msg(msg_can, 50); //st_asio_wrapper will not maintain messages in msg_can anymore after sync_recv_msg return, please note.
+		re = socket.sync_recv_msg(msg_can, 50); //st_asio_wrapper will not maintain messages in msg_can anymore after sync_recv_msg return, please note.
 		if (SUCCESS == re)
 		{
 			for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)

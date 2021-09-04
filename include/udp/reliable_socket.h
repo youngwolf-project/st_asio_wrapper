@@ -36,10 +36,10 @@ public:
 public:
 	reliable_socket_base(boost::asio::io_context& io_context_) : super(io_context_), kcp(NULL), need_kcp_check(false), max_nsnd_que(ST_ASIO_RELIABLE_UDP_NSND_QUE) {}
 	reliable_socket_base(Matrix& matrix_) : super(matrix_), kcp(NULL), need_kcp_check(false), max_nsnd_que(ST_ASIO_RELIABLE_UDP_NSND_QUE) {}
-	~reliable_socket_base() {if (NULL != kcp) ikcp_release(kcp); kcp = NULL;}
+	~reliable_socket_base() {release_kcp();}
 
 	ikcpcb* get_kcpcb() {return kcp;}
-	ikcpcb* create_kcpcb(IUINT32 conv, void* user) {return (kcp = ikcp_create(conv, user));}
+	ikcpcb* create_kcpcb(IUINT32 conv, void* user) {release_kcp(); return (kcp = ikcp_create(conv, user));}
 
 	IUINT32 get_max_nsnd_que() const {return max_nsnd_que;}
 	void set_max_nsnd_que(IUINT32 max_nsnd_que_) {max_nsnd_que = max_nsnd_que_;}
@@ -94,6 +94,7 @@ public:
 	{
 		return (IUINT32)(iclock64() & 0xfffffffful);
 	}
+	//from kpc's test.h
 
 protected:
 	virtual bool do_start()
@@ -202,6 +203,8 @@ private:
 
 		return false;
 	}
+
+	void release_kcp() {if (NULL != kcp) ikcp_release(kcp); kcp = NULL;}
 
 private:
 	ikcpcb* kcp;
