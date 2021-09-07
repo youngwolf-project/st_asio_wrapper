@@ -60,7 +60,7 @@ protected:
 	struct context
 	{
 		boost::asio::io_context io_context;
-		boost::uint_fast64_t refs;
+		unsigned refs;
 #ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
 #if BOOST_ASIO_VERSION > 101100
 		boost::asio::executor_work_guard<typename boost::asio::io_context::executor_type> work;
@@ -126,8 +126,18 @@ public:
 	}
 #endif
 #endif
-	int get_io_context_num() const {return (int) context_can.size();}
 	virtual ~service_pump() {stop_service();}
+
+	int get_io_context_num() const {return (int) context_can.size();}
+	void get_io_context_refs(boost::container::list<unsigned>& refs)
+	{
+		if (!single_io_context)
+		{
+			boost::lock_guard<boost::mutex> lock(context_can_mutex);
+			for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+				refs.push_back(iter->refs);
+		}
+	}
 
 	operator boost::asio::io_context& () {return assign_io_context();}
 #if BOOST_ASIO_VERSION > 101100
@@ -139,7 +149,7 @@ public:
 			return context_can.front().io_context;
 
 		context* ctx = NULL;
-		boost::uint_fast64_t refs = 0;
+		unsigned refs = 0;
 
 		boost::lock_guard<boost::mutex> lock(context_can_mutex);
 		for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
