@@ -245,6 +245,9 @@ public:
 		st_asio_wrapper::do_something_to_all(temp_service_can, boost::bind(&service_pump::stop_and_free, this, boost::placeholders::_1));
 	}
 
+	//stop io_context directly, call this only if the stop_service invocation cannot stop the io_context
+	void stop() {for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter) iter->io_context.stop();}
+
 	void start_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM) {if (!is_service_started()) do_service(thread_num);}
 	//stop the service, must be invoked explicitly when the service need to stop, for example, close the application
 	void stop_service()
