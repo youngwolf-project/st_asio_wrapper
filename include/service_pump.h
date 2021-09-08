@@ -63,7 +63,7 @@ protected:
 		unsigned refs;
 #ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
 #if BOOST_ASIO_VERSION > 101100
-		boost::asio::executor_work_guard<typename boost::asio::io_context::executor_type> work;
+		boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work;
 #else
 		boost::shared_ptr<boost::asio::io_service::work> work;
 #endif
