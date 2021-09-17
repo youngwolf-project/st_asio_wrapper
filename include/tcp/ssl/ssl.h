@@ -225,10 +225,10 @@ template<typename Socket> class single_client_base : public tcp::single_client_b
 public:
 	single_client_base(service_pump& service_pump_, boost::asio::ssl::context& ctx) : tcp::single_client_base<Socket>(service_pump_, ctx) {}
 };
-template<typename Socket, typename Pool = object_pool<Socket> > class multi_client_base : public tcp::multi_client_base<Socket, Pool>
+template<typename Socket, typename Pool = object_pool<Socket>, typename Matrix = i_matrix> class multi_client_base : public tcp::multi_client_base<Socket, Pool, Matrix>
 {
 public:
-	multi_client_base(service_pump& service_pump_, const boost::asio::ssl::context::method& m) : tcp::multi_client_base<Socket, Pool>(service_pump_, m) {}
+	multi_client_base(service_pump& service_pump_, const boost::asio::ssl::context::method& m) : tcp::multi_client_base<Socket, Pool, Matrix>(service_pump_, m) {}
 };
 
 }} //namespace
