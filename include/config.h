@@ -807,7 +807,7 @@
  * REPLACEMENTS:
  *
  * ===============================================================
- * 2021.x.x		version 2.4.0
+ * 2021.9.18	version 2.4.0
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * client_socket's function open_reconnect and close_reconnect have been replaced by function set_reconnect(bool).
