@@ -49,7 +49,9 @@ public:
 		in_msg_type msg;
 		ST_THIS packer()->pack_heartbeat(msg);
 		dur.end();
-		do_direct_send_msg(msg);
+
+		if (!msg.empty())
+			do_direct_send_msg(msg);
 	}
 
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
@@ -404,7 +406,9 @@ private:
 #endif
 #endif
 			sending_msgs.clear();
+#ifndef ST_ASIO_ARBITRARY_SEND
 			if (!do_send_msg(true) && !send_buffer.empty()) //send msg in sequence
+#endif
 				do_send_msg(true); //just make sure no pending msgs
 		}
 		else

@@ -57,11 +57,11 @@ public:
 	}
 
 protected:
-	generic_socket(boost::asio::io_context& io_context_) : super(io_context_), has_bound(false), matrix(NULL) {}
-	generic_socket(Matrix& matrix_) : super(matrix_.get_service_pump()), has_bound(false), matrix(&matrix_) {}
+	generic_socket(boost::asio::io_context& io_context_) : super(io_context_), is_bound(false), is_connected(false), connect_mode(ST_ASIO_UDP_CONNECT_MODE), matrix(NULL) {}
+	generic_socket(Matrix& matrix_) : super(matrix_.get_service_pump()), is_bound(false), is_connected(false), connect_mode(ST_ASIO_UDP_CONNECT_MODE), matrix(&matrix_) {}
 
 public:
-	virtual bool is_ready() {return has_bound;}
+	virtual bool is_ready() {return is_bound;}
 	virtual void send_heartbeat()
 	{
 		in_msg_type msg(peer_addr);
@@ -78,11 +78,22 @@ public:
 	//for udp::single_service_base, this virtual function will never be called, please note.
 	virtual void reset()
 	{
-		has_bound = false;
-
+		is_connected = is_bound = false;
 		sending_msg.clear();
+
+		if (NULL != matrix)
+			if (!ST_THIS change_io_context())
+#if BOOST_ASIO_VERSION < 101100
+				matrix->get_service_pump().assign_io_context(ST_THIS lowest_layer().get_io_service());
+#else
+				matrix->get_service_pump().assign_io_context(ST_THIS lowest_layer().get_executor().context());
+#endif
 		super::reset();
 	}
+
+	bool connected() const {return is_connected;}
+	void set_connect_mode() {connect_mode = true;}
+	bool get_connect_mode() const {return connect_mode;}
 
 	bool set_local_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(local_addr, port, ip);}
 	bool set_local_addr(const std::string& file_name) {local_addr = typename Family::endpoint(file_name); return true;}
@@ -173,6 +184,7 @@ protected:
 	const Matrix* get_matrix() const {return matrix;}
 
 	virtual bool bind(const typename Family::endpoint& local_addr) {return true;}
+	virtual bool connect(const typename Family::endpoint& peer_addr) {return false;}
 
 	virtual bool do_start()
 	{
@@ -184,7 +196,7 @@ protected:
 			if (ec)
 			{
 				unified_out::error_out("cannot create socket: %s", ec.message().data());
-				return (has_bound = false);
+				return (is_bound = false);
 			}
 
 #ifndef ST_ASIO_NOT_REUSE_ADDRESS
@@ -193,9 +205,11 @@ protected:
 		}
 
 		if (!bind(local_addr))
-			return (has_bound = false);
+			return (is_bound = false);
+		else if (connect_mode)
+			is_connected = connect(peer_addr);
 
-		return (has_bound = true) && super::do_start();
+		return (is_bound = true) && super::do_start();
 	}
 
 	//msg was failed to send and udp::generic_socket will not hold it any more, if you want to re-send it in the future,
@@ -221,9 +235,27 @@ protected:
 		return true;
 	}
 
+	virtual void on_close()
+	{
 #ifdef ST_ASIO_SYNC_SEND
-	virtual void on_close() {if (sending_msg.p) sending_msg.p->set_value(NOT_APPLICABLE); super::on_close();}
+		if (sending_msg.p)
+			sending_msg.p->set_value(NOT_APPLICABLE);
 #endif
+		if (NULL != matrix)
+#if BOOST_ASIO_VERSION < 101100
+			matrix->get_service_pump().return_io_context(ST_THIS lowest_layer().get_io_service());
+#else
+			matrix->get_service_pump().return_io_context(ST_THIS lowest_layer().get_executor().context());
+#endif
+		super::on_close();
+	}
+
+	//reliable UDP socket needs following virtual functions to specify different behaviors.
+	virtual bool check_send_cc() {return true;} //congestion control, return true means can continue to send messages
+	virtual bool do_send_msg(const typename super::in_msg& sending_msg) {return false;} //customize message sending, for connected socket only
+	virtual void pre_handle_msg(typename Unpacker::container_type& msg_can) {}
+
+	void resume_sending() {sending = false; super::send_msg();} //for reliable UDP socket only
 
 private:
 	using super::close;
@@ -251,8 +283,12 @@ private:
 #ifdef ST_ASIO_PASSIVE_RECV
 			reading = true;
 #endif
-			ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(rw_strand,
-				ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+			if (is_connected)
+				ST_THIS next_layer().async_receive(recv_buff, make_strand_handler(rw_strand,
+					ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+			else
+				ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(rw_strand,
+					ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 		}
 	}
 
@@ -265,11 +301,14 @@ private:
 			typename Unpacker::container_type msg_can;
 			ST_THIS unpacker()->parse_msg(bytes_transferred, msg_can);
 
+			if (is_connected)
+				pre_handle_msg(msg_can);
+
 #ifdef ST_ASIO_PASSIVE_RECV
 			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
 #endif
 			for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
-				temp_msg_can.emplace_back(temp_addr, boost::ref(*iter));
+				temp_msg_can.emplace_back(is_connected ? peer_addr : temp_addr, boost::ref(*iter));
 			if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
 				do_recv_msg(); //receive msg in sequence
 		}
@@ -297,13 +336,20 @@ private:
 		if (!in_strand && sending)
 			return true;
 
-		if ((sending = send_buffer.try_dequeue(sending_msg)))
+		if (is_connected && !check_send_cc())
+			sending = true;
+		else if ((sending = send_buffer.try_dequeue(sending_msg)))
 		{
 			stat.send_delay_sum += statistic::now() - sending_msg.begin_time;
-
 			sending_msg.restart();
-			ST_THIS next_layer().async_send_to(boost::asio::buffer(sending_msg.data(), sending_msg.size()), sending_msg.peer_addr, make_strand_handler(rw_strand,
-				ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+			if (!is_connected)
+				ST_THIS next_layer().async_send_to(boost::asio::buffer(sending_msg.data(), sending_msg.size()), sending_msg.peer_addr, make_strand_handler(rw_strand,
+					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+			else if (do_send_msg(sending_msg))
+				ST_THIS post_strand(rw_strand, boost::bind(&generic_socket::send_handler, this, boost::system::error_code(), sending_msg.size()));
+			else
+				ST_THIS next_layer().async_send(boost::asio::buffer(sending_msg.data(), sending_msg.size()), make_strand_handler(rw_strand,
+					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
 
@@ -363,7 +409,7 @@ private:
 #endif
 	using super::rw_strand;
 
-	bool has_bound;
+	bool is_bound, is_connected, connect_mode;
 	typename super::in_msg sending_msg;
 	typename Family::endpoint local_addr;
 	typename Family::endpoint temp_addr; //used when receiving messages
@@ -400,6 +446,23 @@ protected:
 
 		return true;
 	}
+
+	virtual bool connect(const boost::asio::ip::udp::endpoint& peer_addr)
+	{
+		if (0 != peer_addr.port() || !peer_addr.address().is_unspecified())
+		{
+			boost::system::error_code ec;
+			ST_THIS lowest_layer().connect(peer_addr, ec);
+			if (ec)
+				unified_out::error_out("cannot connect to the peer");
+			else
+				return true;
+		}
+		else
+			unified_out::error_out("invalid peer ip address");
+
+		return false;
+	}
 };
 
 #ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
@@ -430,6 +493,23 @@ protected:
 		}
 
 		return true;
+	}
+
+	virtual bool connect(const boost::asio::local::datagram_protocol::endpoint& peer_addr)
+	{
+		if (!peer_addr.path().empty())
+		{
+			boost::system::error_code ec;
+			ST_THIS lowest_layer().connect(peer_addr, ec);
+			if (ec)
+				unified_out::error_out("cannot connect to the peer");
+			else
+				return true;
+		}
+		else
+			unified_out::error_out("invalid peer path");
+
+		return false;
 	}
 };
 #endif

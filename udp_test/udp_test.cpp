@@ -11,23 +11,24 @@
 							 //you will see them cross together on the receiver's screen.
 							 //with this macro, if heartbeat not applied, macro ST_ASIO_AVOID_AUTO_STOP_SERVICE must be defined to avoid the service_pump run out.
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
+#define ST_ASIO_UDP_CONNECT_MODE true
 //#define ST_ASIO_HEARTBEAT_INTERVAL 5 //neither udp_unpacker nor udp_unpacker2 support heartbeat message, so heartbeat will be treated as normal message.
 //#define ST_ASIO_DEFAULT_UDP_UNPACKER udp_unpacker2<>
 //configuration
 
-#include "../include/ext/udp.h"
+#include "../include/ext/reliable_udp.h"
 using namespace st_asio_wrapper;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
 
-void sync_recv_thread(ext::udp::single_socket_service& service)
+void sync_recv_thread(ext::udp::reliable_socket& socket)
 {
-	list<ext::udp::single_socket_service::out_msg_type> msg_can;
+	list<ext::udp::reliable_socket::out_msg_type> msg_can;
 	sync_call_result re = SUCCESS;
 	do
 	{
-		re = service.sync_recv_msg(msg_can, 50); //st_asio_wrapper will not maintain messages in msg_can anymore after sync_recv_msg return, please note.
+		re = socket.sync_recv_msg(msg_can, 50); //st_asio_wrapper will not maintain messages in msg_can anymore after sync_recv_msg return, please note.
 		if (SUCCESS == re)
 		{
 			for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
@@ -37,6 +38,10 @@ void sync_recv_thread(ext::udp::single_socket_service& service)
 	} while (SUCCESS == re || TIMEOUT == re);
 	puts("sync recv end.");
 }
+
+//because st_asio_wrapper is header only, it cannot provide the implementation of below global function, but kcp needs it,
+//you're supposed to provide it and call reliable_socket_base::output directly in it, like:
+int output(const char* buf, int len, ikcpcb* kcp, void* user) {return ((ext::udp::single_reliable_socket_service*) user)->output(buf, len);}
 
 int main(int argc, const char* argv[])
 {
@@ -49,9 +54,14 @@ int main(int argc, const char* argv[])
 		puts("type " QUIT_COMMAND " to end.");
 
 	service_pump sp;
-	ext::udp::single_socket_service service(sp);
+	ext::udp::single_reliable_socket_service service(sp);
 	service.set_local_addr((unsigned short) atoi(argv[1])); //for multicast, do not bind to a specific IP, just port is enough
 	service.set_peer_addr((unsigned short) atoi(argv[2]), argc >= 4 ? argv[3] : "127.0.0.1");
+
+	//reliable_socket cannot become reliable without below statement, instead, it downgrade to normal UDP socket
+	service.create_kcpcb(0, (void*) &service);
+	//without below statement, your application will core dump
+	ikcp_setoutput(service.get_kcpcb(), &output);
 
 	sp.start_service();
 	//for broadcast

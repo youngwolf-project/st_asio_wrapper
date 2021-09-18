@@ -15,7 +15,7 @@
 //#define ST_ASIO_USE_STEADY_TIMER
 #define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
-#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+//#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //#define ST_ASIO_MAX_SEND_BUF	65536
 //#define ST_ASIO_MAX_RECV_BUF	65536
 //if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF macro.
@@ -164,6 +164,16 @@ protected:
 		send_msg(pstr, msg_len, true);
 	}
 #endif
+
+	//demonstrate strict reference balance between multiple io_context.
+	virtual bool change_io_context()
+	{
+		if (NULL == get_matrix())
+			return false;
+
+		reset_next_layer(get_matrix()->get_service_pump().assign_io_context());
+		return true;
+	}
 
 private:
 	void handle_msg(out_msg_ctype& msg)
@@ -406,7 +416,7 @@ void start_test(int repeat_times, char mode, echo_client& client, size_t send_th
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: %s [<service thread number=1> [<send thread number=8> [<port=%d> [<ip=%s> [link num=16]]]]]\n", argv[0], ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
+	printf("usage: %s [<service thread number=4> [<send thread number=8> [<port=%d> [<ip=%s> [link num=16]]]]]\n", argv[0], ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -421,6 +431,12 @@ int main(int argc, const char* argv[])
 	///////////////////////////////////////////////////////////
 
 	service_pump sp;
+#ifndef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+	//if you want to decrease service thread at runtime, then you cannot use multiple io_context, if somebody indeed needs it, please let me know.
+	//with multiple io_context, the number of service thread must be bigger than or equal to the number of io_context, please note.
+	//with multiple io_context, please also define macro ST_ASIO_AVOID_AUTO_STOP_SERVICE.
+	sp.set_io_context_num(4);
+#endif
 	echo_client client(sp);
 	//echo client means to cooperate with echo server while doing performance test, it will not send msgs back as echo server does,
 	//otherwise, dead loop will occur, network resource will be exhausted.
@@ -457,7 +473,7 @@ int main(int argc, const char* argv[])
 	//or just add up total message size), under this scenario, just one service thread without receiving buffer will obtain the best IO throughput.
 	//the server has such behavior too.
 
-	sp.start_service(thread_num);
+	sp.start_service(std::max(thread_num, sp.get_io_context_num()));
 	while(sp.is_running())
 	{
 		std::string str;
@@ -478,8 +494,10 @@ int main(int argc, const char* argv[])
 			client.list_all_object();
 		else if (INCREASE_THREAD == str)
 			sp.add_service_thread(1);
+#ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 		else if (DECREASE_THREAD == str)
 			sp.del_service_thread(1);
+#endif
 		else if (is_testing)
 			puts("testing has not finished yet!");
 		else if (QUIT_COMMAND == str)

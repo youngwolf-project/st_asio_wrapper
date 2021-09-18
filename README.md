@@ -10,8 +10,9 @@ st_asio_wrapper is an asynchronous c/s framework based on Boost.Asio, besides al
 5. Worker thread management;</br>
 6. Support message buffer;</br>
 7. Widely support timers;</br>
-8. Support TCP/UDP;</br>
-9. Support ssl;</br>
+8. Support TCP/UDP and Unix domin TCP/UDP;</br>
+9. Support reliable UDP (base on KCP -- https://github.com/skywind3000/kcp);</br>
+10. Support ssl;</br>
 
 Quick start:
 -

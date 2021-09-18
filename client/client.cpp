@@ -57,7 +57,7 @@ public:
 	short_connection(i_matrix& matrix_) : socks4::client_socket(matrix_) {}
 
 protected:
-	virtual void on_connect() {close_reconnect(); client_socket::on_connect();} //close reconnecting mechanism
+	virtual void on_connect() {set_reconnect(false); client_socket::on_connect();} //close reconnecting mechanism
 };
 
 class short_client : public multi_client_base<short_connection>

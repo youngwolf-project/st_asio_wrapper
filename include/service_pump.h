@@ -18,14 +18,14 @@
 namespace st_asio_wrapper
 {
 
-class service_pump : public boost::asio::io_context
+class service_pump
 {
 public:
 	class i_service
 	{
 	protected:
-		i_service(service_pump& service_pump_) : sp(service_pump_), started_(false), id_(0), data(NULL) {service_pump_.add(this);}
-		virtual ~i_service() {}
+		i_service(service_pump& service_pump_) : sp(service_pump_), started_(false), id_(0), data(NULL) {sp.add(this);}
+		virtual ~i_service() {sp.remove(this);}
 
 	public:
 		//for the same i_service, start_service and stop_service are not thread safe,
@@ -56,28 +56,151 @@ public:
 		void* data; //magic data, you can use it in any way
 	};
 
+protected:
+	struct context
+	{
+		boost::asio::io_context io_context;
+		unsigned refs;
+#ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
+#if BOOST_ASIO_VERSION > 101100
+		boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work;
+#else
+		boost::shared_ptr<boost::asio::io_service::work> work;
+#endif
+#endif
+		boost::thread_group threads;
+
+#if BOOST_ASIO_VERSION >= 101200
+		context(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : io_context(concurrency_hint), refs(0)
+#else
+		context() : refs(0)
+#endif
+#ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
+#if BOOST_ASIO_VERSION > 101100
+			, work(io_context.get_executor())
+#else
+			, work(boost::make_shared<boost::asio::io_service::work>(boost::ref(io_context)))
+			//this wrapper boost::ref (and many others in st_asio_wrapper) is just for gcc 4.7, terrible gcc 4.7
+#endif
+#endif
+		{}
+	};
+
 public:
 	typedef i_service* object_type;
 	typedef const object_type object_ctype;
 	typedef boost::container::list<object_type> container_type;
 
 #if BOOST_ASIO_VERSION >= 101200
-	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : boost::asio::io_context(concurrency_hint), started(false)
-#else
-	service_pump() : started(false)
-#endif
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-		, real_thread_num(0), del_thread_num(0)
-#endif
-#ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
-#if BOOST_ASIO_VERSION >= 101100
-		, work(get_executor())
+	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : started(false), real_thread_num(0), del_thread_num(0), single_io_context(true)
+		{context_can.emplace_back(concurrency_hint);}
 #else
-		, work(boost::make_shared<boost::asio::io_service::work>(boost::ref(*this)))
+	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : started(false), single_io_context(true) {context_can.emplace_back(concurrency_hint);}
+	bool set_io_context_num(int io_context_num, int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) //call this before adding any services to this service_pump
+	{
+		if (io_context_num < 1 || is_service_started() || context_can.size() > 1) //can only be called once
+			return false;
+
+		for (int i = 1; i < io_context_num; ++i)
+			context_can.emplace_back(concurrency_hint);
+		single_io_context = context_can.size() < 2;
+
+		return true;
+	}
+#endif
+#else
+#ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+	service_pump() : started(false), real_thread_num(0), del_thread_num(0), single_io_context(true), context_can(1) {}
+#else
+	service_pump() : started(false), single_io_context(true), context_can(1) {}
+	bool set_io_context_num(int io_context_num) //call this before adding any services to this service_pump
+	{
+		if (io_context_num < 1 || is_service_started() || context_can.size() > 1) //can only be called once
+			return false;
+
+		context_can.resize(io_context_num);
+		single_io_context = context_can.size() < 2;
+
+		return true;
+	}
 #endif
 #endif
-	{}
 	virtual ~service_pump() {stop_service();}
+
+	int get_io_context_num() const {return (int) context_can.size();}
+	void get_io_context_refs(boost::container::list<unsigned>& refs)
+	{
+		if (!single_io_context)
+		{
+			boost::lock_guard<boost::mutex> lock(context_can_mutex);
+			for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+				refs.push_back(iter->refs);
+		}
+	}
+
+	operator boost::asio::io_context& () {return assign_io_context();}
+#if BOOST_ASIO_VERSION > 101100
+	boost::asio::io_context::executor_type get_executor() {return assign_io_context().get_executor();}
+#endif
+	boost::asio::io_context& assign_io_context(bool increase_ref = true) //pick the context which has the least references
+	{
+		if (single_io_context)
+			return context_can.front().io_context;
+
+		context* ctx = NULL;
+		unsigned refs = 0;
+
+		boost::lock_guard<boost::mutex> lock(context_can_mutex);
+		for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+		{
+			if (0 == iter->refs || 0 == refs || refs > iter->refs)
+			{
+				refs = iter->refs;
+				ctx = &*iter;
+			}
+
+			if (0 == iter->refs)
+				break;
+		}
+
+		if (NULL != ctx)
+		{
+			if (increase_ref)
+				++ctx->refs;
+
+			return ctx->io_context;
+		}
+
+		throw "no available io_context!";
+	}
+
+	void return_io_context(const boost::asio::execution_context& io_context)
+	{
+		if (!single_io_context)
+		{
+			boost::lock_guard<boost::mutex> lock(context_can_mutex);
+			for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+				if (&io_context == &iter->io_context)
+				{
+					--iter->refs;
+					break;
+				}
+		}
+	}
+	void assign_io_context(const boost::asio::execution_context& io_context)
+	{
+		if (!single_io_context)
+		{
+			boost::lock_guard<boost::mutex> lock(context_can_mutex);
+			for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+				if (&io_context == &iter->io_context)
+				{
+					++iter->refs;
+					break;
+				}
+		}
+	}
 
 	object_type find(int id)
 	{
@@ -122,6 +245,9 @@ public:
 		st_asio_wrapper::do_something_to_all(temp_service_can, boost::bind(&service_pump::stop_and_free, this, boost::placeholders::_1));
 	}
 
+	//stop io_context directly, call this only if the stop_service invocation cannot stop the io_context
+	void stop() {for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter) iter->io_context.stop();}
+
 	void start_service(int thread_num = ST_ASIO_SERVICE_THREAD_NUM) {if (!is_service_started()) do_service(thread_num);}
 	//stop the service, must be invoked explicitly when the service need to stop, for example, close the application
 	void stop_service()
@@ -155,8 +281,7 @@ public:
 	{
 		if (!is_service_started())
 		{
-			do_service(thread_num - 1);
-			run();
+			do_service(thread_num, true);
 			wait_service();
 		}
 	}
@@ -169,39 +294,93 @@ public:
 		if (is_service_started())
 		{
 #ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
-			work.reset();
+			for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+				iter->work.reset();
 #endif
 			do_something_to_all(boost::mem_fn(&i_service::stop_service));
 		}
 	}
 
-	bool is_running() const {return !stopped();}
+	bool is_running() const
+	{
+		for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+			if (!iter->io_context.stopped())
+				return true;
+
+		return false;
+	}
 	bool is_service_started() const {return started;}
 
-	void add_service_thread(int thread_num) {for (int i = 0; i < thread_num; ++i) service_threads.create_thread(boost::bind(&service_pump::run, this));}
+	//not thread safe
+#if BOOST_ASIO_VERSION >= 101200
+	void add_service_thread(int thread_num, bool block = false, int io_context_num = 0, int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE)
+#else
+	void add_service_thread(int thread_num, bool block = false, int io_context_num = 0)
+#endif
+	{
+		if (io_context_num > 0)
+		{
+			if (thread_num < io_context_num)
+			{
+				unified_out::error_out("thread_num must be bigger than or equal to io_context_num.");
+				return;
+			}
+			else
+			{
+				single_io_context = false;
+				boost::lock_guard<boost::mutex> lock(context_can_mutex);
+#if BOOST_ASIO_VERSION >= 101200
+				for (int i = 0; i < io_context_num; ++i)
+					context_can.emplace_back(concurrency_hint);
+#else
+				context_can.resize((size_t) io_context_num + context_can.size());
+#endif
+			}
+		}
+
+		for (int i = 0; i < thread_num; ++i)
+		{
+			BOOST_AUTO(ctx, assign_thread());
+			if (NULL == ctx)
+				unified_out::error_out("no available io_context!");
+			else if (block && i + 1 == thread_num)
+				run(ctx); //block at here
+			else
+				ctx->threads.create_thread(boost::bind(&service_pump::run, this, ctx));
+		}
+	}
+
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-	void del_service_thread(int thread_num) {if (thread_num > 0) {del_thread_num += thread_num;}}
+	void del_service_thread(int thread_num) {if (thread_num > 0) del_thread_num += thread_num;}
 	int service_thread_num() const {return real_thread_num;}
 #endif
 
 protected:
-	void do_service(int thread_num)
+	void do_service(int thread_num, bool block = false)
 	{
+		if (thread_num <= 0 || (size_t) thread_num < context_can.size())
+		{
+			unified_out::error_out("thread_num must be bigger than or equal to io_context_num.");
+			return;
+		}
+
 		started = true;
 		unified_out::info_out("service pump started.");
 
+		for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
 #if BOOST_ASIO_VERSION >= 101100
-		restart(); //this is needed when restart service
+			iter->io_context.restart(); //this is needed when restart service
 #else
-		reset(); //this is needed when restart service
+			iter->io_context.reset(); //this is needed when restart service
 #endif
 		do_something_to_all(boost::mem_fn(&i_service::start_service));
-		add_service_thread(thread_num);
+		add_service_thread(thread_num, block);
 	}
 
 	void wait_service()
 	{
-		service_threads.join_all();
+		for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+			iter->threads.join_all();
 
 		started = false;
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
@@ -228,7 +407,7 @@ protected:
 #endif
 
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-	size_t run()
+	size_t run(context* ctx)
 	{
 		size_t n = 0;
 
@@ -254,9 +433,9 @@ protected:
 			//we cannot always decrease service thread timely (because run_one can block).
 			size_t this_n = 0;
 #ifdef ST_ASIO_NO_TRY_CATCH
-			this_n = boost::asio::io_context::run_one();
+			this_n = ctx->io_context.run_one();
 #else
-			try {this_n = boost::asio::io_context::run_one();} catch (const std::exception& e) {if (!on_exception(e)) break;}
+			try {this_n = ctx->io_context.run_one();} catch (const std::exception& e) {if (!on_exception(e)) break;}
 #endif
 			if (this_n > 0)
 				n += this_n; //n can overflow, please note.
@@ -273,13 +452,36 @@ protected:
 		return n;
 	}
 #elif !defined(ST_ASIO_NO_TRY_CATCH)
-	size_t run() {while (true) {try {return boost::asio::io_context::run();} catch (const std::exception& e) {if (!on_exception(e)) return 0;}}}
+	size_t run(context* ctx) {while (true) {try {return ctx->io_context.run();} catch (const std::exception& e) {if (!on_exception(e)) return 0;}}}
+#else
+	size_t run(context* ctx) {return ctx->io_context.run();}
 #endif
 
-	DO_SOMETHING_TO_ALL_MUTEX(service_can, service_can_mutex)
-	DO_SOMETHING_TO_ONE_MUTEX(service_can, service_can_mutex)
+	DO_SOMETHING_TO_ALL_MUTEX(service_can, service_can_mutex, boost::lock_guard<boost::mutex>)
+	DO_SOMETHING_TO_ONE_MUTEX(service_can, service_can_mutex, boost::lock_guard<boost::mutex>)
 
 private:
+	context* assign_thread() //pick the context which has the least threads
+	{
+		context* ctx = NULL;
+		size_t num = 0;
+
+		for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+		{
+			size_t this_num = iter->threads.size();
+			if (0 == this_num || 0 == num || num > this_num)
+			{
+				num = this_num;
+				ctx = &*iter;
+			}
+
+			if (0 == this_num)
+				break;
+		}
+
+		return ctx;
+	}
+
 	void add(object_type i_service_)
 	{
 		assert(NULL != i_service_);
@@ -296,20 +498,15 @@ private:
 	bool started;
 	container_type service_can;
 	boost::mutex service_can_mutex;
-	boost::thread_group service_threads;
 
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 	atomic_int_fast32_t real_thread_num;
 	atomic_int_fast32_t del_thread_num;
 #endif
 
-#ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
-#if BOOST_ASIO_VERSION >= 101100
-	boost::asio::executor_work_guard<executor_type> work;
-#else
-	boost::shared_ptr<boost::asio::io_service::work> work;
-#endif
-#endif
+	bool single_io_context;
+	boost::container::list<context> context_can;
+	boost::mutex context_can_mutex;
 };
 
 } //namespace

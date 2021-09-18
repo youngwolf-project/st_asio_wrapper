@@ -3,9 +3,9 @@
 #define ST_ASIO_DEFAULT_PACKER	packer2<>
 //#define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
 //#define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
-//note, these two macro are not requisite, i'm just showing how to use them.
+//note, these two macro are not requisite, I'm just showing how to use them.
 
-//all other definitions are in the makefile, because we have two cpp files, defining them in more than one place is riskful (
+//all other definitions are in the makefile, because we have two cpp files, defining them in more than one place is risky (
 // we may define them to different values between the two cpp files)
 //configuration
 

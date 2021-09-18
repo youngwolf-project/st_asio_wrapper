@@ -520,13 +520,13 @@
  * HIGHLIGHT:
  *
  * FIX:
- * If give up connecting (prepare_reconnect returns -1 or call close_reconnect), st_asio_wrapper::socket::started() still returns true (should be false).
+ * If give up connecting (prepare_reconnect returns -1 or call set_reconnect(false)), st_asio_wrapper::socket::started() still returns true (should be false).
  *
  * ENHANCEMENTS:
  * Expose server_base's acceptor via next_layer().
  * Prefix suffix packer and unpacker support heartbeat.
  * New demo socket_management demonstrates how to manage sockets if you use other keys rather than the original id.
- * Control reconnecting more flexibly, see function client_socket_base::open_reconnect and client_socket_base::close_reconnect for more details.
+ * Control reconnecting more flexibly, see function client_socket_base::set_reconnect and client_socket_base::is_reconnect for more details.
  * client_socket_base support binding to a specific local address.
  *
  * DELETION:
@@ -806,6 +806,40 @@
  *
  * REPLACEMENTS:
  *
+ * ===============================================================
+ * 2021.9.18	version 2.4.0
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ * client_socket's function open_reconnect and close_reconnect have been replaced by function set_reconnect(bool).
+ *
+ * HIGHLIGHT:
+ * service_pump support multiple io_context, just needs the number of service thread to be bigger than or equal to the number of io_context.
+ * Introduce virtual function change_io_context() to st_asio_wrapper::socket to balance the reference of multiple io_context strictly,
+ *  this is because after a socket been reused, its next_layer still based on previous io_context, this may break the reference balance of
+ *  multiple io_context, re-write this virtual function to re-create the next_layer base on the io_context which has the least references.
+ *  ssl's server_socket_base and client_socket_base already did this, please note.
+ * Support reliable UDP (based on KCP -- https://github.com/skywind3000/kcp.git), thus introduce new macro ST_ASIO_RELIABLE_UDP_NSND_QUE to
+ *  specify the default value of the max size of ikcpcb::nsnd_que (congestion control).
+ * Support connected UDP socket, set macro ST_ASIO_UDP_CONNECT_MODE to true to open it, you must also provide peer's ip address via set_peer_addr,
+ *  function set_connect_mode can open it too (before start_service). For connected UDP socket, the peer_addr parameter in send_msg (series)
+ *  will be ignored, please note.
+ *
+ * FIX:
+ * single_service_pump support ssl single_client(_base).
+ *
+ * ENHANCEMENTS:
+ * Enhance the reusability of st_asio_wrapper's ssl sockets, now they can be reused (include reconnecting) just as normal socket.
+ * Suppress error logs for empty heartbeat (suppose you want to stop heartbeat but keep heartbeat checking).
+ *
+ * DELETION:
+ * Delete macro ST_ASIO_REUSE_SSL_STREAM, now st_asio_wrapper's ssl sockets can be reused just as normal socket.
+ *
+ * REFACTORING:
+ * Re-implement the reusability (object reuse and reconnecting) of st_asio_wrapper's ssl sockets.
+ *
+ * REPLACEMENTS:
+ * client_socket's function open_reconnect and close_reconnect have been replaced by function set_reconnect(bool).
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -815,8 +849,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20302	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.3.2"
+#define ST_ASIO_VER		20400	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.4.0"
 
 //#define ST_ASIO_HIDE_WARNINGS
 
@@ -896,10 +930,16 @@
 #endif
 
 #if BOOST_ASIO_VERSION < 101100
-namespace boost {namespace asio {typedef io_service io_context;}}
-#define make_strand_handler(S, F) S.wrap(F)
+	namespace boost {namespace asio {typedef io_service io_context; typedef io_context execution_context;}}
+	#define make_strand_handler(S, F) S.wrap(F)
+#elif BOOST_ASIO_VERSION == 101100
+	namespace boost {namespace asio {typedef io_service io_context;}}
+	#define make_strand_handler(S, F) boost::asio::wrap(S, F)
+#elif BOOST_ASIO_VERSION < 101700
+	namespace boost {namespace asio {typedef executor any_io_executor;}}
+	#define make_strand_handler(S, F) boost::asio::bind_executor(S, F)
 #else
-#define make_strand_handler(S, F) boost::asio::bind_executor(S, F)
+	#define make_strand_handler(S, F) boost::asio::bind_executor(S, F)
 #endif
 //boost and compiler check
 
@@ -1098,6 +1138,17 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #define ST_ASIO_UDP_DEFAULT_IP_VERSION boost::asio::ip::udp::v4()
 #endif
 
+#ifndef ST_ASIO_UDP_CONNECT_MODE
+#define ST_ASIO_UDP_CONNECT_MODE false
+#endif
+
+//max value that ikcpcb::nsnd_que can get to, then st_asio_wrapper will suspend message sending (congestion control).
+#ifndef ST_ASIO_RELIABLE_UDP_NSND_QUE
+#define ST_ASIO_RELIABLE_UDP_NSND_QUE 1024
+#elif ST_ASIO_RELIABLE_UDP_NSND_QUE < 0
+	#error kcp send queue must be bigger than or equal to zero.
+#endif
+
 //close port reuse
 //#define ST_ASIO_NOT_REUSE_ADDRESS
 
@@ -1119,7 +1170,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 
 //buffer type used when receiving messages (unpacker's prepare_next_recv() need to return this type)
 #ifndef ST_ASIO_RECV_BUFFER_TYPE
-	#if BOOST_ASIO_VERSION >= 101100
+	#if BOOST_ASIO_VERSION > 101100
 	#define ST_ASIO_RECV_BUFFER_TYPE boost::asio::mutable_buffer
 	#else
 	#define ST_ASIO_RECV_BUFFER_TYPE boost::asio::mutable_buffers_1
@@ -1144,12 +1195,6 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 
 //#define ST_ASIO_ALWAYS_SEND_HEARTBEAT
 //always send heartbeat in each ST_ASIO_HEARTBEAT_INTERVAL seconds without checking if we're sending other messages or not.
-
-//#define ST_ASIO_REUSE_SSL_STREAM
-//if you need ssl::client_socket_base to be able to reconnect the server, or to open object pool in ssl::object_pool, you must define this macro.
-//I tried many ways, only one way can make boost::asio::ssl::stream reusable, which is:
-// don't call any shutdown functions of boost::asio::ssl::stream, just call boost::asio::ip::tcp::socket's shutdown function,
-// this seems not a normal procedure, but it works, I believe that asio's defect caused this problem.
 
 //#define ST_ASIO_AVOID_AUTO_STOP_SERVICE
 //wrap service_pump with boost::asio::io_service::work (boost::asio::executor_work_guard), then it will never run out until you explicitly call stop_service().
@@ -1181,6 +1226,11 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 // sent until new messages come in, define this macro to expose send_msg() interface, then you can call it manually to fix this situation.
 //during message sending, calling send_msg() will fail, this is by design to avoid boost::asio::io_context using up all virtual memory, this also
 // means that before the sending really started, you can greedily call send_msg() and may exhaust all virtual memory, please note.
+
+//#define ST_ASIO_ARBITRARY_SEND
+//dispatch an async do_send_msg invocation for each message, this feature brings 2 behaviors:
+// 1. it can also fix the situation i described for macro ST_ASIO_EXPOSE_SEND_INTERFACE,
+// 2. it brings better effeciency for specific ENV, try to find them by you own.
 
 //#define ST_ASIO_PASSIVE_RECV
 //to gain the ability of changing the unpacker at runtime, with this macro, st_asio_wrapper will not do message receiving automatically (except

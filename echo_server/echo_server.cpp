@@ -12,7 +12,7 @@
 //#define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_ALIGNED_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
-#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+//#define ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 //#define ST_ASIO_MAX_SEND_BUF	65536
 //#define ST_ASIO_MAX_RECV_BUF	65536
 //if there's a huge number of links, please reduce messge buffer via ST_ASIO_MAX_SEND_BUF and ST_ASIO_MAX_RECV_BUF macro.
@@ -153,13 +153,15 @@ protected:
 	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg);}
 #endif
 	//msg handling end
+
+	//demonstrate strict reference balance between multiple io_context.
+	virtual bool change_io_context() {reset_next_layer(get_server().get_service_pump().assign_io_context()); return true;}
 };
 
-typedef server_base<echo_socket, object_pool<echo_socket>, i_echo_server> echo_server_base;
-class echo_server : public echo_server_base
+class echo_server : public server2<echo_socket, i_echo_server>
 {
 public:
-	echo_server(service_pump& service_pump_) : echo_server_base(service_pump_) {}
+	echo_server(service_pump& service_pump_) : server2<echo_socket, i_echo_server>(service_pump_) {}
 
 protected:
 	//from i_echo_server, pure virtual function, we must implement it.
@@ -243,7 +245,7 @@ private:
 */
 int main(int argc, const char* argv[])
 {
-	printf("usage: %s [<service thread number=1> [<port=%d> [ip=0.0.0.0]]]\n", argv[0], ST_ASIO_SERVER_PORT);
+	printf("usage: %s [<service thread number=4> [<port=%d> [ip=0.0.0.0]]]\n", argv[0], ST_ASIO_SERVER_PORT);
 	puts("normal server's port will be 100 larger.");
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
@@ -259,6 +261,12 @@ int main(int argc, const char* argv[])
 	context.run();
 */
 	service_pump sp;
+#ifndef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+	//if you want to decrease service thread at runtime, then you cannot use multiple io_context, if somebody indeed needs it, please let me know.
+	//with multiple io_context, the number of service thread must be bigger than or equal to the number of io_context, please note.
+	//with multiple io_context, please also define macro ST_ASIO_AVOID_AUTO_STOP_SERVICE.
+	sp.set_io_context_num(4);
+#endif
 	echo_server echo_server_(sp); //echo server
 
 	//demonstrate how to use singel_service
@@ -286,7 +294,7 @@ int main(int argc, const char* argv[])
 	global_packer->prefix_suffix("begin", "end");
 #endif
 
-	sp.start_service(thread_num);
+	sp.start_service(std::max(thread_num, sp.get_io_context_num()));
 	normal_server_.start_service(1);
 	short_server.start_service(1);
 	while(sp.is_running())
@@ -329,8 +337,10 @@ int main(int argc, const char* argv[])
 		}
 		else if (INCREASE_THREAD == str)
 			sp.add_service_thread(1);
+#ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 		else if (DECREASE_THREAD == str)
 			sp.del_service_thread(1);
+#endif
 		else
 		{
 //			/*

@@ -29,7 +29,7 @@ atomic<boost::int_fast64_t> received_size;
 
 int main(int argc, const char* argv[])
 {
-	puts("this is a file transfer client.");
+	puts("this is a file transmission client.");
 	printf("usage: %s [<port=%d> [<ip=%s> [link num=1]]]\n", argv[0], ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
@@ -37,6 +37,12 @@ int main(int argc, const char* argv[])
 		puts("type " QUIT_COMMAND " to end.");
 
 	service_pump sp;
+#ifndef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
+	//if you want to decrease service thread at runtime, then you cannot use multiple io_context, if somebody indeed needs it, please let me know.
+	//with multiple io_context, the number of service thread must be bigger than or equal to the number of io_context, please note.
+	//with multiple io_context, please also define macro ST_ASIO_AVOID_AUTO_STOP_SERVICE.
+	sp.set_io_context_num(4);
+#endif
 	file_client client(sp);
 
 	if (argc > 3)
