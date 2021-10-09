@@ -110,7 +110,9 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 		{
 			boost::uint_fast64_t id;
 			memcpy(&id, boost::next(msg.data(), ORDER_LEN), sizeof(boost::uint_fast64_t));
-			get_server().restore_socket(ST_THIS shared_from_this(), id, true);
+			if (!get_server().restore_socket(ST_THIS shared_from_this(), id, false)) //client restores the peer socket on the server
+				get_server().restore_socket(ST_THIS shared_from_this(), id, true); //client controls the id of peer socket on the server
+				//although you always want socket restoration, you must set the id of peer socket for the first time
 		}
 	default:
 		break;
