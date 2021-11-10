@@ -175,7 +175,7 @@ public:
 		throw "no available io_context!";
 	}
 
-	void return_io_context(const boost::asio::execution_context& io_context)
+	void return_io_context(const boost::asio::execution_context& io_context, unsigned refs = 1)
 	{
 		if (!single_io_context)
 		{
@@ -183,12 +183,12 @@ public:
 			for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
 				if (&io_context == &iter->io_context)
 				{
-					--iter->refs;
+					iter->refs -= refs;
 					break;
 				}
 		}
 	}
-	void assign_io_context(const boost::asio::execution_context& io_context)
+	void assign_io_context(const boost::asio::execution_context& io_context, unsigned refs = 1)
 	{
 		if (!single_io_context)
 		{
@@ -196,7 +196,7 @@ public:
 			for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
 				if (&io_context == &iter->io_context)
 				{
-					++iter->refs;
+					iter->refs += refs;
 					break;
 				}
 		}
