@@ -217,7 +217,7 @@ private:
 				return true;
 		}
 
-		unified_out::info_out(ST_ASIO_LLF " reconnectiong abandon.", ST_THIS id());
+		unified_out::info_out(ST_ASIO_LLF " reconnecting abandoned.", ST_THIS id());
 		super::force_shutdown();
 		return false;
 	}
