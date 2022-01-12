@@ -32,8 +32,7 @@ cflag += ${ext_cflag} ${boost_include_dir}
 lflag += ${boost_lib_dir} ${common_libs} ${ext_libs}
 
 target = ${dir}/${module}
-sources = ${shell ls *.cpp}
-objects = ${patsubst %.cpp,${dir}/%.o,${sources}}
+objects = ${patsubst %.cpp,${dir}/%.o,${wildcard *.cpp}}
 deps = ${patsubst %.o,%.d,${objects}}
 ${shell mkdir -p ${dir}}
 
@@ -42,7 +41,7 @@ release debug : ${target}
 ${target} : ${objects}
 	${CXX} -o $@ $^ ${lflag}
 ${objects} : ${dir}/%.o : %.cpp
-	${CXX} ${cflag} -E -MMD -w -MT '$@' -MF ${subst .cpp,.d,${dir}/$<} $< 1>/dev/null
+	${CXX} ${cflag} -E -MMD -w -MT '$@' -MF ${patsubst %.cpp,%.d,${dir}/$<} $< 1>/dev/null
 	${CXX} ${cflag} -c $< -o $@
 
 .PHONY : clean
