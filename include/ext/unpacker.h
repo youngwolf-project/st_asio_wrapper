@@ -176,7 +176,7 @@ protected:
 //protocol: length + body
 //this unpacker has a fixed buffer (4000 bytes), if messages can be held in it, then this unpacker works just as the default unpacker,
 // otherwise, a dynamic T will be created to hold big messages, then this unpacker works as the non_copy_unpacker.
-//T can be std::string or basic_buffer, the latter will not fill its buffer in resize invocation, so is more efficient.
+//T can be std::string or basic_buffer, the latter will not fill the extended buffers in resize invocation, so is more efficient.
 template<typename T = basic_buffer>
 class flexible_unpacker : public i_unpacker<T>
 {
@@ -353,7 +353,7 @@ private:
 			step = ST_ASIO_HEAD_LEN;
 		}
 
-		big_msg.resize(cur_msg_len); //std::string will fill big_msg, which is totally not necessary for this scenario, but basic_buffer won't.
+		big_msg.resize(cur_msg_len); //std::string will fill extended buffers, which is totally not necessary for this scenario, but basic_buffer won't.
 		memcpy(const_cast<char*>(big_msg.data()), boost::next(raw_buff.data(), step), remain_len);
 	}
 
