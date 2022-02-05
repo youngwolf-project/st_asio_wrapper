@@ -46,8 +46,10 @@ public:
 	protected:
 		virtual bool init() = 0;
 		virtual void uninit() = 0;
+		virtual void finalize() {} //clean up after stop_service
 
 	protected:
+		friend service_pump;
 		service_pump& sp;
 
 	private:
@@ -65,7 +67,7 @@ protected:
 #if BOOST_ASIO_VERSION > 101100
 		boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work;
 #else
-		boost::shared_ptr<boost::asio::io_service::work> work;
+		boost::shared_ptr<boost::asio::io_context::work> work;
 #endif
 #endif
 		boost::thread_group threads;
@@ -79,7 +81,7 @@ protected:
 #if BOOST_ASIO_VERSION > 101100
 			, work(io_context.get_executor())
 #else
-			, work(boost::make_shared<boost::asio::io_service::work>(boost::ref(io_context)))
+			, work(boost::make_shared<boost::asio::io_context::work>(boost::ref(io_context)))
 			//this wrapper boost::ref (and many others in st_asio_wrapper) is just for gcc 4.7, terrible gcc 4.7
 #endif
 #endif
@@ -93,10 +95,10 @@ public:
 
 #if BOOST_ASIO_VERSION >= 101200
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : started(false), real_thread_num(0), del_thread_num(0), single_io_context(true)
+	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : started(false), first(false), real_thread_num(0), del_thread_num(0), single_io_context(true)
 		{context_can.emplace_back(concurrency_hint);}
 #else
-	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : started(false), single_io_context(true) {context_can.emplace_back(concurrency_hint);}
+	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : started(false), first(false), single_io_context(true) {context_can.emplace_back(concurrency_hint);}
 	bool set_io_context_num(int io_context_num, int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) //call this before adding any services to this service_pump
 	{
 		if (io_context_num < 1 || is_service_started() || context_can.size() > 1) //can only be called once
@@ -111,9 +113,9 @@ public:
 #endif
 #else
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-	service_pump() : started(false), real_thread_num(0), del_thread_num(0), single_io_context(true), context_can(1) {}
+	service_pump() : started(false), first(false), real_thread_num(0), del_thread_num(0), single_io_context(true), context_can(1) {}
 #else
-	service_pump() : started(false), single_io_context(true), context_can(1) {}
+	service_pump() : started(false), first(false), single_io_context(true), context_can(1) {}
 	bool set_io_context_num(int io_context_num) //call this before adding any services to this service_pump
 	{
 		if (io_context_num < 1 || is_service_started() || context_can.size() > 1) //can only be called once
@@ -139,10 +141,12 @@ public:
 		}
 	}
 
+	//do not call below function implicitly or explicitly, before 1.6, a service_pump is also an io_context, so we already have it implicitly,
+	// but in 2.4 and later, a service_pump is not an io_context anymore, then it is just provided to accommodate legacy usage in class
+	// (unix_)server_base, (unix_)server_socket_base, (unix_)client_socket_base, udp::(unix_)socket_base and their subclasses.
+	//according to the implementation, it picks the io_context who has the least references, so the return values are not consistent.
 	operator boost::asio::io_context& () {return assign_io_context();}
-#if BOOST_ASIO_VERSION > 101100
-	boost::asio::io_context::executor_type get_executor() {return assign_io_context().get_executor();}
-#endif
+
 	boost::asio::io_context& assign_io_context(bool increase_ref = true) //pick the context which has the least references
 	{
 		if (single_io_context)
@@ -309,7 +313,9 @@ public:
 
 		return false;
 	}
+
 	bool is_service_started() const {return started;}
+	bool is_first_running() const {return first;}
 
 	//not thread safe
 #if BOOST_ASIO_VERSION >= 101200
@@ -364,6 +370,19 @@ protected:
 			return;
 		}
 
+#ifdef ST_ASIO_AVOID_AUTO_STOP_SERVICE
+		if (!is_first_running())
+			for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+			{
+#if BOOST_ASIO_VERSION > 101100
+				(&iter->work)->~executor_work_guard();
+				new(&iter->work) boost::asio::executor_work_guard<boost::asio::io_context::executor_type>(iter->io_context.get_executor());
+#else
+				iter->work = boost::make_shared<boost::asio::io_context::work>(iter->io_context);
+#endif
+			}
+#endif
+
 		started = true;
 		unified_out::info_out("service pump started.");
 
@@ -380,9 +399,13 @@ protected:
 	void wait_service()
 	{
 		for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
+		{
 			iter->threads.join_all();
+			(&iter->threads)->~thread_group(); new (&iter->threads) boost::thread_group();
+		}
+		do_something_to_all(boost::mem_fn(&i_service::finalize));
 
-		started = false;
+		started = first = false;
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 		del_thread_num = 0;
 #endif
@@ -496,7 +519,7 @@ private:
 	}
 
 private:
-	bool started;
+	bool started, first;
 	container_type service_can;
 	boost::mutex service_can_mutex;
 

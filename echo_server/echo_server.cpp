@@ -62,6 +62,7 @@ using namespace st_asio_wrapper::ext::tcp;
 #define LIST_ALL_CLIENT	"list all client"
 #define INCREASE_THREAD	"increase thread"
 #define DECREASE_THREAD	"decrease thread"
+#define REFS			"refs"
 
 //demonstrate how to use custom packer
 //under the default behavior, each tcp::socket has their own packer, and cause memory waste
@@ -153,9 +154,6 @@ protected:
 	virtual bool on_msg_handle(out_msg_type& msg) {return send_msg(msg);}
 #endif
 	//msg handling end
-
-	//demonstrate strict reference balance between multiple io_context.
-	virtual bool change_io_context() {reset_next_layer(get_server().get_service_pump().assign_io_context()); return true;}
 };
 
 class echo_server : public server2<echo_socket, i_echo_server>
@@ -221,6 +219,17 @@ protected:
 #endif
 	//msg handling end
 };
+
+void dump_io_context_refs(service_pump& sp)
+{
+	boost::container::list<unsigned> refs;
+	sp.get_io_context_refs(refs);
+	char buff[16];
+	std::string str = "io_context references:\n";
+	for (BOOST_AUTO(iter, refs.begin()); iter != refs.end(); ++iter)
+		str.append(buff, sprintf(buff, " %u", *iter));
+	puts(str.data());
+}
 /*
 class test_aci_ref : public tracked_executor
 {
@@ -268,6 +277,9 @@ int main(int argc, const char* argv[])
 	sp.set_io_context_num(4);
 #endif
 	echo_server echo_server_(sp); //echo server
+	echo_server_.add_io_context_refs(1); //the acceptor takes 2 references on the io_context that assigned to it.
+	((timer<executor>&) echo_server_).add_io_context_refs(1); //the timer object in server_base takes 2 references on the io_context that assigned to it.
+	dump_io_context_refs(sp);
 
 	//demonstrate how to use singel_service
 	//because of normal_socket, this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
@@ -303,6 +315,8 @@ int main(int argc, const char* argv[])
 		std::getline(std::cin, str);
 		if (str.empty())
 			;
+		else if (REFS == str)
+			dump_io_context_refs(sp);
 		else if (QUIT_COMMAND == str)
 		{
 			sp.stop_service();
@@ -312,7 +326,9 @@ int main(int argc, const char* argv[])
 		else if (RESTART_COMMAND == str)
 		{
 			sp.stop_service();
-			sp.start_service(thread_num);
+			dump_io_context_refs(sp);
+			sp.start_service(std::max(thread_num, sp.get_io_context_num()));
+			dump_io_context_refs(sp);
 		}
 		else if (STATISTIC == str)
 		{

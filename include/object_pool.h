@@ -24,7 +24,7 @@ namespace st_asio_wrapper
 {
 
 template<typename Object>
-class object_pool : public service_pump::i_service, protected timer<executor>
+class object_pool : public service_pump::i_service, public timer<executor>
 {
 public:
 	typedef typename Object::in_msg_type in_msg_type;
@@ -107,6 +107,18 @@ protected:
 		}
 
 		return !!object_ptr;
+	}
+
+	//from i_service
+	virtual void finalize()
+	{
+		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter)
+		{
+			try {invalid_object_can.emplace_back(iter->second);}
+			catch (const std::exception& e) {unified_out::error_out("cannot hold more objects (%s)", e.what());}
+		}
+
+		object_can.clear();
 	}
 
 	//you can do some statistic about object creations at here

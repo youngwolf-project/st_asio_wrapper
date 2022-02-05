@@ -29,20 +29,11 @@ private:
 public:
 	generic_server_socket(Server& server_) : super(server_.get_service_pump()), server(server_) {}
 	template<typename Arg> generic_server_socket(Server& server_, Arg& arg) : super(server_.get_service_pump(), arg), server(server_) {}
+	~generic_server_socket() {ST_THIS clear_io_context_refs();}
 
 	virtual const char* type_name() const {return "TCP (server endpoint)";}
 	virtual int type_id() const {return 2;}
 
-	virtual void reset()
-	{
-		if (!ST_THIS change_io_context())
-#if BOOST_ASIO_VERSION < 101100
-			server.get_service_pump().assign_io_context(ST_THIS lowest_layer().get_io_service());
-#else
-			server.get_service_pump().assign_io_context(ST_THIS lowest_layer().get_executor().context());
-#endif
-		super::reset();
-	}
 	virtual void take_over(boost::shared_ptr<generic_server_socket> socket_ptr) {} //restore this socket from socket_ptr
 
 	void disconnect() {force_shutdown();}
@@ -88,11 +79,19 @@ protected:
 
 	virtual void on_async_shutdown_error() {force_shutdown();}
 	virtual bool on_heartbeat_error() {ST_THIS show_info("server link:", "broke unexpectedly."); force_shutdown(); return false;}
-#if BOOST_ASIO_VERSION < 101100
-	virtual void on_close() {server.get_service_pump().return_io_context(ST_THIS lowest_layer().get_io_service()); super::on_close();}
-#else
-	virtual void on_close() {server.get_service_pump().return_io_context(ST_THIS lowest_layer().get_executor().context()); super::on_close();}
-#endif
+	virtual void on_close()
+	{
+		ST_THIS clear_io_context_refs();
+		super::on_close();
+	}
+
+private:
+	//call following two functions (via timer object's add_io_context_refs, sub_io_context_refs or clear_io_context_refs) in:
+	// 1. on_xxxx callbacks on this object;
+	// 2. use this->post or this->set_timer to emit an async event, then in the callback.
+	//otherwise, you must protect them to not be called with reset and on_close simultaneously
+	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) {server.get_service_pump().assign_io_context(io_context_, refs);}
+	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {server.get_service_pump().return_io_context(io_context_, refs);}
 
 private:
 	Server& server;

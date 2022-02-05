@@ -27,7 +27,12 @@ template <typename Socket>
 class socket : public Socket
 {
 public:
-	template<typename Arg> socket(Arg& arg, boost::asio::ssl::context& ctx) : Socket(arg, ctx) {}
+	template<typename Arg> socket(Arg& arg, boost::asio::ssl::context& ctx_) : Socket(arg, ctx_), ctx(ctx_) {}
+
+public:
+	virtual void reset() {ST_THIS reset_next_layer(ctx); Socket::reset();}
+
+	boost::asio::ssl::context& get_context() {return ctx;}
 
 protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
@@ -72,6 +77,9 @@ private:
 		if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
 			unified_out::info_out(ST_ASIO_LLF " async shutdown ssl link failed (maybe intentionally because of reusing)", ST_THIS id());
 	}
+
+private:
+	boost::asio::ssl::context& ctx;
 };
 
 template <typename Packer, typename Unpacker, typename Matrix = i_matrix,
@@ -83,8 +91,8 @@ private:
 	typedef socket<tcp::client_socket_base<Packer, Unpacker, Matrix, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, InQueue, InContainer, OutQueue, OutContainer> > super;
 
 public:
-	client_socket_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx_) : super(io_context_, ctx_), ctx(ctx_) {}
-	client_socket_base(Matrix& matrix_, boost::asio::ssl::context& ctx_) : super(matrix_, ctx_), ctx(ctx_) {}
+	client_socket_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx_) : super(io_context_, ctx_) {}
+	client_socket_base(Matrix& matrix_, boost::asio::ssl::context& ctx_) : super(matrix_, ctx_) {}
 
 	virtual const char* type_name() const {return "SSL (client endpoint)";}
 	virtual int type_id() const {return 3;}
@@ -107,18 +115,9 @@ protected:
 	virtual void after_close()
 	{
 		if (ST_THIS is_reconnect())
-			ST_THIS reset_next_layer(ctx);
+			ST_THIS reset_next_layer(ST_THIS get_context());
 
 		super::after_close();
-	}
-
-	virtual bool change_io_context()
-	{
-		if (NULL == ST_THIS get_matrix())
-			return false;
-
-		ST_THIS reset_next_layer(ST_THIS get_matrix()->get_service_pump().assign_io_context(), ctx);
-		return true;
 	}
 
 private:
@@ -145,9 +144,6 @@ private:
 	}
 
 	using super::shutdown_ssl;
-
-private:
-	boost::asio::ssl::context& ctx;
 };
 
 template<typename Object>
@@ -176,7 +172,7 @@ private:
 	typedef socket<tcp::server_socket_base<Packer, Unpacker, Server, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, InQueue, InContainer, OutQueue, OutContainer> > super;
 
 public:
-	server_socket_base(Server& server_, boost::asio::ssl::context& ctx_) : super(server_, ctx_), ctx(ctx_) {}
+	server_socket_base(Server& server_, boost::asio::ssl::context& ctx_) : super(server_, ctx_) {}
 
 	virtual const char* type_name() const {return "SSL (server endpoint)";}
 	virtual int type_id() const {return 4;}
@@ -196,8 +192,6 @@ protected:
 
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); ST_THIS force_shutdown();}
 
-	virtual bool change_io_context() {ST_THIS reset_next_layer(ST_THIS get_server().get_service_pump().assign_io_context(), ctx); return true;}
-
 private:
 	void handle_handshake(const boost::system::error_code& ec)
 	{
@@ -210,9 +204,6 @@ private:
 	}
 
 	using super::shutdown_ssl;
-
-private:
-	boost::asio::ssl::context& ctx;
 };
 
 template<typename Socket, typename Pool = object_pool<Socket>, typename Server = tcp::i_server> class server_base : public tcp::server_base<Socket, Pool, Server>

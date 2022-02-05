@@ -44,6 +44,12 @@ int main(int argc, const char* argv[])
 		else if (RESTART_COMMAND == str)
 		{
 			sp.stop_service();
+
+			//add all clients back
+			//auto socket_ptr = uu2.create_object();
+			//socket_ptr->set_local_addr(UNIX_SOCKET_NAME_2);
+			//socket_ptr->set_peer_addr(UNIX_SOCKET_NAME_1);
+			//uu2.add_socket(socket_ptr);
 			sp.start_service();
 		}
 		else
