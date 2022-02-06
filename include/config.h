@@ -818,9 +818,10 @@
  *  if a socket broken, it will be unbound from the io_context to reduce the reference number of the io_context, but if it's reused later,
  *  it will be bound to previous io_context again, this can break the balance, if you want strict balance, you must not use object reuse,
  *  which means you should not define macro ST_ASIO_REUSE_OBJECT.
- * Support io_context reference customization, all of the services support this feature, because it's implemented by the timer object,
- *  the acceptor in the server_base also support this feature, see echo_server and echo_client for more details. socket also support this
- *  feature, but the reference number will be reset to 1 after link broken and reconnecting is no open (client_socket).
+ * Support io_context reference customization, all of the services support this feature, because it's implemented by the timer object, but
+ *  single_xxxx services don't even they inherit from class timer too, please note.
+ *  the acceptor in the server_base also support this feature, see echo_server and echo_client for more details.
+ *  socket also support this feature, but the reference number will be reset to 1 after link broken and reconnecting is closed (client_socket).
  * Support reliable UDP (based on KCP -- https://github.com/skywind3000/kcp.git), thus introduce new macro ST_ASIO_RELIABLE_UDP_NSND_QUE to
  *  specify the default value of the max size of ikcpcb::nsnd_que (congestion control).
  * Support connected UDP socket, set macro ST_ASIO_UDP_CONNECT_MODE to true to open it, you must also provide peer's ip address via set_peer_addr,
@@ -829,7 +830,6 @@
  *
  * FIX:
  * single_service_pump support ssl single_client(_base).
- * core dump happen in stop_service on restarted service_pump.
  * macro ST_ASIO_AVOID_AUTO_STOP_SERVICE will not take effect after service_pump been restarted.
  * with macro ST_ASIO_CLEAR_OBJECT_INTERVAL, after stop_service, some sockets can still exist in the valid object queue.
  * server_base refuses to start listening if user has opened the acceptor before (to configure the acceptor).

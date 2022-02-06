@@ -213,8 +213,14 @@ public:
 };
 template<typename Socket> class single_client_base : public tcp::single_client_base<Socket>
 {
+private:
+	typedef tcp::single_client_base<Socket> super;
+
 public:
-	single_client_base(service_pump& service_pump_, boost::asio::ssl::context& ctx) : tcp::single_client_base<Socket>(service_pump_, ctx) {}
+	single_client_base(service_pump& service_pump_, boost::asio::ssl::context& ctx_) : super(service_pump_, ctx_) {}
+
+protected:
+	virtual bool init() {if (0 == ST_THIS get_io_context_refs()) ST_THIS reset_next_layer(ST_THIS get_context()); return super::init();}
 };
 template<typename Socket, typename Pool = object_pool<Socket>, typename Matrix = i_matrix> class multi_client_base : public tcp::multi_client_base<Socket, Pool, Matrix>
 {

@@ -25,16 +25,20 @@ class single_socket_service : public service_pump::i_service, public Socket
 public:
 	single_socket_service(service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
 	template<typename Arg> single_socket_service(service_pump& service_pump_, Arg& arg) : i_service(service_pump_), Socket(service_pump_, arg) {}
+	~single_socket_service() {clear_io_context_refs();}
 
 	using Socket::id; //release these functions
 
 protected:
-	virtual bool init() {ST_THIS start(); return Socket::started();}
+	virtual bool init() {ST_THIS reset_io_context_refs(); ST_THIS start(); return Socket::started();}
 	virtual void uninit() {ST_THIS graceful_shutdown();} //if you wanna force shutdown, call force_shutdown before service_pump::stop_service invocation.
 
 private:
+	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) {get_service_pump().assign_io_context(io_context_, refs);}
+	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {get_service_pump().return_io_context(io_context_, refs);}
+
+private:
 	//hide these functions
-	using Socket::get_io_context_refs;
 	using Socket::add_io_context_refs;
 	using Socket::sub_io_context_refs;
 	using Socket::clear_io_context_refs;

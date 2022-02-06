@@ -207,7 +207,7 @@ protected:
 		}
 	}
 
-	void reset_io_context_refs() {attach_io_context(io_context_, io_context_refs = 1);}
+	void reset_io_context_refs() {if (0 == io_context_refs) add_io_context_refs(1);}
 	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) = 0;
 	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) = 0;
 
