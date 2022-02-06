@@ -841,6 +841,7 @@
  * ENHANCEMENTS:
  * Enhance the reusability of st_asio_wrapper's ssl sockets, now they can be reused (include reconnecting) just as normal socket.
  * Suppress error logs for empty heartbeat (suppose you want to stop heartbeat but keep heartbeat checking).
+ * service_pump's single io_context optimization can be closed.
  *
  * DELETION:
  * Delete macro ST_ASIO_REUSE_SSL_STREAM, now st_asio_wrapper's ssl sockets can be reused just as normal socket.
