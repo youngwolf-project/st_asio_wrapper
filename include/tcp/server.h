@@ -21,8 +21,8 @@ template<typename Socket, typename Family = boost::asio::ip::tcp, typename Pool 
 class generic_server : public Server, public Pool
 {
 protected:
-	generic_server(service_pump& service_pump_) : Pool(service_pump_), acceptor(service_pump_) {}
-	template<typename Arg> generic_server(service_pump& service_pump_, const Arg& arg) : Pool(service_pump_, arg), acceptor(service_pump_) {}
+	generic_server(service_pump& service_pump_) : Pool(service_pump_), acceptor(service_pump_), listening(false) {}
+	template<typename Arg> generic_server(service_pump& service_pump_, const Arg& arg) : Pool(service_pump_, arg), acceptor(service_pump_), listening(false) {}
 
 public:
 	bool set_server_addr(unsigned short port, const std::string& ip = std::string())
@@ -61,6 +61,7 @@ public:
 #endif
 		acceptor.bind(server_addr, ec); assert(!ec);
 		if (ec) {unified_out::error_out("bind failed."); return false;}
+		listening = true;
 
 		int num = async_accept_num();
 		assert(num > 0);
@@ -92,8 +93,8 @@ public:
 		st_asio_wrapper::do_something_to_all(sockets, boost::bind(&generic_server::do_async_accept, this, boost::placeholders::_1));
 		return true;
 	}
-	bool is_listening() const {return acceptor.is_open();}
-	void stop_listen() {boost::lock_guard<boost::mutex> lock(mutex); boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
+	bool is_listening() const {return listening;}
+	void stop_listen() {boost::lock_guard<boost::mutex> lock(mutex); listening = false; boost::system::error_code ec; acceptor.cancel(ec); acceptor.close(ec);}
 
 	typename Family::acceptor& next_layer() {return acceptor;}
 	const typename Family::acceptor& next_layer() const {return acceptor;}
@@ -230,6 +231,7 @@ private:
 	typename Family::endpoint server_addr;
 	typename Family::acceptor acceptor;
 	boost::mutex mutex;
+	bool listening;
 };
 
 template<typename Socket, typename Pool = object_pool<Socket>, typename Server = i_server>
