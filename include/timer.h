@@ -74,8 +74,27 @@ public:
 	};
 	typedef const timer_info timer_cinfo;
 
-	timer(boost::asio::io_context& io_context_) : Executor(io_context_) {}
+	timer(boost::asio::io_context& io_context_) : Executor(io_context_), io_context_refs(1) {}
 	~timer() {stop_all_timer();}
+
+	unsigned get_io_context_refs() const {return io_context_refs;}
+	void add_io_context_refs(unsigned count)
+	{
+		if (count > 0)
+		{
+			io_context_refs += count;
+			attach_io_context(io_context_, count);
+		}
+	}
+	void sub_io_context_refs(unsigned count)
+	{
+		if (count > 0 && io_context_refs >= count)
+		{
+			io_context_refs -= count;
+			detach_io_context(io_context_, count);
+		}
+	}
+	void clear_io_context_refs() {sub_io_context_refs(io_context_refs);}
 
 	//after this call, call_back cannot be used again, please note.
 	bool create_or_update_timer(tid id, unsigned interval, boost::function<bool(tid)>& call_back, bool start = false)
@@ -188,12 +207,17 @@ protected:
 		}
 	}
 
+	void reset_io_context_refs() {if (0 == io_context_refs) add_io_context_refs(1);}
+	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) = 0;
+	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) = 0;
+
 private:
 	typedef boost::container::list<timer_info> container_type;
 	container_type timer_can;
 	boost::mutex timer_can_mutex;
 
 	using Executor::io_context_;
+	unsigned io_context_refs;
 };
 
 } //namespace

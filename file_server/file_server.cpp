@@ -37,6 +37,7 @@ int main(int argc, const char* argv[])
 #else
 	printf("usage: %s [-d] [<port=%d> [ip=0.0.0.0]]\n", argv[0], ST_ASIO_SERVER_PORT);
 #endif
+
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
@@ -69,7 +70,7 @@ int main(int argc, const char* argv[])
 #if !defined(_MSC_VER) && !defined(__MINGW64__) && !defined(__MINGW32__)
 	if (1 == index)
 	{
-		boost::asio::signal_set signal_receiver(sp, SIGINT, SIGTERM);
+		boost::asio::signal_set signal_receiver(sp.assign_io_context(), SIGINT, SIGTERM);
 		signal_receiver.async_wait(boost::bind(&signal_handler, boost::ref(sp), boost::ref(signal_receiver), boost::placeholders::_1, boost::placeholders::_2));
 
 		sp.run_service();

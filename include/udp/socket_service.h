@@ -33,16 +33,17 @@ public:
 	multi_socket_service_base(service_pump& service_pump_) : super(service_pump_) {}
 
 	using super::add_socket;
-	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = std::string())
+	typename Pool::object_type add_socket(unsigned short port, const std::string& ip = std::string(), unsigned additional_io_context_refs = 0)
 	{
 		BOOST_AUTO(socket_ptr, ST_THIS create_object());
 		if (!socket_ptr)
 			return socket_ptr;
 
 		socket_ptr->set_local_addr(port, ip);
-		return add_socket(socket_ptr) ? socket_ptr : typename Pool::object_type();
+		return add_socket(socket_ptr, additional_io_context_refs) ? socket_ptr : typename Pool::object_type();
 	}
-	typename Pool::object_type add_socket(unsigned short port, unsigned short peer_port, const std::string& ip = std::string(), const std::string& peer_ip = std::string())
+	typename Pool::object_type add_socket(unsigned short port, unsigned short peer_port, const std::string& ip = std::string(), const std::string& peer_ip = std::string(),
+		unsigned additional_io_context_refs = 0)
 	{
 		BOOST_AUTO(socket_ptr, ST_THIS create_object());
 		if (!socket_ptr)
@@ -50,7 +51,7 @@ public:
 
 		socket_ptr->set_local_addr(port, ip);
 		socket_ptr->set_peer_addr(peer_port, peer_ip);
-		return add_socket(socket_ptr) ? socket_ptr : typename Pool::object_type();
+		return add_socket(socket_ptr, additional_io_context_refs) ? socket_ptr : typename Pool::object_type();
 	}
 
 	//functions with a socket_ptr parameter will remove the link from object pool first, then call corresponding function

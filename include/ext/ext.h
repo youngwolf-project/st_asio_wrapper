@@ -66,20 +66,20 @@ class basic_buffer
 {
 public:
 	basic_buffer() {do_detach();}
+	virtual ~basic_buffer() {clean();}
 	explicit basic_buffer(size_t len) {do_detach(); resize(len);}
 	basic_buffer(size_t count, char c) {do_detach(); append(count, c);}
 	basic_buffer(const char* buff) {do_detach(); operator+=(buff);}
 	basic_buffer(const char* buff, size_t len) {do_detach(); append(buff, len);}
 	basic_buffer(const basic_buffer& other) {do_detach(); append(other.buff, other.len);}
-	virtual ~basic_buffer() {clean();}
 
-	inline basic_buffer& operator=(const basic_buffer& other) {resize(0); return operator+=(other);}
 	inline basic_buffer& operator=(char c) {resize(0); return operator+=(c);}
 	inline basic_buffer& operator=(const char* buff) {resize(0); return operator+=(buff);}
+	inline basic_buffer& operator=(const basic_buffer& other) {resize(0); return operator+=(other);}
 
-	inline basic_buffer& operator+=(const basic_buffer& other) {return append(other);}
 	inline basic_buffer& operator+=(char c) {return append(c);}
 	inline basic_buffer& operator+=(const char* buff) {return append(buff);}
+	inline basic_buffer& operator+=(const basic_buffer& other) {return append(other);}
 
 	basic_buffer& append(char c) {return append(1, c);}
 	basic_buffer& append(size_t count, char c)
@@ -137,12 +137,12 @@ public:
 	size_t capacity() const {return cap;}
 
 	//the following five functions are needed by st_asio_wrapper
-	bool empty() const {return 0 == len || NULL == buff;}
-	size_t size() const {return NULL == buff ? 0 : len;}
-	const char* data() const {return buff;}
-	void swap(basic_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len); std::swap(cap, other.cap);}
 	void clear() {resize(0);}
 	void clean() {free(buff); do_detach();}
+	const char* data() const {return buff;}
+	size_t size() const {return NULL == buff ? 0 : len;}
+	bool empty() const {return 0 == len || NULL == buff;}
+	void swap(basic_buffer& other) {std::swap(buff, other.buff); std::swap(len, other.len); std::swap(cap, other.cap);}
 
 	//functions needed by packer and unpacker
 	char* data() {return buff;}

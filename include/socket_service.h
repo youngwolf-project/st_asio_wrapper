@@ -25,15 +25,24 @@ class single_socket_service : public service_pump::i_service, public Socket
 public:
 	single_socket_service(service_pump& service_pump_) : i_service(service_pump_), Socket(service_pump_) {}
 	template<typename Arg> single_socket_service(service_pump& service_pump_, Arg& arg) : i_service(service_pump_), Socket(service_pump_, arg) {}
+	~single_socket_service() {clear_io_context_refs();}
 
 	using Socket::id; //release these functions
 
 protected:
-	virtual bool init() {ST_THIS start(); return Socket::started();}
+	virtual bool init() {ST_THIS reset_io_context_refs(); ST_THIS start(); return Socket::started();}
 	virtual void uninit() {ST_THIS graceful_shutdown();} //if you wanna force shutdown, call force_shutdown before service_pump::stop_service invocation.
 
 private:
-	using Socket::get_matrix; //hide this function
+	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) {get_service_pump().assign_io_context(io_context_, refs);}
+	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {get_service_pump().return_io_context(io_context_, refs);}
+
+private:
+	//hide these functions
+	using Socket::add_io_context_refs;
+	using Socket::sub_io_context_refs;
+	using Socket::clear_io_context_refs;
+	using Socket::get_matrix;
 };
 
 template<typename Socket, typename Pool, typename Matrix>
@@ -42,6 +51,7 @@ class multi_socket_service : public Matrix, public Pool
 protected:
 	multi_socket_service(service_pump& service_pump_) : Pool(service_pump_) {}
 	template<typename Arg> multi_socket_service(service_pump& service_pump_, const Arg& arg) : Pool(service_pump_, arg) {}
+	~multi_socket_service() {ST_THIS clear_io_context_refs();}
 
 	virtual bool init()
 	{
@@ -63,11 +73,12 @@ public:
 	typename Pool::object_type create_object() {return Pool::create_object(boost::ref(*this));}
 	template<typename Arg> typename Pool::object_type create_object(Arg& arg) {return Pool::create_object(boost::ref(*this), arg);}
 
-	//parameter reset valid only if the service pump already started, or service pump will call object pool's init function before start service pump
-	bool add_socket(typename Pool::object_ctype& socket_ptr)
+	//will call socket_ptr's start function if the service_pump already started.
+	bool add_socket(typename Pool::object_ctype& socket_ptr, unsigned additional_io_context_refs = 0)
 	{
 		if (ST_THIS add_object(socket_ptr))
 		{
+			socket_ptr->add_io_context_refs(additional_io_context_refs);
 			if (get_service_pump().is_service_started()) //service already started
 				socket_ptr->start();
 
@@ -76,6 +87,10 @@ public:
 
 		return false;
 	}
+
+private:
+	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) {get_service_pump().assign_io_context(io_context_, refs);}
+	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {get_service_pump().return_io_context(io_context_, refs);}
 };
 
 } //namespace

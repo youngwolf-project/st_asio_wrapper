@@ -24,7 +24,7 @@ namespace st_asio_wrapper
 {
 
 template<typename Object>
-class object_pool : public service_pump::i_service, protected timer<executor>
+class object_pool : public service_pump::i_service, public timer<executor>
 {
 public:
 	typedef typename Object::in_msg_type in_msg_type;
@@ -108,6 +108,9 @@ protected:
 
 		return !!object_ptr;
 	}
+
+	//from i_service
+	virtual void finalize() {object_can.clear();}
 
 	//you can do some statistic about object creations at here
 	virtual void on_create(object_ctype& object_ptr) {}

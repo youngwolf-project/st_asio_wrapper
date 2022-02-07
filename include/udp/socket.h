@@ -59,6 +59,7 @@ public:
 protected:
 	generic_socket(boost::asio::io_context& io_context_) : super(io_context_), is_bound(false), is_connected(false), connect_mode(ST_ASIO_UDP_CONNECT_MODE), matrix(NULL) {}
 	generic_socket(Matrix& matrix_) : super(matrix_.get_service_pump()), is_bound(false), is_connected(false), connect_mode(ST_ASIO_UDP_CONNECT_MODE), matrix(&matrix_) {}
+	~generic_socket() {ST_THIS clear_io_context_refs();}
 
 public:
 	virtual bool is_ready() {return is_bound;}
@@ -81,13 +82,6 @@ public:
 		is_connected = is_bound = false;
 		sending_msg.clear();
 
-		if (NULL != matrix)
-			if (!ST_THIS change_io_context())
-#if BOOST_ASIO_VERSION < 101100
-				matrix->get_service_pump().assign_io_context(ST_THIS lowest_layer().get_io_service());
-#else
-				matrix->get_service_pump().assign_io_context(ST_THIS lowest_layer().get_executor().context());
-#endif
 		super::reset();
 	}
 
@@ -241,12 +235,7 @@ protected:
 		if (sending_msg.p)
 			sending_msg.p->set_value(NOT_APPLICABLE);
 #endif
-		if (NULL != matrix)
-#if BOOST_ASIO_VERSION < 101100
-			matrix->get_service_pump().return_io_context(ST_THIS lowest_layer().get_io_service());
-#else
-			matrix->get_service_pump().return_io_context(ST_THIS lowest_layer().get_executor().context());
-#endif
+		ST_THIS clear_io_context_refs();
 		super::on_close();
 	}
 
@@ -267,6 +256,14 @@ private:
 #endif
 
 	void close_() {close(true);} //workaround for old compilers, otherwise, we can bind to close directly in dispatch_strand
+
+	//call following two functions (via timer object's add_io_context_refs, sub_io_context_refs or clear_io_context_refs) in:
+	// 1. on_xxxx callbacks on this object;
+	// 2. use this->post or this->set_timer to emit an async event, then in the callback.
+	//otherwise, you must protect them to not be called with reset and on_close simultaneously
+	//actually, you're recommended to not use them, use add_socket instead.
+	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) {if (NULL != matrix) matrix->get_service_pump().assign_io_context(io_context_, refs);}
+	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {if (NULL != matrix) matrix->get_service_pump().return_io_context(io_context_, refs);}
 
 	virtual void do_recv_msg()
 	{

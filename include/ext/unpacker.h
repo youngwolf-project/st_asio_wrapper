@@ -282,7 +282,7 @@ public:
 	}
 
 	//a return value of 0 indicates that the read operation is complete. a non-zero value indicates the maximum number
-	//of bytes to be read on the next call to the stream's async_read_some function. ---asio::async_read
+	//of bytes to be read on the next call to the stream's async_read_some function. ---boost::asio::async_read
 	//read as many as possible to reduce asynchronous call-back, and don't forget to handle sticky package carefully in parse_msg function.
 	virtual size_t completion_condition(const boost::system::error_code& ec, size_t bytes_transferred)
 	{

@@ -95,6 +95,9 @@ int main(int argc, const char* argv[])
 			sp.stop_service(&client_);
 			sp.stop_service();
 
+			//add all clients back
+			client_.add_socket();
+			client_.add_socket();
 			sp.start_service();
 		}
 		else if (RECONNECT == str)

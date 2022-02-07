@@ -64,6 +64,7 @@ using namespace st_asio_wrapper::ext::tcp;
 #define LIST_ALL_CLIENT	"list all client"
 #define INCREASE_THREAD	"increase thread"
 #define DECREASE_THREAD	"decrease thread"
+#define REFS			"refs"
 
 static bool check_msg;
 
@@ -164,16 +165,6 @@ protected:
 		send_msg(pstr, msg_len, true);
 	}
 #endif
-
-	//demonstrate strict reference balance between multiple io_context.
-	virtual bool change_io_context()
-	{
-		if (NULL == get_matrix())
-			return false;
-
-		reset_next_layer(get_matrix()->get_service_pump().assign_io_context());
-		return true;
-	}
 
 private:
 	void handle_msg(out_msg_ctype& msg)
@@ -414,6 +405,17 @@ void start_test(int repeat_times, char mode, echo_client& client, size_t send_th
 	is_testing = false;
 }
 
+void dump_io_context_refs(service_pump& sp)
+{
+	boost::container::list<unsigned> refs;
+	sp.get_io_context_refs(refs);
+	char buff[16];
+	std::string str = "io_context references:\n";
+	for (BOOST_AUTO(iter, refs.begin()); iter != refs.end(); ++iter)
+		str.append(buff, sprintf(buff, " %u", *iter));
+	puts(str.data());
+}
+
 int main(int argc, const char* argv[])
 {
 	printf("usage: %s [<service thread number=4> [<send thread number=8> [<port=%d> [<ip=%s> [link num=16]]]]]\n", argv[0], ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);
@@ -440,6 +442,8 @@ int main(int argc, const char* argv[])
 	echo_client client(sp);
 	//echo client means to cooperate with echo server while doing performance test, it will not send msgs back as echo server does,
 	//otherwise, dead loop will occur, network resource will be exhausted.
+	client.add_io_context_refs(1); //the timer object in multi_client_base takes 2 references on the io_context that assigned to it.
+	dump_io_context_refs(sp);
 
 //	argv[4] = "::1" //ipv6
 //	argv[4] = "127.0.0.1" //ipv4
@@ -480,6 +484,8 @@ int main(int argc, const char* argv[])
 		std::getline(std::cin, str);
 		if (str.empty())
 			;
+		else if (REFS == str)
+			dump_io_context_refs(sp);
 		else if (STATISTIC == str)
 		{
 			printf("link #: " ST_ASIO_SF ", valid links: " ST_ASIO_SF ", invalid links: " ST_ASIO_SF "\n\n", client.size(), client.valid_size(), client.invalid_object_size());
@@ -505,7 +511,12 @@ int main(int argc, const char* argv[])
 		else if (RESTART_COMMAND == str)
 		{
 			sp.stop_service();
-			sp.start_service(thread_num);
+			dump_io_context_refs(sp);
+
+			//add all clients back
+			for (size_t i = 0; i < link_num; ++i)
+				client.add_socket(port, ip);
+			sp.start_service(std::max(thread_num, sp.get_io_context_num()));
 		}
 		else
 		{
