@@ -125,7 +125,7 @@ public:
 		return *this;
 	}
 
-	//nonstandard, delete the last character if it's '\0' before appending another string.
+	//nonstandard function append2 -- delete the last character if it's '\0' before appending another string.
 	//this feature makes basic_buffer to be able to works as std::string, which will append '\0' automatically.
 	//please note that the second verion of append2 still needs you to provide '\0' at the end of the fed string.
 	//usage:
@@ -133,15 +133,14 @@ public:
 		basic_buffer bb("1"); //not include the '\0' character
 		printf("%s\n", bb.data()); //not ok, random characters can be outputted after "1", use basic_buffer bb("1", 2) instead.
 		bb.append2("23"); //include the '\0' character, but just append2, please note.
-		printf("%s\n", bb.data()); //ok, additional '\0' has been added so no random characters can be outputted after "123".
+		printf("%s\n", bb.data()); //ok, additional '\0' has been added automatically so no random characters can be outputted after "123".
 		bb.append2("456", 4); //include the '\0' character
-		printf("%s\n", bb.data()); //ok, additional '\0' has been added so no random characters can be outputted after "123456".
+		printf("%s\n", bb.data()); //ok, additional '\0' has been added manually so no random characters can be outputted after "123456".
 		bb.append2("789", 3); //not include the '\0' character
 		printf("%s\n", bb.data()); //not ok, random characters can be outputted after "123456789"
-		bb.append2("000");
-		printf("%s\n", bb.data()); //ok, the last character '9' will not be deleted because it's not '\0', so the output is "123456789000".
-		printf("%zu\n", bb.size());
-		//the final length of bb is 13, just include the last '\0' character, all middle '\0' characters have been deleted.
+		bb.append2("000"); //the last character '9' will not be deleted because it's not '\0'
+		printf("%s\n", bb.data()); //ok, additional '\0' has been added automatically so no random characters can be outputted after "123456789000".
+		printf("%zu\n", bb.size()); //the final length of bb is 13, just include the last '\0' character, all middle '\0' characters have been deleted.
 	*/
 	//by the way, deleting the last character which is not '\0' before appending another string is very efficient, please use it freely.
 	basic_buffer& append2(const char* buff) {return append(buff, strlen(buff) + 1);} //include the '\0' character
@@ -156,7 +155,7 @@ public:
 	basic_buffer& erase(size_t pos = 0, size_t len = UINT_MAX)
 	{
 		if (pos > size())
-			throw "out of range.";
+			throw std::out_of_range("invalid position");
 
 		if (len >= size())
 			resize(pos);
@@ -190,7 +189,7 @@ public:
 	void reserve(size_t capacity)
 	{
 		if (capacity > max_size())
-			throw "too big memory request!";
+			throw std::length_error("too big memory request");
 		else if (capacity < len)
 			capacity = len;
 		else if (0 == capacity)
@@ -223,7 +222,7 @@ public:
 			{
 				char* new_buff = (char*) realloc(buff, new_cap);
 				if (NULL == new_buff)
-					throw "no sufficient memory!";
+					throw std::bad_alloc();
 
 				cap = (unsigned) new_cap;
 				buff = new_buff;
@@ -249,7 +248,7 @@ protected:
 	void do_attach(char* _buff, size_t _len, size_t capacity) {buff = _buff; len = (unsigned) _len; cap = (unsigned) capacity;}
 	void do_detach() {buff = NULL; len = cap = 0;}
 
-	void check_length(size_t add_len) {if (add_len > max_size() || max_size() - add_len < len) throw "too big memory request!";}
+	void check_length(size_t add_len) {if (add_len > max_size() || max_size() - add_len < len) throw std::length_error("too big memory request");}
 
 protected:
 	char* buff;
