@@ -72,6 +72,13 @@ public:
 	basic_buffer(const char* buff) {do_detach(); operator+=(buff);}
 	basic_buffer(const char* buff, size_t len) {do_detach(); append(buff, len);}
 	basic_buffer(const basic_buffer& other) {do_detach(); append(other.buff, other.len);}
+	basic_buffer(const basic_buffer& other, size_t pos) {do_detach(); if (pos < other.len) append(boost::next(other.buff, pos), other.len - pos);}
+	basic_buffer(const basic_buffer& other, size_t pos, size_t len)
+	{
+		do_detach();
+		if (pos < other.len)
+			append(boost::next(other.buff, pos), pos + len > other.len ? other.len - pos : len);
+	}
 
 	inline basic_buffer& operator=(char c) {resize(0); return operator+=(c);}
 	inline basic_buffer& operator=(const char* buff) {resize(0); return operator+=(buff);}
@@ -86,7 +93,12 @@ public:
 	{
 		if (count > 0)
 		{
-			reserve(len + count);
+			check_length(count);
+
+			size_t capacity = len + count;
+			if (capacity > cap)
+				reserve(capacity);
+
 			memset(boost::next(buff, len), c, count);
 			len += (unsigned) count;
 		}
@@ -100,7 +112,12 @@ public:
 	{
 		if (NULL != _buff && _len > 0)
 		{
-			reserve(len + _len);
+			check_length(_len);
+
+			size_t capacity = len + _len;
+			if (capacity > cap)
+				reserve(capacity);
+
 			memcpy(boost::next(buff, len), _buff, _len);
 			len += (unsigned) _len;
 		}
@@ -108,32 +125,112 @@ public:
 		return *this;
 	}
 
+	//nonstandard function append2 -- delete the last character if it's '\0' before appending another string.
+	//this feature makes basic_buffer to be able to works as std::string, which will append '\0' automatically.
+	//please note that the second verion of append2 still needs you to provide '\0' at the end of the fed string.
+	//usage:
+	/*
+		basic_buffer bb("1"); //not include the '\0' character
+		printf("%s\n", bb.data()); //not ok, random characters can be outputted after "1", use basic_buffer bb("1", 2) instead.
+		bb.append2("23"); //include the '\0' character, but just append2, please note.
+		printf("%s\n", bb.data()); //ok, additional '\0' has been added automatically so no random characters can be outputted after "123".
+		bb.append2("456", 4); //include the '\0' character
+		printf("%s\n", bb.data()); //ok, additional '\0' has been added manually so no random characters can be outputted after "123456".
+		bb.append2("789", 3); //not include the '\0' character
+		printf("%s\n", bb.data()); //not ok, random characters can be outputted after "123456789"
+		bb.append2("000"); //the last character '9' will not be deleted because it's not '\0'
+		printf("%s\n", bb.data()); //ok, additional '\0' has been added automatically so no random characters can be outputted after "123456789000".
+		printf("%zu\n", bb.size()); //the final length of bb is 13, just include the last '\0' character, all middle '\0' characters have been deleted.
+	*/
+	//by the way, deleting the last character which is not '\0' before appending another string is very efficient, please use it freely.
+	basic_buffer& append2(const char* buff) {return append(buff, strlen(buff) + 1);} //include the '\0' character
+	basic_buffer& append2(const char* _buff, size_t _len)
+	{
+		if (len > 0 && '\0' == *boost::next(buff, len - 1))
+			resize(len - 1); //delete the last character if it's '\0'
+
+		return append(_buff, _len);
+	}
+
+	basic_buffer& erase(size_t pos = 0, size_t len = UINT_MAX)
+	{
+		if (pos > size())
+			throw std::out_of_range("invalid position");
+
+		if (len >= size())
+			resize(pos);
+		else
+		{
+			size_t start = size() - len;
+			if (pos >= start)
+				resize(pos);
+			else
+			{
+				memmove(boost::next(buff, pos), boost::next(buff, pos + len), size() - pos - len);
+				resize(size() - len);
+			}
+		}
+
+		return *this;
+	}
+
 	void resize(size_t _len) //won't fill the extended buffers
 	{
-		reserve(_len);
+		if (_len > cap)
+			reserve(_len);
+
 		len = (unsigned) _len;
 	}
 
 	void assign(size_t len) {resize(len);}
 	void assign(const char* buff, size_t len) {resize(0); append(buff, len);}
 
+	void shrink_to_fit() {reserve(0);}
 	void reserve(size_t capacity)
 	{
-		if (capacity > cap)
-		{
-			cap = (unsigned) capacity & 0xFFFFFFF0;
-			if ((unsigned) capacity > cap)
-				cap <<= 1;
-			//memory expansion strategy -- double memory reservation each time as std::string does.
-			//not considered integer overflow, please note.
+		if (capacity > max_size())
+			throw std::length_error("too big memory request");
+		else if (capacity < len)
+			capacity = len;
+		else if (0 == capacity)
+			capacity = 16;
 
-			if (cap < 16)
-				cap = 16;
-			buff = (char*) realloc(buff, cap);
+		if (capacity != cap)
+		{
+#ifdef _MSC_VER
+			if (cap < capacity && capacity < cap + cap / 2) //memory expansion strategy -- quoted from std::string.
+			{
+				capacity = cap + cap / 2;
+#else
+			if (cap < capacity && capacity < 2 * cap) //memory expansion strategy -- quoted from std::string.
+			{
+				capacity = 2 * cap;
+#endif
+				if (capacity > max_size())
+					capacity = max_size();
+			}
+
+			size_t new_cap = capacity & (unsigned) (max_size() << 4);
+			if (capacity > new_cap)
+			{
+				new_cap += 0x10;
+				if (capacity > new_cap || new_cap > max_size()) //overflow
+					new_cap = max_size();
+			}
+
+			if (new_cap != cap)
+			{
+				char* new_buff = (char*) realloc(buff, new_cap);
+				if (NULL == new_buff)
+					throw std::bad_alloc();
+
+				cap = (unsigned) new_cap;
+				buff = new_buff;
+			}
 		}
 	}
 
-	size_t max_size() const {return (unsigned) -1;}
+	size_t max_size() const {return UINT_MAX;}
 	size_t capacity() const {return cap;}
 
 	//the following five functions are needed by st_asio_wrapper
@@ -150,6 +247,8 @@ public:
 protected:
 	void do_attach(char* _buff, size_t _len, size_t capacity) {buff = _buff; len = (unsigned) _len; cap = (unsigned) capacity;}
 	void do_detach() {buff = NULL; len = cap = 0;}
+
+	void check_length(size_t add_len) {if (add_len > max_size() || max_size() - add_len < len) throw std::length_error("too big memory request");}
 
 protected:
 	char* buff;

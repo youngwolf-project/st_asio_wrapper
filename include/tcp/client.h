@@ -88,7 +88,8 @@ public:
 	void force_shutdown(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->force_shutdown(false);}
 	void force_shutdown(bool reconnect = false) {ST_THIS do_something_to_all(boost::bind(&Socket::force_shutdown, boost::placeholders::_1, reconnect));}
 	void graceful_shutdown(typename Pool::object_ctype& socket_ptr, bool sync = true) {ST_THIS del_object(socket_ptr); socket_ptr->graceful_shutdown(false, sync);}
-	void graceful_shutdown(bool reconnect = false, bool sync = true) {ST_THIS do_something_to_all(boost::bind(&Socket::graceful_shutdown, boost::placeholders::_1, reconnect, sync));}
+	void graceful_shutdown(bool reconnect = false) {ST_THIS do_something_to_all(boost::bind(&Socket::graceful_shutdown, boost::placeholders::_1, reconnect, false));}
+	//for the last function, parameter sync will always be false, or dead lock will occur (until timeout).
 
 protected:
 	virtual void uninit() {ST_THIS stop(); force_shutdown();} //if you wanna graceful shutdown, call graceful_shutdown before service_pump::stop_service invocation.

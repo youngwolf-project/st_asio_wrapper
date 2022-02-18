@@ -183,7 +183,7 @@ public:
 			return ctx->io_context;
 		}
 
-		throw "no available io_context!";
+		throw std::runtime_error("no available io_context");
 	}
 
 	void return_io_context(const boost::asio::execution_context& io_context, unsigned refs = 1)
