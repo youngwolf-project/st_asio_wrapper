@@ -385,7 +385,7 @@ protected:
 				(&iter->work)->~executor_work_guard();
 				new(&iter->work) boost::asio::executor_work_guard<boost::asio::io_context::executor_type>(iter->io_context.get_executor());
 #else
-				iter->work = boost::make_shared<boost::asio::io_context::work>(iter->io_context);
+				iter->work = boost::make_shared<boost::asio::io_context::work>(boost::ref(iter->io_context));
 #endif
 			}
 #endif
