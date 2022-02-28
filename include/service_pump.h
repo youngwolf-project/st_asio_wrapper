@@ -49,7 +49,7 @@ public:
 		virtual void finalize() {} //clean up after stop_service
 
 	protected:
-		friend service_pump;
+		friend class service_pump;
 		service_pump& sp;
 
 	private:
