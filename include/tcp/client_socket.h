@@ -124,7 +124,7 @@ protected:
 	virtual bool do_start() //connect
 	{
 		assert(!ST_THIS is_connected());
-		return ST_THIS set_timer(TIMER_CONNECT, 50, (boost::lambda::bind(&generic_client_socket::connect, this), false));
+		return bind() && ST_THIS set_timer(TIMER_CONNECT, 50, (boost::lambda::bind(&generic_client_socket::connect, this, true), false));
 	}
 
 	virtual void connect_handler(const boost::system::error_code& ec)
@@ -185,9 +185,9 @@ private:
 	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) {if (NULL != matrix) matrix->get_service_pump().assign_io_context(io_context_, refs);}
 	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {if (NULL != matrix) matrix->get_service_pump().return_io_context(io_context_, refs);}
 
-	bool connect()
+	bool connect(bool first)
 	{
-		if (!bind())
+		if (!first && !bind())
 			return false;
 
 		ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_handler_error(boost::bind(&generic_client_socket::connect_handler, this, boost::asio::placeholders::error)));
@@ -209,7 +209,7 @@ private:
 			int delay = prepare_reconnect(ec);
 			if (delay < 0)
 				need_reconnect = false;
-			else if (ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&generic_client_socket::connect, this), false)))
+			else if (ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&generic_client_socket::connect, this, false), false)))
 				return true;
 		}
 
