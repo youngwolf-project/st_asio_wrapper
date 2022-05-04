@@ -30,6 +30,12 @@
 //define this macro will introduce scatter-gather buffers when doing async read, it's very useful under certain situations (for example, ring buffer).
 //this macro is used by unpackers only, it doesn't belong to st_asio_wrapper.
 
+#if 107900 == BOOST_VERSION && (defined(_MSC_VER) || defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L)
+#define pos_list std::list<std::pair<const char*, size_t>> //a workaround for a bug introduced in boost 1.79, used by unpackers
+#else
+#define pos_list boost::container::list<std::pair<const char*, size_t> >
+#endif
+
 #ifdef ST_ASIO_HUGE_MSG
 #define ST_ASIO_HEAD_TYPE	boost::uint32_t
 #define ST_ASIO_HEAD_H2N	htonl

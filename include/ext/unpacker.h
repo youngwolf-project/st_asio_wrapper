@@ -60,7 +60,7 @@ public:
 	unpacker() {reset();}
 	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means not available
 
-	bool parse_msg(boost::container::list<std::pair<const char*, size_t> >& msg_can)
+	bool parse_msg(pos_list& msg_can)
 	{
 		const char* pnext = raw_buff.begin();
 		bool unpack_ok = true;
@@ -107,7 +107,7 @@ public:
 		remain_len += bytes_transferred;
 		assert(remain_len <= ST_ASIO_MSG_BUFFER_SIZE);
 
-		boost::container::list<std::pair<const char*, size_t> > msg_pos_can;
+		pos_list msg_pos_can;
 		bool unpack_ok = parse_msg(msg_pos_can);
 		for (BOOST_AUTO(iter, msg_pos_can.begin()); iter != msg_pos_can.end(); ++iter)
 			if (iter->second > ST_ASIO_HEAD_LEN) //ignore heartbeat
@@ -187,7 +187,7 @@ public:
 	flexible_unpacker() {reset();}
 	size_t current_msg_length() const {return cur_msg_len;} //current msg's total length, -1 means not available
 
-	bool parse_msg(boost::container::list<std::pair<const char*, size_t> >& msg_can)
+	bool parse_msg(pos_list& msg_can)
 	{
 		const char* pnext = raw_buff.begin();
 		bool unpack_ok = true;
@@ -257,7 +257,7 @@ public:
 			return true;
 		}
 
-		boost::container::list<std::pair<const char*, size_t> > msg_pos_can;
+		pos_list msg_pos_can;
 		bool unpack_ok = parse_msg(msg_pos_can);
 		for (BOOST_AUTO(iter, msg_pos_can.begin()); iter != msg_pos_can.end(); ++iter)
 			if (iter->second > ST_ASIO_HEAD_LEN) //ignore heartbeat
