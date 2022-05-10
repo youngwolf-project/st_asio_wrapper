@@ -11,6 +11,8 @@
 #endif
 #define ST_ASIO_RECV_BUFFER_TYPE std::vector<boost::asio::mutable_buffer> //scatter-gather buffer, it's very useful under certain situations (for example, ring buffer).
 #define ST_ASIO_SCATTERED_RECV_BUFFER //used by unpackers, not belongs to st_asio_wrapper
+#define ST_ASIO_WANT_MSG_SEND_NOTIFY
+#define ST_ASIO_DEFAULT_PACKER packer2<>
 //configuration
 
 #include "file_client.h"
@@ -20,15 +22,12 @@
 #define STATUS			"status"
 #define STATISTIC		"statistic"
 #define LIST_ALL_CLIENT	"list all client"
-#define REQUEST_FILE	"get"
+#define GET_FILE		"get"
+#define PUT_FILE		"put"
 
 int link_num = 1;
 fl_type file_size;
-#if BOOST_VERSION >= 105300
-boost::atomic_int_fast64_t received_size;
-#else
-atomic<boost::int_fast64_t> received_size;
-#endif
+atomic_size transmit_size;
 
 void add_socket(file_client& client, int argc, const char* argv[])
 {
@@ -94,9 +93,9 @@ int main(int argc, const char* argv[])
 			client.list_all_status();
 		else if (LIST_ALL_CLIENT == str)
 			client.list_all_object();
-		else if (str.size() > sizeof(REQUEST_FILE) && !strncmp(REQUEST_FILE, str.data(), sizeof(REQUEST_FILE) - 1) && isspace(str[sizeof(REQUEST_FILE) - 1]))
+		else if (str.size() > sizeof(GET_FILE) && !strncmp(GET_FILE, str.data(), sizeof(GET_FILE) - 1) && isspace(str[sizeof(GET_FILE) - 1]))
 		{
-			str.erase(0, sizeof(REQUEST_FILE));
+			str.erase(0, sizeof(GET_FILE));
 
 			boost::char_separator<char> sep(" \t");
 			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
@@ -106,6 +105,19 @@ int main(int argc, const char* argv[])
 				file_list.push_back(*iter);
 
 			client.get_file(file_list);
+		}
+		else if (str.size() > sizeof(PUT_FILE) && !strncmp(PUT_FILE, str.data(), sizeof(PUT_FILE) - 1) && isspace(str[sizeof(PUT_FILE) - 1]))
+		{
+			str.erase(0, sizeof(PUT_FILE));
+
+			boost::char_separator<char> sep(" \t");
+			boost::tokenizer<boost::char_separator<char> > tok(str, sep);
+
+			boost::container::list<std::string> file_list;
+			for (BOOST_AUTO(iter, tok.begin()); iter != tok.end(); ++iter)
+				file_list.push_back(*iter);
+
+			client.put_file(file_list);
 		}
 		else
 			client.at(0)->talk(str);

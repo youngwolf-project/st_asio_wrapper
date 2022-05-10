@@ -1,15 +1,12 @@
 #ifndef FILE_BUFFER_H_
 #define FILE_BUFFER_H_
 
-#include "../include/base.h"
-using namespace st_asio_wrapper;
-
 #include "common.h"
 
 class file_buffer : public i_buffer, public boost::noncopyable
 {
 public:
-	file_buffer(FILE* file, fl_type total_len_) : _file(file), total_len(total_len_)
+	file_buffer(FILE* file, fl_type total_len_, atomic_size* transmit_size_ = NULL) : _file(file), total_len(total_len_), transmit_size(transmit_size_)
 	{
 		assert(NULL != _file);
 
@@ -38,6 +35,8 @@ public:
 				printf("fread(" ST_ASIO_SF ") error!\n", data_len);
 				data_len = 0;
 			}
+			else if (NULL != transmit_size)
+				*transmit_size += data_len;
 		}
 	}
 
@@ -47,6 +46,7 @@ protected:
 	size_t data_len;
 
 	fl_type total_len;
+	atomic_size* transmit_size;
 };
 
 #endif //FILE_BUFFER_H_

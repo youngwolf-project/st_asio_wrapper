@@ -3,12 +3,22 @@
 
 #include <stdio.h>
 
+#include "../include/base.h"
+using namespace st_asio_wrapper;
+using namespace st_asio_wrapper::tcp;
+
 #ifdef _MSC_VER
 #define fseeko _fseeki64
 #define ftello _ftelli64
 #define fl_type __int64
 #else
 #define fl_type off_t
+#endif
+
+#if BOOST_VERSION >= 105300
+#define atomic_size	boost::atomic_int_fast64_t
+#else
+#define atomic_size atomic<boost::int_fast64_t>
 #endif
 
 #define ORDER_LEN	sizeof(char)
@@ -29,10 +39,14 @@ if head equal to:
 2: body is talk content
 	talk, client->server. please note that server cannot talk to client, this is because server never knows whether
 	it is going to transmit a file or not.
-	return: n/a
+	return: na
 3: body is object id(8 bytes)
 	change file server's object ids, demonstrate how to use macro ST_ASIO_RESTORE_OBJECT.
-	return: n/a
+	return: na
+
+10:body is offset(8 bytes) + data length(8 bytes) + leader (1 byte) + filename
+	request to upload the file, client->server->client
+	return: same head + data length(8 bytes) + status(1 byte, 0 - success, !0 - failed), then file content(no-protocol), repeat until all data been sent
 */
 
 class base_socket
