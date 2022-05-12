@@ -184,7 +184,7 @@ bool file_socket::handle_msg(out_msg_ctype& msg)
 			else
 			{
 				bool re = NULL != (file = fopen(boost::next(msg.data(), ORDER_LEN + OFFSET_LEN + DATA_LEN + 1), "r+b"));
-				if (!re && ++retry_num < 10) //wait (up to 10 times of ST_ASIO_MSG_HANDLING_INTERVAL) the leader to create the file
+				if (!re && ++retry_num < 100) //wait (up to 100 times of ST_ASIO_MSG_HANDLING_INTERVAL) the leader to create the file
 					return false;
 
 				response_put_file(offset, length, re);
