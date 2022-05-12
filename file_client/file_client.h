@@ -75,7 +75,7 @@ public:
 
 		fseeko(file, 0, SEEK_END);
 		fl_type length = ftello(file);
-		if (link_num - 1 == index)
+		if (0 == index)
 			file_size = length;
 
 		fl_type my_length = length / link_num;
@@ -282,13 +282,13 @@ private:
 				}
 				else
 				{
-					fl_type length;
-					memcpy(&length, boost::next(msg.data(), ORDER_LEN), DATA_LEN);
+					fl_type my_length;
+					memcpy(&my_length, boost::next(msg.data(), ORDER_LEN), DATA_LEN);
 
-					printf("start to send the file with length " ST_ASIO_LLF "\n", length);
+					printf("start to send the file with length " ST_ASIO_LLF "\n", my_length);
 
 					state = TRANS_BUSY;
-					in_msg_type msg(new file_buffer(file, length, &transmit_size));
+					in_msg_type msg(new file_buffer(file, my_length, &transmit_size));
 					direct_send_msg(msg, true);
 				}
 			}
@@ -368,8 +368,8 @@ private:
 					do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t (file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
 						boost::lambda::bind(&file_socket::get_file, *boost::lambda::_1, file_name)));
 			}
-			else if ((re = find(link_num - 1)->put_file(file_name)))
-				do_something_to_all(boost::lambda::if_then((unsigned) (link_num - 1) != boost::lambda::bind((boost::uint_fast64_t(file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
+			else if ((re = find(0)->put_file(file_name)))
+				do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t(file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
 					boost::lambda::bind(&file_socket::put_file, *boost::lambda::_1, file_name)));
 
 			if (re)
