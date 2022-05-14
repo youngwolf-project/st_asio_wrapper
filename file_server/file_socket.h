@@ -34,11 +34,7 @@ protected:
 private:
 	void clear();
 	void trans_end(bool reset_unpacker = true);
-	void response_put_file(fl_type offset, fl_type length, bool success);
-	bool handle_msg(out_msg_ctype& msg);
-
-private:
-	int retry_num;
+	void handle_msg(out_msg_ctype& msg);
 };
 
 #endif //#ifndef FILE_SOCKET_H_

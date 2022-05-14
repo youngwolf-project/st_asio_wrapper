@@ -44,7 +44,10 @@ if head equal to:
 	change file server's object ids, demonstrate how to use macro ST_ASIO_RESTORE_OBJECT.
 	return: na
 
-10:body is offset(8 bytes) + data length(8 bytes) + leader (1 byte) + filename
+10:body is a filename
+	request to create or truncate the file on the server, client->server->client
+	return: same head + status(1 byte, 0 - success, !0 - failed) + filename
+11:body is offset(8 bytes) + data length(8 bytes) + filename
 	request to upload the file, client->server->client
 	return: same head + data length(8 bytes) + status(1 byte, 0 - success, !0 - failed), then file content(no-protocol), repeat until all data been sent
 */

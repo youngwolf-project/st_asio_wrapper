@@ -17,14 +17,20 @@ extern int link_num;
 extern fl_type file_size;
 extern atomic_size transmit_size;
 
-class file_socket : public base_socket, public client_socket
+class file_matrix : public i_matrix
 {
 public:
-	file_socket(i_matrix& matrix_) : client_socket(matrix_), index(-1) {}
+	virtual void put_file(const std::string& file_name) = 0;
+};
+
+class file_socket : public base_socket, public client_socket2<file_matrix>
+{
+public:
+	file_socket(file_matrix& matrix_) : client_socket2<file_matrix>(matrix_), index(-1) {}
 	virtual ~file_socket() {clear();}
 
 	//reset all, be ensure that there's no any operations performed on this file_socket when invoke it
-	virtual void reset() {trans_end(); client_socket::reset();}
+	virtual void reset() {trans_end(); client_socket2<file_matrix>::reset();}
 
 	bool is_idle() const {return TRANS_IDLE == state;}
 	void set_index(int index_) {index = index_;}
@@ -56,50 +62,62 @@ public:
 		return true;
 	}
 
-	bool put_file(const std::string& file_name)
+	bool truncate_file(const std::string& file_name)
 	{
 		assert(!file_name.empty());
 
 		if (TRANS_IDLE != state)
 			return false;
-
-		file = fopen(file_name.data(), "rb");
-		if (NULL == file)
+		else if (0 == index)
 		{
-			printf("can't open file %s.\n", file_name.data());
-			return false;
-		}
-
-		char buffer[ORDER_LEN + OFFSET_LEN + DATA_LEN + 1];
-		*buffer = 10; //head
-
-		fseeko(file, 0, SEEK_END);
-		fl_type length = ftello(file);
-		if (0 == index)
-			file_size = length;
-
-		fl_type my_length = length / link_num;
-		fl_type offset = my_length * index;
-		fseeko(file, offset, SEEK_SET);
-
-		if (link_num - 1 == index)
-			my_length = length - offset;
-		if (my_length > 0)
-		{
-			memcpy(boost::next(buffer, ORDER_LEN), &offset, OFFSET_LEN);
-			memcpy(boost::next(buffer, ORDER_LEN + OFFSET_LEN), &my_length, DATA_LEN);
-			*boost::next(buffer, ORDER_LEN + OFFSET_LEN + DATA_LEN) = link_num - 1 == index ? 0 : 1;
-
-			std::string order(buffer, sizeof(buffer));
+			std::string order(ORDER_LEN, (char) 10);
 			order += file_name;
 
 			state = TRANS_PREPARE;
 			send_msg(order, true);
 		}
-		else
-			trans_end(false);
 
 		return true;
+	}
+
+	bool put_file(const std::string& file_name)
+	{
+		assert(!file_name.empty());
+
+		file = fopen(file_name.data(), "rb");
+		bool re = NULL != file;
+		if (re)
+		{
+			fseeko(file, 0, SEEK_END);
+			fl_type length = ftello(file);
+			if (0 == index)
+				file_size = length;
+
+			fl_type my_length = length / link_num;
+			fl_type offset = my_length * index;
+			fseeko(file, offset, SEEK_SET);
+
+			if (link_num - 1 == index)
+				my_length = length - offset;
+			if (my_length > 0)
+			{
+				char buffer[ORDER_LEN + OFFSET_LEN + DATA_LEN];
+				*buffer = 11; //head
+
+				memcpy(boost::next(buffer, ORDER_LEN), &offset, OFFSET_LEN);
+				memcpy(boost::next(buffer, ORDER_LEN + OFFSET_LEN), &my_length, DATA_LEN);
+
+				std::string order(buffer, sizeof(buffer));
+				order += file_name;
+
+				state = TRANS_PREPARE;
+				send_msg(order, true);
+				return true;
+			}
+		}
+
+		trans_end(false);
+		return re;
 	}
 
 	void talk(const std::string& str)
@@ -183,7 +201,7 @@ protected:
 		memcpy(boost::next(buffer, ORDER_LEN), &id, sizeof(boost::uint_fast64_t));
 		send_msg(buffer, sizeof(buffer), true);
 
-		client_socket::on_connect();
+		client_socket2<file_matrix>::on_connect();
 	}
 
 private:
@@ -272,6 +290,24 @@ private:
 			}
 			break;
 		case 10:
+			if (msg.size() > ORDER_LEN + 1 && NULL == file && TRANS_PREPARE == state)
+			{
+				const char* file_name = boost::next(msg.data(), ORDER_LEN + 1);
+				if ('\0' != *boost::next(msg.data(), ORDER_LEN))
+				{
+					if (link_num - 1 == index)
+						printf("cannot create or truncated file %s on the server\n", file_name);
+					trans_end(false);
+				}
+				else
+				{
+					if (link_num - 1 == index)
+						printf("prepare to send file %s\n", file_name);
+					get_matrix()->put_file(boost::next(msg.data(), ORDER_LEN + 1));
+				}
+			}
+			break;
+		case 11:
 			if (ORDER_LEN + DATA_LEN + 1 == msg.size() && NULL != file && TRANS_PREPARE == state)
 			{
 				if ('\0' != *boost::next(msg.data(), ORDER_LEN + DATA_LEN))
@@ -284,7 +320,6 @@ private:
 				{
 					fl_type my_length;
 					memcpy(&my_length, boost::next(msg.data(), ORDER_LEN), DATA_LEN);
-
 					printf("start to send the file with length " ST_ASIO_LLF "\n", my_length);
 
 					state = TRANS_BUSY;
@@ -306,14 +341,14 @@ private:
 	int index;
 };
 
-class file_client : public multi_client_base<file_socket>
+class file_client : public multi_client2<file_socket, file_matrix>
 {
 public:
-	static const tid TIMER_BEGIN = multi_client_base<file_socket>::TIMER_END;
+	static const tid TIMER_BEGIN = multi_client2<file_socket, file_matrix>::TIMER_END;
 	static const tid UPDATE_PROGRESS = TIMER_BEGIN;
 	static const tid TIMER_END = TIMER_BEGIN + 5;
 
-	file_client(service_pump& service_pump_) : multi_client_base<file_socket>(service_pump_) {}
+	file_client(service_pump& service_pump_) : multi_client2<file_socket, file_matrix>(service_pump_) {}
 
 	void get_file(const boost::container::list<std::string>& files)
 	{
@@ -342,6 +377,9 @@ public:
 		return idle_num == size();
 	}
 
+protected:
+	virtual void put_file(const std::string& file_name) {do_something_to_all(boost::lambda::bind(&file_socket::put_file, *boost::lambda::_1, file_name));}
+
 private:
 	void transmit_file()
 	{
@@ -368,9 +406,8 @@ private:
 					do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t (file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
 						boost::lambda::bind(&file_socket::get_file, *boost::lambda::_1, file_name)));
 			}
-			else if ((re = find(0)->put_file(file_name)))
-				do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t(file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
-					boost::lambda::bind(&file_socket::put_file, *boost::lambda::_1, file_name)));
+			else
+				re = find(0)->truncate_file(file_name);
 
 			if (re)
 			{
