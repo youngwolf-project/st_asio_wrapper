@@ -1,22 +1,12 @@
 #ifndef UNPACKER_H_
 #define UNPACKER_H_
 
-#include "../include/base.h"
-using namespace st_asio_wrapper;
-using namespace st_asio_wrapper::tcp;
-
-#include "../file_server/common.h"
-
-#if BOOST_VERSION >= 105300
-extern boost::atomic_int_fast64_t received_size;
-#else
-extern atomic<boost::int_fast64_t> received_size;
-#endif
+#include "common.h"
 
 class file_unpacker : public i_unpacker<std::string>, public boost::noncopyable
 {
 public:
-	file_unpacker(FILE* file, fl_type total_len_)  : _file(file), total_len(total_len_)
+	file_unpacker(FILE* file, fl_type total_len_, atomic_size* transmit_size_ = NULL)  : _file(file), total_len(total_len_), transmit_size(transmit_size_)
 	{
 		assert(NULL != _file);
 
@@ -31,8 +21,10 @@ public:
 	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can)
 	{
 		assert(total_len >= (fl_type) bytes_transferred && bytes_transferred > 0);
+
 		total_len -= bytes_transferred;
-		received_size += bytes_transferred;
+		if (NULL != transmit_size)
+			*transmit_size += bytes_transferred;
 
 		if (bytes_transferred == fwrite(buffer, 1, bytes_transferred, _file))
 			return true;
@@ -57,6 +49,7 @@ protected:
 	char* buffer;
 
 	fl_type total_len;
+	atomic_size* transmit_size;
 };
 
 #endif //UNPACKER_H_

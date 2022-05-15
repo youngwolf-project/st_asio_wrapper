@@ -7,7 +7,7 @@ using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
 using namespace st_asio_wrapper::ext::tcp;
 
-#include "file_buffer.h"
+#include "../file_common/common.h"
 
 class file_socket : public base_socket, public server_socket
 {
@@ -32,7 +32,8 @@ protected:
 #endif
 
 private:
-	void trans_end();
+	void clear();
+	void trans_end(bool reset_unpacker = true);
 	void handle_msg(out_msg_ctype& msg);
 };
 
