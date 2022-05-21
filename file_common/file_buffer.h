@@ -13,7 +13,7 @@ public:
 		buffer = new char[boost::asio::detail::default_max_transfer_size];
 		assert(NULL != buffer);
 
-		read();
+		good = read();
 	}
 	~file_buffer() {delete[] buffer;}
 
@@ -22,9 +22,10 @@ public:
 	virtual size_t size() const {return data_len;}
 	virtual const char* data() const {return buffer;}
 
-	void read()
+	bool is_good() const {return good;}
+	bool read()
 	{
-		if (0 == total_len)
+		if (total_len <= 0)
 			data_len = 0;
 		else
 		{
@@ -34,13 +35,18 @@ public:
 			{
 				printf("fread(" ST_ASIO_SF ") error!\n", data_len);
 				data_len = 0;
+
+				return (good = false);
 			}
 			else if (NULL != transmit_size)
 				*transmit_size += data_len;
 		}
+
+		return true;
 	}
 
 protected:
+	bool good;
 	FILE* _file;
 	char* buffer;
 	size_t data_len;

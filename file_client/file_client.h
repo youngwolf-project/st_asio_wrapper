@@ -115,6 +115,8 @@ public:
 				return true;
 			}
 		}
+		else
+			printf("can not open file %s.\n", file_name.data());
 
 		trans_end(false);
 		return re;
@@ -180,8 +182,9 @@ protected:
 		file_buffer* buffer = dynamic_cast<file_buffer*>(&*msg.raw_buffer());
 		if (NULL != buffer)
 		{
-			buffer->read();
-			if (buffer->empty())
+			if (!buffer->read())
+				trans_end(false);
+			else if (buffer->empty())
 			{
 				puts("file sending end successfully");
 				trans_end(false);
@@ -297,7 +300,7 @@ private:
 				{
 					if (link_num - 1 == index)
 						printf("cannot create or truncated file %s on the server\n", file_name);
-					trans_end(false);
+					trans_end();
 				}
 				else
 				{
@@ -323,8 +326,17 @@ private:
 					printf("start to send the file with length " ST_ASIO_LLF "\n", my_length);
 
 					state = TRANS_BUSY;
-					in_msg_type msg(new file_buffer(file, my_length, &transmit_size));
-					direct_send_msg(msg, true);
+					BOOST_AUTO(buffer, new file_buffer(file, my_length, &transmit_size));
+					if (buffer->is_good())
+					{
+						in_msg_type msg(buffer);
+						direct_send_msg(msg, true);
+					}
+					else
+					{
+						delete buffer;
+						trans_end();
+					}
 				}
 			}
 			break;
