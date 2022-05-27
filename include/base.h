@@ -46,7 +46,7 @@ typedef boost::atomic_uint_fast64_t atomic_uint_fast64;
 typedef boost::atomic_size_t atomic_size_t;
 typedef boost::atomic_int_fast32_t atomic_int_fast32_t;
 #else
-template <typename T>
+template<typename T>
 class atomic
 {
 public:
@@ -271,6 +271,21 @@ public:
 
 private:
 	bool _stripped;
+};
+
+//just provide msg_type definition, you should not call any functions of it nor store msg in it
+template<typename MsgType>
+class dummy_unpacker : public i_unpacker<MsgType>
+{
+public:
+	using typename i_unpacker<MsgType>::msg_type;
+	using typename i_unpacker<MsgType>::msg_ctype;
+	using typename i_unpacker<MsgType>::container_type;
+	using typename i_unpacker<MsgType>::buffer_type;
+
+	virtual void reset() {assert(false);}
+	virtual bool parse_msg(size_t bytes_transferred, container_type& msg_can) {assert(false); return false;}
+	virtual buffer_type prepare_next_recv() {assert(false); return buffer_type();}
 };
 
 namespace udp
@@ -538,7 +553,7 @@ typedef boost::condition_variable condition_variable;
 class condition_variable : public boost::condition_variable
 {
 public:
-	template <typename Predicate> bool wait_for(boost::unique_lock<boost::mutex>& lock, const boost::chrono::milliseconds& duration, Predicate pred)
+	template<typename Predicate> bool wait_for(boost::unique_lock<boost::mutex>& lock, const boost::chrono::milliseconds& duration, Predicate pred)
 		{return timed_wait(lock, boost::posix_time::milliseconds(duration.count()), pred);}
 };
 #endif

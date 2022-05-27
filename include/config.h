@@ -930,7 +930,7 @@
 	#endif
 
 	#if !defined(ST_ASIO_HIDE_WARNINGS) && (defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L)
-		#warning st_asio_wrapper does not need any c++11 features.
+		#warning st_asio_wrapper does not need any c++11 features except for websocket support.
 	#endif
 #else
 	#error st_asio_wrapper only support Visual C++, GCC and Clang.

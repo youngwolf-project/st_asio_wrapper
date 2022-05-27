@@ -7,7 +7,7 @@
  *		QQ: 676218192
  *		Community on QQ: 198941541
  *
- * make st_asio_wrapper support boost::asio::ssl
+ * make st_asio_wrapper support ssl (based on boost::asio::ssl)
  */
 
 #ifndef ST_ASIO_SSL_H_
@@ -23,8 +23,7 @@
 
 namespace st_asio_wrapper { namespace ssl {
 
-template <typename Socket>
-class socket : public Socket
+template<typename Socket> class socket : public Socket
 {
 public:
 	template<typename Arg> socket(Arg& arg, boost::asio::ssl::context& ctx_) : Socket(arg, ctx_), ctx(ctx_) {}
@@ -82,7 +81,7 @@ private:
 	boost::asio::ssl::context& ctx;
 };
 
-template <typename Packer, typename Unpacker, typename Matrix = i_matrix,
+template<typename Packer, typename Unpacker, typename Matrix = i_matrix,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
 class client_socket_base : public socket<tcp::client_socket_base<Packer, Unpacker, Matrix, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, InQueue, InContainer, OutQueue, OutContainer> >
