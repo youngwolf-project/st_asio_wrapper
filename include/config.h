@@ -938,8 +938,11 @@
 
 #if BOOST_VERSION < 104900
 	#error st_asio_wrapper only support boost 1.49 or higher.
-#elif BOOST_VERSION < 106000
-	namespace boost {namespace placeholders {using ::_1; using ::_2;}}
+#elif BOOST_VERSION < 107000
+	namespace boost {namespace beast {using tcp_stream = boost::asio::ip::tcp::socket;}}
+	#if BOOST_VERSION < 106000
+		namespace boost {namespace placeholders {using ::_1; using ::_2;}}
+	#endif
 #endif
 
 #if !defined(BOOST_THREAD_USES_CHRONO)
@@ -993,8 +996,13 @@
 	#error message capacity must be bigger than zero.
 #endif
 
+//the message mode for websocket, !0 - binary mode (default), 0 - text mode
+#ifndef ST_ASIO_WEBSOCKET_BINARY
+#define ST_ASIO_WEBSOCKET_BINARY	1
+#endif
+
 //by defining this, virtual function socket::calc_shrink_size will be introduced and be called when send buffer is insufficient before sending message,
-//the return value will be used to determine how many messages (in bytes) will be discarded (from the oldest one), 0 means don't shrink send buffer,
+//the return value will be used to determine how many messages (in bytes) will be discarded (from the oldest ones), 0 means don't shrink send buffer,
 //you can rewrite it or accept the default implementation---1/3 of the current size.
 //please note:
 // 1. shrink size will be round up to the last discarded message.

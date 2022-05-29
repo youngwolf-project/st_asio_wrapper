@@ -229,7 +229,7 @@ template<typename Packer, typename Unpacker, typename Matrix = i_matrix, typenam
 class client_socket_base : public generic_client_socket<socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Matrix>
 {
 private:
-	typedef generic_client_socket <socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Matrix> super;
+	typedef generic_client_socket<socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Matrix> super;
 
 public:
 	client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}

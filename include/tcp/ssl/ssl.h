@@ -135,11 +135,7 @@ private:
 	void handle_handshake(const boost::system::error_code& ec)
 	{
 		ST_THIS on_handshake(ec);
-
-		if (!ec)
-			super::connect_handler(ec); //return to tcp::client_socket_base::connect_handler
-		else
-			ST_THIS force_shutdown();
+		ec ? ST_THIS force_shutdown() : super::connect_handler(ec); //return to tcp::client_socket_base::connect_handler
 	}
 
 	using super::shutdown_ssl;
@@ -195,11 +191,7 @@ private:
 	void handle_handshake(const boost::system::error_code& ec)
 	{
 		ST_THIS on_handshake(ec);
-
-		if (!ec)
-			super::do_start(); //return to tcp::server_socket_base::do_start
-		else
-			ST_THIS get_server().del_socket(ST_THIS shared_from_this());
+		ec ? ST_THIS get_server().del_socket(ST_THIS shared_from_this()) : super::do_start(); //return to tcp::server_socket_base::do_start
 	}
 
 	using super::shutdown_ssl;

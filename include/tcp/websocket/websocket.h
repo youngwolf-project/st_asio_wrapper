@@ -34,26 +34,37 @@ public:
 	typedef boost::function<void(const boost::system::error_code& ec, size_t bytes_transferred)> ReadWriteCallBack;
 
 public:
-	stream(boost::asio::io_context& io_context_) : super(io_context_) {}
-	template<typename Arg> stream(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {}
+	stream(boost::asio::io_context& io_context_) : super(io_context_) {first_init();}
+	template<typename Arg> stream(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {first_init();}
 #if BOOST_ASIO_VERSION >= 101300
-	stream(const boost::asio::any_io_executor& executor) : super(executor) {}
-	template<typename Arg> stream(const boost::asio::any_io_executor& executor, Arg& arg) : super(executor, arg) {}
+	stream(const boost::asio::any_io_executor& executor) : super(executor) {first_init();}
+	template<typename Arg> stream(const boost::asio::any_io_executor& executor, Arg& arg) : super(executor, arg) {first_init();}
 #endif
 
+#if BOOST_VERSION >= 107000
 	typedef typename super::next_layer_type::socket_type lowest_layer_type;
 	lowest_layer_type& lowest_layer() {return this->next_layer().socket();}
 	const lowest_layer_type& lowest_layer() const {return this->next_layer().socket();}
+#endif
 
 	void async_read(const ReadWriteCallBack& call_back) {super::async_read(recv_buff, call_back);}
 	template<typename OutMsgType> bool parse_msg(list<OutMsgType>& msg_can)
 	{
+#if BOOST_VERSION < 107000
+		bool re = this->is_message_done() ? (msg_can.emplace_back((const char*) recv_buff.data().data(), recv_buff.size()), true) : false;
+		recv_buff.consume(-1);
+#else
 		bool re = this->is_message_done() ? (msg_can.emplace_back((const char*) recv_buff.cdata().data(), recv_buff.size()), true) : false;
 		recv_buff.clear();
+#endif
 
 		return re;
 	}
 	template<typename Buffer> void async_write(const Buffer& buff, const ReadWriteCallBack& call_back) {super::async_write(buff, call_back);}
+
+protected:
+	//helper function, just call it in constructor
+	void first_init() {this->binary(0 != ST_ASIO_WEBSOCKET_BINARY);}
 
 private:
 	boost::beast::flat_buffer recv_buff;
@@ -173,33 +184,31 @@ protected:
 private:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
 	{
-		if (!ec)
-		{
-			this->status = super::HANDSHAKING;
+		if (ec)
+			return super::connect_handler(ec);
 
-			// Set suggested timeout settings for the websocket
-			this->next_layer().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::client));
+		this->status = super::HANDSHAKING;
 
-			// Set a decorator to change the User-Agent of the handshake
-			this->next_layer().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::request_type& req) {
-				req.set(boost::beast::http::field::user_agent, std::string(BOOST_BEAST_VERSION_STRING) + " ascs websocket client");
-			}));
+#if BOOST_VERSION >= 107000
+		// Turn off the timeout on the tcp_stream, because
+		// the websocket stream has its own timeout system.
+		boost::beast::get_lowest_layer(this->next_layer()).expires_never();
 
-			// Update the host_ string. This will provide the value of the
-			// Host HTTP header during the WebSocket handshake.
-			// See https://tools.ietf.org/html/rfc7230#section-5.4
-			// Perform the websocket handshake
-			this->next_layer().async_handshake(this->endpoint_to_string(this->get_server_addr()), "/", [this](const boost::system::error_code& ec) {
-				this->on_handshake(ec);
+		// Set suggested timeout settings for the websocket
+		this->next_layer().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::client));
 
-				if (!ec)
-					super::connect_handler(ec); //return to tcp::client_socket_base::connect_handler
-				else
-					this->force_shutdown();
-			});
-		}
-		else
-			super::connect_handler(ec);
+		// Set a decorator to change the User-Agent of the handshake
+		this->next_layer().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::request_type& req) {
+			req.set(boost::beast::http::field::user_agent, std::string(BOOST_BEAST_VERSION_STRING) + " ascs websocket client");
+		}));
+#endif
+		// Provide the value of the Host HTTP header during the WebSocket handshake.
+		// See https://tools.ietf.org/html/rfc7230#section-5.4
+		// Perform the websocket handshake
+		this->next_layer().async_handshake(this->endpoint_to_string(this->get_server_addr()), "/", [this](const boost::system::error_code& ec) {
+			this->on_handshake(ec);
+			ec ? this->force_shutdown() : super::connect_handler(ec); //return to tcp::client_socket_base::connect_handler
+		});
 	}
 
 	using super::shutdown_websocket;
@@ -230,6 +239,7 @@ protected:
 	{
 		this->status = super::HANDSHAKING;
 
+#if BOOST_VERSION >= 107000
 		// Set suggested timeout settings for the websocket
 		this->next_layer().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
 
@@ -237,15 +247,11 @@ protected:
 		this->next_layer().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type& res) {
 			res.set(boost::beast::http::field::server, std::string(BOOST_BEAST_VERSION_STRING) + " ascs websocket server");
 		}));
-
+#endif
 		// Accept the websocket handshake
 		this->next_layer().async_accept([this](const boost::system::error_code& ec) {
 			this->on_handshake(ec);
-
-			if (!ec)
-				super::do_start(); //return to tcp::server_socket_base::do_start
-			else
-				this->get_server().del_socket(this->shared_from_this());
+			ec ? this->get_server().del_socket(this->shared_from_this()) : super::do_start(); //return to tcp::server_socket_base::do_start
 		});
 
 		return true;
