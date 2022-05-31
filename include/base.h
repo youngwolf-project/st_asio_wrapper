@@ -619,7 +619,11 @@ template<typename _Can>
 size_t get_size_in_byte(const _Can& __can)
 {
 	size_t size_in_byte = 0;
+#if __cplusplus >= 201703L
+	do_something_to_all(__can, [&](const auto& item) {size_in_byte += item.size();});
+#else
 	do_something_to_all(__can, size_in_byte += boost::lambda::bind(&_Can::value_type::size, boost::lambda::_1));
+#endif
 	return size_in_byte;
 }
 
