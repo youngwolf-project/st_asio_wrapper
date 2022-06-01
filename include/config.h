@@ -874,6 +874,7 @@
  * ENHANCEMENTS:
  * heartbeat(ext) optimization.
  * Add error check during file reading in file_server/file_client.
+ * Enhance basic_buffer to support more comprehensive buffers.
  *
  * DELETION:
  *

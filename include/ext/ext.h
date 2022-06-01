@@ -74,25 +74,31 @@ public:
 	basic_buffer() {do_detach();}
 	virtual ~basic_buffer() {clean();}
 	explicit basic_buffer(size_t len) {do_detach(); resize(len);}
+	basic_buffer(int len) {do_detach(); if (len > 0) resize((size_t) len);}
 	basic_buffer(size_t count, char c) {do_detach(); append(count, c);}
+	basic_buffer(char* buff) {do_detach(); operator+=(buff);}
 	basic_buffer(const char* buff) {do_detach(); operator+=(buff);}
 	basic_buffer(const char* buff, size_t len) {do_detach(); append(buff, len);}
-	basic_buffer(const basic_buffer& other) {do_detach(); append(other.buff, other.len);}
-	basic_buffer(const basic_buffer& other, size_t pos) {do_detach(); if (pos < other.len) append(boost::next(other.buff, pos), other.len - pos);}
-	basic_buffer(const basic_buffer& other, size_t pos, size_t len)
+	basic_buffer(const basic_buffer& other) {do_detach(); append(other);}
+	template<typename Buff> basic_buffer(const Buff& other) {do_detach(); append(other);}
+	template<typename Buff> basic_buffer(const Buff& other, size_t pos) {do_detach(); if (pos < other.size()) append(boost::next(other.data(), pos), other.size() - pos);}
+	template<typename Buff> basic_buffer(const Buff& other, size_t pos, size_t len)
 	{
 		do_detach();
-		if (pos < other.len)
-			append(boost::next(other.buff, pos), pos + len > other.len ? other.len - pos : len);
+		if (pos < other.size())
+			append(boost::next(other.size(), pos), pos + len > other.size() ? other.size() - pos : len);
 	}
 
 	inline basic_buffer& operator=(char c) {resize(0); return operator+=(c);}
+	inline basic_buffer& operator=(char* buff) {resize(0); return operator+=(buff);}
 	inline basic_buffer& operator=(const char* buff) {resize(0); return operator+=(buff);}
 	inline basic_buffer& operator=(const basic_buffer& other) {resize(0); return operator+=(other);}
+	template<typename Buff> inline basic_buffer& operator=(const Buff& other) {resize(0); return operator+=(other);}
 
 	inline basic_buffer& operator+=(char c) {return append(c);}
+	inline basic_buffer& operator+=(char* buff) {return append(buff);}
 	inline basic_buffer& operator+=(const char* buff) {return append(buff);}
-	inline basic_buffer& operator+=(const basic_buffer& other) {return append(other);}
+	template<typename Buff> inline basic_buffer& operator+=(const Buff& other) {return append(other);}
 
 	basic_buffer& append(char c) {return append(1, c);}
 	basic_buffer& append(size_t count, char c)
@@ -112,7 +118,8 @@ public:
 		return *this;
 	}
 
-	basic_buffer& append(const basic_buffer& other) {return append(other.data(), other.size());}
+	template<typename Buff> basic_buffer& append(const Buff& other) {return append(other.data(), other.size());}
+	basic_buffer& append(char* buff) {return append((const char*) buff);}
 	basic_buffer& append(const char* buff) {return append(buff, strlen(buff));}
 	basic_buffer& append(const char* _buff, size_t _len)
 	{
