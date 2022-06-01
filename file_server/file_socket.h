@@ -19,7 +19,7 @@ public:
 	//because we don't use objects pool(we don't defined ST_ASIO_REUSE_OBJECT), so this virtual function will
 	//not be invoked, and can be omitted, but we keep it for the possibility of using it in the future
 	virtual void reset();
-	virtual void take_over(boost::shared_ptr<server_socket> socket_ptr); //move socket_ptr into this socket
+	virtual void take_over(boost::shared_ptr<server_socket> socket_ptr); //move socket_ptr into this socket, Clang will complain with -Woverloaded-virtual
 //	virtual void take_over(boost::shared_ptr<file_socket> socket_ptr); //this works too, but brings warnings with -Woverloaded-virtual option.
 
 protected:

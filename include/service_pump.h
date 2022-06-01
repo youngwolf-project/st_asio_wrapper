@@ -216,7 +216,11 @@ public:
 	object_type find(int id)
 	{
 		boost::lock_guard<boost::mutex> lock(service_can_mutex);
+#if defined(__clang__) && (defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L)
+		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), boost::bind2nd(std::mem_fn(&i_service::is_equal_to), id)));
+#else
 		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), std::bind2nd(std::mem_fun(&i_service::is_equal_to), id)));
+#endif
 		return iter == service_can.end() ? NULL : *iter;
 	}
 
@@ -234,7 +238,11 @@ public:
 	void remove(int id)
 	{
 		boost::unique_lock<boost::mutex> lock(service_can_mutex);
+#if defined(__clang__) && (defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L)
+		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), boost::bind2nd(std::mem_fn(&i_service::is_equal_to), id)));
+#else
 		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), std::bind2nd(std::mem_fun(&i_service::is_equal_to), id)));
+#endif
 		if (iter != service_can.end())
 		{
 			object_type i_service_ = *iter;

@@ -911,7 +911,7 @@
 		#elif BOOST_VERSION < 107000
 			#define ST_ASIO_MIN_ACI_REF 2
 		#elif BOOST_VERSION < 107400
-			#if defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L
+			#if defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
 				#define ST_ASIO_MIN_ACI_REF 2
 			#else
 				#define ST_ASIO_MIN_ACI_REF 3
@@ -929,7 +929,7 @@
 		#warning Your compiler is GCC 4.7 or higher, you can use ascs to gain some performance improvement.
 	#endif
 
-	#if !defined(ST_ASIO_HIDE_WARNINGS) && (defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L)
+	#if !defined(ST_ASIO_HIDE_WARNINGS) && (defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L)
 		#warning st_asio_wrapper does not need any c++11 features except for websocket support.
 	#endif
 #else
