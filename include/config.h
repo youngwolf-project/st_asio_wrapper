@@ -857,6 +857,30 @@
  * REPLACEMENTS:
  * client_socket's function open_reconnect and close_reconnect have been replaced by function set_reconnect(bool).
  *
+ * ===============================================================
+ * 2022.6.1		version 2.5.0
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ *
+ * HIGHLIGHT:
+ * Support websocket, use macro ST_ASIO_WEBSOCKET_BINARY to control the mode (binary or text) of websocket message,
+ *  !0 - binary mode (default), 0 - text mode.
+ *
+ * FIX:
+ * Fix compilation warnings with c++0x in Clang.
+ * Fix compilation error with c++17 and higher in GCC and Clang.
+ * Fix alias for tcp and ssl.
+ *
+ * ENHANCEMENTS:
+ * heartbeat(ext) optimization.
+ * Add error check during file reading in file_server/file_client.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -866,8 +890,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20400	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.4.0"
+#define ST_ASIO_VER		20500	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.5.0"
 
 //#define ST_ASIO_HIDE_WARNINGS
 

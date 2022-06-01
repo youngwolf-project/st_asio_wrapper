@@ -41,8 +41,8 @@ int main(int argc, const char* argv[])
 			sp.start_service();
 		}
 		else
-			client_.broadcast_native_msg(str);
-			//server_.broadcast_native_msg(str);
+			//client_.broadcast_native_msg(str);
+			server_.broadcast_native_msg(str);
 	}
 
 	return 0;
