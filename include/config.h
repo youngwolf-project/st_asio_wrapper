@@ -879,6 +879,7 @@
  * DELETION:
  *
  * REFACTORING:
+ * Add some default implementations for i_matrix interface, which is useful for a dummy matrix.
  *
  * REPLACEMENTS:
  *

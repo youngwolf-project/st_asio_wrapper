@@ -103,9 +103,10 @@ public:
 	virtual service_pump& get_service_pump() = 0;
 	virtual const service_pump& get_service_pump() const = 0;
 
-	virtual bool socket_exist(boost::uint_fast64_t id) = 0;
-	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) = 0;
-	virtual bool del_socket(boost::uint_fast64_t id) = 0;
+	//following implementation is useful for a dummy matrix, for example, in a proxy server, each server_socket (dummy matrix) contains a client_socket
+	virtual bool socket_exist(boost::uint_fast64_t id) {return false;}
+	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return boost::shared_ptr<tracked_executor>();}
+	virtual bool del_socket(boost::uint_fast64_t id) {return false;}
 };
 
 namespace tcp
@@ -113,7 +114,7 @@ namespace tcp
 	class i_server : public i_matrix
 	{
 	private:
-		virtual bool del_socket(boost::uint_fast64_t id) {return false;} //implement and hide i_matrix::del_socket
+		using i_matrix::del_socket; //hide i_matrix::del_socket
 
 	public:
 		virtual bool del_socket(const boost::shared_ptr<tracked_executor>& socket_ptr) = 0;
