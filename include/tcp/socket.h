@@ -17,9 +17,54 @@
 
 namespace st_asio_wrapper { namespace tcp {
 
-template <typename Socket, typename Packer, typename Unpacker,
-	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer>
-class socket_base : public socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>
+template<typename Socket, typename OutMsgType> class reader_writer : public Socket
+{
+public:
+	reader_writer(boost::asio::io_context& io_context_) : Socket(io_context_) {}
+	template<typename Arg> reader_writer(boost::asio::io_context& io_context_, Arg& arg) : Socket(io_context_, arg) {}
+
+	typedef boost::function<void(const boost::system::error_code& ec, size_t bytes_transferred)> ReadWriteCallBack;
+
+protected:
+	bool async_read(const ReadWriteCallBack& call_back)
+	{
+		BOOST_AUTO(recv_buff, ST_THIS unpacker()->prepare_next_recv());
+		assert(boost::asio::buffer_size(recv_buff) > 0);
+		if (0 == boost::asio::buffer_size(recv_buff))
+		{
+			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
+			return false;
+		}
+
+		boost::asio::async_read(ST_THIS next_layer(), recv_buff,
+			boost::bind(&reader_writer::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), call_back);
+		return true;
+	}
+	bool parse_msg(size_t bytes_transferred, list<OutMsgType>& msg_can) {return ST_THIS unpacker()->parse_msg(bytes_transferred, msg_can);}
+
+	size_t batch_msg_send_size() const
+	{
+#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
+		return 0;
+#else
+		return boost::asio::detail::default_max_transfer_size;
+#endif
+	}
+	template<typename Buffer>
+	void async_write(const Buffer& msg_can, const ReadWriteCallBack& call_back) {boost::asio::async_write(ST_THIS next_layer(), msg_can, call_back);}
+
+private:
+	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
+	{
+		auto_duration dur(ST_THIS stat.unpack_time_sum);
+		return ST_THIS unpacker()->completion_condition(ec, bytes_transferred);
+	}
+};
+
+template<typename Socket, typename Packer, typename Unpacker,
+	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer,
+	template<typename, typename> class ReaderWriter = reader_writer>
+class socket_base : public ReaderWriter<socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>, typename Unpacker::msg_type>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -28,7 +73,7 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 private:
-	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef ReaderWriter<socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>, out_msg_type> super;
 
 protected:
 	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN, HANDSHAKING};
@@ -272,31 +317,20 @@ private:
 		}
 	}
 
-	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
-	{
-		auto_duration dur(stat.unpack_time_sum);
-		return ST_THIS unpacker()->completion_condition(ec, bytes_transferred);
-	}
-
 	virtual void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
 		if (reading || !is_ready())
 			return;
 #endif
-		BOOST_AUTO(recv_buff, ST_THIS unpacker()->prepare_next_recv());
-		assert(boost::asio::buffer_size(recv_buff) > 0);
-		if (0 == boost::asio::buffer_size(recv_buff))
-			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
-		else
-		{
 #ifdef ST_ASIO_PASSIVE_RECV
+		if (ST_THIS async_read(make_strand_handler(rw_strand,
+			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)))))
 			reading = true;
+#else
+		ST_THIS async_read(make_strand_handler(rw_strand,
+			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 #endif
-			boost::asio::async_read(ST_THIS next_layer(), recv_buff,
-				boost::bind(&socket_base::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), make_strand_handler(rw_strand,
-				ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
-		}
 	}
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
@@ -310,7 +344,7 @@ private:
 			stat.last_recv_time = time(NULL);
 
 			auto_duration dur(stat.unpack_time_sum);
-			bool unpack_ok = ST_THIS unpacker()->parse_msg(bytes_transferred, temp_msg_can);
+			bool unpack_ok = ST_THIS parse_msg(bytes_transferred, temp_msg_can);
 			dur.end();
 
 			if (!unpack_ok)
@@ -346,11 +380,7 @@ private:
 			return true;
 
 		BOOST_AUTO(end_time, statistic::now());
-#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-		send_buffer.move_items_out(0, sending_msgs);
-#else
-		send_buffer.move_items_out(boost::asio::detail::default_max_transfer_size, sending_msgs);
-#endif
+		send_buffer.move_items_out(ST_THIS batch_msg_send_size(), sending_msgs);
 		std::vector<boost::asio::const_buffer> bufs;
 		bufs.reserve(sending_msgs.size());
 		for (BOOST_AUTO(iter, sending_msgs.begin()); iter != sending_msgs.end(); ++iter)
@@ -362,7 +392,7 @@ private:
 		if ((sending = !bufs.empty()))
 		{
 			sending_msgs.front().restart();
-			boost::asio::async_write(ST_THIS next_layer(), bufs, make_strand_handler(rw_strand,
+			ST_THIS async_write(bufs, make_strand_handler(rw_strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}

@@ -58,7 +58,7 @@ public:
 typedef multi_client client;
 
 typedef st_asio_wrapper::tcp::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> server_socket;
-template <typename Server = st_asio_wrapper::tcp::i_server>
+template<typename Server = st_asio_wrapper::tcp::i_server>
 class server_socket2 : public st_asio_wrapper::tcp::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server>
 {
 private:

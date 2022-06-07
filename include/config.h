@@ -857,6 +857,32 @@
  * REPLACEMENTS:
  * client_socket's function open_reconnect and close_reconnect have been replaced by function set_reconnect(bool).
  *
+ * ===============================================================
+ * 2022.6.1		version 2.5.0
+ *
+ * SPECIAL ATTENTION (incompatible with old editions):
+ *
+ * HIGHLIGHT:
+ * Support websocket, use macro ST_ASIO_WEBSOCKET_BINARY to control the mode (binary or text) of websocket message,
+ *  !0 - binary mode (default), 0 - text mode.
+ *
+ * FIX:
+ * Fix compilation warnings with c++0x in Clang.
+ * Fix compilation error with c++17 and higher in GCC and Clang.
+ * Fix alias for tcp and ssl.
+ *
+ * ENHANCEMENTS:
+ * heartbeat(ext) optimization.
+ * Add error check during file reading in file_server/file_client.
+ * Enhance basic_buffer to support more comprehensive buffers.
+ *
+ * DELETION:
+ *
+ * REFACTORING:
+ * Add some default implementations for i_matrix interface, which is useful for a dummy matrix.
+ *
+ * REPLACEMENTS:
+ *
  */
 
 #ifndef ST_ASIO_CONFIG_H_
@@ -866,8 +892,8 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#define ST_ASIO_VER		20400	//[x]xyyzz -> [x]x.[y]y.[z]z
-#define ST_ASIO_VERSION	"2.4.0"
+#define ST_ASIO_VER		20500	//[x]xyyzz -> [x]x.[y]y.[z]z
+#define ST_ASIO_VERSION	"2.5.0"
 
 //#define ST_ASIO_HIDE_WARNINGS
 
@@ -911,7 +937,7 @@
 		#elif BOOST_VERSION < 107000
 			#define ST_ASIO_MIN_ACI_REF 2
 		#elif BOOST_VERSION < 107400
-			#if defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L
+			#if defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
 				#define ST_ASIO_MIN_ACI_REF 2
 			#else
 				#define ST_ASIO_MIN_ACI_REF 3
@@ -929,8 +955,8 @@
 		#warning Your compiler is GCC 4.7 or higher, you can use ascs to gain some performance improvement.
 	#endif
 
-	#if !defined(ST_ASIO_HIDE_WARNINGS) && (defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(__cplusplus) && __cplusplus >= 201103L)
-		#warning st_asio_wrapper does not need any c++11 features.
+	#if !defined(ST_ASIO_HIDE_WARNINGS) && (defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L)
+		#warning st_asio_wrapper does not need any c++11 features except for websocket support.
 	#endif
 #else
 	#error st_asio_wrapper only support Visual C++, GCC and Clang.
@@ -938,8 +964,11 @@
 
 #if BOOST_VERSION < 104900
 	#error st_asio_wrapper only support boost 1.49 or higher.
-#elif BOOST_VERSION < 106000
-	namespace boost {namespace placeholders {using ::_1; using ::_2;}}
+#elif BOOST_VERSION < 107000
+	namespace boost {namespace beast {using tcp_stream = boost::asio::ip::tcp::socket;}}
+	#if BOOST_VERSION < 106000
+		namespace boost {namespace placeholders {using ::_1; using ::_2;}}
+	#endif
 #endif
 
 #if !defined(BOOST_THREAD_USES_CHRONO)
@@ -993,8 +1022,13 @@
 	#error message capacity must be bigger than zero.
 #endif
 
+//the message mode for websocket, !0 - binary mode (default), 0 - text mode
+#ifndef ST_ASIO_WEBSOCKET_BINARY
+#define ST_ASIO_WEBSOCKET_BINARY	1
+#endif
+
 //by defining this, virtual function socket::calc_shrink_size will be introduced and be called when send buffer is insufficient before sending message,
-//the return value will be used to determine how many messages (in bytes) will be discarded (from the oldest one), 0 means don't shrink send buffer,
+//the return value will be used to determine how many messages (in bytes) will be discarded (from the oldest ones), 0 means don't shrink send buffer,
 //you can rewrite it or accept the default implementation---1/3 of the current size.
 //please note:
 // 1. shrink size will be round up to the last discarded message.

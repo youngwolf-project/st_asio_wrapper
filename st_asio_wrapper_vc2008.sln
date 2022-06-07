@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "file_client", "file_client\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "udp_test", "udp_test\udp_test.vcproj", "{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E42}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "websocket_test", "websocket_test\websocket_test.vcproj", "{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E43}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pingpong_server", "pingpong_server\pingpong_server.vcproj", "{C2951002-BC5C-4D03-BFFE-976BB082BE0C}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pingpong_client", "pingpong_client\pingpong_client.vcproj", "{206E3ACC-8444-471D-9488-4F0AF24F97C4}"
@@ -81,6 +83,14 @@ Global
 		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E42}.Release|Win32.Build.0 = Release|Win32
 		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E42}.Release|x64.ActiveCfg = Release|x64
 		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E42}.Release|x64.Build.0 = Release|x64
+		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E43}.Debug|Win32.ActiveCfg = Debug|Win32
+		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E43}.Debug|Win32.Build.0 = Debug|Win32
+		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E43}.Debug|x64.ActiveCfg = Debug|x64
+		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E43}.Debug|x64.Build.0 = Debug|x64
+		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E43}.Release|Win32.ActiveCfg = Release|Win32
+		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E43}.Release|Win32.Build.0 = Release|Win32
+		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E43}.Release|x64.ActiveCfg = Release|x64
+		{49CB1FE2-FFC4-4650-B4CC-BFDFD5929E43}.Release|x64.Build.0 = Release|x64
 		{C2951002-BC5C-4D03-BFFE-976BB082BE0C}.Debug|Win32.ActiveCfg = Debug|Win32
 		{C2951002-BC5C-4D03-BFFE-976BB082BE0C}.Debug|Win32.Build.0 = Debug|Win32
 		{C2951002-BC5C-4D03-BFFE-976BB082BE0C}.Debug|x64.ActiveCfg = Debug|x64

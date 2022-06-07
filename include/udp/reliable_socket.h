@@ -19,7 +19,7 @@
 
 namespace st_asio_wrapper { namespace udp {
 
-template <typename Packer, typename Unpacker, typename Matrix = i_matrix,
+template<typename Packer, typename Unpacker, typename Matrix = i_matrix,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
 class reliable_socket_base : public socket_base<Packer, Unpacker, Matrix, InQueue, InContainer, OutQueue, OutContainer>

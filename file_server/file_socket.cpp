@@ -20,7 +20,9 @@ file_socket::~file_socket() {clear();}
 void file_socket::reset() {trans_end(); server_socket::reset();}
 
 //socket_ptr actually is a pointer of file_socket, use boost::dynamic_pointer_cast to convert it.
-void file_socket::take_over(boost::shared_ptr<generic_server_socket<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> > socket_ptr)
+//Clang will still complain with -Woverloaded-virtual, because the initial version has type boost::shared_ptr<generic_server_socket<...> >.
+//GCC and MSVC is more inclusive.
+void file_socket::take_over(boost::shared_ptr<server_socket> socket_ptr)
 	{printf("restore user data from invalid object (" ST_ASIO_LLF ").\n", socket_ptr->id());}
 //this works too, but brings warnings with -Woverloaded-virtual option.
 //void file_socket::take_over(boost::shared_ptr<file_socket> socket_ptr) {printf("restore user data from invalid object (" ST_ASIO_LLF ").\n", socket_ptr->id());}
@@ -32,11 +34,12 @@ bool file_socket::on_msg_handle(out_msg_type& msg) {handle_msg(msg); if (0 == ge
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
 void file_socket::on_msg_send(in_msg_type& msg)
 {
-	BOOST_AUTO(buffer, dynamic_cast<file_buffer*>(msg.raw_buffer().get()));
+	file_buffer* buffer = dynamic_cast<file_buffer*>(&*msg.raw_buffer());
 	if (NULL != buffer)
 	{
-		buffer->read();
-		if (buffer->empty())
+		if (!buffer->read())
+			trans_end(false);
+		else if (buffer->empty())
 		{
 			puts("file sending end successfully");
 			trans_end(false);
@@ -133,8 +136,17 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 
 				state = TRANS_BUSY;
 				fseeko(file, offset, SEEK_SET);
-				in_msg_type msg(new file_buffer(file, length));
-				direct_send_msg(msg, true);
+				BOOST_AUTO(buffer, new file_buffer(file, length));
+				if (buffer->is_good())
+				{
+					in_msg_type msg(buffer);
+					direct_send_msg(msg, true);
+				}
+				else
+				{
+					delete buffer;
+					trans_end();
+				}
 			}
 			else
 				trans_end();

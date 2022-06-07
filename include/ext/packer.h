@@ -66,6 +66,8 @@ private:
 public:
 	static size_t get_max_msg_size() {return ST_ASIO_MSG_BUFFER_SIZE - ST_ASIO_HEAD_LEN;}
 
+	packer() {ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(0); heartbeat.assign((const char*) &head_len, ST_ASIO_HEAD_LEN);}
+
 	using i_packer<typename super::msg_type>::pack_msg;
 	virtual bool pack_msg(typename super::msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
@@ -136,13 +138,15 @@ public:
 
 		return true;
 	}
-	virtual bool pack_heartbeat(typename super::msg_type& msg)
-		{ST_ASIO_HEAD_TYPE head_len = packer_helper::pack_header(0); msg.assign((const char*) &head_len, ST_ASIO_HEAD_LEN); return true;}
+	virtual bool pack_heartbeat(typename super::msg_type& msg) {msg = heartbeat; return true;}
 
 	//msg must has been packed by this packer with native == false
 	virtual char* raw_data(typename super::msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
 	virtual const char* raw_data(typename super::msg_ctype& msg) const {return boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
 	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
+
+private:
+	typename super::msg_type heartbeat;
 };
 
 //protocol: length + body
@@ -254,7 +258,7 @@ class prefix_suffix_packer : public i_packer<std::string>
 {
 public:
 	void prefix_suffix(const std::string& prefix, const std::string& suffix)
-		{assert(!suffix.empty() && prefix.size() + suffix.size() < ST_ASIO_MSG_BUFFER_SIZE); _prefix = prefix;  _suffix = suffix;}
+		{assert(!suffix.empty() && prefix.size() + suffix.size() < ST_ASIO_MSG_BUFFER_SIZE); _prefix = prefix; _suffix = suffix; heartbeat = prefix + suffix;}
 	const std::string& prefix() const {return _prefix;}
 	const std::string& suffix() const {return _suffix;}
 
@@ -324,7 +328,7 @@ public:
 
 		return true;
 	}
-	virtual bool pack_heartbeat(msg_type& msg) {msg_type hb = _prefix + _suffix; msg.swap(hb); return true;}
+	virtual bool pack_heartbeat(msg_type& msg) {msg = heartbeat; return true;}
 
 	//msg must has been packed by this packer with native == false
 	virtual char* raw_data(msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), _prefix.size()));}
@@ -333,6 +337,7 @@ public:
 
 private:
 	std::string _prefix, _suffix;
+	msg_type heartbeat;
 };
 
 }} //namespace

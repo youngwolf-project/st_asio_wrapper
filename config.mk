@@ -3,7 +3,11 @@
 #boost_include_dir = -I/usr/local/include/
 #boost_lib_dir = -L/usr/local/lib/
 
-cflag = -Wall -fexceptions -std=c++98
+ifeq (, ${STD})
+STD = c++98
+endif
+
+cflag = -Wall -fexceptions -std=${STD}
 ifeq (${MAKECMDGOALS}, debug)
 	cflag += -g -DDEBUG
 	dir = debug

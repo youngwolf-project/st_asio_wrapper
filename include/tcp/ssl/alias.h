@@ -17,13 +17,13 @@
 
 namespace st_asio_wrapper { namespace ssl {
 
-template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+template<typename Packer, typename Unpacker, typename Matrix = i_matrix,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class connector_base : public client_socket_base<Packer, Unpacker, Matrix, Socket, InQueue, InContainer, OutQueue, OutContainer>
+class connector_base : public client_socket_base<Packer, Unpacker, Matrix, InQueue, InContainer, OutQueue, OutContainer>
 {
 private:
-	typedef client_socket_base<Packer, Unpacker, Matrix, Socket, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef client_socket_base<Packer, Unpacker, Matrix, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	connector_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx) : super(io_context_, ctx) {}

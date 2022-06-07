@@ -17,13 +17,10 @@
 
 namespace st_asio_wrapper { namespace tcp {
 
-template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::tcp::socket, typename Family = boost::asio::ip::tcp,
-	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
-	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class generic_client_socket : public socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer>
+template<typename Socket, typename Matrix = i_matrix, typename Family = boost::asio::ip::tcp> class generic_client_socket : public Socket
 {
 private:
-	typedef socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef Socket super;
 
 public:
 	static const typename super::tid TIMER_BEGIN = super::TIMER_END;
@@ -229,13 +226,14 @@ private:
 	Matrix* matrix;
 };
 
-template <typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::tcp::socket,
+template<typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::tcp::socket,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
-	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class client_socket_base : public generic_client_socket<Packer, Unpacker, Matrix, Socket, boost::asio::ip::tcp, InQueue, InContainer, OutQueue, OutContainer>
+	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER,
+	template<typename, typename> class ReaderWriter = reader_writer>
+class client_socket_base : public generic_client_socket<socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Matrix>
 {
 private:
-	typedef generic_client_socket<Packer, Unpacker, Matrix, Socket, boost::asio::ip::tcp, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef generic_client_socket<socket_base<Socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Matrix> super;
 
 public:
 	client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT, ST_ASIO_SERVER_IP);}
@@ -282,13 +280,14 @@ private:
 };
 
 #ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
-template <typename Packer, typename Unpacker, typename Matrix = i_matrix,
+template<typename Packer, typename Unpacker, typename Matrix = i_matrix,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
-	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class unix_client_socket_base : public generic_client_socket<Packer, Unpacker, Matrix, boost::asio::local::stream_protocol::socket, boost::asio::local::stream_protocol, InQueue, InContainer, OutQueue, OutContainer>
+	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER,
+	template<typename, typename> class ReaderWriter = reader_writer>
+class unix_client_socket_base : public generic_client_socket<socket_base<boost::asio::local::stream_protocol::socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Matrix, boost::asio::local::stream_protocol>
 {
 private:
-	typedef generic_client_socket<Packer, Unpacker, Matrix, boost::asio::local::stream_protocol::socket, boost::asio::local::stream_protocol, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef generic_client_socket<socket_base<boost::asio::local::stream_protocol::socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Matrix, boost::asio::local::stream_protocol> super;
 
 public:
 	unix_client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {ST_THIS set_server_addr("./st-unix-socket");}
