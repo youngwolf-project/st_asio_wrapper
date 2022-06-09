@@ -155,7 +155,7 @@ public:
 	client_socket_base(Matrix& matrix_) : super(matrix_) {}
 	template<typename Arg> client_socket_base(Matrix& matrix_, Arg& arg) : super(matrix_, arg) {}
 
-	virtual const char* type_name() const {return "sebsocket (client endpoint)";}
+	virtual const char* type_name() const {return "websocket (client endpoint)";}
 	virtual int type_id() const {return 5;}
 
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
@@ -227,7 +227,7 @@ public:
 	server_socket_base(Server& server_) : super(server_) {}
 	template<typename Arg> server_socket_base(Server& server_, Arg& arg) : super(server_, arg) {}
 
-	virtual const char* type_name() const {return "sebsocket (server endpoint)";}
+	virtual const char* type_name() const {return "websocket (server endpoint)";}
 	virtual int type_id() const {return 6;}
 
 	void disconnect() {force_shutdown();}
@@ -260,6 +260,18 @@ protected:
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", this->id()); this->unpacker()->dump_left_data(); this->force_shutdown();}
 
 	using super::shutdown_websocket;
+};
+
+template<typename Socket> class single_client_base : public tcp::single_client_base<Socket>
+{
+private:
+	typedef tcp::single_client_base<Socket> super;
+
+public:
+	single_client_base(service_pump& service_pump_) : super(service_pump_) {}
+
+protected:
+	virtual bool init() {if (0 == this->get_io_context_refs()) this->reset_next_layer(); return super::init();}
 };
 
 }} //namespace
