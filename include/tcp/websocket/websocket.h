@@ -90,9 +90,6 @@ public:
 	template<typename Arg> socket(Arg& arg) : Socket(arg) {}
 	template<typename Arg1, typename Arg2> socket(Arg1& arg1, Arg2& arg2) : Socket(arg1, arg2) {}
 
-public:
-	virtual void reset() {this->reset_next_layer(); Socket::reset();}
-
 protected:
 	virtual void on_recv_error(const boost::system::error_code& ec)
 	{
@@ -173,13 +170,6 @@ public:
 
 protected:
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", this->id()); this->unpacker()->dump_left_data(); force_shutdown(this->is_reconnect());}
-	virtual void after_close()
-	{
-		if (this->is_reconnect())
-			this->reset_next_layer();
-
-		super::after_close();
-	}
 
 private:
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
@@ -260,18 +250,6 @@ protected:
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", this->id()); this->unpacker()->dump_left_data(); this->force_shutdown();}
 
 	using super::shutdown_websocket;
-};
-
-template<typename Socket> class single_client_base : public tcp::single_client_base<Socket>
-{
-private:
-	typedef tcp::single_client_base<Socket> super;
-
-public:
-	single_client_base(service_pump& service_pump_) : super(service_pump_) {}
-
-protected:
-	virtual bool init() {if (0 == this->get_io_context_refs()) this->reset_next_layer(); return super::init();}
 };
 
 }} //namespace

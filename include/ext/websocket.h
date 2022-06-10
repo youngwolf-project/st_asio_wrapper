@@ -42,7 +42,7 @@ public:
 	template<typename Arg> client_socket2(Matrix& matrix_, Arg& arg) : super(matrix_, arg) {}
 };
 typedef client_socket connector;
-typedef st_asio_wrapper::websocket::single_client_base<client_socket> single_client;
+typedef st_asio_wrapper::tcp::single_client_base<client_socket> single_client;
 typedef st_asio_wrapper::tcp::multi_client_base<client_socket> multi_client;
 template<typename Socket, typename Matrix = i_matrix>
 class multi_client2 : public st_asio_wrapper::tcp::multi_client_base<Socket, object_pool<Socket>, Matrix>

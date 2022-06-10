@@ -113,9 +113,7 @@ protected:
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); force_shutdown(ST_THIS is_reconnect());}
 	virtual void after_close()
 	{
-		if (ST_THIS is_reconnect())
-			ST_THIS reset_next_layer(ST_THIS get_context());
-
+		ST_THIS reset_next_layer(ST_THIS get_context());
 		super::after_close();
 	}
 
