@@ -12,6 +12,7 @@ using namespace st_asio_wrapper::ext::websocket;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
+#define RECONNECT		"reconnect"
 
 int main(int argc, const char* argv[])
 {
@@ -38,8 +39,15 @@ int main(int argc, const char* argv[])
 		else if (RESTART_COMMAND == str)
 		{
 			sp.stop_service();
+
+			//add all clients back
+			client_.add_socket();
+			client_.add_socket();
 			sp.start_service();
 		}
+		else if (RECONNECT == str)
+			//client_.force_shutdown(true);
+			client_.graceful_shutdown(true);
 		else
 			//client_.broadcast_native_msg(str);
 			server_.broadcast_native_msg(str);

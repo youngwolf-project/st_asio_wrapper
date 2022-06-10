@@ -24,6 +24,7 @@ release debug clean :
 	cd udp_test && ${ST_MAKE}
 	cd ssl_test && ${ST_MAKE}
 	cd websocket_test && ${ST_MAKE}
+	cd ssl_websocket_test && ${ST_MAKE}
 ifeq (, ${findstring cygwin, ${target_machine}})
 ifeq (, ${findstring mingw, ${target_machine}})
 	cd unix_socket && ${ST_MAKE}
