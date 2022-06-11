@@ -29,50 +29,17 @@
 namespace st_asio_wrapper { namespace ext { namespace websocket { namespace ssl {
 
 typedef st_asio_wrapper::websocket::ssl::client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> client_socket;
-template<typename Matrix = i_matrix>
-class client_socket2 : public st_asio_wrapper::websocket::ssl::client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Matrix>
-{
-private:
-	typedef st_asio_wrapper::websocket::ssl::client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Matrix> super;
-
-public:
-	client_socket2(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx_) : super(io_context_, ctx_) {}
-	client_socket2(Matrix& matrix_, boost::asio::ssl::context& ctx_) : super(matrix_, ctx_) {}
-};
+template<typename Matrix = i_matrix> using client_socket2 = st_asio_wrapper::websocket::ssl::client_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Matrix>;
 typedef client_socket connector;
 typedef st_asio_wrapper::ssl::single_client_base<client_socket> single_client;
 typedef st_asio_wrapper::ssl::multi_client_base<client_socket> multi_client;
-template<typename Socket, typename Matrix = i_matrix>
-class multi_client2 : public st_asio_wrapper::ssl::multi_client_base<Socket, st_asio_wrapper::ssl::object_pool<Socket>, Matrix>
-{
-private:
-	typedef st_asio_wrapper::ssl::multi_client_base<Socket, st_asio_wrapper::ssl::object_pool<Socket>, Matrix> super;
-
-public:
-	multi_client2(service_pump& service_pump_, const boost::asio::ssl::context::method& m) : super(service_pump_, m) {}
-};
+template<typename Socket, typename Matrix = i_matrix> using multi_client2 = st_asio_wrapper::ssl::multi_client_base<Socket, st_asio_wrapper::ssl::object_pool<Socket>, Matrix>;
 typedef multi_client client;
 
 typedef st_asio_wrapper::websocket::ssl::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> server_socket;
-template<typename Server = st_asio_wrapper::tcp::i_server>
-class server_socket2 : public st_asio_wrapper::websocket::ssl::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server>
-{
-private:
-	typedef st_asio_wrapper::websocket::ssl::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server> super;
-
-public:
-	server_socket2(Server& server_, boost::asio::ssl::context& ctx) : super(server_, ctx) {}
-};
+template<typename Server = st_asio_wrapper::tcp::i_server> using server_socket2 = st_asio_wrapper::websocket::ssl::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server>;
 typedef st_asio_wrapper::ssl::server_base<server_socket> server;
-template<typename Socket, typename Server = st_asio_wrapper::tcp::i_server>
-class server2 : public st_asio_wrapper::ssl::server_base<Socket, st_asio_wrapper::ssl::object_pool<Socket>, Server>
-{
-private:
-	typedef st_asio_wrapper::ssl::server_base<Socket, st_asio_wrapper::ssl::object_pool<Socket>, Server> super;
-
-public:
-	server2(service_pump& service_pump_, const boost::asio::ssl::context::method& m) : super(service_pump_, m) {}
-};
+template<typename Socket, typename Server = st_asio_wrapper::tcp::i_server> using server2 = st_asio_wrapper::ssl::server_base<Socket, st_asio_wrapper::ssl::object_pool<Socket>, Server>;
 
 }}}} //namespace
 
