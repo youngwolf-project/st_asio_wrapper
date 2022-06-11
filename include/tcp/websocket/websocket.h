@@ -15,6 +15,9 @@
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
+#if BOOST_VERSION < 107000
+namespace boost {namespace beast {using tcp_stream = boost::asio::ip::tcp::socket;}}
+#endif
 
 #include "../client.h"
 #include "../server.h"
