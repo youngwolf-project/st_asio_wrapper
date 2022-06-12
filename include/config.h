@@ -964,11 +964,8 @@
 
 #if BOOST_VERSION < 104900
 	#error st_asio_wrapper only support boost 1.49 or higher.
-#elif BOOST_VERSION < 107000
-	namespace boost {namespace beast {using tcp_stream = boost::asio::ip::tcp::socket;}}
-	#if BOOST_VERSION < 106000
-		namespace boost {namespace placeholders {using ::_1; using ::_2;}}
-	#endif
+#elif BOOST_VERSION < 106000
+	namespace boost {namespace placeholders {using ::_1; using ::_2;}}
 #endif
 
 #if !defined(BOOST_THREAD_USES_CHRONO)
