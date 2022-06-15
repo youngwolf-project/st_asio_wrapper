@@ -107,10 +107,14 @@ private:
 			return super::connect_handler(boost::beast::error_code(static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()));
 
 		// Perform the SSL handshake
-		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::client, [this](const boost::system::error_code& ec) {
-			this->on_ssl_handshake(ec);
-			ec ? this->force_shutdown() : super::connect_handler(ec); //return to websocket::client_socket_base::connect_handler
-		});
+		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::client,
+			this->make_handler_error(boost::bind(&client_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+	}
+
+	void handle_handshake(const boost::system::error_code& ec)
+	{
+		this->on_ssl_handshake(ec);
+		ec ? this->force_shutdown() : super::connect_handler(ec); //return to websocket::client_socket_base::connect_handler
 	}
 };
 
@@ -138,12 +142,16 @@ protected:
 		//beast::get_lowest_layer(ws_).expires_after(std::chrono::seconds(30));
 #endif
 		// Perform the SSL handshake
-		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::server, [this](const boost::system::error_code& ec) {
-			this->on_ssl_handshake(ec);
-			ec ? this->get_server().del_socket(this->shared_from_this()) : super::do_start(); //return to websocket::server_socket_base::do_start
-		});
-
+		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::server,
+			this->make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
 		return true;
+	}
+
+private:
+	void handle_handshake(const boost::system::error_code& ec)
+	{
+		this->on_ssl_handshake(ec);
+		ec ? this->get_server().del_socket(this->shared_from_this()) : super::do_start(); //return to websocket::server_socket_base::do_start
 	}
 };
 
