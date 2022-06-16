@@ -126,6 +126,10 @@ public:
 
 	boost::uint_fast64_t id() const {return _id;}
 	bool is_equal_to(boost::uint_fast64_t id) const {return _id == id;}
+	//the id can not be changed except this socket is not managed by object_pool,
+	//if this socket is managed by single_socket_service, you can change it freely via function void id(boost::uint_fast64_t),
+	//otherwise, we have only one chance to change it via this function.
+	bool try_change_id(boost::uint_fast64_t id) {if ((boost::uint_fast64_t) -1 != _id) return false; _id = id; return true;}
 
 	Socket& next_layer() {return next_layer_;}
 	const Socket& next_layer() const {return next_layer_;}
