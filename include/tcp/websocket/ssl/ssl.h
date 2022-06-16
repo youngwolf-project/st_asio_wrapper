@@ -139,7 +139,7 @@ protected:
 
 #if BOOST_VERSION >= 107000
 		// Set the timeout.
-		//beast::get_lowest_layer(ws_).expires_after(std::chrono::seconds(30));
+		//boost::beast::get_lowest_layer(this->next_layer()).expires_after(std::chrono::seconds(30));
 #endif
 		// Perform the SSL handshake
 		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::server,
