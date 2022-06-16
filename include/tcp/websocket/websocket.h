@@ -193,7 +193,7 @@ protected:
 
 		// Set a decorator to change the User-Agent of the handshake
 		this->next_layer().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::request_type& req) {
-			req.set(boost::beast::http::field::user_agent, std::string(BOOST_BEAST_VERSION_STRING) + " ascs websocket client");
+			req.set(boost::beast::http::field::user_agent, "st_asio_wrapper websocket client based on " BOOST_BEAST_VERSION_STRING);
 		}));
 #endif
 		// Provide the value of the Host HTTP header during the WebSocket handshake.
@@ -244,7 +244,7 @@ protected:
 
 		// Set a decorator to change the Server of the handshake
 		this->next_layer().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type& res) {
-			res.set(boost::beast::http::field::server, std::string(BOOST_BEAST_VERSION_STRING) + " ascs websocket server");
+			res.set(boost::beast::http::field::server, "st_asio_wrapper websocket server based on " BOOST_BEAST_VERSION_STRING);
 		}));
 #endif
 		// Accept the websocket handshake
