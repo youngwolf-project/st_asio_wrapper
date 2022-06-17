@@ -39,7 +39,11 @@ public:
 	// call superclass' reset function, before reusing this socket, object_pool will invoke this function
 	virtual void reset() {need_reconnect = true; super::reset();}
 
+#ifdef _MSC_VER
+	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip.empty() ? ST_ASIO_SERVER_IP : ip);}
+#else
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip);}
+#endif
 	const boost::asio::ip::tcp::endpoint& get_server_addr() const {return server_addr;}
 	bool set_local_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(local_addr, port, ip);}
 	const boost::asio::ip::tcp::endpoint& get_local_addr() const {return local_addr;}
