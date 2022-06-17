@@ -66,7 +66,11 @@ public:
 
 	virtual void reset() {need_reconnect = ST_ASIO_RECONNECT; super::reset();}
 
+#ifdef _MSC_VER
+	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip.empty() ? ST_ASIO_SERVER_IP : ip);}
+#else
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip);}
+#endif
 	bool set_server_addr(const std::string& file_name) {server_addr = typename Family::endpoint(file_name); return true;}
 	const typename Family::endpoint& get_server_addr() const {return server_addr;}
 
