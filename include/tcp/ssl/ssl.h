@@ -34,48 +34,25 @@ public:
 	boost::asio::ssl::context& get_context() {return ctx;}
 
 protected:
-	virtual void on_recv_error(const boost::system::error_code& ec)
-	{
-		shutdown_ssl(true);
-		Socket::on_recv_error(ec);
-	}
-
 	virtual void on_handshake(const boost::system::error_code& ec)
 	{
 		if (!ec)
-			unified_out::info_out(ST_ASIO_LLF " handshake success.", ST_THIS id());
+			ST_THIS show_info(NULL, "handshake success.");
 		else
-			unified_out::error_out(ST_ASIO_LLF " handshake failed: %s", ST_THIS id(), ec.message().data());
+			ST_THIS show_info(ec, NULL, "handshake failed");
 	}
 
-	void shutdown_ssl(bool sync = true)
-	{
-		if (!ST_THIS is_ready())
-			return;
-
-		ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN;
-		if (!sync)
-		{
-			ST_THIS show_info("ssl link:", "been shutting down.");
-			ST_THIS next_layer().async_shutdown(ST_THIS make_handler_error(boost::bind(&socket::shutdown_handler, this, boost::asio::placeholders::error)));
-		}
-		else
-		{
-			ST_THIS show_info("ssl link:", "been shut down.");
-
-			boost::system::error_code ec;
-			ST_THIS next_layer().shutdown(ec);
-			if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
-				unified_out::info_out(ST_ASIO_LLF " shutdown ssl link failed: %s", ST_THIS id(), ec.message().data());
-		}
-	}
+	void shutdown_ssl() {ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN; ST_THIS do_something_in_strand(boost::bind(&socket::async_shutdown, this));}
 
 private:
-	void shutdown_handler(const boost::system::error_code& ec)
+	void async_shutdown()
 	{
-		if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
-			unified_out::info_out(ST_ASIO_LLF " async shutdown ssl link failed (maybe intentionally because of reusing)", ST_THIS id());
+		ST_THIS show_info("ssl link:", "been shutting down.");
+		ST_THIS start_graceful_shutdown_monitoring();
+		ST_THIS next_layer().async_shutdown(ST_THIS make_handler_error(boost::bind(&socket::shutdown_handler, this, boost::asio::placeholders::error)));
 	}
+
+	void shutdown_handler(const boost::system::error_code& ec) {ST_THIS stop_graceful_shutdown_monitoring(); if (ec) ST_THIS show_info(ec, "ssl link", "async shutdown failed");}
 
 private:
 	boost::asio::ssl::context& ctx;
@@ -96,14 +73,15 @@ public:
 	virtual const char* type_name() const {return "SSL (client endpoint)";}
 	virtual int type_id() const {return 3;}
 
+	//these functions are not thread safe, please note.
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false) {graceful_shutdown(reconnect);}
-	void graceful_shutdown(bool reconnect = false, bool sync = true)
+	void graceful_shutdown(bool reconnect = false)
 	{
 		if (ST_THIS is_ready())
 		{
 			ST_THIS set_reconnect(reconnect);
-			shutdown_ssl(sync);
+			shutdown_ssl();
 		}
 		else
 			super::force_shutdown(reconnect);
@@ -170,9 +148,10 @@ public:
 	virtual const char* type_name() const {return "SSL (server endpoint)";}
 	virtual int type_id() const {return 4;}
 
+	//these functions are not thread safe, please note.
 	void disconnect() {force_shutdown();}
 	void force_shutdown() {graceful_shutdown();} //must with async mode (the default value), because server_base::uninit will call this function
-	void graceful_shutdown(bool sync = false) {if (ST_THIS is_ready()) shutdown_ssl(sync); else super::force_shutdown();}
+	void graceful_shutdown() {if (ST_THIS is_ready()) shutdown_ssl(); else super::force_shutdown();}
 
 protected:
 	virtual bool do_start() //intercept tcp::server_socket_base::do_start (to add handshake)

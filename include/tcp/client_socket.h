@@ -84,6 +84,7 @@ public:
 	bool is_reconnect() const {return need_reconnect;}
 
 	//if the connection is broken unexpectedly, generic_client_socket will try to reconnect to the server automatically (if need_reconnect is true).
+	//these functions are not thread safe, please note.
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false)
 	{
@@ -94,14 +95,14 @@ public:
 		else if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
 			ST_THIS show_info("client link:", "been shut down.");
 
-		super::force_shutdown();
+		ST_THIS force_shutdown_in_strand();
 	}
 
 	//sync must be false if you call graceful_shutdown in on_msg
 	//furthermore, you're recommended to call this function with sync equal to false in all service threads,
 	//all callbacks will be called in service threads.
 	//this function is not thread safe, please note.
-	void graceful_shutdown(bool reconnect = false, bool sync = true)
+	void graceful_shutdown(bool reconnect = false)
 	{
 		need_reconnect = reconnect;
 
@@ -112,7 +113,7 @@ public:
 		else if (!ST_THIS is_shutting_down())
 			ST_THIS show_info("client link:", "being shut down gracefully.");
 
-		super::graceful_shutdown(sync);
+		ST_THIS graceful_shutdown_in_strand();
 	}
 
 protected:

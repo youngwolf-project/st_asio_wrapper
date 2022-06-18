@@ -861,10 +861,12 @@
  * 2022.6.1		version 2.5.0
  *
  * SPECIAL ATTENTION (incompatible with old editions):
+ * Graceful shutdown does not support sync mode anymore.
  *
  * HIGHLIGHT:
  * Support websocket, use macro ST_ASIO_WEBSOCKET_BINARY to control the mode (binary or text) of websocket message,
  *  !0 - binary mode (default), 0 - text mode.
+ * Make shutdown thread safe.
  *
  * FIX:
  * Fix compilation warnings with c++0x in Clang.

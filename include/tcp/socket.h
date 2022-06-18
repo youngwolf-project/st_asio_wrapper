@@ -138,7 +138,7 @@ public:
 		{
 			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec2));
 			if (!ec2)
-				unified_out::info_out(ST_ASIO_LLF " %s (%s %s) %s (%d %s)", ST_THIS id(), NULL == head ? "" : head,
+				unified_out::error_out(ST_ASIO_LLF " %s (%s %s) %s (%d %s)", ST_THIS id(), NULL == head ? "" : head,
 					endpoint_to_string(local_ep).data(), endpoint_to_string(remote_ep).data(), NULL == tail ? "" : tail, ec.value(), ec.message().data());
 		}
 	}
@@ -217,8 +217,15 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
+	//do something in the read/write strand -- rw_strand
+	void do_something_in_strand(const boost::function<void()>& handler) {ST_THIS dispatch_strand(rw_strand, handler);}
+
+	void force_shutdown_in_strand() {do_something_in_strand(boost::bind(&socket_base::force_shutdown, this));}
+	void graceful_shutdown_in_strand() {do_something_in_strand(boost::bind(&socket_base::graceful_shutdown, this));}
+
+	//following two functions must be called in the read/write strand
 	void force_shutdown() {if (FORCE_SHUTTING_DOWN != status) shutdown();}
-	void graceful_shutdown(bool sync) //will block until shutdown success or time out if sync equal to true
+	void graceful_shutdown()
 	{
 		if (is_broken())
 			shutdown();
@@ -230,22 +237,19 @@ protected:
 			ST_THIS lowest_layer().shutdown(boost::asio::socket_base::shutdown_send, ec);
 			if (ec) //graceful shutdown is impossible
 				shutdown();
-			else if (!sync)
+			else
 				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this,
 					ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100), true, false));
-			else
-			{
-				int loop_num = ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100; //seconds to 10 milliseconds
-				while (--loop_num >= 0 && GRACEFUL_SHUTTING_DOWN == status)
-					boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
-				if (loop_num < 0) //graceful shutdown is impossible
-				{
-					unified_out::info_out(ST_ASIO_LLF " failed to graceful shutdown within %d seconds", ST_THIS id(), ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
-					shutdown();
-				}
-			}
 		}
 	}
+
+	//used by ssl and websocket
+	void start_graceful_shutdown_monitoring()
+	{
+		ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 1000,
+			boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this, 1), true, false));
+	}
+	void stop_graceful_shutdown_monitoring() {ST_THIS stop_timer(TIMER_ASYNC_SHUTDOWN);}
 
 	virtual bool do_start()
 	{
@@ -305,14 +309,13 @@ private:
 	using super::do_direct_sync_send_msg;
 #endif
 
-	void close_() {close(true);} //workaround for old compilers, otherwise, we can bind to close directly in dispatch_strand
 	void shutdown()
 	{
 		if (is_broken())
-			ST_THIS dispatch_strand(rw_strand, boost::bind(&socket_base::close_, this));
+			close(true);
 		else
 		{
-			status = FORCE_SHUTTING_DOWN; //not thread safe because of this assignment
+			status = FORCE_SHUTTING_DOWN;
 			close();
 		}
 	}
@@ -462,13 +465,13 @@ private:
 			--loop_num;
 			if (loop_num > 0)
 			{
-				ST_THIS change_timer_call_back(TIMER_ASYNC_SHUTDOWN, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this,
-					loop_num), true, false));
+				ST_THIS change_timer_call_back(TIMER_ASYNC_SHUTDOWN,
+					boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this, loop_num), true, false));
 				return true;
 			}
 			else
 			{
-				unified_out::info_out(ST_ASIO_LLF " failed to graceful shutdown within %d seconds", ST_THIS id(), ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
+				unified_out::error_out(ST_ASIO_LLF " failed to graceful shutdown within %d seconds", ST_THIS id(), ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION);
 				on_async_shutdown_error();
 			}
 		}
