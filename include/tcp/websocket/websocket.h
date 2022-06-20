@@ -138,6 +138,7 @@ public:
 	virtual const char* type_name() const {return "websocket (client endpoint)";}
 	virtual int type_id() const {return 7;}
 
+	//these functions are not thread safe, please note.
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false) {graceful_shutdown(reconnect);}
 	void graceful_shutdown(bool reconnect = false)
@@ -207,8 +208,9 @@ public:
 	virtual const char* type_name() const {return "websocket (server endpoint)";}
 	virtual int type_id() const {return 8;}
 
+	//these functions are not thread safe, please note.
 	void disconnect() {force_shutdown();}
-	void force_shutdown() {graceful_shutdown();} //must with async mode (the default value), because server_base::uninit will call this function
+	void force_shutdown() {graceful_shutdown();}
 	void graceful_shutdown() {if (this->is_ready()) shutdown_websocket(); else super::force_shutdown();}
 
 protected:

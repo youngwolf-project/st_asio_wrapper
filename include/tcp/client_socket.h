@@ -98,9 +98,6 @@ public:
 		ST_THIS force_shutdown_in_strand();
 	}
 
-	//sync must be false if you call graceful_shutdown in on_msg
-	//furthermore, you're recommended to call this function with sync equal to false in all service threads,
-	//all callbacks will be called in service threads.
 	//this function is not thread safe, please note.
 	void graceful_shutdown(bool reconnect = false)
 	{

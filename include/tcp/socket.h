@@ -120,27 +120,38 @@ public:
 	void show_info(const char* head = NULL, const char* tail = NULL) const
 	{
 		boost::system::error_code ec;
-		BOOST_AUTO(local_ep, ST_THIS lowest_layer().local_endpoint(ec));
+		std::string local_addr, remote_addr;
+		BOOST_AUTO(ep, ST_THIS lowest_layer().local_endpoint(ec));
 		if (!ec)
-		{
-			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec));
-			if (!ec)
-				unified_out::info_out(ST_ASIO_LLF " %s (%s %s) %s", ST_THIS id(), NULL == head ? "" : head,
-					endpoint_to_string(local_ep).data(), endpoint_to_string(remote_ep).data(), NULL == tail ? "" : tail);
-		}
+			local_addr = endpoint_to_string(ep);
+
+		ec.clear();
+		ep = ST_THIS lowest_layer().remote_endpoint(ec);
+		if (!ec)
+			remote_addr = endpoint_to_string(ep);
+
+		unified_out::info_out(ST_ASIO_LLF " %s [%s %s] %s", ST_THIS id(), NULL == head ? "" : head,
+			local_addr.data(), remote_addr.data(), NULL == tail ? "" : tail);
 	}
 
 	void show_info(const boost::system::error_code& ec, const char* head = NULL, const char* tail = NULL) const
 	{
+		if (!ec)
+			return show_info(head, tail);
+
 		boost::system::error_code ec2;
-		BOOST_AUTO(local_ep, ST_THIS lowest_layer().local_endpoint(ec2));
+		std::string local_addr, remote_addr;
+		BOOST_AUTO(ep, ST_THIS lowest_layer().local_endpoint(ec2));
 		if (!ec2)
-		{
-			BOOST_AUTO(remote_ep, ST_THIS lowest_layer().remote_endpoint(ec2));
-			if (!ec2)
-				unified_out::error_out(ST_ASIO_LLF " %s (%s %s) %s (%d %s)", ST_THIS id(), NULL == head ? "" : head,
-					endpoint_to_string(local_ep).data(), endpoint_to_string(remote_ep).data(), NULL == tail ? "" : tail, ec.value(), ec.message().data());
-		}
+			local_addr = endpoint_to_string(ep);
+
+		ec2.clear();
+		ep = ST_THIS lowest_layer().remote_endpoint(ec2);
+		if (!ec2)
+			remote_addr = endpoint_to_string(ep);
+
+		unified_out::error_out(ST_ASIO_LLF " %s [%s %s] %s (%d %s)", ST_THIS id(), NULL == head ? "" : head,
+			local_addr.data(), remote_addr.data(), NULL == tail ? "" : tail, ec.value(), ec.message().data());
 	}
 
 	void show_status() const
