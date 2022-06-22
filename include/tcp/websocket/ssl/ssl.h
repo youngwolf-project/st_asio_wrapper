@@ -59,9 +59,9 @@ protected:
 		assert(nullptr != type);
 
 		if (!ec)
-			unified_out::info_out(ST_ASIO_LLF " %s handshake success.", this->id(), type);
+			this->show_info(type, "handshake success.");
 		else
-			unified_out::error_out(ST_ASIO_LLF " %s handshake failed: %s", this->id(), type, ec.message().data());
+			this->show_info(ec, type, "handshake failed");
 	}
 
 private:

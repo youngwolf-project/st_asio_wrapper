@@ -96,48 +96,26 @@ public:
 	template<typename Arg1, typename Arg2> socket(Arg1& arg1, Arg2& arg2) : Socket(arg1, arg2) {}
 
 protected:
-	virtual void on_recv_error(const boost::system::error_code& ec)
-	{
-		shutdown_websocket(true);
-		Socket::on_recv_error(ec);
-	}
-
 	virtual void on_handshake(const boost::system::error_code& ec)
 	{
 		if (!ec)
-			unified_out::info_out(ST_ASIO_LLF " handshake success.", this->id());
+			this->show_info(nullptr, "handshake success.");
 		else
-			unified_out::error_out(ST_ASIO_LLF " handshake failed: %s", this->id(), ec.message().data());
+			this->show_info(ec, nullptr, "handshake failed");
 	}
 
-	void shutdown_websocket(bool sync = true)
+	void shutdown_websocket()
 	{
-		if (!this->is_ready())
-			return;
-
 		this->status = Socket::GRACEFUL_SHUTTING_DOWN;
-		if (!sync)
-		{
+		this->do_something_in_strand([this]() {
 			this->show_info("websocket link:", "been shutting down.");
-			this->next_layer().async_close(boost::beast::websocket::close_code::normal,
-				this->make_handler_error(boost::bind(&socket::shutdown_handler, this, boost::asio::placeholders::error)));
-		}
-		else
-		{
-			this->show_info("websocket link:", "been shut down.");
-
-			boost::system::error_code ec;
-			this->next_layer().close(boost::beast::websocket::close_code::normal, ec);
-			if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
-				unified_out::info_out(ST_ASIO_LLF " shutdown websocket link failed: %s", this->id(), ec.message().data());
-		}
-	}
-
-private:
-	void shutdown_handler(const boost::system::error_code& ec)
-	{
-		if (ec && boost::asio::error::eof != ec) //the endpoint who initiated a shutdown operation will get error eof.
-			unified_out::info_out(ST_ASIO_LLF " async shutdown websocket link failed (maybe intentionally because of reusing)", this->id());
+			this->start_graceful_shutdown_monitoring();
+			this->next_layer().async_close(boost::beast::websocket::close_code::normal, this->make_handler_error([this](const boost::system::error_code& ec) {
+				this->stop_graceful_shutdown_monitoring();
+				if (ec)
+					this->show_info(ec, "websocket link", "async shutdown failed");
+			}));
+		});
 	}
 };
 
@@ -160,14 +138,15 @@ public:
 	virtual const char* type_name() const {return "websocket (client endpoint)";}
 	virtual int type_id() const {return 7;}
 
+	//these functions are not thread safe, please note.
 	void disconnect(bool reconnect = false) {force_shutdown(reconnect);}
 	void force_shutdown(bool reconnect = false) {graceful_shutdown(reconnect);}
-	void graceful_shutdown(bool reconnect = false, bool sync = true)
+	void graceful_shutdown(bool reconnect = false)
 	{
 		if (this->is_ready())
 		{
 			this->set_reconnect(reconnect);
-			shutdown_websocket(sync);
+			shutdown_websocket();
 		}
 		else
 			super::force_shutdown(reconnect);
@@ -229,9 +208,10 @@ public:
 	virtual const char* type_name() const {return "websocket (server endpoint)";}
 	virtual int type_id() const {return 8;}
 
+	//these functions are not thread safe, please note.
 	void disconnect() {force_shutdown();}
-	void force_shutdown() {graceful_shutdown();} //must with async mode (the default value), because server_base::uninit will call this function
-	void graceful_shutdown(bool sync = false) {if (this->is_ready()) shutdown_websocket(sync); else super::force_shutdown();}
+	void force_shutdown() {graceful_shutdown();}
+	void graceful_shutdown() {if (this->is_ready()) shutdown_websocket(); else super::force_shutdown();}
 
 protected:
 	virtual bool do_start() //intercept tcp::server_socket_base::do_start (to add handshake)

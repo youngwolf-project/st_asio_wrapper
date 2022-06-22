@@ -136,13 +136,15 @@ public:
 
 	virtual bool socket_exist(boost::uint_fast64_t id) {return ST_THIS exist(id);}
 	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return ST_THIS find(id);}
-	virtual bool del_socket(const boost::shared_ptr<tracked_executor>& socket_ptr)
+	virtual bool del_socket(const boost::shared_ptr<tracked_executor>& socket_ptr, bool need_shutdown = true)
 	{
 		BOOST_AUTO(raw_socket_ptr, boost::dynamic_pointer_cast<Socket>(socket_ptr));
 		if (!raw_socket_ptr)
 			return false;
 
-		raw_socket_ptr->force_shutdown();
+		if (need_shutdown)
+			raw_socket_ptr->force_shutdown();
+
 		return ST_THIS del_object(raw_socket_ptr);
 	}
 	//restore the invalid socket whose id is equal to 'id', if successful, socket_ptr's take_over function will be invoked,
@@ -193,9 +195,8 @@ public:
 	void disconnect() {ST_THIS do_something_to_all(boost::bind(&Socket::disconnect, boost::placeholders::_1));}
 	void force_shutdown(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->force_shutdown();}
 	void force_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::force_shutdown, boost::placeholders::_1));}
-	void graceful_shutdown(typename Pool::object_ctype& socket_ptr, bool sync = false) {ST_THIS del_object(socket_ptr); socket_ptr->graceful_shutdown(sync);}
-	void graceful_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::graceful_shutdown, boost::placeholders::_1, false));}
-	//for the last function, parameter sync must be false (the default value), or dead lock will occur.
+	void graceful_shutdown(typename Pool::object_ctype& socket_ptr) {ST_THIS del_object(socket_ptr); socket_ptr->graceful_shutdown();}
+	void graceful_shutdown() {ST_THIS do_something_to_all(boost::bind(&Socket::graceful_shutdown, boost::placeholders::_1));}
 
 protected:
 	virtual int async_accept_num() {return ST_ASIO_ASYNC_ACCEPT_NUM;}

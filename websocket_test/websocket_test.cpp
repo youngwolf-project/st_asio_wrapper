@@ -23,7 +23,9 @@ int main(int argc, const char* argv[])
 		puts("type " QUIT_COMMAND " to end.");
 
 	service_pump sp;
+
 	server server_(sp);
+	server_.set_start_object_id(1000);
 
 	multi_client client_(sp);
 	client_.add_socket();

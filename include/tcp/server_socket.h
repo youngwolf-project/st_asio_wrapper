@@ -38,21 +38,18 @@ public:
 		if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
 			ST_THIS show_info("server link:", "been shut down.");
 
-		super::force_shutdown();
+		ST_THIS force_shutdown_in_strand();
 	}
 
-	//sync must be false if you call graceful_shutdown in on_msg
-	//furthermore, you're recommended to call this function with sync equal to false in all service threads,
-	//all callbacks will be called in service threads.
 	//this function is not thread safe, please note.
-	void graceful_shutdown(bool sync = false)
+	void graceful_shutdown()
 	{
 		if (ST_THIS is_broken())
 			return force_shutdown();
 		else if (!ST_THIS is_shutting_down())
 			ST_THIS show_info("server link:", "being shut down gracefully.");
 
-		super::graceful_shutdown(sync);
+		ST_THIS graceful_shutdown_in_strand();
 	}
 
 protected:
@@ -65,11 +62,9 @@ protected:
 	{
 		ST_THIS show_info(ec, "server link:", "broken/been shut down");
 
-#ifdef ST_ASIO_CLEAR_OBJECT_INTERVAL
 		force_shutdown();
-#else
-		server.del_socket(ST_THIS shared_from_this());
-		ST_THIS status = super::BROKEN;
+#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
+		server.del_socket(ST_THIS shared_from_this(), false);
 #endif
 	}
 
