@@ -155,19 +155,19 @@ public:
 
 #ifdef ST_ASIO_PASSIVE_RECV
 	bool is_reading() const {return reading;}
-	void recv_msg() {if (!reading && is_ready()) dispatch_strand(rw_strand, boost::bind(&socket::do_recv_msg, this));}
+	void recv_msg() {if (!reading && is_ready()) post_strand(rw_strand, boost::bind(&socket::do_recv_msg, this));}
 #else
 private:
-	void recv_msg() {dispatch_strand(rw_strand, boost::bind(&socket::do_recv_msg, this));}
+	void recv_msg() {post_strand(rw_strand, boost::bind(&socket::do_recv_msg, this));}
 public:
 #endif
 #ifndef ST_ASIO_EXPOSE_SEND_INTERFACE
 protected:
 #endif
 #ifdef ST_ASIO_ARBITRARY_SEND
-	void send_msg() {dispatch_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}
+	void send_msg() {post_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}
 #else
-	void send_msg() {if (!sending && is_ready()) dispatch_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}
+	void send_msg() {if (!sending && is_ready()) post_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}
 #endif
 
 public:
