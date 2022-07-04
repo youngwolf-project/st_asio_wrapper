@@ -38,7 +38,7 @@ public:
 		if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
 			ST_THIS show_info("server link:", "been shut down.");
 
-		ST_THIS force_shutdown_in_strand();
+		super::force_shutdown();
 	}
 
 	//this function is not thread safe, please note.
@@ -49,7 +49,7 @@ public:
 		else if (!ST_THIS is_shutting_down())
 			ST_THIS show_info("server link:", "being shut down gracefully.");
 
-		ST_THIS graceful_shutdown_in_strand();
+		super::graceful_shutdown();
 	}
 
 protected:
@@ -57,22 +57,16 @@ protected:
 	const Server& get_server() const {return server;}
 
 	virtual void on_unpack_error() {unified_out::error_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); force_shutdown();}
-	//do not forget to force_shutdown this socket(in del_socket(), there's a force_shutdown() invocation)
-	virtual void on_recv_error(const boost::system::error_code& ec)
-	{
-		ST_THIS show_info(ec, "server link:", "broken/been shut down");
-
-		force_shutdown();
-#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
-		server.del_socket(ST_THIS shared_from_this(), false);
-#endif
-	}
-
+	virtual void on_recv_error(const boost::system::error_code& ec) {ST_THIS show_info(ec, "server link:", "broken/been shut down"); force_shutdown();}
 	virtual void on_async_shutdown_error() {force_shutdown();}
 	virtual bool on_heartbeat_error() {ST_THIS show_info("server link:", "broke unexpectedly."); force_shutdown(); return false;}
+
 	virtual void on_close()
 	{
 		ST_THIS clear_io_context_refs();
+#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
+		server.del_socket(ST_THIS shared_from_this(), false);
+#endif
 		super::on_close();
 	}
 

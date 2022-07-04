@@ -64,6 +64,7 @@ public:
 	virtual const char* type_name() const {return "TCP (client endpoint)";}
 	virtual int type_id() const {return 1;}
 
+	virtual bool obsoleted() {return !need_reconnect && super::obsoleted();}
 	virtual void reset() {need_reconnect = ST_ASIO_RECONNECT; super::reset();}
 
 #ifdef _MSC_VER
@@ -77,7 +78,7 @@ public:
 	//if you don't want to reconnect to the server after link broken, define macro ST_ASIO_RECONNECT as false, call set_reconnect(false) in on_connect()
 	// or rewrite after_close() virtual function and do nothing in it.
 	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
-	//disconnect(bool), force_shutdown(bool) and graceful_shutdown(bool, bool) can overwrite reconnecting behavior, please note.
+	//disconnect(bool), force_shutdown(bool) and graceful_shutdown(bool) can overwrite reconnecting behavior, please note.
 	//reset() virtual function will set reconnecting behavior according to macro ST_ASIO_RECONNECT, please note.
 	//if prepare_reconnect returns negative value, reconnecting will be closed, please note.
 	void set_reconnect(bool reconnect) {need_reconnect = reconnect;}
@@ -95,7 +96,7 @@ public:
 		else if (super::FORCE_SHUTTING_DOWN != ST_THIS status)
 			ST_THIS show_info("client link:", "been shut down.");
 
-		ST_THIS force_shutdown_in_strand();
+		super::force_shutdown();
 	}
 
 	//this function is not thread safe, please note.
@@ -110,7 +111,7 @@ public:
 		else if (!ST_THIS is_shutting_down())
 			ST_THIS show_info("client link:", "being shut down gracefully.");
 
-		ST_THIS graceful_shutdown_in_strand();
+		super::graceful_shutdown();
 	}
 
 protected:
@@ -138,38 +139,25 @@ protected:
 	virtual int prepare_reconnect(const boost::system::error_code& ec) {return ST_ASIO_RECONNECT_INTERVAL;}
 	virtual void on_connect() {unified_out::info_out(ST_ASIO_LLF " connecting success.", ST_THIS id());}
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); force_shutdown(need_reconnect);}
-	virtual void on_recv_error(const boost::system::error_code& ec)
-	{
-		ST_THIS show_info(ec, "client link:", "broken/been shut down");
-
-		force_shutdown(need_reconnect);
-		ST_THIS status = super::BROKEN;
-
-#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
-		if (!need_reconnect && NULL != matrix)
-			matrix->del_socket(ST_THIS id());
-#endif
-	}
-
+	virtual void on_recv_error(const boost::system::error_code& ec) {ST_THIS show_info(ec, "client link:", "broken/been shut down"); force_shutdown(need_reconnect);}
 	virtual void on_async_shutdown_error() {force_shutdown(need_reconnect);}
-	virtual bool on_heartbeat_error()
-	{
-		ST_THIS show_info("client link:", "broke unexpectedly.");
-
-		force_shutdown(need_reconnect);
-		return false;
-	}
+	virtual bool on_heartbeat_error() {ST_THIS show_info("client link:", "broke unexpectedly."); force_shutdown(need_reconnect); return false;}
 
 	virtual void on_close()
 	{
 		if (!need_reconnect)
+		{
 			ST_THIS clear_io_context_refs();
+#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
+			if (NULL != matrix)
+				matrix->del_socket(ST_THIS id());
+#endif
+		}
 
 		super::on_close();
 	}
-
 	//reconnect at here rather than in on_recv_error to make sure no async invocations performed on this socket before reconnecting.
-	//if you don't want to reconnect the server after link broken, rewrite this virtual function and do nothing in it or call close_reconnt().
+	//if you don't want to reconnect the server after link broken, rewrite this virtual function and do nothing in it or call set_reconnect(false).
 	//if you want to control the retry times and delay time after reconnecting failed, rewrite prepare_reconnect virtual function.
 	virtual void after_close() {if (need_reconnect) ST_THIS start();}
 

@@ -107,7 +107,7 @@ protected:
 	void shutdown_websocket()
 	{
 		this->status = Socket::GRACEFUL_SHUTTING_DOWN;
-		this->do_something_in_strand([this]() {
+		this->dispatch_in_io_strand([this]() {
 			this->show_info("websocket link:", "been shutting down.");
 			this->start_graceful_shutdown_monitoring();
 			this->next_layer().async_close(boost::beast::websocket::close_code::normal, this->make_handler_error([this](const boost::system::error_code& ec) {

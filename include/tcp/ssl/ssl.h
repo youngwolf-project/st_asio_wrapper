@@ -42,7 +42,7 @@ protected:
 			ST_THIS show_info(ec, NULL, "handshake failed");
 	}
 
-	void shutdown_ssl() {ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN; ST_THIS do_something_in_strand(boost::bind(&socket::async_shutdown, this));}
+	void shutdown_ssl() {ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN; ST_THIS dispatch_in_io_strand(boost::bind(&socket::async_shutdown, this));}
 
 private:
 	void async_shutdown()
@@ -89,10 +89,10 @@ public:
 
 protected:
 	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); force_shutdown(ST_THIS is_reconnect());}
-	virtual void after_close()
+	virtual void on_close()
 	{
 		ST_THIS reset_next_layer(ST_THIS get_context());
-		super::after_close();
+		super::on_close();
 	}
 
 private:
