@@ -54,6 +54,7 @@ protected:
 		sr_status = NOT_REQUESTED;
 #endif
 		started_ = false;
+		obsoleted_ = false;
 		dispatching = false;
 		recv_idle_began = false;
 		send_buf_size_ = ST_ASIO_MAX_SEND_BUF;
@@ -78,15 +79,12 @@ protected:
 
 	void reset()
 	{
-		reset_io_context_refs();
+		assert(!is_timer(TIMER_DELAY_CLOSE));
+		if (is_timer(TIMER_DELAY_CLOSE))
+			throw std::runtime_error("invalid resetting or object reusing");
 
-		bool need_clean_up = is_timer(TIMER_DELAY_CLOSE);
+		reset_io_context_refs();
 		stop_all_timer(); //just in case, theoretically, timer TIMER_DELAY_CLOSE and TIMER_ASYNC_SHUTDOWN (used by tcp::socket_base) can left behind.
-		if (need_clean_up)
-		{
-			on_close();
-			set_async_calling(false);
-		}
 
 		stat.reset();
 		packer_->reset();
@@ -98,6 +96,7 @@ protected:
 #ifdef ST_ASIO_SYNC_RECV
 		sr_status = NOT_REQUESTED;
 #endif
+		obsoleted_ = false;
 		dispatching = false;
 		recv_idle_began = false;
 		clear_buffer();
@@ -111,6 +110,16 @@ protected:
 		send_buffer.clear();
 		recv_buffer.clear();
 	}
+
+	//execute in the IO strand -- rw_strand
+	void post_in_io_strand(const boost::function<void()>& handler) {post_strand(rw_strand, handler);}
+	//execute in the IO strand -- rw_strand, or current thead, use it carefully
+	void dispatch_in_io_strand(const boost::function<void()>& handler) {dispatch_strand(rw_strand, handler);}
+
+	//execute in the dispatch strand -- dis_strand
+	void post_in_dis_strand(const boost::function<void()>& handler) {post_strand(dis_strand, handler);}
+	//execute in the dispatch strand -- dis_strand, or current thead, use it carefully
+	void dispatch_in_dis_strand(const boost::function<void()>& handler) {dispatch_strand(dis_strand, handler);}
 
 public:
 #ifdef ST_ASIO_SYNC_SEND
@@ -136,7 +145,7 @@ public:
 	typename Socket::lowest_layer_type& lowest_layer() {return next_layer().lowest_layer();}
 	const typename Socket::lowest_layer_type& lowest_layer() const {return next_layer().lowest_layer();}
 
-	virtual bool obsoleted() {return !started_ && !is_async_calling();}
+	virtual bool obsoleted() {return obsoleted_ && !is_async_calling();}
 	virtual bool is_ready() = 0; //is ready for sending and receiving messages
 	virtual void send_heartbeat() = 0;
 	virtual const char* type_name() const = 0;
@@ -159,19 +168,19 @@ public:
 
 #ifdef ST_ASIO_PASSIVE_RECV
 	bool is_reading() const {return reading;}
-	void recv_msg() {if (!reading && is_ready()) dispatch_strand(rw_strand, boost::bind(&socket::do_recv_msg, this));}
+	void recv_msg() {if (!reading && is_ready()) post_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
 #else
 private:
-	void recv_msg() {dispatch_strand(rw_strand, boost::bind(&socket::do_recv_msg, this));}
+	void recv_msg() {post_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
 public:
 #endif
 #ifndef ST_ASIO_EXPOSE_SEND_INTERFACE
 protected:
 #endif
 #ifdef ST_ASIO_ARBITRARY_SEND
-	void send_msg() {dispatch_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}
+	void send_msg() {post_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
 #else
-	void send_msg() {if (!sending && is_ready()) dispatch_strand(rw_strand, boost::bind(&socket::do_send_msg, this, false));}
+	void send_msg() {if (!sending && is_ready()) post_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
 #endif
 
 public:
@@ -446,6 +455,7 @@ protected:
 			unpacker_->reset(); //very important, otherwise, the unpacker will never be able to parse any more messages if its buffer has legacy data
 			on_close();
 			after_close();
+			obsoleted_ = true;
 		}
 		else
 		{
@@ -716,7 +726,7 @@ private:
 	}
 
 	//do not use dispatch_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
-	void dispatch_msg() {if (!dispatching) post_strand(dis_strand, boost::bind(&socket::do_dispatch_msg, this));}
+	void dispatch_msg() {if (!dispatching) post_in_dis_strand(boost::bind(&socket::do_dispatch_msg, this));}
 	void accumulate_dispatch_delay(const statistic::stat_time& begin_time, const out_msg& msg) {stat.dispatch_delay_sum += begin_time - msg.begin_time;}
 	void do_dispatch_msg()
 	{
@@ -769,14 +779,14 @@ private:
 		switch (id)
 		{
 		case TIMER_DISPATCH_MSG:
-			post_strand(dis_strand, boost::bind(&socket::do_dispatch_msg, this));
+			post_in_dis_strand(boost::bind(&socket::do_dispatch_msg, this));
 			break;
 		case TIMER_DELAY_CLOSE:
 			{
 				int re = is_last_async_call();
 				if (0 == re)
 				{
-					stop_all_timer(TIMER_DELAY_CLOSE);
+					stop_all_timer(id);
 					return true;
 				}
 				else if (1 != re)
@@ -790,9 +800,10 @@ private:
 			}
 			unpacker_->reset(); //very important, otherwise, the unpacker will never be able to parse any more messages if its buffer has legacy data
 			on_close();
-			change_timer_status(TIMER_DELAY_CLOSE, timer_info::TIMER_CANCELED);
+			change_timer_status(id, timer_info::TIMER_CANCELED);
 			after_close();
 			set_async_calling(false);
+			obsoleted_ = true;
 			break;
 		default:
 			assert(false);
@@ -820,6 +831,8 @@ private:
 
 	bool recv_idle_began;
 	volatile bool started_; //has started or not
+	volatile bool obsoleted_;
+
 	volatile bool dispatching;
 #ifndef ST_ASIO_DISPATCH_BATCH_MSG
 	out_msg dispatching_msg;

@@ -98,7 +98,7 @@ public:
 	const typename Family::endpoint& get_peer_addr() const {return peer_addr;}
 
 	void disconnect() {force_shutdown();}
-	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_strand(rw_strand, boost::bind(&generic_socket::close_, this));}
+	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_in_io_strand(boost::bind(&generic_socket::close_, this));}
 	void graceful_shutdown() {force_shutdown();}
 
 	std::string endpoint_to_string(const boost::asio::ip::udp::endpoint& ep) const {return ep.address().to_string() + ':' + boost::to_string(ep.port());}
@@ -216,10 +216,6 @@ protected:
 	{
 		if (boost::asio::error::operation_aborted != ec)
 			unified_out::error_out(ST_ASIO_LLF " recv msg error (%d %s)", ST_THIS id(), ec.value(), ec.message().data());
-#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
-		else if (NULL != matrix)
-			matrix->del_socket(ST_THIS id());
-#endif
 	}
 
 	virtual bool on_heartbeat_error()
@@ -236,6 +232,10 @@ protected:
 			sending_msg.p->set_value(NOT_APPLICABLE);
 #endif
 		ST_THIS clear_io_context_refs();
+#ifndef ST_ASIO_CLEAR_OBJECT_INTERVAL
+		if (NULL != matrix)
+			matrix->del_socket(ST_THIS id());
+#endif
 		super::on_close();
 	}
 
@@ -343,7 +343,7 @@ private:
 				ST_THIS next_layer().async_send_to(boost::asio::buffer(sending_msg.data(), sending_msg.size()), sending_msg.peer_addr, make_strand_handler(rw_strand,
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			else if (do_send_msg(sending_msg))
-				ST_THIS post_strand(rw_strand, boost::bind(&generic_socket::send_handler, this, boost::system::error_code(), sending_msg.size()));
+				ST_THIS post_in_io_strand(boost::bind(&generic_socket::send_handler, this, boost::system::error_code(), sending_msg.size()));
 			else
 				ST_THIS next_layer().async_send(boost::asio::buffer(sending_msg.data(), sending_msg.size()), make_strand_handler(rw_strand,
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));

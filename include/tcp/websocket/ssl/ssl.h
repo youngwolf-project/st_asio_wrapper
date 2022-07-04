@@ -84,10 +84,10 @@ public:
 	virtual int type_id() const {return 9;}
 
 protected:
-	virtual void after_close()
+	virtual void on_close()
 	{
 		this->reset_next_layer(this->get_context());
-		super::after_close();
+		super::on_close();
 	}
 
 private:

@@ -73,7 +73,7 @@ public:
 	typedef typename Unpacker::msg_ctype out_msg_ctype;
 
 private:
-	typedef ReaderWriter<socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>, out_msg_type> super;
+	typedef ReaderWriter<socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer>, out_msg_type> super;
 
 protected:
 	enum link_status {CONNECTED, FORCE_SHUTTING_DOWN, GRACEFUL_SHUTTING_DOWN, BROKEN, HANDSHAKING};
@@ -86,7 +86,6 @@ public:
 	static const typename super::tid TIMER_ASYNC_SHUTDOWN = TIMER_BEGIN;
 	static const typename super::tid TIMER_END = TIMER_BEGIN + 5;
 
-	virtual bool obsoleted() {return !is_shutting_down() && super::obsoleted();}
 	virtual bool is_ready() {return is_connected();}
 	virtual void send_heartbeat()
 	{
@@ -228,31 +227,8 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
-	//do something in the read/write strand -- rw_strand
-	void do_something_in_strand(const boost::function<void()>& handler) {ST_THIS dispatch_strand(rw_strand, handler);}
-
-	void force_shutdown_in_strand() {do_something_in_strand(boost::bind(&socket_base::force_shutdown, this));}
-	void graceful_shutdown_in_strand() {do_something_in_strand(boost::bind(&socket_base::graceful_shutdown, this));}
-
-	//following two functions must be called in the read/write strand
-	void force_shutdown() {if (FORCE_SHUTTING_DOWN != status) shutdown();}
-	void graceful_shutdown()
-	{
-		if (is_broken())
-			shutdown();
-		else if (!is_shutting_down())
-		{
-			status = GRACEFUL_SHUTTING_DOWN;
-
-			boost::system::error_code ec;
-			ST_THIS lowest_layer().shutdown(boost::asio::socket_base::shutdown_send, ec);
-			if (ec) //graceful shutdown is impossible
-				shutdown();
-			else
-				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this,
-					ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100), true, false));
-		}
-	}
+	void force_shutdown() {ST_THIS dispatch_in_io_strand(boost::bind(&socket_base::_force_shutdown, this));}
+	void graceful_shutdown() {ST_THIS dispatch_in_io_strand(boost::bind(&socket_base::_graceful_shutdown, this));}
 
 	//used by ssl and websocket
 	void start_graceful_shutdown_monitoring()
@@ -319,6 +295,25 @@ private:
 #ifdef ST_ASIO_SYNC_SEND
 	using super::do_direct_sync_send_msg;
 #endif
+
+	void _force_shutdown() {if (FORCE_SHUTTING_DOWN != status) shutdown();}
+	void _graceful_shutdown()
+	{
+		if (is_broken())
+			shutdown();
+		else if (!is_shutting_down())
+		{
+			status = GRACEFUL_SHUTTING_DOWN;
+
+			boost::system::error_code ec;
+			ST_THIS lowest_layer().shutdown(boost::asio::socket_base::shutdown_send, ec);
+			if (ec) //graceful shutdown is impossible
+				shutdown();
+			else
+				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this,
+					ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100), true, false));
+		}
+	}
 
 	void shutdown()
 	{
