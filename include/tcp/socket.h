@@ -117,7 +117,7 @@ public:
 #ifdef ST_ASIO_PASSIVE_RECV
 	//changing unpacker must before calling st_asio_wrapper::socket::recv_msg, and define ST_ASIO_PASSIVE_RECV macro.
 	void unpacker(const boost::shared_ptr<i_unpacker<out_msg_type> >& _unpacker_) {unpacker_ = _unpacker_;}
-	virtual void recv_msg() {if (!reading && is_ready()) ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
+	virtual void recv_msg() {if (!reading && is_ready()) ST_THIS post_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
 #endif
 
 	///////////////////////////////////////////////////
@@ -208,9 +208,9 @@ protected:
 
 private:
 #ifndef ST_ASIO_PASSIVE_RECV
-	virtual void recv_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
+	virtual void recv_msg() {ST_THIS post_strand(strand, boost::bind(&socket_base::do_recv_msg, this));}
 #endif
-	virtual void send_msg() {ST_THIS dispatch_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
+	virtual void send_msg() {ST_THIS post_strand(strand, boost::bind(&socket_base::do_send_msg, this, false));}
 
 	using super::close;
 	using super::handle_error;
