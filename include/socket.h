@@ -168,19 +168,31 @@ public:
 
 #ifdef ST_ASIO_PASSIVE_RECV
 	bool is_reading() const {return reading;}
+#ifdef ST_ASIO_USE_DISPATCH_IN_IO
+	void recv_msg() {if (!reading && is_ready()) dispatch_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
+#else
 	void recv_msg() {if (!reading && is_ready()) post_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
+#endif
 #else
 private:
-	void recv_msg() {post_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
+	void recv_msg() {dispatch_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
 public:
 #endif
 #ifndef ST_ASIO_EXPOSE_SEND_INTERFACE
 protected:
 #endif
+#ifdef ST_ASIO_USE_DISPATCH_IN_IO
+#ifdef ST_ASIO_ARBITRARY_SEND
+	void send_msg() {dispatch_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
+#else
+	void send_msg() {if (!sending && is_ready()) dispatch_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
+#endif
+#else
 #ifdef ST_ASIO_ARBITRARY_SEND
 	void send_msg() {post_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
 #else
 	void send_msg() {if (!sending && is_ready()) post_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
+#endif
 #endif
 
 public:
@@ -725,7 +737,7 @@ private:
 		return false;
 	}
 
-	//do not use dispatch_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
+	//do not use dispatch_strand/dispatch_in_dis_strand at here, because the handler (do_dispatch_msg) may call this function, which can lead stack overflow.
 	void dispatch_msg() {if (!dispatching) post_in_dis_strand(boost::bind(&socket::do_dispatch_msg, this));}
 	void accumulate_dispatch_delay(const statistic::stat_time& begin_time, const out_msg& msg) {stat.dispatch_delay_sum += begin_time - msg.begin_time;}
 	void do_dispatch_msg()
