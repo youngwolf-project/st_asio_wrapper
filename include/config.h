@@ -862,10 +862,8 @@
  *
  * SPECIAL ATTENTION (incompatible with old editions):
  * Graceful shutdown does not support sync mode anymore.
- * Use post_strand instead of dispatch_strand in send_msg and recv_msg, because we don't synchronize socket's member variable sending and reading,
- *  there's still a race condition even in the same strand because of memory synchronization.
- *  But we can difine macro ST_ASIO_USE_DISPATCH_IN_IO to use dispatch_strand back, because dispatch_strand can be more efficient in specific cases.
- *  The macro will be removed after I confirmed that dispatch_strand indeed introduces race condition.
+ * Introduce memory fence to synchronize socket's status -- sending and reading, dispatch_strand is not enough, except post_strand,
+ *  but dispatch_strand is more efficient than post_strand.
  *
  * HIGHLIGHT:
  * Support websocket, use macro ST_ASIO_WEBSOCKET_BINARY to control the mode (binary or text) of websocket message,

@@ -46,9 +46,9 @@ protected:
 		_id = -1;
 		packer_ = boost::make_shared<Packer>();
 		unpacker_ = boost::make_shared<Unpacker>();
-		sending = false;
+		clear_sending();
 #ifdef ST_ASIO_PASSIVE_RECV
-		reading = false;
+		clear_reading();
 #endif
 #ifdef ST_ASIO_SYNC_RECV
 		sr_status = NOT_REQUESTED;
@@ -89,9 +89,9 @@ protected:
 		stat.reset();
 		packer_->reset();
 		unpacker_->reset();
-		sending = false;
+		clear_sending();
 #ifdef ST_ASIO_PASSIVE_RECV
-		reading = false;
+		clear_reading();
 #endif
 #ifdef ST_ASIO_SYNC_RECV
 		sr_status = NOT_REQUESTED;
@@ -167,12 +167,8 @@ public:
 	}
 
 #ifdef ST_ASIO_PASSIVE_RECV
-	bool is_reading() const {return reading;}
-#ifdef ST_ASIO_USE_DISPATCH_IN_IO
-	void recv_msg() {if (!reading && is_ready()) dispatch_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
-#else
-	void recv_msg() {if (!reading && is_ready()) post_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
-#endif
+	bool is_reading() const {return 1 == reading.load(boost::memory_order_relaxed);}
+	void recv_msg() {if (is_ready() && !is_reading()) dispatch_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
 #else
 private:
 	void recv_msg() {dispatch_in_io_strand(boost::bind(&socket::do_recv_msg, this));}
@@ -181,18 +177,10 @@ public:
 #ifndef ST_ASIO_EXPOSE_SEND_INTERFACE
 protected:
 #endif
-#ifdef ST_ASIO_USE_DISPATCH_IN_IO
 #ifdef ST_ASIO_ARBITRARY_SEND
 	void send_msg() {dispatch_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
 #else
-	void send_msg() {if (!sending && is_ready()) dispatch_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
-#endif
-#else
-#ifdef ST_ASIO_ARBITRARY_SEND
-	void send_msg() {post_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
-#else
-	void send_msg() {if (!sending && is_ready()) post_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
-#endif
+	void send_msg() {if (is_ready() && !is_sending()) dispatch_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
 #endif
 
 public:
@@ -221,7 +209,7 @@ public:
 					return false;
 
 #ifndef ST_ASIO_ALWAYS_SEND_HEARTBEAT
-			if (!sending && now - stat.last_send_time >= interval) //don't need to send heartbeat if we're sending messages
+			if (!is_sending() && now - stat.last_send_time >= interval) //don't need to send heartbeat if we're sending messages
 #endif
 				send_heartbeat();
 		}
@@ -229,7 +217,7 @@ public:
 		return true;
 	}
 
-	bool is_sending() const {return sending;}
+	bool is_sending() const {return 1 == sending.load(boost::memory_order_relaxed);}
 	bool is_dispatching() const {return dispatching;}
 	bool is_recv_idle() const {return recv_idle_began;}
 
@@ -435,6 +423,14 @@ protected:
 #else
 	bool shrink_send_buffer() const {return is_send_buffer_available();}
 #endif
+
+#ifdef ST_ASIO_PASSIVE_RECV
+	void clear_reading() {reading.store(0, boost::memory_order_release);}
+	bool test_and_set_reading() {return 1 == reading.exchange(1, boost::memory_order_acq_rel);}
+#endif
+
+	void clear_sending() {sending.store(0, boost::memory_order_release);}
+	bool test_and_set_sending() {return 1 == sending.exchange(1, boost::memory_order_acq_rel);}
 
 	//subclass notify shutdown event
 	bool close(bool use_close = false) //if not use_close, shutdown (both direction) will be used
@@ -743,8 +739,9 @@ private:
 	void do_dispatch_msg()
 	{
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
-		if ((dispatching = !recv_buffer.empty()))
+		if (!recv_buffer.empty())
 		{
+			dispatching = true;
 			BOOST_AUTO(begin_time, statistic::now());
 #ifdef ST_ASIO_FULL_STATISTIC
 			recv_buffer.do_something_to_all(boost::bind(&socket::accumulate_dispatch_delay, this, boost::cref(begin_time), boost::placeholders::_1));
@@ -763,8 +760,9 @@ private:
 			else
 			{
 #else
-		if (dispatching || (dispatching = recv_buffer.try_dequeue(dispatching_msg)))
+		if (dispatching || recv_buffer.try_dequeue(dispatching_msg))
 		{
+			dispatching = true;
 			BOOST_AUTO(begin_time, statistic::now());
 			stat.dispatch_delay_sum += begin_time - dispatching_msg.begin_time;
 			bool re = on_msg_handle(dispatching_msg); //must before next msg dispatching to keep sequence
@@ -781,9 +779,11 @@ private:
 				dispatching_msg.clear();
 #endif
 				dispatching = false;
-				dispatch_msg(); //dispatch msg in sequence
+				post_in_dis_strand(boost::bind(&socket::do_dispatch_msg, this)); //dispatch msg in sequence
 			}
 		}
+		else
+			dispatching = false;
 	}
 
 	bool timer_handler(tid id)
@@ -830,11 +830,6 @@ protected:
 	list<OutMsgType> temp_msg_can;
 
 	in_queue_type send_buffer;
-	volatile bool sending;
-
-#ifdef ST_ASIO_PASSIVE_RECV
-	volatile bool reading;
-#endif
 	boost::asio::io_context::strand rw_strand;
 
 private:
@@ -856,6 +851,10 @@ private:
 	boost::uint_fast64_t _id;
 	Socket next_layer_;
 
+#ifdef ST_ASIO_PASSIVE_RECV
+	atomic_size_t reading;
+#endif
+	atomic_size_t sending;
 	atomic_size_t start_atomic;
 	boost::asio::io_context::strand dis_strand;
 

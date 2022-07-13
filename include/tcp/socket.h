@@ -329,13 +329,15 @@ private:
 	virtual void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (reading || !is_ready())
+		if (!is_ready())
+			return;
+		else if (ST_THIS test_and_set_reading())
 			return;
 #endif
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (ST_THIS async_read(make_strand_handler(rw_strand,
+		if (!ST_THIS async_read(make_strand_handler(rw_strand,
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)))))
-			reading = true;
+			ST_THIS clear_reading();
 #else
 		ST_THIS async_read(make_strand_handler(rw_strand,
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
@@ -345,7 +347,7 @@ private:
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
-		reading = false; //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
+		ST_THIS clear_reading(); //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
 #endif
 		bool need_next_recv = false;
 		if (bytes_transferred > 0)
@@ -385,26 +387,27 @@ private:
 
 	virtual bool do_send_msg(bool in_strand = false)
 	{
-		if (!in_strand && sending)
+		if (!in_strand && ST_THIS test_and_set_sending())
 			return true;
 
 		BOOST_AUTO(end_time, statistic::now());
 		send_buffer.move_items_out(ST_THIS batch_msg_send_size(), sending_msgs);
-		std::vector<boost::asio::const_buffer> bufs;
-		bufs.reserve(sending_msgs.size());
+		sending_buffer.clear(); //this buffer will not be refreshed according to sending_msgs timely
 		for (BOOST_AUTO(iter, sending_msgs.begin()); iter != sending_msgs.end(); ++iter)
 		{
 			stat.send_delay_sum += end_time - iter->begin_time;
-			bufs.push_back(boost::asio::const_buffer(iter->data(), iter->size()));
+			sending_buffer.push_back(boost::asio::const_buffer(iter->data(), iter->size()));
 		}
 
-		if ((sending = !bufs.empty()))
+		if (!sending_buffer.empty())
 		{
 			sending_msgs.front().restart();
-			ST_THIS async_write(bufs, make_strand_handler(rw_strand,
+			ST_THIS async_write(sending_buffer, make_strand_handler(rw_strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
+		else
+			ST_THIS clear_sending();
 
 		return false;
 	}
@@ -417,7 +420,7 @@ private:
 
 			stat.send_byte_sum += bytes_transferred;
 			stat.send_time_sum += statistic::now() - sending_msgs.front().begin_time;
-			stat.send_msg_sum += sending_msgs.size();
+			stat.send_msg_sum += sending_buffer.size(); //before gcc 5.0, std::list::size() has linear complexity, very embarrassing!
 #ifdef ST_ASIO_SYNC_SEND
 			for (BOOST_AUTO(iter, sending_msgs.begin()); iter != sending_msgs.end(); ++iter)
 				if (iter->p)
@@ -445,10 +448,12 @@ private:
 #endif
 #endif
 			sending_msgs.clear();
-#ifndef ST_ASIO_ARBITRARY_SEND
+#ifdef ST_ASIO_ARBITRARY_SEND
+			do_send_msg(true); //just make sure no pending msgs
+#else
 			if (!do_send_msg(true) && !send_buffer.empty()) //send msg in sequence
+				super::send_msg(); //just make sure no pending msgs
 #endif
-				do_send_msg(true); //just make sure no pending msgs
 		}
 		else
 		{
@@ -460,7 +465,7 @@ private:
 			on_send_error(ec, sending_msgs);
 			sending_msgs.clear(); //clear sending messages after on_send_error, then user can decide how to deal with them in on_send_error
 
-			sending = false;
+			ST_THIS clear_sending();
 		}
 	}
 
@@ -493,14 +498,13 @@ private:
 	using super::temp_msg_can;
 
 	using super::send_buffer;
-	using super::sending;
-
-#ifdef ST_ASIO_PASSIVE_RECV
-	using super::reading;
-#endif
 	using super::rw_strand;
 
+	//although boost::container::list::size() has constant complexity, but user can use std::list via macro or template parameter,
+	//before gcc 5.0, std::list::size() has linear complexity, very embarrassing!
+	//so use std::vector (member variable) to reduce memory allocation and keep the number of sending msgs (its size() has constant complexity, it's very important).
 	typename super::in_container_type sending_msgs;
+	std::vector<boost::asio::const_buffer> sending_buffer;
 };
 
 }} //namespace
