@@ -64,10 +64,10 @@ public:
 	T fetch_add(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data += value; return pre_data;}
 	T fetch_sub(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data -= value; return pre_data;}
 	void store(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); data = value;}
-	T load(boost::memory_order) const {return data;}
+	T load(boost::memory_order) const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
 
 	bool is_lock_free() const {return false;}
-	operator T() const {return data;}
+	operator T() const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
 
 private:
 	T data;

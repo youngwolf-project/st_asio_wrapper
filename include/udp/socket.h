@@ -244,7 +244,7 @@ protected:
 	virtual bool do_send_msg(const typename super::in_msg& sending_msg) {return false;} //customize message sending, for connected socket only
 	virtual void pre_handle_msg(typename Unpacker::container_type& msg_can) {}
 
-	void resume_sending() {sending = false; super::send_msg();} //for reliable UDP socket only
+	void resume_sending() {ST_THIS clear_sending(); super::send_msg();} //for reliable UDP socket only
 
 private:
 	using super::close;
@@ -268,7 +268,7 @@ private:
 	virtual void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (reading)
+		if (ST_THIS test_and_set_reading())
 			return;
 #endif
 		BOOST_AUTO(recv_buff, ST_THIS unpacker()->prepare_next_recv());
@@ -277,20 +277,25 @@ private:
 			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
 		else
 		{
-#ifdef ST_ASIO_PASSIVE_RECV
-			reading = true;
-#endif
 			if (is_connected)
 				ST_THIS next_layer().async_receive(recv_buff, make_strand_handler(rw_strand,
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			else
 				ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(rw_strand,
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+			return;
 		}
+
+#ifdef ST_ASIO_PASSIVE_RECV
+		ST_THIS clear_reading();
+#endif
 	}
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
 	{
+#ifdef ST_ASIO_PASSIVE_RECV
+		ST_THIS clear_reading(); //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
+#endif
 		if (!ec && bytes_transferred > 0)
 		{
 			stat.last_recv_time = time(NULL);
@@ -301,9 +306,6 @@ private:
 			if (is_connected)
 				pre_handle_msg(msg_can);
 
-#ifdef ST_ASIO_PASSIVE_RECV
-			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
-#endif
 			for (BOOST_AUTO(iter, msg_can.begin()); iter != msg_can.end(); ++iter)
 				temp_msg_can.emplace_back(is_connected ? peer_addr : temp_addr, boost::ref(*iter));
 			if (handle_msg()) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
@@ -311,9 +313,6 @@ private:
 		}
 		else
 		{
-#ifdef ST_ASIO_PASSIVE_RECV
-			reading = false; //clear reading flag before call handle_msg() to make sure that recv_msg() can be called successfully in on_msg_handle()
-#endif
 #if defined(_MSC_VER) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__MINGW64__)
 			if (ec && boost::asio::error::connection_refused != ec && boost::asio::error::connection_reset != ec)
 #else
@@ -330,12 +329,11 @@ private:
 
 	virtual bool do_send_msg(bool in_strand = false)
 	{
-		if (!in_strand && sending)
+		if (!in_strand && ST_THIS test_and_set_sending())
 			return true;
-
-		if (is_connected && !check_send_cc())
-			sending = true;
-		else if ((sending = send_buffer.try_dequeue(sending_msg)))
+		else if (is_connected && !check_send_cc())
+			;
+		else if (send_buffer.try_dequeue(sending_msg))
 		{
 			stat.send_delay_sum += statistic::now() - sending_msg.begin_time;
 			sending_msg.restart();
@@ -349,6 +347,8 @@ private:
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
+		else
+			ST_THIS clear_sending();
 
 		return false;
 	}
@@ -385,13 +385,12 @@ private:
 		sending_msg.clear(); //clear sending message after on_send_error, then user can decide how to deal with it in on_send_error
 
 		if (ec && (boost::asio::error::not_socket == ec || boost::asio::error::bad_descriptor == ec))
-			return;
-
+			ST_THIS clear_sending();
 		//send msg in sequence
 		//on windows, sending a msg to addr_any may cause errors, please note
 		//for UDP, sending error will not stop subsequent sending.
-		if (!do_send_msg(true) && !send_buffer.empty())
-			do_send_msg(true); //just make sure no pending msgs
+		else if (!do_send_msg(true) && !send_buffer.empty())
+			super::send_msg(); //just make sure no pending msgs
 	}
 
 private:
@@ -399,11 +398,6 @@ private:
 	using super::temp_msg_can;
 
 	using super::send_buffer;
-	using super::sending;
-
-#ifdef ST_ASIO_PASSIVE_RECV
-	using super::reading;
-#endif
 	using super::rw_strand;
 
 	bool is_bound, is_connected, connect_mode;
