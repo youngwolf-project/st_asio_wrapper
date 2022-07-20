@@ -45,7 +45,7 @@ private:
 
 //Container must at least has the following functions (like boost::container::list):
 // Container() constructor
-// empty, must be thread safe, but doesn't have to be consistent
+// empty
 // clear
 // swap
 // emplace_back(), must return the reference of the new item
@@ -65,14 +65,17 @@ public:
 	typedef typename Container::size_type size_type;
 	typedef typename Container::reference reference;
 	typedef typename Container::const_reference const_reference;
+	//since boost::container::list::size() has constant complexity, we expose this size() function
 	using Container::size;
-	using Container::empty;
 
 	queue() : total_size(0) {}
 
 	//thread safe
 	bool is_thread_safe() const {return Lockable::is_lockable();}
 	size_t size_in_byte() const {return total_size;}
+	//almost all implementations of list::empty() in the world are thread safe (not means correctness, but just no memory access violation),
+	// but we need a memory fence to synchronize memory with the IO thread, so we use a lock here.
+	bool empty() {typename Lockable::lock_guard lock(*this); return Container::empty();}
 	void clear() {typename Lockable::lock_guard lock(*this); Container::clear(); total_size = 0;}
 	void swap(Container& can)
 	{
@@ -185,7 +188,7 @@ public:
 		total_size += size_in_byte;
 	}
 
-	bool try_dequeue_(reference item) {if (ST_THIS empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); total_size -= item.size(); return true;}
+	bool try_dequeue_(reference item) {if (Container::empty()) return false; item.swap(ST_THIS front()); ST_THIS pop_front(); total_size -= item.size(); return true;}
 
 	void move_items_out_(Container& dest, size_t max_item_num = -1)
 	{
