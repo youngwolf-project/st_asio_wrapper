@@ -874,6 +874,8 @@
  * Fix compilation warnings with c++0x in Clang.
  * Fix compilation error with c++17 and higher in GCC and Clang.
  * Fix alias for tcp and ssl.
+ * Fix -- in Windows, a TCP client must explicitly specify a full IP address (not only the port) to connect to.
+ * Fix -- reliable UDP sometimes cannot send messages successfully.
  *
  * ENHANCEMENTS:
  * heartbeat(ext) optimization.
