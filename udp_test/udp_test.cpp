@@ -45,23 +45,31 @@ int output(const char* buf, int len, ikcpcb* kcp, void* user) {return ((ext::udp
 
 int main(int argc, const char* argv[])
 {
-	printf("usage: %s <my port> <peer port> [peer ip=127.0.0.1]\n", argv[0]);
+	printf("usage: %s [-n normal UDP, otherwise reliable UDP] <my port> <peer port> [peer ip=127.0.0.1]\n", argv[0]);
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
-	else if (argc < 3)
+
+	int index = 0;
+	if (argc >= 2 && 0 == strcmp(argv[1], "-n"))
+		index = 1;
+
+	if (argc < index + 3)
 		return 1;
 	else
 		puts("type " QUIT_COMMAND " to end.");
 
 	service_pump sp;
 	ext::udp::single_reliable_socket_service service(sp);
-	service.set_local_addr((unsigned short) atoi(argv[1])); //for multicast, do not bind to a specific IP, just port is enough
-	service.set_peer_addr((unsigned short) atoi(argv[2]), argc >= 4 ? argv[3] : "127.0.0.1");
+	service.set_local_addr((unsigned short) atoi(argv[index + 1])); //for multicast, do not bind to a specific IP, just port is enough
+	service.set_peer_addr((unsigned short) atoi(argv[index + 2]), argc >= index + 4 ? argv[index + 3] : "127.0.0.1");
 
-	//reliable_socket cannot become reliable without below statement, instead, it downgrade to normal UDP socket
-	service.create_kcpcb(0, (void*) &service);
-	//without below statement, your application will core dump
-	ikcp_setoutput(service.get_kcpcb(), &output);
+	if (0 == index)
+	{
+		//reliable_socket cannot become reliable without below statement, instead, it downgrade to normal UDP socket
+		service.create_kcpcb(0, (void*) &service);
+		//without below statement, your application will core dump
+		ikcp_setoutput(service.get_kcpcb(), &output);
+	}
 
 	sp.start_service();
 	//for broadcast

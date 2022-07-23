@@ -241,7 +241,7 @@ protected:
 
 	//reliable UDP socket needs following virtual functions to specify different behaviors.
 	virtual bool check_send_cc() {return true;} //congestion control, return true means can continue to send messages
-	virtual bool do_send_msg(const typename super::in_msg& sending_msg) {return false;} //customize message sending, for connected socket only
+	virtual bool do_send_msg(const typename super::in_msg& msg) {return false;} //customize message sending, for connected socket only
 	virtual void pre_handle_msg(typename Unpacker::container_type& msg_can) {}
 
 	void resume_sending() {ST_THIS clear_sending(); super::send_msg();} //for reliable UDP socket only
