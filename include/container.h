@@ -65,7 +65,8 @@ public:
 	typedef typename Container::size_type size_type;
 	typedef typename Container::reference reference;
 	typedef typename Container::const_reference const_reference;
-	//since boost::container::list::size() has constant complexity, we expose this size() function
+	//since boost::container::list::size() has constant complexity, we expose this size() function, st_asio_wrapper will not use this function.
+	//most likely, this function is thread safe, but if you rely it, you may still need a memory fence as we do for the empty() function.
 	using Container::size;
 
 	queue() : total_size(0) {}
@@ -74,7 +75,7 @@ public:
 	bool is_thread_safe() const {return Lockable::is_lockable();}
 	size_t size_in_byte() const {return total_size;}
 	//almost all implementations of list::empty() in the world are thread safe (not means correctness, but just no memory access violation),
-	// but we need a memory fence to synchronize memory with the IO thread, so we use a lock here.
+	// but we need a memory fence to synchronize memory with IO threads, so we use a lock here.
 	bool empty() {typename Lockable::lock_guard lock(*this); return Container::empty();}
 	void clear() {typename Lockable::lock_guard lock(*this); Container::clear(); total_size = 0;}
 	void swap(Container& can)
