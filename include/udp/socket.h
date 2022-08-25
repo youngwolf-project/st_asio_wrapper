@@ -329,7 +329,14 @@ private:
 
 	virtual bool do_send_msg(bool in_strand = false)
 	{
-		if (!in_strand && ST_THIS test_and_set_sending())
+		if (send_buffer.empty()) //without this, in extreme circumstances, messages can leave behind in the send buffer until the next message sending
+		{
+			if (in_strand)
+				ST_THIS clear_sending();
+
+			return false;
+		}
+		else if (!in_strand && ST_THIS test_and_set_sending())
 			return true;
 		else if (is_connected && !check_send_cc())
 			;
