@@ -140,7 +140,7 @@ public:
 		return *this;
 	}
 	template<size_t size> basic_buffer& append(char(&buff)[size], size_t len) {return append((const char*) buff, std::min(size, len));}
-	template<size_t size> basic_buffer & append(const char(&buff)[size], size_t len) {return append((const char*) buff, std::min(size, len));}
+	template<size_t size> basic_buffer& append(const char(&buff)[size], size_t len) {return append((const char*) buff, std::min(size, len));}
 
 	//nonstandard function append2 -- delete the last character if it's '\0' before appending another string.
 	//this feature makes basic_buffer to be able to works as std::string, which will append '\0' automatically.
