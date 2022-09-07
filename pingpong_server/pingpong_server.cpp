@@ -4,7 +4,7 @@
 //configuration
 #define ST_ASIO_SERVER_PORT		9527
 #define ST_ASIO_REUSE_OBJECT //use objects pool
-#define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
+#define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve performance)
 #define ST_ASIO_SYNC_DISPATCH
 #define ST_ASIO_MSG_BUFFER_SIZE	65536
 #define ST_ASIO_DEFAULT_UNPACKER stream_unpacker //non-protocol

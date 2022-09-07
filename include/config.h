@@ -43,7 +43,7 @@
  * 2016.8.7		version 1.1.0
  * Add stream_unpacker to receive native data.
  * asio_server and test_client are now able to start with configurable thread number.
- * Add efficiency statistic for performance tuning, and it can be shut down.
+ * Add performance statistic for performance tuning, and it can be shut down.
  * Add pingpong test.
  * Move packers and unpackers out of 'include' directory (now in 'ext' directory), they don't belong to st_asio_wrapper library.
  *
@@ -99,7 +99,7 @@
  * New macros--ST_ASIO_INPUT_QUEUE, ST_ASIO_INPUT_CONTAINER, ST_ASIO_OUTPUT_QUEUE and ST_ASIO_OUTPUT_CONTAINER.
  * In contrast to non_lock_queue, rename message_queue to lock_queue.
  * Move container related classes and functions from st_asio_wrapper_base.h to st_asio_wrapper_container.h.
- * Improve efficiency in scenarios of low throughput like pingpong test.
+ * Improve performance in scenarios of low throughput like pingpong test.
  * Move class statistic and obj_with_begin_time out of st_socket to reduce template tiers.
  *
  * 2016.11.13	version 1.3.2
@@ -458,7 +458,7 @@
  *
  * HIGHLIGHT:
  * Fully support sync message sending and receiving (even be able to mix with async message sending and receiving without any limitations), but please note
- *  that this feature will slightly impact efficiency even if you always use async message sending and receiving, so only open this feature when really needed.
+ *  that this feature will slightly impact performance even if you always use async message sending and receiving, so only open this feature when really needed.
  *
  * FIX:
  * Fix race condition when aligning timers, see macro ST_ASIO_ALIGNED_TIMER for more details.
@@ -1072,7 +1072,7 @@
 //you must define this macro as a value, not just define it, the value means the duration, unit is second.
 //a value equal to zero will cause st_asio_wrapper to use a mechanism to guarantee 100% safety when reusing or freeing this socket,
 //st_asio_wrapper will hook all async calls to avoid this socket to be reused or freed before all async calls finish
-//or been interrupted (of course, this mechanism will slightly impact efficiency).
+//or been interrupted (of course, this mechanism will slightly impact performance).
 #ifndef ST_ASIO_DELAY_CLOSE
 #define ST_ASIO_DELAY_CLOSE	0 //seconds, guarantee 100% safety when reusing or freeing socket objects
 #elif ST_ASIO_DELAY_CLOSE < 0
@@ -1328,7 +1328,7 @@
 // sync_safe_send_native_msg
 // sync_recv_msg
 //please note that:
-// this feature will slightly impact efficiency even if you always use async message sending and receiving, so only open this feature when really needed.
+// this feature will slightly impact performance even if you always use async message sending and receiving, so only open this feature when really needed.
 // we must avoid to do sync message sending and receiving in service threads.
 // if prior sync_recv_msg() not returned, the second sync_recv_msg() will return false immediately.
 // with macro ST_ASIO_PASSIVE_RECV, in sync_recv_msg(), recv_msg() will be automatically called, but the first one (right after the connection been established)
@@ -1342,7 +1342,7 @@
 //#define ST_ASIO_SYNC_DISPATCH
 //with this macro, virtual bool on_msg(list<OutMsgType>& msg_can) will be provided, you can rewrite it and handle all or a part of the
 // messages like virtual function on_msg_handle (with macro ST_ASIO_DISPATCH_BATCH_MSG), if your logic is simple enough (like echo or pingpong test),
-// this feature is recommended because it can slightly improve efficiency.
+// this feature is recommended because it can slightly improve performance.
 //now we have three ways to handle messages (sync_recv_msg, on_msg and on_msg_handle), the invocation order is the same as listed, if messages been successfully
 // dispatched to sync_recv_msg, then the second two will not be called, otherwise messages will be dispatched to on_msg, if on_msg only handled a part of (include
 // zero) the messages, then on_msg_handle will continue to dispatch the rest of them asynchronously, this will disorder messages because on_msg_handle and the next

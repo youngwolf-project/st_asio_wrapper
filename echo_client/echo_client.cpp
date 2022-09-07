@@ -6,12 +6,12 @@
 //configuration
 #define ST_ASIO_SERVER_PORT		9528
 //#define ST_ASIO_REUSE_OBJECT //use objects pool
-#define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
+#define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve performance)
 #define ST_ASIO_CLEAR_OBJECT_INTERVAL 1
 #define ST_ASIO_SYNC_DISPATCH
 #define ST_ASIO_DISPATCH_BATCH_MSG
 //#define ST_ASIO_WANT_MSG_SEND_NOTIFY
-//#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
+//#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact performance
 //#define ST_ASIO_USE_STEADY_TIMER
 #define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_AVOID_AUTO_STOP_SERVICE
