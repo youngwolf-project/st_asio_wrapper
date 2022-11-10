@@ -101,9 +101,9 @@ public:
 	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_in_io_strand(boost::bind(&generic_socket::close_, this));}
 	void graceful_shutdown() {force_shutdown();}
 
-	std::string endpoint_to_string(const boost::asio::ip::udp::endpoint& ep) const {return ep.address().to_string() + ':' + boost::to_string(ep.port());}
+	static std::string endpoint_to_string(const boost::asio::ip::udp::endpoint& ep) {return ep.address().to_string() + ':' + boost::to_string(ep.port());}
 #ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
-	std::string endpoint_to_string(const boost::asio::local::datagram_protocol::endpoint& ep) const {return ep.path();}
+	static std::string endpoint_to_string(const boost::asio::local::datagram_protocol::endpoint& ep) {return ep.path();}
 #endif
 
 	void show_info(const char* head = NULL, const char* tail = NULL) const
