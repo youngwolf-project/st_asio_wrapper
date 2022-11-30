@@ -35,14 +35,15 @@ public:
 	bool is_idle() const {return TRANS_IDLE == state;}
 	void set_index(int index_) {index = index_;}
 
-	bool get_file(const std::string& file_name)
+	bool get_file(const std::string& file_name, bool master_only)
 	{
 		assert(!file_name.empty());
 
-		if (TRANS_IDLE != state)
+		if ((master_only && 0 != index) || (!master_only && 0 == index))
+			return true;
+		else if (TRANS_IDLE != state)
 			return false;
-
-		if (0 == index)
+		else if (master_only)
 			file = fopen(file_name.data(), "w+b");
 		else
 			file = fopen(file_name.data(), "r+b");
@@ -62,13 +63,15 @@ public:
 		return true;
 	}
 
-	bool truncate_file(const std::string& file_name)
+	bool truncate_file(const std::string& file_name, bool master_only)
 	{
 		assert(!file_name.empty());
 
-		if (TRANS_IDLE != state)
+		if ((master_only && 0 != index) || (!master_only && 0 == index))
+			return true;
+		else if (TRANS_IDLE != state)
 			return false;
-		else if (0 == index)
+		else if (master_only)
 		{
 			std::string order(ORDER_LEN, (char) 10);
 			order += file_name;
@@ -298,13 +301,13 @@ private:
 				const char* file_name = boost::next(msg.data(), ORDER_LEN + 1);
 				if ('\0' != *boost::next(msg.data(), ORDER_LEN))
 				{
-					if (link_num - 1 == index)
+					if (0 == index)
 						printf("cannot create or truncated file %s on the server\n", file_name);
 					trans_end();
 				}
 				else
 				{
-					if (link_num - 1 == index)
+					if (0 == index)
 						printf("prepare to send file %s\n", file_name);
 					get_matrix()->put_file(boost::next(msg.data(), ORDER_LEN + 1));
 				}
@@ -390,7 +393,7 @@ public:
 	}
 
 protected:
-	virtual void put_file(const std::string& file_name) {do_something_to_all(boost::lambda::bind(&file_socket::put_file, *boost::lambda::_1, file_name));}
+	virtual void put_file(const std::string& file_name) {do_something_to_all(boost::lambda::bind(&file_socket::put_file, *boost::lambda::_1, boost::lambda::constant_ref(file_name)));}
 
 private:
 	void transmit_file()
@@ -411,15 +414,14 @@ private:
 			transmit_size = 0;
 
 			printf("transmit %s begin.\n", file_name.data());
-			bool re = false;
+			bool re = true;
 			if (0 == type)
 			{
-				if ((re = find(0)->get_file(file_name)))
-					do_something_to_all(boost::lambda::if_then(0U != boost::lambda::bind((boost::uint_fast64_t (file_socket::*)() const) &file_socket::id, *boost::lambda::_1),
-						boost::lambda::bind(&file_socket::get_file, *boost::lambda::_1, file_name)));
+				do_something_to_all(boost::lambda::if_then(!boost::lambda::bind(&file_socket::get_file, *boost::lambda::_1, boost::lambda::constant_ref(file_name), true), boost::lambda::var(re) = false));
+				do_something_to_all(boost::lambda::if_then(!boost::lambda::bind(&file_socket::get_file, *boost::lambda::_1, boost::lambda::constant_ref(file_name), false), boost::lambda::var(re) = false));
 			}
 			else
-				re = find(0)->truncate_file(file_name);
+				do_something_to_all(boost::lambda::if_then(!boost::lambda::bind(&file_socket::truncate_file, *boost::lambda::_1, boost::lambda::constant_ref(file_name), true), boost::lambda::var(re) = false));
 
 			if (re)
 			{

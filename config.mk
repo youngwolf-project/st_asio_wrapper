@@ -16,8 +16,8 @@ else
 	lflag = -s
 	dir = release
 endif
-cflag += -DBOOST_ASIO_NO_DEPRECATED
-common_libs = -lboost_system -lboost_thread -lboost_chrono
+cflag += -DBOOST_ASIO_NO_DEPRECATED -DBOOST_CHRONO_HEADER_ONLY
+common_libs = -lboost_system -lboost_thread
 
 target_machine = ${shell ${CXX} -dumpmachine}
 ifneq (, ${findstring solaris, ${target_machine}})

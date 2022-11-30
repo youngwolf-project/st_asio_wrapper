@@ -7,7 +7,7 @@
 //#define ST_ASIO_FREE_OBJECT_INTERVAL 60 //it's useless if ST_ASIO_REUSE_OBJECT macro been defined
 //#define ST_ASIO_SYNC_DISPATCH //do not open this feature, see below for more details
 #define ST_ASIO_DISPATCH_BATCH_MSG
-//#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact efficiency
+//#define ST_ASIO_FULL_STATISTIC //full statistic will slightly impact performance
 #define ST_ASIO_USE_STEADY_TIMER
 //#define ST_ASIO_USE_SYSTEM_TIMER
 #define ST_ASIO_ALIGNED_TIMER

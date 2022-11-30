@@ -6,7 +6,7 @@
 #define ST_ASIO_MAX_OBJECT_NUM	102400
 #define ST_ASIO_ASYNC_ACCEPT_NUM 1024 //pre-create 1024 server socket, this is very useful if creating server socket is very expensive
 #define ST_ASIO_REUSE_OBJECT //use objects pool
-#define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve efficiency)
+#define ST_ASIO_DELAY_CLOSE		5 //define this to avoid hooks for async call (and slightly improve performance)
 #define ST_ASIO_MSG_BUFFER_SIZE	1024
 #define ST_ASIO_SYNC_DISPATCH
 #ifdef ST_ASIO_SYNC_DISPATCH

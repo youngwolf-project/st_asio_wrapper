@@ -79,6 +79,8 @@ public:
 	basic_buffer(char* buff) {do_detach(); operator+=(buff);}
 	basic_buffer(const char* buff) {do_detach(); operator+=(buff);}
 	basic_buffer(const char* buff, size_t len) {do_detach(); append(buff, len);}
+	template<size_t size> basic_buffer(char(&buff)[size], size_t len) {do_detach(); append(buff, len);}
+	template<size_t size> basic_buffer(const char(&buff)[size], size_t len) {do_detach(); append(buff, len);}
 	basic_buffer(const basic_buffer& other) {do_detach(); append(other);}
 	template<typename Buff> basic_buffer(const Buff& other) {do_detach(); append(other);}
 	template<typename Buff> basic_buffer(const Buff& other, size_t pos) {do_detach(); if (pos < other.size()) append(boost::next(other.data(), pos), other.size() - pos);}
@@ -137,6 +139,8 @@ public:
 
 		return *this;
 	}
+	template<size_t size> basic_buffer& append(char(&buff)[size], size_t len) {return append((const char*) buff, std::min(size, len));}
+	template<size_t size> basic_buffer& append(const char(&buff)[size], size_t len) {return append((const char*) buff, std::min(size, len));}
 
 	//nonstandard function append2 -- delete the last character if it's '\0' before appending another string.
 	//this feature makes basic_buffer to be able to works as std::string, which will append '\0' automatically.
