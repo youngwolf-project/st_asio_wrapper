@@ -128,7 +128,7 @@ public:
 	boost::asio::ssl::context& context() {return ctx;}
 
 protected:
-	template<typename Arg> typename object_pool::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
+	template<typename Arg> typename super::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
 
 private:
 	boost::asio::ssl::context ctx;
@@ -162,7 +162,7 @@ protected:
 		return true;
 	}
 
-	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); ST_THIS force_shutdown();}
+	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); force_shutdown();}
 
 private:
 	void handle_handshake(const boost::system::error_code& ec)
@@ -185,10 +185,13 @@ private:
 	typedef tcp::single_client_base<Socket> super;
 
 public:
-	single_client_base(service_pump& service_pump_, boost::asio::ssl::context& ctx_) : super(service_pump_, ctx_) {}
+	single_client_base(service_pump& service_pump_, const boost::shared_ptr<boost::asio::ssl::context>& ctx_) : super(service_pump_, *ctx_), ctx_holder(ctx_) {}
 
 protected:
 	virtual bool init() {if (0 == ST_THIS get_io_context_refs()) ST_THIS reset_next_layer(ST_THIS get_context()); return super::init();}
+
+private:
+	boost::shared_ptr<boost::asio::ssl::context> ctx_holder;
 };
 template<typename Socket, typename Pool = object_pool<Socket>, typename Matrix = i_matrix> class multi_client_base : public tcp::multi_client_base<Socket, Pool, Matrix>
 {
