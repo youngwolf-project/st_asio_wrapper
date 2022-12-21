@@ -41,6 +41,7 @@ protected:
 		else
 			ST_THIS show_info(ec, NULL, "handshake failed");
 	}
+	virtual void on_recv_error(const boost::system::error_code& ec) {ST_THIS stop_graceful_shutdown_monitoring(); Socket::on_recv_error(ec);}
 
 	void shutdown_ssl() {ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN; ST_THIS dispatch_in_io_strand(boost::bind(&socket::async_shutdown, this));}
 
@@ -52,7 +53,9 @@ private:
 		ST_THIS next_layer().async_shutdown(ST_THIS make_handler_error(boost::bind(&socket::shutdown_handler, this, boost::asio::placeholders::error)));
 	}
 
-	void shutdown_handler(const boost::system::error_code& ec) {ST_THIS stop_graceful_shutdown_monitoring(); if (ec) ST_THIS show_info(ec, "ssl link", "async shutdown failed");}
+	//do not stop the shutdown monitoring at here, sometimes, this async_shutdown cannot trigger on_recv_error,
+	//very strange, maybe, there's a bug in Asio. so we stop it in on_recv_error.
+	void shutdown_handler(const boost::system::error_code& ec) {if (ec) ST_THIS show_info(ec, "ssl link", "async shutdown failed");}
 
 private:
 	boost::asio::ssl::context& ctx;
