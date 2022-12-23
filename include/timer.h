@@ -179,9 +179,11 @@ protected:
 
 	void timer_handler(const boost::system::error_code& ec, timer_info& ti, unsigned char prev_seq)
 	{
+		//the first 'timer_info::TIMER_STARTED == ti.status' judgement means stop_timer can also invalidate cumulative timer callbacks
+		//the second 'timer_info::TIMER_STARTED == ti.status' judgement is used to exclude a particular situation--stop the same timer in call_back and return true
 #ifdef ST_ASIO_ALIGNED_TIMER
 		BOOST_AUTO(begin_time, boost::chrono::system_clock::now());
-		if (!ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)
+		if (timer_info::TIMER_STARTED == ti.status && !ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)
 		{
 			unsigned elapsed_ms = (unsigned) boost::chrono::duration_cast<boost::chrono::milliseconds>(boost::chrono::system_clock::now() - begin_time).count();
 			if (elapsed_ms > ti.interval_ms)
@@ -190,7 +192,7 @@ protected:
 			start_timer(ti, ti.interval_ms - elapsed_ms);
 		}
 #else
-		if (!ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)
+		if (timer_info::TIMER_STARTED == ti.status && !ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)
 			start_timer(ti);
 #endif
 		else if (prev_seq == ti.seq) //exclude a particular situation--start the same timer in call_back and return false
@@ -201,9 +203,9 @@ protected:
 	{
 		if (timer_info::TIMER_STARTED == ti.status) //enable stopping timers that has been stopped
 		{
+			ti.status = timer_info::TIMER_CANCELED; //invalidate cumulative timer callbacks first
 			try {ti.timer.cancel();}
 			catch (const boost::system::system_error& e) {unified_out::error_out("cannot stop timer %d (%d %s)", ti.id, e.code().value(), e.what());}
-			ti.status = timer_info::TIMER_CANCELED;
 		}
 	}
 
