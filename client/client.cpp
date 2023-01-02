@@ -39,6 +39,7 @@ public:
 };
 
 #include "../include/ext/tcp.h"
+#include "../include/ext/socket.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
@@ -51,19 +52,10 @@ using namespace st_asio_wrapper::ext::tcp::proxy;
 #define STATISTIC		"statistic"
 
 //we only want close reconnecting mechanism on this socket, so we don't define macro ST_ASIO_RECONNECT
-class short_connection : public socks4::client_socket
+class short_client : public multi_client_base<c_socket<socks4::client_socket> >
 {
 public:
-	short_connection(i_matrix& matrix_) : socks4::client_socket(matrix_) {}
-
-protected:
-	virtual void on_connect() {set_reconnect(false); client_socket::on_connect();} //close reconnecting mechanism
-};
-
-class short_client : public multi_client_base<short_connection>
-{
-public:
-	short_client(service_pump& service_pump_) : multi_client_base<short_connection>(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
+	short_client(service_pump& service_pump_) : multi_client_base<c_socket<socks4::client_socket> >(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
 
 	void set_server_addr(unsigned short _port, const std::string& _ip = ST_ASIO_SERVER_IP) {port = _port; ip = _ip;}
 	bool send_msg(const std::string& msg) {return send_msg(msg, port, ip);}
@@ -74,6 +66,9 @@ public:
 		BOOST_AUTO(socket_ptr, add_socket(port, ip));
 		if (!socket_ptr)
 			return false;
+
+		//register event callback from outside of the socket, it also can be done from inside of the socket, see echo_server for more details
+		socket_ptr->register_on_connect(boost::bind(&socks4::client_socket::set_reconnect, boost::placeholders::_1, false), true); //close reconnection mechanism
 
 		//without following setting, socks4::client_socket will be downgraded to normal client_socket
 		//socket_ptr->set_target_addr(9527, "172.27.0.14"); //target server address, original server address becomes SOCK4 server address

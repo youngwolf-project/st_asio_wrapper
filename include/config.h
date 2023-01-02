@@ -864,11 +864,13 @@
  * Graceful shutdown does not support sync mode anymore.
  * Introduce memory fence to synchronize socket's status -- sending and reading, dispatch_strand is not enough, except post_strand,
  *  but dispatch_strand is more efficient than post_strand in specific circumstances.
+ * stop_timer will also invalidate cumulative timers.
  *
  * HIGHLIGHT:
  * Support websocket, use macro ST_ASIO_WEBSOCKET_BINARY to control the mode (binary or text) of websocket message,
  *  !0 - binary mode (default), 0 - text mode.
  * Make shutdown thread safe.
+ * Support call back registration, then we can get event notify and customize our socket without inhirt ascs socket and overwrite its virtual functions.
  *
  * FIX:
  * Fix compilation warnings with c++0x in Clang.
@@ -881,6 +883,7 @@
  *  pop_first/all_pending_send_msg and pop_first/all_pending_recv_msg.
  *  socket::send_msg().
  * Fix -- basic_buffer doesn't support fixed arrays (just in the constructor) in GCC and Clang.
+ * Fix ssl graceful shutdown monitoring.
  *
  * ENHANCEMENTS:
  * heartbeat(ext) optimization.
@@ -890,6 +893,8 @@
  * st_asio_wrapper needs the container's empty() function (used by the queue for message sending and receiving) to be thread safe (here, thread safe does not means
  *  correctness, but just no memory access violation), almost all implementations of list::empty() in the world are thread safe, but not for list::size().
  *  if your container's empty() function is not thread safe, please define macro ST_ASIO_CAN_EMPTY_NOT_SAFE, then st_asio_wrapper will make it thread safe for you.
+ * Maintain the ssl::context in ssl::single_client_base.
+ * Make function endpoint_to_string static.
  *
  * DELETION:
  *

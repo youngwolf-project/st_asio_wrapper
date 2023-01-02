@@ -50,6 +50,7 @@
 //configuration
 
 #include "../include/ext/tcp.h"
+#include "../include/ext/socket.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
@@ -195,29 +196,46 @@ protected:
 	virtual bool on_accept(object_ctype& socket_ptr) {stop_listen(); return true;}
 };
 
-typedef server_socket_base<packer<>, unpacker<> > short_socket_base;
-class short_connection : public short_socket_base
+typedef server_socket_base<packer<>, unpacker<> > short_socket;
+class short_connection : public s_socket<short_socket>
 {
 public:
-	short_connection(i_server& server_) : short_socket_base(server_) {}
-
-protected:
-	//msg handling
+	short_connection(i_server& server_) : s_socket<short_socket>(server_)
+	{
+		//register msg handling from inside of the socket, it also can be done from outside of the socket, see client for more details
+		//since we're in the socket, so the 'raw_socket* socket' actually is 'this'
+		//in xxxx callback, do not call s_socket<short_socket>::xxxx, call raw_socket::xxxx instead, otherwise, dead loop will occur.
+		//in this demo, the raw_socket is 'short_socket', it is defined by the s_socket.
 #ifdef ST_ASIO_SYNC_DISPATCH
-	//do not hold msg_can for further usage, return from on_msg as quickly as possible
-	//access msg_can freely within this callback, it's always thread safe.
-	virtual size_t on_msg(list<out_msg_type>& msg_can) {bool re = short_socket_base::on_msg(msg_can); force_shutdown(); return re;}
+		//do not hold msg_can for further usage, return from on_msg as quickly as possible
+		//access msg_can freely within this callback, it's always thread safe.
+		register_on_msg(boost::bind((size_t (short_connection::*)(raw_socket*, list<out_msg_type>&)) &short_connection::handle_msg_and_shutdown,
+			this, boost::placeholders::_1, boost::placeholders::_2));
 #endif
 
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
-	//do not hold msg_can for further usage, access msg_can and return from on_msg_handle as quickly as possible
-	//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
-	// that new messages will not come until we returned from this callback (for example, pingpong test).
-	virtual size_t on_msg_handle(out_queue_type& msg_can) {size_t re = short_socket_base::on_msg_handle(msg_can); force_shutdown(); return re;}
+		//do not hold msg_can for further usage, access msg_can and return from on_msg_handle as quickly as possible
+		//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
+		// that new messages will not come until we returned from this callback (for example, pingpong test).
+		register_on_msg_handle(boost::bind((size_t (short_connection::*)(raw_socket*, out_queue_type&)) &short_connection::handle_msg_and_shutdown,
+			this, boost::placeholders::_1, boost::placeholders::_2));
 #else
-	virtual bool on_msg_handle(out_msg_type& msg) {bool re = short_socket_base::on_msg_handle(msg); force_shutdown(); return re;}
+		register_on_msg_handle(boost::bind((bool (short_connection::*)(raw_socket*, out_msg_type&)) &short_connection::handle_msg_and_shutdown,
+			this, boost::placeholders::_1, boost::placeholders::_2));
 #endif
-	//msg handling end
+		//register msg handling end
+	}
+
+private:
+#ifdef ST_ASIO_SYNC_DISPATCH
+	size_t handle_msg_and_shutdown(raw_socket* socket, list<out_msg_type>& msg_can) {size_t re = raw_socket::on_msg(msg_can); socket->force_shutdown(); return re;}
+#endif
+
+#ifdef ST_ASIO_DISPATCH_BATCH_MSG
+	size_t handle_msg_and_shutdown(raw_socket* socket, out_queue_type& msg_can) {size_t re = raw_socket::on_msg_handle(msg_can); socket->force_shutdown(); return re;}
+#else
+	bool handle_msg_and_shutdown(raw_socket* socket, out_msg_type& msg) {bool re = raw_socket::on_msg_handle(msg); socket->force_shutdown(); return re;}
+#endif
 };
 
 void dump_io_context_refs(service_pump& sp)

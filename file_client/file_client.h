@@ -393,7 +393,7 @@ public:
 	}
 
 protected:
-	virtual void put_file(const std::string& file_name) {do_something_to_all(boost::lambda::bind(&file_socket::put_file, *boost::lambda::_1, boost::lambda::constant_ref(file_name)));}
+	virtual void put_file(const std::string& file_name) {do_something_to_all(boost::bind(&file_socket::put_file, boost::placeholders::_1, boost::cref(file_name)));}
 
 private:
 	void transmit_file()
