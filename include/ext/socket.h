@@ -220,13 +220,13 @@ public:
 	register_cb(take_over, false)
 
 public:
-	virtual void take_over(boost::shared_ptr<Socket> socket_ptr) call_cb_1_void(take_over, socket_ptr)
+	virtual void take_over(boost::shared_ptr<typename Socket::type_of_object_restore> socket_ptr) call_cb_1_void(take_over, socket_ptr)
 
 private:
 	void first_init() {cb_take_over.second = true;}
 
 private:
-	std::pair<boost::function<void(Socket*, boost::shared_ptr<Socket>)>, bool> cb_take_over;
+	std::pair<boost::function<void(Socket*, boost::shared_ptr<typename Socket::type_of_object_restore>)>, bool> cb_take_over;
 };
 
 }} //namespace

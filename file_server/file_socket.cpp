@@ -20,9 +20,8 @@ file_socket::~file_socket() {clear();}
 void file_socket::reset() {trans_end(); server_socket::reset();}
 
 //socket_ptr actually is a pointer of file_socket, use boost::dynamic_pointer_cast to convert it.
-//Clang will still complain with -Woverloaded-virtual, because the initial version has type boost::shared_ptr<generic_server_socket<...> >.
-//GCC and MSVC is more inclusive.
-void file_socket::take_over(boost::shared_ptr<server_socket> socket_ptr) {printf("restore user data from invalid object (" ST_ASIO_LLF ").\n", socket_ptr->id());}
+void file_socket::take_over(boost::shared_ptr<server_socket::type_of_object_restore> socket_ptr)
+	{printf("restore user data from invalid object (" ST_ASIO_LLF ").\n", socket_ptr->id());}
 //this works too, but brings warnings with -Woverloaded-virtual option.
 //void file_socket::take_over(boost::shared_ptr<file_socket> socket_ptr) {printf("restore user data from invalid object (" ST_ASIO_LLF ").\n", socket_ptr->id());}
 
