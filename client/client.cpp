@@ -39,7 +39,7 @@ public:
 };
 
 #include "../include/ext/tcp.h"
-#include "../include/ext/socket.h"
+#include "../include/ext/callbacks.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
@@ -51,11 +51,12 @@ using namespace st_asio_wrapper::ext::tcp::proxy;
 #define RECONNECT		"reconnect"
 #define STATISTIC		"statistic"
 
-//we only want close reconnecting mechanism on this socket, so we don't define macro ST_ASIO_RECONNECT
-class short_client : public multi_client_base<c_socket<socks4::client_socket> >
+//we only want close reconnecting mechanism on these sockets, so it cannot be done by defining macro ST_ASIO_RECONNECT to false
+//method 1
+class short_client : public multi_client_base<callbacks::c_socket<socks4::client_socket> >
 {
 public:
-	short_client(service_pump& service_pump_) : multi_client_base<c_socket<socks4::client_socket> >(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
+	short_client(service_pump& service_pump_) : multi_client_base<callbacks::c_socket<socks4::client_socket> >(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
 
 	void set_server_addr(unsigned short _port, const std::string& _ip = ST_ASIO_SERVER_IP) {port = _port; ip = _ip;}
 	bool send_msg(const std::string& msg) {return send_msg(msg, port, ip);}
@@ -79,6 +80,20 @@ private:
 	unsigned short port;
 	std::string ip;
 };
+
+//method 2
+//class short_client : public multi_client_base<socks4::client_socket, callbacks::object_pool<object_pool<socks4::client_socket> > >
+//{
+//public:
+//	we now can not call register_on_connect on socket_ptr, since it's not wrapped by callbacks::c_socket
+//	socket_ptr->register_on_connect(boost::bind(&socks4::client_socket::set_reconnect, boost::placeholders::_1, false), true); //close reconnection mechanism
+//};
+//
+//but now, we're able to call register_on_create on client2, since its object pool is wrapped by callbacks::object_pool
+//short_client client2(...);
+//client2.register_on_create([](object_pool<socks4::client_socket>*, object_pool<socks4::client_socket>::object_ctype& object_ptr) {
+//	object_ptr->set_reconnect(false); //close reconnection mechanism
+//});
 
 void sync_recv_thread(client_socket& client)
 {

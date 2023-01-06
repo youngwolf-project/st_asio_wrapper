@@ -50,7 +50,7 @@
 //configuration
 
 #include "../include/ext/tcp.h"
-#include "../include/ext/socket.h"
+#include "../include/ext/callbacks.h"
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
@@ -184,32 +184,22 @@ protected:
 };
 #endif
 
-//demonstrate how to accept just one client at server endpoint
-typedef server_base<normal_socket> normal_server_base;
-class normal_server : public normal_server_base
-{
-public:
-	normal_server(service_pump& service_pump_) : normal_server_base(service_pump_) {}
-
-protected:
-	virtual int async_accept_num() {return 1;}
-	virtual bool on_accept(object_ctype& socket_ptr) {stop_listen(); return true;}
-};
+int get_async_accept_num(server_base<normal_socket>*) {return 1;}
+bool on_accept_handler(server_base<normal_socket>* server, server_base<normal_socket>::object_ctype&) {server->stop_listen(); return true;}
 
 typedef server_socket_base<packer<>, unpacker<> > short_socket;
-class short_connection : public s_socket<short_socket>
+class short_connection : public callbacks::s_socket<short_socket>
 {
 public:
-	short_connection(i_server& server_) : s_socket<short_socket>(server_)
+	short_connection(i_server& server_) : callbacks::s_socket<short_socket>(server_)
 	{
 		//register msg handling from inside of the socket, it also can be done from outside of the socket, see client for more details
-		//since we're in the socket, so the 'raw_socket* socket' actually is 'this'
-		//in xxxx callback, do not call s_socket<short_socket>::xxxx, call raw_socket::xxxx instead, otherwise, dead loop will occur.
-		//in this demo, the raw_socket is 'short_socket', it is defined by the s_socket.
+		//since we're in the socket, so the 'short_socket* socket' actually is 'this'
+		//in xxxx callback, do not call s_socket<short_socket>::xxxx, call short_socket::xxxx instead, otherwise, dead loop will occur.
 #ifdef ST_ASIO_SYNC_DISPATCH
 		//do not hold msg_can for further usage, return from on_msg as quickly as possible
 		//access msg_can freely within this callback, it's always thread safe.
-		register_on_msg(boost::bind((size_t (short_connection::*)(raw_socket*, list<out_msg_type>&)) &short_connection::handle_msg_and_shutdown,
+		register_on_msg(boost::bind((size_t (short_connection::*)(short_socket*, list<out_msg_type>&)) &short_connection::handle_msg_and_shutdown,
 			this, boost::placeholders::_1, boost::placeholders::_2));
 #endif
 
@@ -217,10 +207,10 @@ public:
 		//do not hold msg_can for further usage, access msg_can and return from on_msg_handle as quickly as possible
 		//can only access msg_can via functions that marked as 'thread safe', if you used non-lock queue, its your responsibility to guarantee
 		// that new messages will not come until we returned from this callback (for example, pingpong test).
-		register_on_msg_handle(boost::bind((size_t (short_connection::*)(raw_socket*, out_queue_type&)) &short_connection::handle_msg_and_shutdown,
+		register_on_msg_handle(boost::bind((size_t (short_connection::*)(short_socket*, short_socket::out_queue_type&)) &short_connection::handle_msg_and_shutdown,
 			this, boost::placeholders::_1, boost::placeholders::_2));
 #else
-		register_on_msg_handle(boost::bind((bool (short_connection::*)(raw_socket*, out_msg_type&)) &short_connection::handle_msg_and_shutdown,
+		register_on_msg_handle(boost::bind((bool (short_connection::*)(short_socket*, out_msg_type&)) &short_connection::handle_msg_and_shutdown,
 			this, boost::placeholders::_1, boost::placeholders::_2));
 #endif
 		//register msg handling end
@@ -228,13 +218,13 @@ public:
 
 private:
 #ifdef ST_ASIO_SYNC_DISPATCH
-	size_t handle_msg_and_shutdown(raw_socket* socket, list<out_msg_type>& msg_can) {size_t re = raw_socket::on_msg(msg_can); socket->force_shutdown(); return re;}
+	size_t handle_msg_and_shutdown(short_socket* socket, list<out_msg_type>& msg_can) {size_t re = short_socket::on_msg(msg_can); socket->force_shutdown(); return re;}
 #endif
 
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
-	size_t handle_msg_and_shutdown(raw_socket* socket, out_queue_type& msg_can) {size_t re = raw_socket::on_msg_handle(msg_can); socket->force_shutdown(); return re;}
+	size_t handle_msg_and_shutdown(short_socket* socket, out_queue_type& msg_can) {size_t re = short_socket::on_msg_handle(msg_can); socket->force_shutdown(); return re;}
 #else
-	bool handle_msg_and_shutdown(raw_socket* socket, out_msg_type& msg) {bool re = raw_socket::on_msg_handle(msg); socket->force_shutdown(); return re;}
+	bool handle_msg_and_shutdown(short_socket* socket, out_msg_type& msg) {bool re = short_socket::on_msg_handle(msg); socket->force_shutdown(); return re;}
 #endif
 };
 
@@ -302,7 +292,12 @@ int main(int argc, const char* argv[])
 	//demonstrate how to use singel_service
 	//because of normal_socket, this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
 	//the reason is these packer and unpacker need additional initializations that normal_socket not implemented, see echo_socket's constructor for more details.
-	single_service_pump<normal_server> normal_server_;
+	single_service_pump<callbacks::server<server_base<normal_socket> > > normal_server_;
+	//following statements demonstrate how to accept just one client at server endpoint
+	normal_server_.register_async_accept_num(boost::bind(&get_async_accept_num, boost::placeholders::_1));
+	normal_server_.register_on_accept(boost::bind(&on_accept_handler, boost::placeholders::_1, boost::placeholders::_2));
+
+	//demonstrate how to use singel_service
 	single_service_pump<server_base<short_connection> > short_server;
 
 	unsigned short port = ST_ASIO_SERVER_PORT;
@@ -385,18 +380,18 @@ int main(int argc, const char* argv[])
 //			*/
 			/*
 			//if all clients used the same protocol, we can pack msg one time, and send it repeatedly like this:
-			packer p;
-			packer::msg_type msg;
+			packer<> p;
+			packer<>::msg_type msg;
 			//send \0 character too, because demo client used basic_buffer as its msg type, it will not append \0 character automatically as std::string does,
 			//so need \0 character when printing it.
 			if (p.pack_msg(msg, str.data(), str.size() + 1))
-				((normal_server&) normal_server_).do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg,
-					boost::placeholders::_1, boost::cref(msg), false, false));
+				((server_base<normal_socket>&) normal_server_).do_something_to_all(boost::bind(
+					(bool (normal_socket::*)(packer<>::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg, boost::placeholders::_1, boost::cref(msg), false, false));
 			*/
 			/*
 			//if demo client is using stream_unpacker
-			((normal_server&) normal_server_).do_something_to_all(boost::bind((bool (normal_socket::*)(packer::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg,
-				boost::placeholders::_1, boost::cref(str), false, false));
+			((server_base<normal_socket>&) normal_server_).do_something_to_all(boost::bind(
+				(bool (normal_socket::*)(packer<>::msg_ctype&, bool, bool)) &normal_socket::direct_send_msg, boost::placeholders::_1, boost::cref(str), false, false));
 			//or
 			normal_server_.broadcast_native_msg(str);
 			*/
