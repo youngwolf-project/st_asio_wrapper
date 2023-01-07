@@ -64,11 +64,11 @@ public:
 
 public:
 	call_cb_combine(Socket, obsoleted)
-	call_cb_combine(Socket, is_ready)
-	call_cb_void(Socket, send_heartbeat)
 	call_cb_void(Socket, reset)
 
-protected:
+private:
+	call_cb_combine(Socket, is_ready)
+	call_cb_void(Socket, send_heartbeat)
 	call_cb_combine(Socket, on_heartbeat_error)
 	virtual void on_send_error(const boost::system::error_code& ec, typename Socket::in_container_type& msg_can) call_cb_2_void(Socket, on_send_error, ec, msg_can)
 	virtual void on_recv_error(const boost::system::error_code& ec) call_cb_1_void(Socket, on_recv_error, ec)
@@ -96,7 +96,6 @@ protected:
 	virtual void on_msg_discard(typename Socket::in_container_type& msg_can) call_cb_1_void(Socket, on_msg_discard, msg_can)
 #endif
 
-private:
 	void first_init()
 	{
 		cb_obsoleted.second = true;
@@ -174,12 +173,11 @@ public:
 	register_cb(on_unpack_error, true)
 	register_cb(on_async_shutdown_error, true)
 
-protected:
+private:
 	call_cb_void(Socket, on_connect)
 	call_cb_void(Socket, on_unpack_error)
 	call_cb_void(Socket, on_async_shutdown_error)
 
-private:
 	void first_init()
 	{
 		cb_on_connect.second = true;
@@ -201,10 +199,9 @@ public:
 
 	register_cb(prepare_reconnect, false)
 
-protected:
+private:
 	virtual int prepare_reconnect(const boost::system::error_code& ec) call_cb_1_return(Socket, int, prepare_reconnect, ec)
 
-private:
 	void first_init() {cb_prepare_reconnect.second = true;}
 
 private:
@@ -240,13 +237,12 @@ public:
 	register_cb(on_accept, true)
 	register_cb(on_accept_error, true)
 
-protected:
+private:
 	call_cb_return(Server, int, async_accept_num)
 	call_cb_void(Server, start_next_accept)
 	virtual bool on_accept(typename Server::object_ctype& socket_ptr) call_cb_1_combine(Server, on_accept, socket_ptr)
 	virtual bool on_accept_error(const boost::system::error_code& ec, typename Server::object_ctype& socket_ptr) call_cb_2_combine(Server, on_accept_error, ec, socket_ptr)
 
-private:
 	void first_init()
 	{
 		cb_async_accept_num.second = true;
@@ -269,10 +265,9 @@ public:
 
 	register_cb(on_create, false)
 
-protected:
+private:
 	virtual void on_create(typename ObjectPool::object_ctype& object_ptr) call_cb_1_void(ObjectPool, on_create, object_ptr)
 
-private:
 	void first_init() {cb_on_create.second = true;}
 
 private:
