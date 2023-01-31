@@ -57,13 +57,13 @@ int main(int argc, const char* argv[])
 /*
 	//method #2
 	//to use single_client, we must construct ssl context first.
-	boost::asio::ssl::context ctx(boost::asio::ssl::context::sslv23_client);
-	ctx.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
-	ctx.set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
-	ctx.load_verify_file("certs/server.crt");
-	ctx.use_certificate_chain_file("client_certs/server.crt");
-	ctx.use_private_key_file("client_certs/server.key", boost::asio::ssl::context::pem);
-	ctx.use_tmp_dh_file("client_certs/dh2048.pem");
+	boost::shared_ptr<boost::asio::ssl::context> ctx = boost::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::sslv23_client);
+	ctx->set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
+	ctx->set_verify_mode(boost::asio::ssl::context::verify_peer | boost::asio::ssl::context::verify_fail_if_no_peer_cert);
+	ctx->load_verify_file("certs/server.crt");
+	ctx->use_certificate_chain_file("client_certs/server.crt");
+	ctx->use_private_key_file("client_certs/server.key", boost::asio::ssl::context::pem);
+	ctx->use_tmp_dh_file("client_certs/dh2048.pem");
 
 	single_client client_(sp, ctx);
 */

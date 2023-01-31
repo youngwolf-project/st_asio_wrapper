@@ -371,7 +371,7 @@ private:
 		else if (!ec)
 		{
 			assert(false);
-			unified_out::error_out(ST_ASIO_LLF " read 0 byte without any errors which is unexpected, please check your unpacker!", ST_THIS id());
+			unified_out::error_out(ST_ASIO_LLF " read 0 byte without any errors is unexpected, please check your unpacker!", ST_THIS id());
 		}
 
 		if (ec)

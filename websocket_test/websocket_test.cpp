@@ -16,7 +16,7 @@ using namespace st_asio_wrapper::ext::websocket;
 
 int main(int argc, const char* argv[])
 {
-	puts("Demonstrate how to use websocket with st_asio_wrapper (ssl has not been supported yet).");
+	puts("Demonstrate how to use websocket with st_asio_wrapper.");
 	if (argc >= 2 && (0 == strcmp(argv[1], "--help") || 0 == strcmp(argv[1], "-h")))
 		return 0;
 	else
