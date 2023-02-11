@@ -925,10 +925,6 @@
 	#ifndef ST_ASIO_MIN_ACI_REF
 		#if BOOST_VERSION < 105500
 			#define ST_ASIO_MIN_ACI_REF 3
-		#elif BOOST_VERSION < 107000
-			#define ST_ASIO_MIN_ACI_REF 2
-		#elif BOOST_VERSION < 107400
-			#define ST_ASIO_MIN_ACI_REF 3
 		#else
 			#define ST_ASIO_MIN_ACI_REF 2
 		#endif
