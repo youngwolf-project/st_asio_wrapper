@@ -107,8 +107,7 @@ private:
 			return super::connect_handler(boost::beast::error_code(static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()));
 
 		// Perform the SSL handshake
-		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::client,
-			this->make_handler_error(boost::bind(&client_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::client, this->make_handler_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
 	}
 
 	void handle_handshake(const boost::system::error_code& ec)
@@ -142,8 +141,7 @@ protected:
 		//boost::beast::get_lowest_layer(this->next_layer()).expires_after(std::chrono::seconds(30));
 #endif
 		// Perform the SSL handshake
-		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::server,
-			this->make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::server, this->make_handler_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
 		return true;
 	}
 

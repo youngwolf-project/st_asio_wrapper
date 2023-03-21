@@ -134,7 +134,7 @@ public:
 
 //convert '->' operation to '.' operation
 //user needs to allocate object, and object_buffer will free it
-//A can be std::scoped_ptr or std::shared_ptr
+//A can be boost::scoped_ptr or boost::shared_ptr
 //T is the object that represent a buffer (a buffer must at least has those interfaces in i_buffer, or inherit from i_buffer).
 template<template<typename> class A, typename T> class object_buffer
 {

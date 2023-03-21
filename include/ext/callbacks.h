@@ -19,26 +19,26 @@
 
 namespace st_asio_wrapper { namespace ext { namespace callbacks {
 
-#define call_cb_void(super, fun) virtual void fun() {if (cb_##fun.first) cb_##fun.first(this); if (cb_##fun.second) super::fun();}
-#define call_cb_1_void(super, fun, p) {if (cb_##fun.first) cb_##fun.first(this, p); if (cb_##fun.second) super::fun(p);}
-#define call_cb_2_void(super, fun, p1, p2) {if (cb_##fun.first) cb_##fun.first(this, p1, p2); if (cb_##fun.second) super::fun(p1, p2);}
+#define call_cb_void(super, fun) virtual void fun() {if (cb_##fun.first) cb_##fun.first(this); if (!cb_##fun.second) super::fun();}
+#define call_cb_1_void(super, fun, p) {if (cb_##fun.first) cb_##fun.first(this, p); if (!cb_##fun.second) super::fun(p);}
+#define call_cb_2_void(super, fun, p1, p2) {if (cb_##fun.first) cb_##fun.first(this, p1, p2); if (!cb_##fun.second) super::fun(p1, p2);}
 
-#define call_cb_combine(super, fun) virtual bool fun() {bool re = cb_##fun.first ? cb_##fun.first(this) : true; if (re && cb_##fun.second) re = super::fun(); return re;}
-#define call_cb_return(super, type, fun) virtual type fun() {type re = type(); if (cb_##fun.first) re = cb_##fun.first(this); if (cb_##fun.second) re = super::fun(); return re;}
-#define call_cb_1_combine(super, fun, p) {bool re = cb_##fun.first ? cb_##fun.first(this, p) : true; if (re && cb_##fun.second) re = super::fun(p); return re;}
-#define call_cb_1_return(super, type, fun, p) {type re = type(); if (cb_##fun.first) re = cb_##fun.first(this, p); if (cb_##fun.second) re = super::fun(p); return re;}
-#define call_cb_2_combine(super, fun, p1, p2) {bool re = cb_##fun.first ? cb_##fun.first(this, p1, p2) : true; if (re && cb_##fun.second) re = super::fun(p1, p2); return re;}
+#define call_cb_combine(super, fun) virtual bool fun() {bool re = cb_##fun.first ? cb_##fun.first(this) : true; if (re && !cb_##fun.second) re = super::fun(); return re;}
+#define call_cb_return(super, type, fun) virtual type fun() {type re = type(); if (cb_##fun.first) re = cb_##fun.first(this); if (!cb_##fun.second) re = super::fun(); return re;}
+#define call_cb_1_combine(super, fun, p) {bool re = cb_##fun.first ? cb_##fun.first(this, p) : true; if (re && !cb_##fun.second) re = super::fun(p); return re;}
+#define call_cb_1_return(super, type, fun, p) {type re = type(); if (cb_##fun.first) re = cb_##fun.first(this, p); if (!cb_##fun.second) re = super::fun(p); return re;}
+#define call_cb_2_combine(super, fun, p1, p2) {bool re = cb_##fun.first ? cb_##fun.first(this, p1, p2) : true; if (re && !cb_##fun.second) re = super::fun(p1, p2); return re;}
 
 #define register_cb_1(fun, init) \
-template<typename CallBack> void register_##fun(const CallBack& cb, bool pass_on = init) {cb_##fun.first = cb; cb_##fun.second = pass_on;} \
-void register_##fun(fo_##fun* cb, bool pass_on = init) {cb_##fun.first = boost::bind(cb, boost::placeholders::_1); cb_##fun.second = pass_on;}
+template<typename CallBack> void register_##fun(const CallBack& cb, bool pass_on = init) {cb_##fun.first = cb; cb_##fun.second = !pass_on;} \
+void register_##fun(fo_##fun* cb, bool pass_on = init) {cb_##fun.first = boost::bind(cb, boost::placeholders::_1); cb_##fun.second = !pass_on;}
 #define register_cb_2(fun, init) \
-template<typename CallBack> void register_##fun(const CallBack& cb, bool pass_on = init) {cb_##fun.first = cb; cb_##fun.second = pass_on;} \
-void register_##fun(fo_##fun* cb, bool pass_on = init) {cb_##fun.first = boost::bind(cb, boost::placeholders::_1, boost::placeholders::_2); cb_##fun.second = pass_on;}
+template<typename CallBack> void register_##fun(const CallBack& cb, bool pass_on = init) {cb_##fun.first = cb; cb_##fun.second = !pass_on;} \
+void register_##fun(fo_##fun* cb, bool pass_on = init) {cb_##fun.first = boost::bind(cb, boost::placeholders::_1, boost::placeholders::_2); cb_##fun.second = !pass_on;}
 #define register_cb_3(fun, init) \
-template<typename CallBack> void register_##fun(const CallBack& cb, bool pass_on = init) {cb_##fun.first = cb; cb_##fun.second = pass_on;} \
+template<typename CallBack> void register_##fun(const CallBack& cb, bool pass_on = init) {cb_##fun.first = cb; cb_##fun.second = !pass_on;} \
 void register_##fun(fo_##fun* cb, bool pass_on = init) \
-	{cb_##fun.first = boost::bind(cb, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3); cb_##fun.second = pass_on;}
+	{cb_##fun.first = boost::bind(cb, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3); cb_##fun.second = !pass_on;}
 
 template<typename Socket> class g_socket : public Socket //udp socket will use g_socket only
 {
@@ -75,8 +75,8 @@ public:
 #endif
 
 public:
-	template<typename Arg> g_socket(Arg& arg) : Socket(arg) {first_init();}
-	template<typename Arg1, typename Arg2> g_socket(Arg1& arg1, Arg2& arg2) : Socket(arg1, arg2) {first_init();}
+	template<typename Arg> g_socket(Arg& arg) : Socket(arg) {}
+	template<typename Arg1, typename Arg2> g_socket(Arg1& arg1, Arg2& arg2) : Socket(arg1, arg2) {}
 
 	register_cb_1(obsoleted, true)
 	register_cb_1(is_ready, true)
@@ -136,40 +136,6 @@ private:
 	virtual void on_msg_discard(typename Socket::in_container_type& msg_can) call_cb_1_void(Socket, on_msg_discard, msg_can)
 #endif
 
-	void first_init()
-	{
-		cb_obsoleted.second = true;
-		cb_is_ready.second = true;
-		cb_send_heartbeat.second = true;
-		cb_reset.second = true;
-		cb_on_heartbeat_error.second = true;
-		cb_on_send_error.second = true;
-		cb_on_recv_error.second = true;
-		cb_on_close.second = true;
-		cb_after_close.second = true;
-
-#ifdef ST_ASIO_SYNC_DISPATCH
-		cb_on_msg.second = true;
-#endif
-#ifdef ST_ASIO_DISPATCH_BATCH_MSG
-		cb_on_msg_handle.second = true;
-#else
-		cb_on_msg_handle.second = true;
-#endif
-
-#ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-		cb_on_msg_send.second = true;
-#endif
-#ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-		cb_on_all_msg_send.second = true;
-#endif
-
-#ifdef ST_ASIO_SHRINK_SEND_BUFFER
-		cb_calc_shrink_size.second = true;
-		cb_on_msg_discard.second = true;
-#endif
-	}
-
 private:
 	std::pair<boost::function<fo_obsoleted>, bool> cb_obsoleted;
 	std::pair<boost::function<fo_is_ready>, bool> cb_is_ready;
@@ -206,8 +172,8 @@ public:
 	typedef void fo_on_async_shutdown_error(Socket*);
 
 public:
-	template<typename Arg> tcp_socket(Arg& arg) : g_socket<Socket>(arg) {first_init();}
-	template<typename Arg1, typename Arg2> tcp_socket(Arg1& arg1, Arg2& arg2) : g_socket<Socket>(arg1, arg2) {first_init();}
+	template<typename Arg> tcp_socket(Arg& arg) : g_socket<Socket>(arg) {}
+	template<typename Arg1, typename Arg2> tcp_socket(Arg1& arg1, Arg2& arg2) : g_socket<Socket>(arg1, arg2) {}
 
 	register_cb_1(on_connect, false)
 	register_cb_1(on_unpack_error, true)
@@ -217,13 +183,6 @@ private:
 	call_cb_void(Socket, on_connect)
 	call_cb_void(Socket, on_unpack_error)
 	call_cb_void(Socket, on_async_shutdown_error)
-
-	void first_init()
-	{
-		cb_on_connect.second = true;
-		cb_on_unpack_error.second = true;
-		cb_on_async_shutdown_error.second = true;
-	}
 
 private:
 	std::pair<boost::function<fo_on_connect>, bool> cb_on_connect;
@@ -237,15 +196,13 @@ public:
 	typedef int fo_prepare_reconnect(Socket*, const boost::system::error_code&);
 
 public:
-	template<typename Arg> c_socket(Arg& arg) : tcp_socket<Socket>(arg) {first_init();}
-	template<typename Arg1, typename Arg2> c_socket(Arg1& arg1, Arg2& arg2) : tcp_socket<Socket>(arg1, arg2) {first_init();}
+	template<typename Arg> c_socket(Arg& arg) : tcp_socket<Socket>(arg) {}
+	template<typename Arg1, typename Arg2> c_socket(Arg1& arg1, Arg2& arg2) : tcp_socket<Socket>(arg1, arg2) {}
 
 	register_cb_2(prepare_reconnect, false)
 
 private:
 	virtual int prepare_reconnect(const boost::system::error_code& ec) call_cb_1_return(Socket, int, prepare_reconnect, ec)
-
-	void first_init() {cb_prepare_reconnect.second = true;}
 
 private:
 	std::pair<boost::function<fo_prepare_reconnect>, bool> cb_prepare_reconnect;
@@ -257,16 +214,13 @@ public:
 	typedef void fo_take_over(Socket*, boost::shared_ptr<typename Socket::type_of_object_restore>);
 
 public:
-	template<typename Arg> s_socket(Arg& arg) : tcp_socket<Socket>(arg) {first_init();}
-	template<typename Arg1, typename Arg2> s_socket(Arg1& arg1, Arg2& arg2) : tcp_socket<Socket>(arg1, arg2) {first_init();}
+	template<typename Arg> s_socket(Arg& arg) : tcp_socket<Socket>(arg) {}
+	template<typename Arg1, typename Arg2> s_socket(Arg1& arg1, Arg2& arg2) : tcp_socket<Socket>(arg1, arg2) {}
 
 	register_cb_2(take_over, false)
 
 public:
 	virtual void take_over(boost::shared_ptr<typename Socket::type_of_object_restore> socket_ptr) call_cb_1_void(Socket, take_over, socket_ptr)
-
-private:
-	void first_init() {cb_take_over.second = true;}
 
 private:
 	std::pair<boost::function<fo_take_over>, bool> cb_take_over;
@@ -281,8 +235,8 @@ public:
 	typedef bool fo_on_accept_error(Server*, const boost::system::error_code&, typename Server::object_ctype&);
 
 public:
-	template<typename Arg> server(Arg& arg) : Server(arg) {first_init();}
-	template<typename Arg1, typename Arg2> server(Arg1& arg1, Arg2& arg2) : Server(arg1, arg2) {first_init();}
+	template<typename Arg> server(Arg& arg) : Server(arg) {}
+	template<typename Arg1, typename Arg2> server(Arg1& arg1, Arg2& arg2) : Server(arg1, arg2) {}
 
 	register_cb_1(async_accept_num, false)
 	register_cb_1(start_next_accept, true)
@@ -294,14 +248,6 @@ private:
 	call_cb_void(Server, start_next_accept)
 	virtual bool on_accept(typename Server::object_ctype& socket_ptr) call_cb_1_combine(Server, on_accept, socket_ptr)
 	virtual bool on_accept_error(const boost::system::error_code& ec, typename Server::object_ctype& socket_ptr) call_cb_2_combine(Server, on_accept_error, ec, socket_ptr)
-
-	void first_init()
-	{
-		cb_async_accept_num.second = true;
-		cb_start_next_accept.second = true;
-		cb_on_accept.second = true;
-		cb_on_accept_error.second = true;
-	}
 
 private:
 	std::pair<boost::function<fo_async_accept_num>, bool> cb_async_accept_num;
@@ -316,14 +262,12 @@ public:
 	typedef void fo_on_create(ObjectPool*, typename ObjectPool::object_ctype&);
 
 public:
-	template<typename Arg> object_pool(Arg& arg) : ObjectPool(arg) {first_init();}
+	template<typename Arg> object_pool(Arg& arg) : ObjectPool(arg) {}
 
 	register_cb_2(on_create, false)
 
 private:
 	virtual void on_create(typename ObjectPool::object_ctype& object_ptr) call_cb_1_void(ObjectPool, on_create, object_ptr)
-
-	void first_init() {cb_on_create.second = true;}
 
 private:
 	std::pair<boost::function<fo_on_create>, bool> cb_on_create;
