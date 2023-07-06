@@ -895,6 +895,7 @@
  *  if your container's empty() function is not thread safe, please define macro ST_ASIO_CAN_EMPTY_NOT_SAFE, then st_asio_wrapper will make it thread safe for you.
  * Maintain the ssl::context in ssl::single_client_base.
  * Make function endpoint_to_string static.
+ * Introduce macro ST_ASIO_UNPACKER_STRIPPED to control i_unpacker's default value of the stripped property.
  *
  * DELETION:
  *
@@ -1038,6 +1039,11 @@
 //the message mode for websocket, !0 - binary mode (default), 0 - text mode
 #ifndef ST_ASIO_WEBSOCKET_BINARY
 #define ST_ASIO_WEBSOCKET_BINARY	1
+#endif
+
+//i_unpacker's default value of the stripped property, must be boolean.
+#ifndef ST_ASIO_UNPACKER_STRIPPED
+#define ST_ASIO_UNPACKER_STRIPPED	true
 #endif
 
 //by defining this, virtual function socket::calc_shrink_size will be introduced and be called when send buffer is insufficient before sending message,
