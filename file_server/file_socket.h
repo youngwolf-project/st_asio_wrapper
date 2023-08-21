@@ -3,8 +3,7 @@
 #define FILE_SOCKET_H_
 
 #include "../include/ext/tcp.h"
-using namespace st_asio_wrapper::tcp;
-using namespace st_asio_wrapper::ext;
+//using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext::tcp;
 
 #include "../file_common/common.h"
@@ -12,7 +11,7 @@ using namespace st_asio_wrapper::ext::tcp;
 class file_socket : public base_socket, public server_socket
 {
 public:
-	file_socket(i_server& server_);
+	file_socket(tcp::i_server& server_);
 	virtual ~file_socket();
 
 public:

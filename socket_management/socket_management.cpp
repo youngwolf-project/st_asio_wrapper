@@ -35,7 +35,7 @@
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
-using namespace st_asio_wrapper::ext::tcp;
+//using namespace st_asio_wrapper::ext::tcp;
 
 #include "server.h"
 #include "client.h"

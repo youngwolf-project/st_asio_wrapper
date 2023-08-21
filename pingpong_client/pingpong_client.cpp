@@ -16,7 +16,7 @@
 
 #include "../include/ext/tcp.h"
 using namespace st_asio_wrapper;
-using namespace st_asio_wrapper::tcp;
+//using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
 using namespace st_asio_wrapper::ext::tcp;
 
@@ -106,7 +106,7 @@ private:
 	boost::uint64_t total_bytes, send_bytes, recv_bytes;
 };
 
-class echo_client : public multi_client_base<echo_socket>
+class echo_client : public st_asio_wrapper::tcp::multi_client_base<echo_socket>
 {
 public:
 	echo_client(service_pump& service_pump_) : multi_client_base<echo_socket>(service_pump_) {}

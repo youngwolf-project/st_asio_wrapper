@@ -54,7 +54,7 @@
 using namespace st_asio_wrapper;
 using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
-using namespace st_asio_wrapper::ext::tcp;
+//using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
 #define RESTART_COMMAND	"restart"
@@ -78,7 +78,7 @@ public:
 	virtual void test() = 0;
 };
 
-class echo_socket : public server_socket2<i_echo_server>
+class echo_socket : public ext::tcp::server_socket2<i_echo_server>
 {
 private:
 	typedef server_socket2<i_echo_server> super;
@@ -157,7 +157,7 @@ protected:
 	//msg handling end
 };
 
-class echo_server : public server2<echo_socket, i_echo_server>
+class echo_server : public ext::tcp::server2<echo_socket, i_echo_server>
 {
 public:
 	echo_server(service_pump& service_pump_) : server2<echo_socket, i_echo_server>(service_pump_) {}
