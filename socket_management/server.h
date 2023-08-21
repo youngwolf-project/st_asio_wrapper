@@ -1,10 +1,10 @@
 #ifndef _SERVER_H_
 #define _SERVER_H_
 
-class my_server_socket : public server_socket
+class my_server_socket : public ext::tcp::server_socket
 {
 public:
-	my_server_socket(i_server& server_) : server_socket(server_)
+	my_server_socket(i_server& server_) : ext::tcp::server_socket(server_)
 	{
 #if 3 == PACKER_UNPACKER_TYPE
 		boost::dynamic_pointer_cast<ST_ASIO_DEFAULT_PACKER>(packer())->prefix_suffix("", "\n");

@@ -14,7 +14,7 @@
 
 #include "file_socket.h"
 
-file_socket::file_socket(i_server& server_) : server_socket(server_) {}
+file_socket::file_socket(tcp::i_server& server_) : server_socket(server_) {}
 file_socket::~file_socket() {clear();}
 
 void file_socket::reset() {trans_end(); server_socket::reset();}

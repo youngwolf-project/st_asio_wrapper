@@ -41,7 +41,7 @@ public:
 #include "../include/ext/tcp.h"
 #include "../include/ext/callbacks.h"
 using namespace st_asio_wrapper;
-using namespace st_asio_wrapper::tcp;
+//using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext;
 using namespace st_asio_wrapper::ext::tcp;
 using namespace st_asio_wrapper::ext::tcp::proxy;
@@ -54,7 +54,7 @@ using namespace st_asio_wrapper::ext::tcp::proxy;
 //we only want close reconnecting mechanism on these sockets, so it cannot be done by defining macro ST_ASIO_RECONNECT to false
 ///*
 //method 1
-class short_client : public multi_client_base<callbacks::c_socket<socks4::client_socket> >
+class short_client : public st_asio_wrapper::tcp::multi_client_base<callbacks::c_socket<socks4::client_socket> >
 {
 public:
 	short_client(service_pump& service_pump_) : multi_client_base<callbacks::c_socket<socks4::client_socket> >(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}

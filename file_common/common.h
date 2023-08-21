@@ -5,7 +5,7 @@
 
 #include "../include/base.h"
 using namespace st_asio_wrapper;
-using namespace st_asio_wrapper::tcp;
+//using namespace st_asio_wrapper::tcp;
 
 #ifdef _MSC_VER
 #define fseeko _fseeki64

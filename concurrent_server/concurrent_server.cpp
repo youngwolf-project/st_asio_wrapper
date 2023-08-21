@@ -18,7 +18,7 @@
 
 #include "../include/ext/tcp.h"
 using namespace st_asio_wrapper;
-using namespace st_asio_wrapper::tcp;
+//using namespace st_asio_wrapper::tcp;
 using namespace st_asio_wrapper::ext::tcp;
 
 #define QUIT_COMMAND	"quit"
@@ -31,7 +31,7 @@ using namespace st_asio_wrapper::ext::tcp;
 class echo_socket : public server_socket
 {
 public:
-	echo_socket(i_server& server_) : server_socket(server_) {unpacker()->stripped(false);}
+	echo_socket(st_asio_wrapper::tcp::i_server& server_) : server_socket(server_) {unpacker()->stripped(false);}
 	//other heavy things can be done in the constructor too, because we pre-created ST_ASIO_ASYNC_ACCEPT_NUM echo_socket objects
 
 protected:
@@ -61,7 +61,7 @@ protected:
 	//msg handling end
 };
 
-class echo_server : public server_base<echo_socket>
+class echo_server : public st_asio_wrapper::tcp::server_base<echo_socket>
 {
 public:
 	echo_server(service_pump& service_pump_) : server_base<echo_socket>(service_pump_) {}

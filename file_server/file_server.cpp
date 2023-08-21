@@ -60,7 +60,7 @@ int main(int argc, const char* argv[])
 	//with multiple io_context, please also define macro ST_ASIO_AVOID_AUTO_STOP_SERVICE.
 	sp.set_io_context_num(8);
 #endif
-	server_base<file_socket> file_server_(sp);
+	tcp::server_base<file_socket> file_server_(sp);
 
 	if (argc > 2 + index)
 		file_server_.set_server_addr(atoi(argv[1 + index]), argv[2 + index]);
