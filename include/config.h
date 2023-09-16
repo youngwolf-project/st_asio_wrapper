@@ -884,6 +884,8 @@
  *  socket::send_msg().
  * Fix -- basic_buffer doesn't support fixed arrays (just in the constructor) in GCC and Clang.
  * Fix ssl graceful shutdown monitoring.
+ * Fix msvc++'s complaint -- ambiguous namespace proxy.
+ * Close connected UDP for normal UDP (to support receiving messages from multipile peers).
  *
  * ENHANCEMENTS:
  * heartbeat(ext) optimization.
@@ -901,6 +903,7 @@
  *
  * REFACTORING:
  * Add some default implementations for i_matrix interface, which is useful for a dummy matrix.
+ * Refactoring of callback mechanism.
  *
  * REPLACEMENTS:
  *
