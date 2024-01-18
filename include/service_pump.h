@@ -95,12 +95,12 @@ public:
 
 #if BOOST_ASIO_VERSION >= 101200
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : started(false), first(false), real_thread_num(0), del_thread_num(0), single_ctx(true)
+	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) : started(false), first(true), real_thread_num(0), del_thread_num(0), single_ctx(true)
 		{context_can.emplace_back(concurrency_hint);}
 #else
 	//basically, the parameter multi_ctx is designed to be used by single_service_pump, which means single_service_pump always think it's using multiple io_context
 	//for service_pump, you should use set_io_context_num function instead if you really need multiple io_context.
-	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE, bool multi_ctx = false) : started(false), first(false), single_ctx(!multi_ctx)
+	service_pump(int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE, bool multi_ctx = false) : started(false), first(true), single_ctx(!multi_ctx)
 		{context_can.emplace_back(concurrency_hint);}
 	bool set_io_context_num(int io_context_num, int concurrency_hint = BOOST_ASIO_CONCURRENCY_HINT_SAFE) //call this before construct any services on this service_pump
 	{
@@ -117,11 +117,11 @@ public:
 #endif
 #else
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-	service_pump() : started(false), first(false), real_thread_num(0), del_thread_num(0), single_ctx(true), context_can(1) {}
+	service_pump() : started(false), first(true), real_thread_num(0), del_thread_num(0), single_ctx(true), context_can(1) {}
 #else
 	//basically, the parameter multi_ctx is designed to be used by single_service_pump, which means single_service_pump always think it's using multiple io_context
 	//for service_pump, you should use set_io_context_num function instead if you really need multiple io_context.
-	service_pump(bool multi_ctx = false) : started(false), first(false), single_ctx(!multi_ctx), context_can(1) {}
+	service_pump(bool multi_ctx = false) : started(false), first(true), single_ctx(!multi_ctx), context_can(1) {}
 	bool set_io_context_num(int io_context_num) //call this before construct any services on this service_pump
 	{
 		if (io_context_num < 1 || is_service_started() || context_can.size() > 1) //can only be called once
