@@ -143,7 +143,7 @@ int main(int argc, const char* argv[])
 
 	//demonstrate how to use single_service_pump
 	single_service_pump<socks5::single_client> client;
-	//singel_service_pump also is a service_pump, this let us to control client2 via client
+	//single_service_pump also is a service_pump, this let us to control client2 via client
 	short_client client2(client); //without single_client, we need to define ST_ASIO_AVOID_AUTO_STOP_SERVICE macro to forbid service_pump stopping services automatically
 	//method 2
 	/*

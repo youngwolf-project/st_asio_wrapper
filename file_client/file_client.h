@@ -302,7 +302,7 @@ private:
 				if ('\0' != *boost::next(msg.data(), ORDER_LEN))
 				{
 					if (0 == index)
-						printf("cannot create or truncated file %s on the server\n", file_name);
+						printf("cannot create or truncate file %s on the server\n", file_name);
 					trans_end();
 				}
 				else
