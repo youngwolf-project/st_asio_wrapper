@@ -24,7 +24,8 @@ private:
 
 public:
 	static const typename super::tid TIMER_BEGIN = super::TIMER_END;
-	static const typename super::tid TIMER_CONNECT = TIMER_BEGIN;
+	static const typename super::tid TIMER_CONNECT_DELAY = TIMER_BEGIN;
+	static const typename super::tid TIMER_CONNECT = TIMER_BEGIN + 1;
 	static const typename super::tid TIMER_END = TIMER_BEGIN + 5;
 
 	static bool set_addr(boost::asio::ip::tcp::endpoint& endpoint, unsigned short port, const std::string& ip)
@@ -132,7 +133,11 @@ protected:
 		if (!ec) //already started, so cannot call start()
 			super::do_start();
 		else
-			prepare_next_reconnect(ec);
+			ST_THIS set_timer(TIMER_CONNECT_DELAY, 50, boost::lambda::bind(&generic_client_socket::check_and_reconnect, this, ec));
+			//prepare_next_reconnect(ec);
+			//do not call prepare_next_reconnect directly at here, otherwise, there's a posibility that the next set_timer (reconnecting failed immediately)
+			// be called concurrently with the callback of this timer.
+			//for the same timer in the same timer object, any manipulations are not thread safe ---st_asio_wrapper::timer
 	}
 
 	//after how much time (ms), generic_client_socket will try to reconnect the server, negative value means give up.
@@ -181,6 +186,7 @@ private:
 		return true;
 	}
 
+	bool check_and_reconnect(const boost::system::error_code& ec) {return ST_THIS is_timer(TIMER_CONNECT) ? true : (prepare_next_reconnect(ec), false);}
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
 	{
 		if (need_reconnect && ST_THIS started() && !ST_THIS stopped())
