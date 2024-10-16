@@ -133,7 +133,9 @@ protected:
 		if (!ec) //already started, so cannot call start()
 			super::do_start();
 		else
-			ST_THIS set_timer(TIMER_CONNECT_DELAY, 50, boost::lambda::bind(&generic_client_socket::check_and_reconnect, this, ec));
+			ST_THIS set_timer(TIMER_CONNECT_DELAY, 50, boost::lambda::if_then_else_return(
+				boost::lambda::bind(&Socket::is_timer, this, TIMER_CONNECT), true, (boost::lambda::bind(&generic_client_socket::prepare_next_reconnect, this, ec), false)
+			));
 			//prepare_next_reconnect(ec);
 			//do not call prepare_next_reconnect directly at here, otherwise, there's a posibility that the next set_timer (reconnecting failed immediately)
 			// be called concurrently with the callback of this timer.
@@ -186,7 +188,6 @@ private:
 		return true;
 	}
 
-	bool check_and_reconnect(const boost::system::error_code& ec) {return ST_THIS is_timer(TIMER_CONNECT) ? true : (prepare_next_reconnect(ec), false);}
 	bool prepare_next_reconnect(const boost::system::error_code& ec)
 	{
 		if (need_reconnect && ST_THIS started() && !ST_THIS stopped())
