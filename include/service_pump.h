@@ -144,7 +144,7 @@ public:
 		{
 			boost::lock_guard<boost::mutex> lock(context_can_mutex);
 			for (BOOST_AUTO(iter, context_can.begin()); iter != context_can.end(); ++iter)
-				refs.push_back(iter->refs);
+				refs.emplace_back(iter->refs);
 		}
 	}
 
