@@ -281,7 +281,7 @@ int main(int argc, const char* argv[])
 	((timer<executor>&) echo_server_).add_io_context_refs(1); //the timer object in server_base takes 2 references on the io_context that assigned to it.
 	dump_io_context_refs(sp);
 
-	//demonstrate how to use singel_service
+	//demonstrate how to use single_service_pump
 	//because of normal_socket, this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
 	//the reason is these packer and unpacker need additional initializations that normal_socket not implemented, see echo_socket's constructor for more details.
 	single_service_pump<normal_server> normal_server_;
