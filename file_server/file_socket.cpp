@@ -92,7 +92,7 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 	switch (*msg.data())
 	{
 	case 0:
-		//let the client to control the life cycle of file transmission, so we don't care the state
+		//let client control the life cycle of file transmission, so we don't care the state
 		//avoid accessing the send queue concurrently, because we use non_lock_queue
 		if (/*TRANS_IDLE == state && */!is_sending())
 		{
@@ -141,7 +141,7 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 		}
 		break;
 	case 10:
-		//let the client to control the life cycle of file transmission, so we don't care the state
+		//let client control the life cycle of file transmission, so we don't care the state
 		//avoid accessing the send queue concurrently, because we use non_lock_queue
 		if (/*TRANS_IDLE == state && */!is_sending())
 		{
@@ -168,7 +168,7 @@ void file_socket::handle_msg(out_msg_ctype& msg)
 		}
 		break;
 	case 11:
-		//let the client to control the life cycle of file transmission, so we don't care the state
+		//let client control the life cycle of file transmission, so we don't care the state
 		//avoid accessing the send queue concurrently, because we use non_lock_queue
 		if (/*TRANS_IDLE == state && */msg.size() > ORDER_LEN + OFFSET_LEN + DATA_LEN && !is_sending())
 		{

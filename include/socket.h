@@ -503,7 +503,7 @@ protected:
 		if (empty)
 		{
 			empty = false;
-			temp_msg_can.emplace_back(); //empty message, let user always having the chance to call recv_msg()
+			temp_msg_can.emplace_back(); //empty message, let user always have the chance to call recv_msg()
 		}
 #endif
 		if (!empty)
