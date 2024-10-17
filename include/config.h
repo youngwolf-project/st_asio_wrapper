@@ -1031,7 +1031,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 	#endif
 #endif
 
-//define ST_ASIO_CLEAR_OBJECT_INTERVAL macro to let object_pool to invoke clear_obsoleted_object() automatically and periodically
+//define ST_ASIO_CLEAR_OBJECT_INTERVAL macro to let object_pool invoke clear_obsoleted_object() automatically and periodically
 //this feature may affect performance with huge number of objects, so re-write server_socket_base::on_recv_error and invoke object_pool::del_object()
 //is recommended for long-term connection system, but for short-term connection system, you are recommended to open this feature.
 //you must define this macro as a value, not just define it, the value means the interval, unit is second
@@ -1115,7 +1115,7 @@ namespace boost {namespace asio {typedef io_service io_context;}}
 #endif
 //we also can control the queues (and their containers) via template parameters on class 'client_socket_base'
 //'server_socket_base', 'ssl::client_socket_base' and 'ssl::server_socket_base'.
-//we even can let a socket to use different queue (and / or different container) for input and output via template parameters.
+//we even can let socket use different queue (and / or different container) for input and output via template parameters.
 
 //buffer type used when receiving messages (unpacker's prepare_next_recv() need to return this type)
 #ifndef ST_ASIO_RECV_BUFFER_TYPE
