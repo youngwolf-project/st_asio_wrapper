@@ -261,7 +261,7 @@ int main(int argc, const char* argv[])
 	service_pump sp;
 	echo_server echo_server_(sp); //echo server
 
-	//demonstrate how to use singel_service
+	//demonstrate how to use single_service_pump
 	//because of normal_socket, this server cannot support fixed_length_packer/fixed_length_unpacker and prefix_suffix_packer/prefix_suffix_unpacker,
 	//the reason is these packer and unpacker need additional initializations that normal_socket not implemented, see echo_socket's constructor for more details.
 	single_service_pump<normal_server> normal_server_;

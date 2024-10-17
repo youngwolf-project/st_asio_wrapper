@@ -76,7 +76,7 @@ public:
 			if (!socket_ptr)
 				break;
 
-			sockets.push_back(socket_ptr);
+			sockets.emplace_back(socket_ptr);
 		}
 		if (num >= 0)
 			unified_out::info_out("finished pre-creating server sockets, but failed %d time(s).", num + 1);

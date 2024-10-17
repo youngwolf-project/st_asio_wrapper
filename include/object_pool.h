@@ -153,7 +153,7 @@ protected:
 		if (old_object_ptr && !init_object_id(object_ptr, id))
 		{
 			boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
-			invalid_object_can.push_back(old_object_ptr);
+			invalid_object_can.emplace_back(old_object_ptr);
 			old_object_ptr.reset();
 		}
 
