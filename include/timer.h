@@ -37,21 +37,16 @@ template<typename Executor>
 class timer : public Executor
 {
 public:
-#if defined(ST_ASIO_USE_STEADY_TIMER) || defined(ST_ASIO_USE_SYSTEM_TIMER)
-	#ifdef BOOST_ASIO_HAS_STD_CHRONO
-		typedef std::chrono::milliseconds milliseconds;
-	#else
-		typedef boost::chrono::milliseconds milliseconds;
-	#endif
-
-	#ifdef ST_ASIO_USE_STEADY_TIMER
-		typedef boost::asio::steady_timer timer_type;
-	#else
-		typedef boost::asio::system_timer timer_type;
-	#endif
+#ifdef BOOST_ASIO_HAS_STD_CHRONO
+	typedef std::chrono::milliseconds milliseconds;
 #else
-	typedef boost::posix_time::milliseconds milliseconds;
-	typedef boost::asio::deadline_timer timer_type;
+	typedef boost::chrono::milliseconds milliseconds;
+#endif
+
+#ifdef ST_ASIO_USE_STEADY_TIMER
+	typedef boost::asio::steady_timer timer_type;
+#else
+	typedef boost::asio::system_timer timer_type;
 #endif
 
 	typedef unsigned short tid;
@@ -165,7 +160,7 @@ protected:
 			return false;
 
 		ti.status = timer_info::TIMER_STARTED;
-#if BOOST_ASIO_VERSION >= 101100 && (defined(ST_ASIO_USE_STEADY_TIMER) || defined(ST_ASIO_USE_SYSTEM_TIMER))
+#if BOOST_ASIO_VERSION >= 101100
 		ti.timer.expires_after(milliseconds(interval_ms));
 #else
 		ti.timer.expires_from_now(milliseconds(interval_ms));

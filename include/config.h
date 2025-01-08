@@ -1072,11 +1072,8 @@
 //if defined, service_pump will not catch exceptions for boost::asio::io_context::run().
 //#define ST_ASIO_NO_TRY_CATCH
 
-//if defined, boost::asio::steady_timer will be used in st_asio_wrapper::timer.
+//if defined, boost::asio::steady_timer will be used in st_asio_wrapper::timer, otherwise, boost::asio::system_timer will be used.
 //#define ST_ASIO_USE_STEADY_TIMER
-//if defined, boost::asio::system_timer will be used in st_asio_wrapper::timer.
-//#define ST_ASIO_USE_SYSTEM_TIMER
-//otherwise, boost::asio::deadline_timer will be used
 
 //after this duration, this socket can be freed from the heap or reused,
 //you must define this macro as a value, not just define it, the value means the duration, unit is second.
