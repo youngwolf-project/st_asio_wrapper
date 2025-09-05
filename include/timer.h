@@ -15,7 +15,7 @@
 
 #ifdef ST_ASIO_USE_STEADY_TIMER
 #include <boost/asio/steady_timer.hpp>
-#elif defined(ST_ASIO_USE_SYSTEM_TIMER)
+#else
 #include <boost/asio/system_timer.hpp>
 #endif
 
