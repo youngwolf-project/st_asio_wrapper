@@ -996,7 +996,7 @@ public:
 	static void to_time_str(time_t time, std::stringstream& os)
 	{
 		char time_buff[64];
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MSVCRT__)
 		ctime_s(time_buff, sizeof(time_buff), &time);
 #else
 		ctime_r(&time, time_buff);
