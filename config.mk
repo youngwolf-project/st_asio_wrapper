@@ -25,6 +25,7 @@ common_libs = -lboost_system -lboost_thread #in some ENV, the file name of boost
 #if your boost version is too high, boost_system may not exists.
 
 target_machine = ${shell ${CXX} -dumpmachine}
+link_to_win = 0
 ifneq (, ${findstring solaris, ${target_machine}})
 	cflag += -pthreads
 	lflag += -pthreads -lsocket -lnsl
@@ -38,21 +39,28 @@ else
 
 	ifneq (, ${findstring cygwin, ${target_machine}})
 		cflag += -D__USE_W32_SOCKETS ${WIN_VER}
-		lflag += -lws2_32 -lwsock32
+		link_to_win = 1
 	endif
 endif
 
 ifneq (, ${findstring mingw, ${target_machine}})
 	SHELL = cmd
 	cflag += -D__USE_MINGW_ANSI_STDIO=1 ${WIN_VER}
-	lflag += -lws2_32 -lwsock32
+	link_to_win = 1
 	ignore = 1>nul
 	make_dir = md ${dir} 2>nul
 	del_dirs = -rd /S /Q debug release 2>nul
 else
+	ifneq (, ${findstring windows, ${target_machine}})
+		link_to_win = 1
+	endif
 	ignore = 1>/dev/null
 	make_dir = mkdir -p ${dir}
 	del_dirs = -rm -rf debug release
+endif
+
+ifeq (1, ${link_to_win})
+	lflag += -lws2_32 -lwsock32
 endif
 
 cflag += ${ext_cflag} ${boost_include_dir}
