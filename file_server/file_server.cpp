@@ -19,7 +19,7 @@
 #define STATISTIC		"statistic"
 #define LIST_ALL_CLIENT	"list all client"
 
-#if !defined(_MSC_VER) && !defined(__MINGW64__) && !defined(__MINGW32__)
+#ifndef _WIN32
 void signal_handler(service_pump& sp, boost::asio::signal_set& signal_receiver, const boost::system::error_code& ec, int signal_number)
 {
 	if (!ec)
@@ -32,7 +32,7 @@ void signal_handler(service_pump& sp, boost::asio::signal_set& signal_receiver, 
 int main(int argc, const char* argv[])
 {
 	puts("this is a file transmission server.");
-#if defined(_MSC_VER) || defined(__MINGW64__) || defined(__MINGW32__)
+#ifdef _WIN32
 	printf("usage: %s [<port=%d> [ip=0.0.0.0]]\n", argv[0], ST_ASIO_SERVER_PORT);
 #else
 	printf("usage: %s [-d] [<port=%d> [ip=0.0.0.0]]\n", argv[0], ST_ASIO_SERVER_PORT);
@@ -46,7 +46,7 @@ int main(int argc, const char* argv[])
 	int index = 0;
 	if (argc >= 2 && 0 == strcmp(argv[1], "-d"))
 	{
-#if defined(_MSC_VER) || defined(__MINGW64__) || defined(__MINGW32__)
+#ifdef _WIN32
 		puts("on windows, -d is not supported!");
 		return 1;
 #endif
@@ -67,7 +67,7 @@ int main(int argc, const char* argv[])
 	else if (argc > 1 + index)
 		file_server_.set_server_addr(atoi(argv[1 + index]));
 
-#if !defined(_MSC_VER) && !defined(__MINGW64__) && !defined(__MINGW32__)
+#ifndef _WIN32
 	if (1 == index)
 	{
 		boost::asio::signal_set signal_receiver(sp.assign_io_context(), SIGINT, SIGTERM);
