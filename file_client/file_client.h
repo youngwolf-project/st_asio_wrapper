@@ -485,7 +485,7 @@ private:
 protected:
 	boost::timer::cpu_timer begin_time;
 
-#if BOOST_VERSION >= 107900 && (defined(_MSC_VER) || defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L)
+#if BOOST_VERSION == 107900 && (defined(_MSC_VER) || defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L)
 	std::list<std::pair<int, std::string>> file_list; //a workaround for a bug introduced in boost 1.79
 #else
 	boost::container::list<std::pair<int, std::string> > file_list;
