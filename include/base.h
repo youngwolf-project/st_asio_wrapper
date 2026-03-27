@@ -41,57 +41,76 @@
 namespace st_asio_wrapper
 {
 
-#if BOOST_VERSION >= 105300
+#if BOOST_VERSION >= 107800
 typedef boost::atomic_uint_fast64_t atomic_uint_fast64;
 typedef boost::atomic_size_t atomic_size_t;
 typedef boost::atomic_int_fast32_t atomic_int_fast32_t;
 #else
-template<typename T>
-class atomic
-{
-public:
-	atomic() : data(0) {}
-	atomic(T _data) : data(_data) {}
+	#if BOOST_VERSION >= 105300
+	template<typename T> class atomic : public boost::atomic<T>
+	{
+	public:
+		atomic() : boost::atomic<T>(0) {}
+		atomic(T value) : boost::atomic<T>(value) {}
 
-	T operator++() {boost::lock_guard<boost::mutex> lock(data_mutex); return ++data;}
-	//deliberately omitted operator++(int)
-	T operator+=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data += value;}
-	T operator--() {boost::lock_guard<boost::mutex> lock(data_mutex); return --data;}
-	//deliberately omitted operator--(int)
-	T operator-=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data -= value;}
-	T operator=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data = value;}
-	T exchange(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data = value; return pre_data;}
-	T fetch_add(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data += value; return pre_data;}
-	T fetch_sub(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data -= value; return pre_data;}
-	void store(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); data = value;}
-	T load(boost::memory_order) const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
+		T operator=(T value) {return boost::atomic<T>::operator=(value);}
+	};
+	#else
+	template<typename T> class atomic
+	{
+	public:
+		atomic() : data(0) {}
+		atomic(T value) : data(value) {}
 
-	bool is_lock_free() const {return false;}
-	operator T() const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
+		T operator++() {boost::lock_guard<boost::mutex> lock(data_mutex); return ++data;}
+		//deliberately omitted operator++(int)
+		T operator+=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data += value;}
+		T operator--() {boost::lock_guard<boost::mutex> lock(data_mutex); return --data;}
+		//deliberately omitted operator--(int)
+		T operator-=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data -= value;}
+		T operator=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data = value;}
+		T exchange(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data = value; return pre_data;}
+		T fetch_add(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data += value; return pre_data;}
+		T fetch_sub(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data -= value; return pre_data;}
+		void store(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); data = value;}
+		T load(boost::memory_order) const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
 
-private:
-	T data;
-	boost::mutex data_mutex;
-};
+		bool is_lock_free() const {return false;}
+		operator T() const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
+
+	private:
+		T data;
+		boost::mutex data_mutex;
+	};
+	#endif
 typedef atomic<boost::uint_fast64_t> atomic_uint_fast64;
 typedef atomic<size_t> atomic_size_t;
 typedef atomic<boost::int_fast32_t> atomic_int_fast32_t;
 #endif
 
-template<typename atomic_type = atomic_size_t>
+#if BOOST_VERSION >= 105600 || (BOOST_VERSION >= 105300 && !defined(BOOST_ATOMIC_FLAG_LOCK_FREE))
+typedef boost::atomic_flag atomic_flag;
+#else
+class atomic_flag : public atomic_size_t
+{
+public:
+	void clear(boost::memory_order order) {atomic_size_t::store(0, order);}
+	bool test_and_set(boost::memory_order order) {return 1 == atomic_size_t::exchange(1, order);}
+};
+#endif
 class scope_atomic_lock : public boost::noncopyable
 {
 public:
-	scope_atomic_lock(atomic_type& atomic_) : _locked(false), atomic(atomic_) {lock();} //atomic_ must has been initialized with zero
+	scope_atomic_lock(atomic_flag& atomic_) : _locked(false), atomic(atomic_) {lock();} //atomic_ must has been initialized as clear state or zero
 	~scope_atomic_lock() {unlock();}
 
-	void lock() {if (!_locked) _locked = 0 == atomic.exchange(1, boost::memory_order_acq_rel);}
-	void unlock() {if (_locked) atomic.store(0, boost::memory_order_release); _locked = false;}
+	void lock() {if (!_locked) _locked = !atomic.test_and_set(boost::memory_order_acq_rel);}
+	void unlock() {if (_locked) atomic.clear(boost::memory_order_release); _locked = false;}
 	bool locked() const {return _locked;}
 
 private:
 	bool _locked;
-	atomic_type& atomic;
+	atomic_flag& atomic;
 };
 
 class tracked_executor;

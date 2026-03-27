@@ -46,10 +46,6 @@ protected:
 		_id = -1;
 		packer_ = boost::make_shared<Packer>();
 		unpacker_ = boost::make_shared<Unpacker>();
-		clear_sending();
-#ifdef ST_ASIO_PASSIVE_RECV
-		clear_reading();
-#endif
 #ifdef ST_ASIO_SYNC_RECV
 		sr_status = NOT_REQUESTED;
 #endif
@@ -61,7 +57,6 @@ protected:
 		recv_buf_size_ = ST_ASIO_MAX_RECV_BUF;
 		msg_resuming_interval_ = ST_ASIO_MSG_RESUMING_INTERVAL;
 		msg_handling_interval_ = ST_ASIO_MSG_HANDLING_INTERVAL;
-		start_atomic.store(0, boost::memory_order_relaxed);
 	}
 
 	//guarantee no operations (include asynchronous operations) be performed on this socket during call following reset_next_layer functions.
@@ -156,7 +151,7 @@ public:
 	{
 		if (!started_ && !is_timer(TIMER_DELAY_CLOSE) && !stopped())
 		{
-			scope_atomic_lock<> lock(start_atomic);
+			scope_atomic_lock lock(start_atomic);
 			if (!started_ && lock.locked())
 				started_ = do_start();
 			else
@@ -435,7 +430,7 @@ protected:
 	//subclass notify shutdown event
 	bool close(bool use_close = false) //if not use_close, shutdown (both direction) will be used
 	{
-		scope_atomic_lock<> lock(start_atomic);
+		scope_atomic_lock lock(start_atomic);
 		while (!lock.locked())
 		{
 			boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
@@ -857,7 +852,7 @@ private:
 	atomic_size_t reading;
 #endif
 	atomic_size_t sending;
-	atomic_size_t start_atomic;
+	atomic_flag start_atomic;
 	boost::asio::io_context::strand dis_strand;
 
 #ifdef ST_ASIO_SYNC_RECV

@@ -15,8 +15,8 @@ using namespace st_asio_wrapper;
 #define fl_type off_t
 #endif
 
-#if BOOST_VERSION >= 105300
-#define atomic_size	boost::atomic_int_fast64_t
+#if BOOST_VERSION >= 107800
+#define atomic_size boost::atomic_int_fast64_t
 #else
 #define atomic_size atomic<boost::int_fast64_t>
 #endif
