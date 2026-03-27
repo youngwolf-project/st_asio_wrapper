@@ -411,7 +411,7 @@ private:
 			file_list.pop_front();
 
 			file_size = -1;
-			transmit_size = 0;
+			transmit_size.store(0);
 
 			printf("transmit %s begin.\n", file_name.data());
 			bool re = true;
