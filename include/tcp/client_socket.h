@@ -133,13 +133,16 @@ protected:
 		if (!ec) //already started, so cannot call start()
 			super::do_start();
 		else
+		{
+			BOOST_AUTO(connect_timer, TIMER_CONNECT);
 			ST_THIS set_timer(TIMER_CONNECT_DELAY, 50, boost::lambda::if_then_else_return(
-				boost::lambda::bind(&Socket::is_timer, this, TIMER_CONNECT), true, (boost::lambda::bind(&generic_client_socket::prepare_next_reconnect, this, ec), false)
+				boost::lambda::bind(&Socket::is_timer, this, connect_timer), true, (boost::lambda::bind(&generic_client_socket::prepare_next_reconnect, this, ec), false)
 			));
 			//prepare_next_reconnect(ec);
 			//do not call prepare_next_reconnect directly at here, otherwise, there's a posibility that the next set_timer (reconnecting failed immediately)
 			// be called concurrently with the callback of this timer.
 			//for the same timer in the same timer object, any manipulations are not thread safe ---st_asio_wrapper::timer
+		}
 	}
 
 	//after how much time (ms), generic_client_socket will try to reconnect the server, negative value means give up.

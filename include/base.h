@@ -41,13 +41,22 @@
 namespace st_asio_wrapper
 {
 
-#if BOOST_VERSION >= 105300
+#if BOOST_VERSION >= 107800
 typedef boost::atomic_uint_fast64_t atomic_uint_fast64;
 typedef boost::atomic_size_t atomic_size_t;
 typedef boost::atomic_int_fast32_t atomic_int_fast32_t;
+#elif BOOST_VERSION >= 105300
+template<typename T> class atomic : public boost::atomic<T>
+{
+public:
+	atomic() : boost::atomic<T>(0) {}
+	atomic(T data) : boost::atomic<T>(data) {}
+};
+typedef atomic<boost::uint_fast64_t> atomic_uint_fast64;
+typedef atomic<size_t> atomic_size_t;
+typedef atomic<boost::int_fast32_t> atomic_int_fast32_t;
 #else
-template<typename T>
-class atomic
+template<typename T> class atomic
 {
 public:
 	atomic() : data(0) {}
@@ -78,20 +87,29 @@ typedef atomic<size_t> atomic_size_t;
 typedef atomic<boost::int_fast32_t> atomic_int_fast32_t;
 #endif
 
-template<typename atomic_type = atomic_size_t>
+#if BOOST_VERSION >= 106600
+typedef boost::atomic_flag atomic_flag;
+#else
+class atomic_flag : public atomic_size_t
+{
+public:
+	void clear(boost::memory_order order) {atomic_size_t::store(0, order);}
+	bool test_and_set(boost::memory_order order) {return 1 == atomic_size_t::exchange(1, order);}
+}
+#endif
 class scope_atomic_lock : public boost::noncopyable
 {
 public:
-	scope_atomic_lock(atomic_type& atomic_) : _locked(false), atomic(atomic_) {lock();} //atomic_ must has been initialized with zero
+	scope_atomic_lock(atomic_flag& atomic_) : _locked(false), atomic(atomic_) {lock();} //atomic_ must has been initialized as clear state or zero
 	~scope_atomic_lock() {unlock();}
 
-	void lock() {if (!_locked) _locked = 0 == atomic.exchange(1, boost::memory_order_acq_rel);}
-	void unlock() {if (_locked) atomic.store(0, boost::memory_order_release); _locked = false;}
+	void lock() {if (!_locked) _locked = !atomic.test_and_set(boost::memory_order_acq_rel);}
+	void unlock() {if (_locked) atomic.clear(boost::memory_order_release); _locked = false;}
 	bool locked() const {return _locked;}
 
 private:
 	bool _locked;
-	atomic_type& atomic;
+	atomic_flag& atomic;
 };
 
 class tracked_executor;

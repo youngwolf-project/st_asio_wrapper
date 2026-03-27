@@ -28,7 +28,7 @@ using namespace st_asio_wrapper::ext::tcp;
 #define DECREASE_THREAD	"decrease thread"
 
 boost::timer::cpu_timer begin_time;
-#if BOOST_VERSION >= 105300
+#if BOOST_VERSION >= 107800
 boost::atomic_ushort completed_session_num;
 #else
 atomic<unsigned short> completed_session_num;

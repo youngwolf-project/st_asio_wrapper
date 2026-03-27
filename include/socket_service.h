@@ -48,9 +48,11 @@ private:
 template<typename Socket, typename Pool, typename Matrix>
 class multi_socket_service : public Matrix, public Pool
 {
-protected:
+public:
 	multi_socket_service(service_pump& service_pump_) : Pool(service_pump_) {}
 	template<typename Arg> multi_socket_service(service_pump& service_pump_, const Arg& arg) : Pool(service_pump_, arg) {}
+
+protected:
 	~multi_socket_service() {ST_THIS clear_io_context_refs();}
 
 	virtual bool init()
