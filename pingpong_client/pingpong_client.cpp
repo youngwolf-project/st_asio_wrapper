@@ -186,7 +186,7 @@ int main(int argc, const char* argv[])
 			printf("test parameters after adjustment: " ST_ASIO_SF " " ST_ASIO_SF " %c\n", msg_num, msg_len, msg_fill);
 			puts("performance test begin, this application will have no response during the test!");
 
-			completed_session_num = (unsigned short) link_num;
+			completed_session_num.store((unsigned short) link_num);
 			char* init_msg = new char[msg_len];
 			memset(init_msg, msg_fill, msg_len);
 			client.begin(msg_num, init_msg, msg_len);

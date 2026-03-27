@@ -95,7 +95,7 @@ class atomic_flag : public atomic_size_t
 public:
 	void clear(boost::memory_order order) {atomic_size_t::store(0, order);}
 	bool test_and_set(boost::memory_order order) {return 1 == atomic_size_t::exchange(1, order);}
-}
+};
 #endif
 class scope_atomic_lock : public boost::noncopyable
 {
