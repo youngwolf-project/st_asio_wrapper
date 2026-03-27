@@ -4,7 +4,7 @@
 #boost_lib_dir = -L/usr/local/lib/
 
 ifndef STD
-	STD = c++98 #if your boost version is too hight, you may need to specify c++11
+	STD = c++98 #if your boost version is too high, you may need to specify c++11
 endif
 
 ifndef WIN_VER

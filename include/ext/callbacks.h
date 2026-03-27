@@ -266,6 +266,9 @@ public:
 
 	register_cb_2(on_create, false)
 
+protected:
+	~object_pool() {}
+
 private:
 	virtual void on_create(typename ObjectPool::object_ctype& object_ptr) call_cb_1_void(ObjectPool, on_create, object_ptr)
 
