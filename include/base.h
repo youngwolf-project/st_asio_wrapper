@@ -88,7 +88,7 @@ typedef atomic<size_t> atomic_size_t;
 typedef atomic<boost::int_fast32_t> atomic_int_fast32_t;
 #endif
 
-#if BOOST_VERSION >= 106600
+#if BOOST_VERSION >= 105600 || (BOOST_VERSION >= 105300 && !defined(BOOST_ATOMIC_FLAG_LOCK_FREE))
 typedef boost::atomic_flag atomic_flag;
 #else
 class atomic_flag : public atomic_size_t
