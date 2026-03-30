@@ -422,7 +422,7 @@ protected:
 
 		started = first = false;
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
-		del_thread_num.store(0);
+		del_thread_num = 0;
 #endif
 		unified_out::info_out("service pump end.");
 	}

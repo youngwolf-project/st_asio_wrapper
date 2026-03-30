@@ -45,43 +45,44 @@ namespace st_asio_wrapper
 typedef boost::atomic_uint_fast64_t atomic_uint_fast64;
 typedef boost::atomic_size_t atomic_size_t;
 typedef boost::atomic_int_fast32_t atomic_int_fast32_t;
-#elif BOOST_VERSION >= 105300
-template<typename T> class atomic : public boost::atomic<T>
-{
-public:
-	atomic() : boost::atomic<T>(0) {}
-	atomic(T data) : boost::atomic<T>(data) {}
-};
-typedef atomic<boost::uint_fast64_t> atomic_uint_fast64;
-typedef atomic<size_t> atomic_size_t;
-typedef atomic<boost::int_fast32_t> atomic_int_fast32_t;
 #else
-template<typename T> class atomic
-{
-public:
-	atomic() : data(0) {}
-	atomic(T _data) : data(_data) {}
+	#if BOOST_VERSION >= 105300
+	template<typename T> class atomic : public boost::atomic<T>
+	{
+	public:
+		atomic() : boost::atomic<T>(0) {}
+		atomic(T value) : boost::atomic<T>(value) {}
 
-	T operator++() {boost::lock_guard<boost::mutex> lock(data_mutex); return ++data;}
-	//deliberately omitted operator++(int)
-	T operator+=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data += value;}
-	T operator--() {boost::lock_guard<boost::mutex> lock(data_mutex); return --data;}
-	//deliberately omitted operator--(int)
-	T operator-=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data -= value;}
-	T operator=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data = value;}
-	T exchange(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data = value; return pre_data;}
-	T fetch_add(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data += value; return pre_data;}
-	T fetch_sub(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data -= value; return pre_data;}
-	void store(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); data = value;}
-	T load(boost::memory_order) const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
+		T operator=(T value) {return boost::atomic<T>::operator=(value);}
+	};
+	#else
+	template<typename T> class atomic
+	{
+	public:
+		atomic() : data(0) {}
+		atomic(T value) : data(value) {}
 
-	bool is_lock_free() const {return false;}
-	operator T() const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
+		T operator++() {boost::lock_guard<boost::mutex> lock(data_mutex); return ++data;}
+		//deliberately omitted operator++(int)
+		T operator+=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data += value;}
+		T operator--() {boost::lock_guard<boost::mutex> lock(data_mutex); return --data;}
+		//deliberately omitted operator--(int)
+		T operator-=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data -= value;}
+		T operator=(T value) {boost::lock_guard<boost::mutex> lock(data_mutex); return data = value;}
+		T exchange(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data = value; return pre_data;}
+		T fetch_add(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data += value; return pre_data;}
+		T fetch_sub(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); T pre_data = data; data -= value; return pre_data;}
+		void store(T value, boost::memory_order) {boost::lock_guard<boost::mutex> lock(data_mutex); data = value;}
+		T load(boost::memory_order) const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
 
-private:
-	T data;
-	boost::mutex data_mutex;
-};
+		bool is_lock_free() const {return false;}
+		operator T() const {boost::lock_guard<boost::mutex> lock(data_mutex); return data;}
+
+	private:
+		T data;
+		boost::mutex data_mutex;
+	};
+	#endif
 typedef atomic<boost::uint_fast64_t> atomic_uint_fast64;
 typedef atomic<size_t> atomic_size_t;
 typedef atomic<boost::int_fast32_t> atomic_int_fast32_t;
