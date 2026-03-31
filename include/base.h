@@ -101,7 +101,7 @@ public:
 class scope_atomic_lock : public boost::noncopyable
 {
 public:
-	scope_atomic_lock(atomic_flag& atomic_) : _locked(false), atomic(atomic_) {lock();} //atomic_ must has been initialized as clear state or zero
+	scope_atomic_lock(atomic_flag& atomic_) : _locked(false), atomic(atomic_) {lock();} //atomic_ must has been initialized
 	~scope_atomic_lock() {unlock();}
 
 	void lock() {if (!_locked) _locked = !atomic.test_and_set(boost::memory_order_acq_rel);}
