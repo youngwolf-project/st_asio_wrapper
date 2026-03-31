@@ -172,11 +172,8 @@ public:
 #ifndef ST_ASIO_EXPOSE_SEND_INTERFACE
 protected:
 #endif
-#ifdef ST_ASIO_ARBITRARY_SEND
-	void send_msg() {_send_msg();}
-#else
-	void send_msg() {if (is_ready() && 1 != sending.load(boost::memory_order_acquire)) _send_msg();} //here we cannot use is_sending(), because we need memory fence
-#endif
+	//here we cannot use is_sending(), because we need memory fence
+	void send_msg() {if (is_ready() && 1 != sending.load(boost::memory_order_acquire)) dispatch_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
 
 public:
 	void start_heartbeat(int interval, int max_absence = ST_ASIO_HEARTBEAT_MAX_ABSENCE)
@@ -679,8 +676,6 @@ private:
 	void reset_next_layer(const boost::asio::any_io_executor& executor, Arg& arg) {(&next_layer_)->~Socket(); new (&next_layer_) Socket(executor, arg);}
 #endif
 
-void _send_msg() {dispatch_in_io_strand(boost::bind(&socket::do_send_msg, this, false));}
-
 #ifdef ST_ASIO_SYNC_RECV
 	sync_call_result sync_recv_waiting(boost::unique_lock<boost::mutex>& lock, unsigned duration)
 	{
@@ -736,7 +731,7 @@ void _send_msg() {dispatch_in_io_strand(boost::bind(&socket::do_send_msg, this, 
 	void do_dispatch_msg()
 	{
 #ifdef ST_ASIO_DISPATCH_BATCH_MSG
-		if (!recv_buffer.empty())
+		if (!recv_buffer.is_empty())
 		{
 			dispatching = true;
 			BOOST_AUTO(begin_time, statistic::now());

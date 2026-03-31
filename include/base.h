@@ -101,7 +101,7 @@ public:
 class scope_atomic_lock : public boost::noncopyable
 {
 public:
-	scope_atomic_lock(atomic_flag& atomic_) : _locked(false), atomic(atomic_) {lock();} //atomic_ must has been initialized as clear state or zero
+	scope_atomic_lock(atomic_flag& atomic_) : _locked(false), atomic(atomic_) {lock();} //atomic_ must has been initialized
 	~scope_atomic_lock() {unlock();}
 
 	void lock() {if (!_locked) _locked = !atomic.test_and_set(boost::memory_order_acq_rel);}
@@ -685,12 +685,12 @@ template<typename _Predicate> void NAME(const _Predicate& __pred) const {for (BO
 }
 
 #define GET_PENDING_MSG_SIZE(FUNNAME, CAN) size_t FUNNAME() const {return CAN.size_in_byte();}
-#define POP_FIRST_PENDING_MSG(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) {msg.clear(); if (CAN.try_dequeue(msg)) _send_msg();}
+#define POP_FIRST_PENDING_MSG(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) {msg.clear(); CAN.try_dequeue(msg);}
 #define POP_FIRST_PENDING_MSG_NOTIFY(FUNNAME, CAN, MSGTYPE) void FUNNAME(MSGTYPE& msg) \
-	{msg.clear(); if (CAN.try_dequeue(msg)) {_send_msg(); if (msg.p) msg.p->set_value(NOT_APPLICABLE);}}
-#define POP_ALL_PENDING_MSG(FUNNAME, CAN, CANTYPE) void FUNNAME(CANTYPE& can) {can.clear(); CAN.swap(can); _send_msg();}
+	{msg.clear(); if (CAN.try_dequeue(msg)) {if (msg.p) msg.p->set_value(NOT_APPLICABLE);}}
+#define POP_ALL_PENDING_MSG(FUNNAME, CAN, CANTYPE) void FUNNAME(CANTYPE& can) {can.clear(); CAN.swap(can);}
 #define POP_ALL_PENDING_MSG_NOTIFY(FUNNAME, CAN, CANTYPE) void FUNNAME(CANTYPE& can) \
-	{can.clear(); CAN.swap(can); _send_msg(); for (BOOST_AUTO(iter, can.begin()); iter != can.end(); ++iter) if (iter->p) iter->p->set_value(NOT_APPLICABLE);}
+	{can.clear(); CAN.swap(can); for (BOOST_AUTO(iter, can.begin()); iter != can.end(); ++iter) if (iter->p) iter->p->set_value(NOT_APPLICABLE);}
 
 ///////////////////////////////////////////////////
 //TCP msg sending interface
