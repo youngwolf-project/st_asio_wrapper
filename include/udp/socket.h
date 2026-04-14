@@ -244,7 +244,7 @@ protected:
 	virtual bool do_send_msg(const typename super::in_msg& msg) {return false;} //customize message sending, for connected socket only
 	virtual void pre_handle_msg(typename Unpacker::container_type& msg_can) {}
 
-	void resume_sending() {ST_THIS clear_sending(); if (!send_buffer.empty()) super::send_msg();} //for reliable UDP socket only
+	void resume_sending() {ST_THIS clear_sending(); if (!send_buffer.is_empty()) super::send_msg();} //for reliable UDP socket only
 
 private:
 	using super::close;
@@ -329,17 +329,10 @@ private:
 
 	virtual bool do_send_msg(bool in_strand = false)
 	{
-		if (send_buffer.empty()) //without this, in extreme circumstances, messages can leave behind in the send buffer until the next message sending
-		{
-			if (in_strand)
-				ST_THIS clear_sending();
-
-			return false;
-		}
-		else if (!in_strand && ST_THIS test_and_set_sending())
+		if (!in_strand && ST_THIS test_and_set_sending())
 			return true;
 		else if (is_connected && !check_send_cc())
-			;
+			return false;
 		else if (send_buffer.try_dequeue(sending_msg))
 		{
 			stat.send_delay_sum += statistic::now() - sending_msg.begin_time;
@@ -354,10 +347,9 @@ private:
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
-		else
-			ST_THIS clear_sending();
 
-		return false;
+		ST_THIS clear_sending();
+		return send_buffer.is_empty() ? false : do_send_msg(); //send msg in sequence, just make sure no pending msgs
 	}
 
 	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
@@ -377,7 +369,7 @@ private:
 			ST_THIS on_msg_send(sending_msg);
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-			if (send_buffer.empty())
+			if (send_buffer.is_empty())
 				ST_THIS on_all_msg_send(sending_msg);
 #endif
 		}
@@ -396,8 +388,8 @@ private:
 		//send msg in sequence
 		//on windows, sending a msg to addr_any may cause errors, please note
 		//for UDP, sending error will not stop subsequent sending.
-		else if (!do_send_msg(true) && !send_buffer.empty())
-			super::send_msg(); //just make sure no pending msgs
+		else
+			do_send_msg(true);
 	}
 
 private:

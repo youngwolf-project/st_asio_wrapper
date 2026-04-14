@@ -349,7 +349,6 @@ private:
 #ifdef ST_ASIO_PASSIVE_RECV
 		ST_THIS clear_reading(); //clear reading flag before calling handle_msg() to make sure that recv_msg() is available in on_msg() and on_msg_handle()
 #endif
-		bool need_next_recv = false;
 		if (bytes_transferred > 0)
 		{
 			stat.last_recv_time = time(NULL);
@@ -366,7 +365,8 @@ private:
 				ST_THIS unpacker()->reset(); //user can get the left half-baked msg in unpacker's reset()
 			}
 
-			need_next_recv = handle_msg(); //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
+			if (handle_msg() && !ec) //if macro ST_ASIO_PASSIVE_RECV been defined, handle_msg will always return false
+				do_recv_msg(); //receive msg in sequence
 		}
 		else if (!ec)
 		{
@@ -379,22 +379,11 @@ private:
 			handle_error();
 			on_recv_error(ec);
 		}
-		//if you wrote an terrible unpacker whoes completion_condition always returns 0, it will cause st_asio_wrapper to occupies almost all CPU resources
-		// because of following do_recv_msg() invocation (rapidly and repeatedly), please note.
-		else if (need_next_recv)
-			do_recv_msg(); //receive msg in sequence
 	}
 
 	virtual bool do_send_msg(bool in_strand = false)
 	{
-		if (send_buffer.empty()) //without this, in extreme circumstances, messages can leave behind in the send buffer until the next message sending
-		{
-			if (in_strand)
-				ST_THIS clear_sending();
-
-			return false;
-		}
-		else if (!in_strand && ST_THIS test_and_set_sending())
+		if (!in_strand && ST_THIS test_and_set_sending())
 			return true;
 
 		BOOST_AUTO(end_time, statistic::now());
@@ -413,10 +402,9 @@ private:
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
-		else
-			ST_THIS clear_sending();
 
-		return false;
+		ST_THIS clear_sending();
+		return send_buffer.is_empty() ? false : do_send_msg(); //send msg in sequence, just make sure no pending msgs
 	}
 
 	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
@@ -439,7 +427,7 @@ private:
 			on_msg_send(sending_msgs);
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-			if (send_buffer.empty())
+			if (send_buffer.is_empty())
 #if defined(ST_ASIO_WANT_MSG_SEND_NOTIFY) || !defined(ST_ASIO_WANT_BATCH_MSG_SEND_NOTIFY)
 				ST_THIS on_all_msg_send(sending_msgs.back());
 #else
@@ -455,12 +443,7 @@ private:
 #endif
 #endif
 			sending_msgs.clear();
-#ifdef ST_ASIO_ARBITRARY_SEND
-			do_send_msg(true); //just make sure no pending msgs
-#else
-			if (!do_send_msg(true) && !send_buffer.empty()) //send msg in sequence
-				super::send_msg(); //just make sure no pending msgs
-#endif
+			do_send_msg(true);
 		}
 		else
 		{
