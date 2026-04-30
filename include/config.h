@@ -944,7 +944,6 @@
 //boost and compiler check
 #ifdef _MSC_VER
 	#define ST_ASIO_SF "%Iu" //format used to print 'size_t'
-	#define ST_ASIO_LLF "%I64d" //format used to print 'boost::uint_fast64_t'
 
 	#ifndef ST_ASIO_MIN_ACI_REF
 		#if BOOST_VERSION < 105500
@@ -965,11 +964,6 @@
 #elif defined(__GNUC__)
 	#define ST_ASIO_SF "%zu" //format used to print 'size_t'
 	#define ST_THIS this->
-	#ifdef __x86_64__
-		#define ST_ASIO_LLF "%ld" //format used to print 'boost::uint_fast64_t'
-	#else
-		#define ST_ASIO_LLF "%lld" //format used to print 'boost::uint_fast64_t'
-	#endif
 
 	#ifndef ST_ASIO_MIN_ACI_REF
 		#if BOOST_VERSION < 105500
@@ -1000,6 +994,13 @@
 	#endif
 #else
 	#error st_asio_wrapper only support Visual C++, GCC and Clang.
+#endif
+
+//format used to print 'boost::uint_fast64_t'
+#ifdef __LP64__
+	#define ST_ASIO_LLF "%ld"
+#else
+	#define ST_ASIO_LLF "%lld"
 #endif
 
 #if BOOST_VERSION < 104900
