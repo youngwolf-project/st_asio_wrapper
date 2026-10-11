@@ -166,7 +166,7 @@ public:
 	virtual bool pack_msg(typename super::msg_type& msg, const char* const pstr[], const size_t len[], size_t num, bool native = false)
 	{
 		typename Packer::msg_type str;
-		if (Packer().pack_msg(str, pstr, len, num, native))
+		if (impl.pack_msg(str, pstr, len, num, native))
 		{
 			BOOST_AUTO(raw_msg, new T());
 			raw_msg->swap(str);
@@ -223,7 +223,7 @@ public:
 	virtual bool pack_heartbeat(typename super::msg_type& msg)
 	{
 		typename Packer::msg_type str;
-		if (Packer().pack_heartbeat(str))
+		if (impl.pack_heartbeat(str))
 		{
 			BOOST_AUTO(raw_msg, new T());
 			raw_msg->swap(str);
@@ -239,6 +239,9 @@ public:
 	virtual char* raw_data(typename super::msg_type& msg) const {return const_cast<char*>(boost::next(msg.data(), ST_ASIO_HEAD_LEN));}
 	virtual const char* raw_data(typename super::msg_ctype& msg) const {return boost::next(msg.data(), ST_ASIO_HEAD_LEN);}
 	virtual size_t raw_data_len(typename super::msg_ctype& msg) const {return msg.size() - ST_ASIO_HEAD_LEN;}
+
+private:
+	Packer impl;
 };
 
 //protocol: fixed length
