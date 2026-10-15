@@ -82,6 +82,8 @@ private:
 	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {server.get_service_pump().return_io_context(io_context_, refs);}
 
 private:
+	using super::rw_strand;
+
 	Server& server;
 };
 

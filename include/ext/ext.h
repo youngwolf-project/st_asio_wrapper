@@ -250,9 +250,11 @@ public:
 	size_t max_size() const {return UINT_MAX;}
 	size_t capacity() const {return cap;}
 
+	//nonstandard function clean -- free internal buffer without destructing this basic_buffer object
+	void clean() {free(buff); do_detach();}
+
 	//the following five functions are needed by st_asio_wrapper
 	void clear() {resize(0);}
-	void clean() {free(buff); do_detach();}
 	const char* data() const {return buff;}
 	size_t size() const {return NULL == buff ? 0 : len;}
 	bool empty() const {return 0 == len || NULL == buff;}

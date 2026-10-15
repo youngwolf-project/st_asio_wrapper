@@ -335,11 +335,11 @@ private:
 			return;
 #endif
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (!ST_THIS async_read(make_strand_handler(rw_strand,
+		if (!ST_THIS async_read(make_strand_handler(ST_THIS rw_strand,
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)))))
 			ST_THIS clear_reading();
 #else
-		ST_THIS async_read(make_strand_handler(rw_strand,
+		ST_THIS async_read(make_strand_handler(ST_THIS rw_strand,
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 #endif
 	}
@@ -398,7 +398,7 @@ private:
 		if (!sending_buffer.empty())
 		{
 			sending_msgs.front().restart();
-			ST_THIS async_write(sending_buffer, make_strand_handler(rw_strand,
+			ST_THIS async_write(sending_buffer, make_strand_handler(ST_THIS rw_strand,
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
@@ -488,7 +488,6 @@ private:
 	using super::temp_msg_can;
 
 	using super::send_buffer;
-	using super::rw_strand;
 
 	//although boost::container::list::size() has constant complexity, but user can use std::list via macro or template parameter,
 	//before gcc 5.0, std::list::size() has linear complexity, very embarrassing!
