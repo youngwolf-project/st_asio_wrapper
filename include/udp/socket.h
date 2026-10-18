@@ -278,10 +278,10 @@ private:
 		else
 		{
 			if (is_connected)
-				ST_THIS next_layer().async_receive(recv_buff, make_strand_handler(rw_strand,
+				ST_THIS next_layer().async_receive(recv_buff, ST_THIS make_io_strand_handler(
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			else
-				ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(rw_strand,
+				ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, ST_THIS make_io_strand_handler(
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return;
 		}
@@ -338,12 +338,12 @@ private:
 			stat.send_delay_sum += statistic::now() - sending_msg.begin_time;
 			sending_msg.restart();
 			if (!is_connected)
-				ST_THIS next_layer().async_send_to(boost::asio::buffer(sending_msg.data(), sending_msg.size()), sending_msg.peer_addr, make_strand_handler(rw_strand,
+				ST_THIS next_layer().async_send_to(boost::asio::buffer(sending_msg.data(), sending_msg.size()), sending_msg.peer_addr, ST_THIS make_io_strand_handler(
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			else if (do_send_msg(sending_msg))
 				ST_THIS post_in_io_strand(boost::bind(&generic_socket::send_handler, this, boost::system::error_code(), sending_msg.size()));
 			else
-				ST_THIS next_layer().async_send(boost::asio::buffer(sending_msg.data(), sending_msg.size()), make_strand_handler(rw_strand,
+				ST_THIS next_layer().async_send(boost::asio::buffer(sending_msg.data(), sending_msg.size()), ST_THIS make_io_strand_handler(
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
@@ -397,7 +397,6 @@ private:
 	using super::temp_msg_can;
 
 	using super::send_buffer;
-	using super::rw_strand;
 
 	bool is_bound, is_connected, connect_mode;
 	typename super::in_msg sending_msg;

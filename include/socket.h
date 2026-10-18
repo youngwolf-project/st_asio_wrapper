@@ -36,9 +36,9 @@ public:
 	static const tid TIMER_END = TIMER_BEGIN + 10;
 
 protected:
-	socket(boost::asio::io_context& io_context_) : super(io_context_), rw_strand(io_context_), next_layer_(io_context_), dis_strand(io_context_) {first_init();}
+	socket(boost::asio::io_context& io_context_) : super(io_context_), next_layer_(io_context_), rw_strand(io_context_), dis_strand(io_context_) {first_init();}
 	template<typename Arg> socket(boost::asio::io_context& io_context_, Arg& arg) :
-		super(io_context_), rw_strand(io_context_), next_layer_(io_context_, arg), dis_strand(io_context_) {first_init();}
+		super(io_context_), next_layer_(io_context_, arg), rw_strand(io_context_), dis_strand(io_context_) {first_init();}
 
 	//helper function, just call it in constructor
 	void first_init()
@@ -106,15 +106,18 @@ protected:
 		recv_buffer.clear();
 	}
 
+	//convert the result to F is a waste, but we have no choice without c++0x
+	template<typename F> F make_io_strand_handler(const F& handler) {return make_strand_handler(rw_strand, handler);}
+
 	//execute in the IO strand -- rw_strand
-	void post_in_io_strand(const boost::function<void()>& handler) {post_strand(rw_strand, handler);}
+	template<typename F> void post_in_io_strand(const F& handler) {post_strand(rw_strand, handler);}
 	//execute in the IO strand -- rw_strand, or current thead, use it carefully
-	void dispatch_in_io_strand(const boost::function<void()>& handler) {dispatch_strand(rw_strand, handler);}
+	template<typename F> void dispatch_in_io_strand(const F& handler) {dispatch_strand(rw_strand, handler);}
 
 	//execute in the dispatch strand -- dis_strand
-	void post_in_dis_strand(const boost::function<void()>& handler) {post_strand(dis_strand, handler);}
+	template<typename F> void post_in_dis_strand(const F& handler) {post_strand(dis_strand, handler);}
 	//execute in the dispatch strand -- dis_strand, or current thead, use it carefully
-	void dispatch_in_dis_strand(const boost::function<void()>& handler) {dispatch_strand(dis_strand, handler);}
+	template<typename F> void dispatch_in_dis_strand(const F& handler) {dispatch_strand(dis_strand, handler);}
 
 public:
 #ifdef ST_ASIO_SYNC_SEND
@@ -822,7 +825,6 @@ protected:
 	list<OutMsgType> temp_msg_can;
 
 	in_queue_type send_buffer;
-	boost::asio::io_context::strand rw_strand;
 
 private:
 	boost::shared_ptr<i_packer<typename Packer::msg_type> > packer_;
@@ -848,7 +850,7 @@ private:
 #endif
 	atomic_size_t sending;
 	atomic_flag start_atomic;
-	boost::asio::io_context::strand dis_strand;
+	boost::asio::io_context::strand rw_strand, dis_strand;
 
 #ifdef ST_ASIO_SYNC_RECV
 	enum sync_recv_status {NOT_REQUESTED, REQUESTED, RESPONDED, RESPONDED_FAILURE};

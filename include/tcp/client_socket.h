@@ -124,17 +124,11 @@ protected:
 	virtual bool do_start() //connect
 	{
 		assert(!ST_THIS is_connected());
-		return bind() && ST_THIS set_timer(TIMER_CONNECT, 50, make_strand_handler(rw_strand,
+		return bind() && ST_THIS set_timer(TIMER_CONNECT, 50, ST_THIS make_io_strand_handler(
 			boost::function<bool(typename super::tid)>((boost::lambda::bind(&generic_client_socket::connect, this, true), false))));
 	}
 
-	virtual void connect_handler(const boost::system::error_code& ec)
-	{
-		if (!ec) //already started, so cannot call start()
-			super::do_start();
-		else
-			prepare_next_reconnect(ec);
-	}
+	virtual void connect_handler(const boost::system::error_code& ec) {ec ? prepare_next_reconnect(ec) : super::do_start();} //already started, so cannot call start()
 
 	//after how much time (ms), generic_client_socket will try to reconnect the server, negative value means give up.
 	virtual int prepare_reconnect(const boost::system::error_code& ec) {return ST_ASIO_RECONNECT_INTERVAL;}
@@ -178,7 +172,7 @@ private:
 		if (!first && !bind())
 			return false;
 
-		ST_THIS lowest_layer().async_connect(server_addr, make_strand_handler(rw_strand,
+		ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_io_strand_handler(
 			ST_THIS make_handler_error(boost::bind(&generic_client_socket::connect_handler, this, boost::asio::placeholders::error))));
 		return true;
 	}
@@ -198,7 +192,7 @@ private:
 			int delay = prepare_reconnect(ec);
 			if (delay < 0)
 				need_reconnect = false;
-			else if (ST_THIS set_timer(TIMER_CONNECT, delay, make_strand_handler(rw_strand,
+			else if (ST_THIS set_timer(TIMER_CONNECT, delay, ST_THIS make_io_strand_handler(
 				boost::function<bool(typename super::tid)>((boost::lambda::bind(&generic_client_socket::connect, this, false), false)))))
 				return true;
 		}
@@ -209,8 +203,6 @@ private:
 	}
 
 private:
-	using super::rw_strand;
-
 	bool need_reconnect;
 	typename Family::endpoint server_addr;
 

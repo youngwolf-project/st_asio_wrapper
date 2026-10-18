@@ -23,10 +23,8 @@ public:
 	reader_writer(boost::asio::io_context& io_context_) : Socket(io_context_) {}
 	template<typename Arg> reader_writer(boost::asio::io_context& io_context_, Arg& arg) : Socket(io_context_, arg) {}
 
-	typedef boost::function<void(const boost::system::error_code& ec, size_t bytes_transferred)> ReadWriteCallBack;
-
 protected:
-	bool async_read(const ReadWriteCallBack& call_back)
+	template<typename F> bool async_read(const F& handler)
 	{
 		BOOST_AUTO(recv_buff, ST_THIS unpacker()->prepare_next_recv());
 		assert(boost::asio::buffer_size(recv_buff) > 0);
@@ -37,7 +35,7 @@ protected:
 		}
 
 		boost::asio::async_read(ST_THIS next_layer(), recv_buff,
-			boost::bind(&reader_writer::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), call_back);
+			boost::bind(&reader_writer::completion_checker, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred), handler);
 		return true;
 	}
 	bool parse_msg(size_t bytes_transferred, list<OutMsgType>& msg_can) {return ST_THIS unpacker()->parse_msg(bytes_transferred, msg_can);}
@@ -50,8 +48,8 @@ protected:
 		return boost::asio::detail::default_max_transfer_size;
 #endif
 	}
-	template<typename Buffer>
-	void async_write(const Buffer& msg_can, const ReadWriteCallBack& call_back) {boost::asio::async_write(ST_THIS next_layer(), msg_can, call_back);}
+	template<typename Buffer, typename F>
+	void async_write(const Buffer& msg_can, const F& handler) {boost::asio::async_write(ST_THIS next_layer(), msg_can, handler);}
 
 private:
 	size_t completion_checker(const boost::system::error_code& ec, size_t bytes_transferred)
@@ -335,11 +333,11 @@ private:
 			return;
 #endif
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (!ST_THIS async_read(make_strand_handler(ST_THIS rw_strand,
+		if (!ST_THIS async_read(ST_THIS make_io_strand_handler(
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)))))
 			ST_THIS clear_reading();
 #else
-		ST_THIS async_read(make_strand_handler(ST_THIS rw_strand,
+		ST_THIS async_read(ST_THIS make_io_strand_handler(
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 #endif
 	}
@@ -398,7 +396,7 @@ private:
 		if (!sending_buffer.empty())
 		{
 			sending_msgs.front().restart();
-			ST_THIS async_write(sending_buffer, make_strand_handler(ST_THIS rw_strand,
+			ST_THIS async_write(sending_buffer, ST_THIS make_io_strand_handler(
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}

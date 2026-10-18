@@ -61,7 +61,7 @@ public:
 		timer_status status;
 		unsigned interval_ms;
 		timer_type timer;
-		boost::function<bool (tid)> call_back; //return true from call_back to continue the timer, or the timer will stop
+		boost::function<bool(tid)> call_back; //return true from call_back to continue the timer, or the timer will stop
 
 		timer_info(tid id_, boost::asio::io_context& io_context_) : id(id_), seq(-1), status(TIMER_CREATED), interval_ms(0), timer(io_context_) {}
 		bool operator ==(const timer_info& other) {return id == other.id;}
@@ -116,7 +116,7 @@ public:
 
 		return true;
 	}
-	bool create_or_update_timer(tid id, unsigned interval, const boost::function<bool (tid)>& call_back, bool start = false)
+	bool create_or_update_timer(tid id, unsigned interval, const boost::function<bool(tid)>& call_back, bool start = false)
 		{BOOST_AUTO(unused, call_back); return create_or_update_timer(id, interval, unused, start);}
 
 	bool change_timer_status(tid id, typename timer_info::timer_status status) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->status = status, true : false;}
