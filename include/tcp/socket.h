@@ -332,13 +332,13 @@ private:
 		else if (ST_THIS test_and_set_reading())
 			return;
 #endif
+		BOOST_AUTO(cb, ST_THIS make_io_strand_handler(
+			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (!ST_THIS async_read(ST_THIS make_io_strand_handler(
-			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)))))
+		if (!ST_THIS async_read(cb))
 			ST_THIS clear_reading();
 #else
-		ST_THIS async_read(ST_THIS make_io_strand_handler(
-			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+		ST_THIS async_read(cb);
 #endif
 	}
 
