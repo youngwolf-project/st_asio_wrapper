@@ -277,12 +277,9 @@ private:
 			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
 		else
 		{
-			if (is_connected)
-				ST_THIS next_layer().async_receive(recv_buff, make_strand_handler(rw_strand,
-					ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
-			else
-				ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, make_strand_handler(rw_strand,
-					ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+			BOOST_AUTO(cb, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
+				ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+			is_connected ? ST_THIS next_layer().async_receive(recv_buff, cb) : ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, cb);
 			return;
 		}
 
@@ -337,14 +334,16 @@ private:
 		{
 			stat.send_delay_sum += statistic::now() - sending_msg.begin_time;
 			sending_msg.restart();
-			if (!is_connected)
-				ST_THIS next_layer().async_send_to(boost::asio::buffer(sending_msg.data(), sending_msg.size()), sending_msg.peer_addr, make_strand_handler(rw_strand,
-					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
-			else if (do_send_msg(sending_msg))
+			if (is_connected && do_send_msg(sending_msg))
 				ST_THIS post_in_io_strand(boost::bind(&generic_socket::send_handler, this, boost::system::error_code(), sending_msg.size()));
 			else
-				ST_THIS next_layer().async_send(boost::asio::buffer(sending_msg.data(), sending_msg.size()), make_strand_handler(rw_strand,
+			{
+				BOOST_AUTO(send_buff, boost::asio::buffer(sending_msg.data(), sending_msg.size()));
+				BOOST_AUTO(cb, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+				is_connected ? ST_THIS next_layer().async_send(send_buff, cb) : ST_THIS next_layer().async_send_to(send_buff, sending_msg.peer_addr, cb);
+
+			}
 			return true;
 		}
 
@@ -397,7 +396,6 @@ private:
 	using super::temp_msg_can;
 
 	using super::send_buffer;
-	using super::rw_strand;
 
 	bool is_bound, is_connected, connect_mode;
 	typename super::in_msg sending_msg;

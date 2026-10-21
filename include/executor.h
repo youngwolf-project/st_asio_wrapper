@@ -48,6 +48,9 @@ public:
 	template<typename F> inline const F& make_handler_error(const F& f) const {return f;}
 	template<typename F> inline const F& make_handler_error_size(const F& f) const {return f;}
 
+	template<typename F> inline F& make_handler_error(F& f) const {return f;}
+	template<typename F> inline F& make_handler_error_size(F& f) const {return f;}
+
 protected:
 	boost::asio::io_context& io_context_;
 };

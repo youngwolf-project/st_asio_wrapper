@@ -50,6 +50,7 @@ public:
 #endif
 
 	typedef unsigned short tid;
+	typedef boost::function<bool(tid)> handler_with_tid;
 	static const tid TIMER_END = 0; //subclass' id must begin from parent class' TIMER_END
 
 	struct timer_info
@@ -61,7 +62,7 @@ public:
 		timer_status status;
 		unsigned interval_ms;
 		timer_type timer;
-		boost::function<bool (tid)> call_back; //return true from call_back to continue the timer, or the timer will stop
+		handler_with_tid handler; //return true from handler to continue the timer, or the timer will stop
 
 		timer_info(tid id_, boost::asio::io_context& io_context_) : id(id_), seq(-1), status(TIMER_CREATED), interval_ms(0), timer(io_context_) {}
 		bool operator ==(const timer_info& other) {return id == other.id;}
@@ -91,8 +92,8 @@ public:
 	}
 	void clear_io_context_refs() {sub_io_context_refs(io_context_refs);}
 
-	//after this call, call_back cannot be used again, please note.
-	bool create_or_update_timer(tid id, unsigned interval, boost::function<bool(tid)>& call_back, bool start = false)
+	//after this call, handler cannot be used again, please note.
+	bool create_or_update_timer(tid id, unsigned interval, handler_with_tid& handler, bool start = false)
 	{
 		timer_info* ti = NULL;
 		{
@@ -109,26 +110,26 @@ public:
 		assert(NULL != ti);
 
 		ti->interval_ms = interval;
-		ti->call_back.swap(call_back);
+		ti->handler.swap(handler);
 
 		if (start)
 			start_timer(*ti);
 
 		return true;
 	}
-	bool create_or_update_timer(tid id, unsigned interval, const boost::function<bool (tid)>& call_back, bool start = false)
-		{BOOST_AUTO(unused, call_back); return create_or_update_timer(id, interval, unused, start);}
+	bool create_or_update_timer(tid id, unsigned interval, const handler_with_tid& handler, bool start = false)
+		{BOOST_AUTO(xvalue, handler); return create_or_update_timer(id, interval, xvalue, start);}
 
 	bool change_timer_status(tid id, typename timer_info::timer_status status) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->status = status, true : false;}
 	bool change_timer_interval(tid id, unsigned interval) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->interval_ms = interval, true : false;}
 
-	//after this call, call_back cannot be used again, please note.
-	bool change_timer_call_back(tid id, boost::function<bool(tid)>& call_back) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->call_back.swap(call_back), true : false;}
-	bool change_timer_call_back(tid id, const boost::function<bool(tid)>& call_back) {BOOST_AUTO(unused, call_back); return change_timer_call_back(id, unused);}
+	//after this call, handler cannot be used again, please note.
+	bool change_timer_handler(tid id, handler_with_tid& handler) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->handler.swap(handler), true : false;}
+	bool change_timer_handler(tid id, const handler_with_tid& handler) {BOOST_AUTO(xvalue, handler); return change_timer_handler(id, xvalue);}
 
-	//after this call, call_back cannot be used again, please note.
-	bool set_timer(tid id, unsigned interval, boost::function<bool(tid)>& call_back) {return create_or_update_timer(id, interval, call_back, true);}
-	bool set_timer(tid id, unsigned interval, const boost::function<bool(tid)>& call_back) {return create_or_update_timer(id, interval, call_back, true);}
+	//after this call, handler cannot be used again, please note.
+	bool set_timer(tid id, unsigned interval, handler_with_tid& handler) {return create_or_update_timer(id, interval, handler, true);}
+	bool set_timer(tid id, unsigned interval, const handler_with_tid& handler) {return create_or_update_timer(id, interval, handler, true);}
 
 	timer_info* find_timer(tid id)
 	{
@@ -156,7 +157,7 @@ public:
 protected:
 	bool start_timer(timer_info& ti, unsigned interval_ms)
 	{
-		if (!ti.call_back)
+		if (!ti.handler)
 			return false;
 
 		ti.status = timer_info::TIMER_STARTED;
@@ -175,10 +176,10 @@ protected:
 	void timer_handler(const boost::system::error_code& ec, timer_info& ti, unsigned char prev_seq)
 	{
 		//the first 'timer_info::TIMER_STARTED == ti.status' judgement means stop_timer can also invalidate cumulative timer callbacks
-		//the second 'timer_info::TIMER_STARTED == ti.status' judgement is used to exclude a particular situation--stop the same timer in call_back and return true
+		//the second 'timer_info::TIMER_STARTED == ti.status' judgement is used to exclude a particular situation--stop the same timer in handler and return true
 #ifdef ST_ASIO_ALIGNED_TIMER
 		BOOST_AUTO(begin_time, boost::chrono::system_clock::now());
-		if (timer_info::TIMER_STARTED == ti.status && !ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)
+		if (timer_info::TIMER_STARTED == ti.status && !ec && ti.handler(ti.id) && timer_info::TIMER_STARTED == ti.status)
 		{
 			unsigned elapsed_ms = (unsigned) boost::chrono::duration_cast<boost::chrono::milliseconds>(boost::chrono::system_clock::now() - begin_time).count();
 			if (elapsed_ms > ti.interval_ms)
@@ -187,10 +188,10 @@ protected:
 			start_timer(ti, ti.interval_ms - elapsed_ms);
 		}
 #else
-		if (timer_info::TIMER_STARTED == ti.status && !ec && ti.call_back(ti.id) && timer_info::TIMER_STARTED == ti.status)
+		if (timer_info::TIMER_STARTED == ti.status && !ec && ti.handler(ti.id) && timer_info::TIMER_STARTED == ti.status)
 			start_timer(ti);
 #endif
-		else if (prev_seq == ti.seq) //exclude a particular situation--start the same timer in call_back and return false
+		else if (prev_seq == ti.seq) //exclude a particular situation--start the same timer in handler and return false
 			ti.status = timer_info::TIMER_CANCELED;
 	}
 

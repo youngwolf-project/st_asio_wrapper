@@ -47,12 +47,9 @@ private:
 	typedef LowestLayerGetter<boost::beast::websocket::stream<NextLayer>> super;
 
 public:
-	typedef boost::function<void(const boost::system::error_code& ec, size_t bytes_transferred)> ReadWriteCallBack;
-
-public:
 	template<class... Args> explicit stream(Args&&... args) : super(std::forward<Args>(args)...) {first_init();}
 
-	void async_read(const ReadWriteCallBack& call_back) {super::async_read(recv_buff, call_back);}
+	template<typename F> void async_read(const F& handler) {super::async_read(recv_buff, handler);}
 	template<typename OutMsgType> bool parse_msg(list<OutMsgType>& msg_can)
 	{
 #if BOOST_VERSION < 107000
@@ -65,7 +62,7 @@ public:
 
 		return re;
 	}
-	template<typename Buffer> void async_write(const Buffer& buff, const ReadWriteCallBack& call_back) {super::async_write(buff, call_back);}
+	template<typename Buffer, typename F> void async_write(const Buffer& buff, const F& handler) {super::async_write(buff, handler);}
 
 protected:
 	//helper function, just call it in constructor
@@ -82,11 +79,11 @@ public:
 	template<typename Arg> reader_writer(boost::asio::io_context& io_context_, Arg& arg) : Socket(io_context_, arg) {}
 
 protected:
-	template<typename CallBack> bool async_read(const CallBack& call_back) {this->next_layer().async_read(call_back); return true;}
+	template<typename F> bool async_read(const F& handler) {this->next_layer().async_read(handler); return true;}
 	bool parse_msg(size_t bytes_transferred, list<OutMsgType>& msg_can) {return this->next_layer().parse_msg(msg_can);}
 
 	size_t batch_msg_send_size() const {return 0;}
-	template<typename Buffer, typename CallBack> void async_write(const Buffer& msg_can, const CallBack& call_back) {this->next_layer().async_write(msg_can, call_back);}
+	template<typename Buffer, typename F> void async_write(const Buffer& buff, const F& handler) {this->next_layer().async_write(buff, handler);}
 };
 
 template<typename Socket> class socket : public Socket

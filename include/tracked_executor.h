@@ -32,26 +32,28 @@ public:
 	bool stopped() const {return io_context_.stopped();}
 
 	#if BOOST_ASIO_VERSION >= 101100
-	void post(const boost::function<void()>& handler) {boost::asio::post(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	void defer(const boost::function<void()>& handler) {boost::asio::defer(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	void dispatch(const boost::function<void()>& handler) {boost::asio::dispatch(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	void post_strand(boost::asio::io_context::strand& strand, const boost::function<void()>& handler)
+	template<typename F> void post(const F& handler) {boost::asio::post(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	template<typename F> void defer(const F& handler) {boost::asio::defer(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	template<typename F> void dispatch(const F& handler) {boost::asio::dispatch(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	template<typename F> void post_strand(boost::asio::io_context::strand& strand, const F& handler)
 		{boost::asio::post(strand, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	void defer_strand(boost::asio::io_context::strand& strand, const boost::function<void()>& handler)
+	template<typename F> void defer_strand(boost::asio::io_context::strand& strand, const F& handler)
 		{boost::asio::defer(strand, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	void dispatch_strand(boost::asio::io_context::strand& strand, const boost::function<void()>& handler)
+	template<typename F> void dispatch_strand(boost::asio::io_context::strand& strand, const F& handler)
 		{boost::asio::dispatch(strand, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
 	#else
-	void post(const boost::function<void()>& handler) {io_context_.post((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	void dispatch(const boost::function<void()>& handler) {io_context_.dispatch((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	void post_strand(boost::asio::io_context::strand& strand, const boost::function<void()>& handler)
+	template<typename F> void post(const F& handler) {io_context_.post((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	template<typename F> void dispatch(const F& handler) {io_context_.dispatch((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	template<typename F> void post_strand(boost::asio::io_context::strand& strand, const F& handler)
 		{strand.post((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	void dispatch_strand(boost::asio::io_context::strand& strand, const boost::function<void()>& handler)
+	template<typename F>void dispatch_strand(boost::asio::io_context::strand& strand, const F& handler)
 		{strand.dispatch((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
 	#endif
 
-	handler_with_error make_handler_error(const handler_with_error& handler) const {return (aci, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1));}
-	handler_with_error_size make_handler_error_size(const handler_with_error_size& handler) const
+	//convert lambda to boost::function is a waste, but we have no choice without c++0x
+	template<typename F> handler_with_error make_handler_error(const F& handler) const
+		{return (aci, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1));}
+	template<typename F> handler_with_error_size make_handler_error_size(const F& handler) const
 		{return (aci, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1, boost::lambda::_2));}
 
 	long get_aci_ref() const {return aci.use_count();}
@@ -79,6 +81,9 @@ protected:
 	tracked_executor(boost::asio::io_context& io_context_) : executor(io_context_), aci(false) {}
 
 public:
+	typedef boost::function<void(const boost::system::error_code&)> handler_with_error;
+	typedef boost::function<void(const boost::system::error_code&, size_t)> handler_with_error_size;
+
 	inline long get_aci_ref() const {return -1;} //na
 	inline bool is_async_calling() const {return aci;}
 	inline int is_last_async_call() const {return 1;} //1-yes
