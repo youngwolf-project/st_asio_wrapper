@@ -456,7 +456,7 @@ private:
 				printf("\r%u%%", new_percent);
 				fflush(stdout);
 
-				change_timer_call_back(id, boost::bind(&file_client::update_progress_handler, this, boost::placeholders::_1, new_percent));
+				change_timer_handler(id, boost::bind(&file_client::update_progress_handler, this, boost::placeholders::_1, new_percent));
 			}
 		}
 

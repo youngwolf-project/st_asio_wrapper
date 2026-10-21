@@ -124,8 +124,8 @@ protected:
 	virtual bool do_start() //connect
 	{
 		assert(!ST_THIS is_connected());
-		return bind() && ST_THIS set_timer(TIMER_CONNECT, 50, ST_THIS make_io_strand_handler(
-			boost::function<bool(typename super::tid)>((boost::lambda::bind(&generic_client_socket::connect, this, true), false))));
+		return bind() && ST_THIS set_timer(TIMER_CONNECT, 50, ST_THIS template make_io_strand_handler<typename super::handler_with_tid>(
+			boost::lambda::ret<bool>((boost::lambda::bind(&generic_client_socket::connect, this, true), false))));
 	}
 
 	virtual void connect_handler(const boost::system::error_code& ec) {ec ? prepare_next_reconnect(ec) : super::do_start();} //already started, so cannot call start()
@@ -172,7 +172,7 @@ private:
 		if (!first && !bind())
 			return false;
 
-		ST_THIS lowest_layer().async_connect(server_addr, ST_THIS make_io_strand_handler(
+		ST_THIS lowest_layer().async_connect(server_addr, ST_THIS template make_io_strand_handler<typename super::handler_with_error>(
 			ST_THIS make_handler_error(boost::bind(&generic_client_socket::connect_handler, this, boost::asio::placeholders::error))));
 		return true;
 	}
@@ -192,8 +192,8 @@ private:
 			int delay = prepare_reconnect(ec);
 			if (delay < 0)
 				need_reconnect = false;
-			else if (ST_THIS set_timer(TIMER_CONNECT, delay, ST_THIS make_io_strand_handler(
-				boost::function<bool(typename super::tid)>((boost::lambda::bind(&generic_client_socket::connect, this, false), false)))))
+			else if (ST_THIS set_timer(TIMER_CONNECT, delay, ST_THIS template make_io_strand_handler<typename super::handler_with_tid>(
+				boost::lambda::ret<bool>((boost::lambda::bind(&generic_client_socket::connect, this, false), false)))))
 				return true;
 		}
 

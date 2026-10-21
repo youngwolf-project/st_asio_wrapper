@@ -277,7 +277,7 @@ private:
 			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
 		else
 		{
-			BOOST_AUTO(cb, ST_THIS make_io_strand_handler(
+			BOOST_AUTO(cb, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
 				ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			is_connected ? ST_THIS next_layer().async_receive(recv_buff, cb) : ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, cb);
 			return;
@@ -339,7 +339,7 @@ private:
 			else
 			{
 				BOOST_AUTO(send_buff, boost::asio::buffer(sending_msg.data(), sending_msg.size()));
-				BOOST_AUTO(cb, ST_THIS make_io_strand_handler(
+				BOOST_AUTO(cb, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
 					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 				is_connected ? ST_THIS next_layer().async_send(send_buff, cb) : ST_THIS next_layer().async_send_to(send_buff, sending_msg.peer_addr, cb);
 

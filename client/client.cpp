@@ -62,7 +62,7 @@ public:
 	void set_server_addr(unsigned short _port, const std::string& _ip = ST_ASIO_SERVER_IP) {port = _port; ip = _ip;}
 	bool send_msg(const std::string& msg) {return send_msg(msg, port, ip);}
 	bool send_msg(std::string& msg) {return send_msg(msg, port, ip);}
-	bool send_msg(const std::string& msg, unsigned short port, const std::string& ip) {std::string unused(msg); return send_msg(unused, port, ip);}
+	bool send_msg(const std::string& msg, unsigned short port, const std::string& ip) {std::string xvalue(msg); return send_msg(xvalue, port, ip);}
 	bool send_msg(std::string& msg, unsigned short port, const std::string& ip)
 	{
 		BOOST_AUTO(socket_ptr, add_socket(port, ip));
@@ -93,7 +93,7 @@ public:
 	void set_server_addr(unsigned short _port, const std::string& _ip = ST_ASIO_SERVER_IP) {port = _port; ip = _ip;}
 	bool send_msg(const std::string& msg) {return send_msg(msg, port, ip);}
 	bool send_msg(std::string& msg) {return send_msg(msg, port, ip);}
-	bool send_msg(const std::string& msg, unsigned short port, const std::string& ip) {std::string unused(msg); return send_msg(unused, port, ip);}
+	bool send_msg(const std::string& msg, unsigned short port, const std::string& ip) {std::string xvalue(msg); return send_msg(xvalue, port, ip);}
 	bool send_msg(std::string& msg, unsigned short port, const std::string& ip)
 	{
 		BOOST_AUTO(socket_ptr, add_socket(port, ip));

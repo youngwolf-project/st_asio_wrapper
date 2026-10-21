@@ -84,16 +84,6 @@ public:
 	typedef boost::function<void(const boost::system::error_code&)> handler_with_error;
 	typedef boost::function<void(const boost::system::error_code&, size_t)> handler_with_error_size;
 
-	//convert lambda to boost::function is a waste, but we have no choice without c++0x
-	template<typename F> handler_with_error make_handler_error(const F& handler) const {return handler;}
-	template<typename F> handler_with_error_size make_handler_error_size(const F& handler) const {return handler;}
-
-	inline const handler_with_error& make_handler_error(const handler_with_error& handler) const {return handler;}
-	inline const handler_with_error_size& make_handler_error_size(const handler_with_error_size& handler) const {return handler;}
-
-	inline handler_with_error& make_handler_error(handler_with_error& handler) const {return handler;}
-	inline handler_with_error_size& make_handler_error_size(handler_with_error_size& handler) const {return handler;}
-
 	inline long get_aci_ref() const {return -1;} //na
 	inline bool is_async_calling() const {return aci;}
 	inline int is_last_async_call() const {return 1;} //1-yes

@@ -332,7 +332,7 @@ private:
 		else if (ST_THIS test_and_set_reading())
 			return;
 #endif
-		BOOST_AUTO(cb, ST_THIS make_io_strand_handler(
+		BOOST_AUTO(cb, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
 			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 #ifdef ST_ASIO_PASSIVE_RECV
 		if (!ST_THIS async_read(cb))
@@ -396,7 +396,7 @@ private:
 		if (!sending_buffer.empty())
 		{
 			sending_msgs.front().restart();
-			ST_THIS async_write(sending_buffer, ST_THIS make_io_strand_handler(
+			ST_THIS async_write(sending_buffer, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
 				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
 			return true;
 		}
@@ -464,7 +464,7 @@ private:
 			--loop_num;
 			if (loop_num > 0)
 			{
-				ST_THIS change_timer_call_back(TIMER_ASYNC_SHUTDOWN,
+				ST_THIS change_timer_handler(TIMER_ASYNC_SHUTDOWN,
 					boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this, loop_num), true, false));
 				return true;
 			}

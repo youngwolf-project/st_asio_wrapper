@@ -99,7 +99,7 @@ public:
 		return socket_ptr ? (socket_ptr->force_shutdown(), true) : false;
 	}
 
-	bool send_msg(const std::string& name, const std::string& msg) {std::string unused(msg); return send_msg(name, unused);}
+	bool send_msg(const std::string& name, const std::string& msg) {std::string xvalue(msg); return send_msg(name, xvalue);}
 	bool send_msg(const std::string& name, std::string& msg)
 	{
 		BOOST_AUTO(socket_ptr, find_link(name));

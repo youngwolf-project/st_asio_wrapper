@@ -106,8 +106,8 @@ protected:
 		recv_buffer.clear();
 	}
 
-	//convert the result to F is a waste, but we have no choice without c++0x
-	template<typename F> F make_io_strand_handler(const F& handler) {return make_strand_handler(rw_strand, handler);}
+	//convert the result to RE is a waste, but we have no choice without c++0x
+	template<typename RE, typename F> RE make_io_strand_handler(const F& handler) {return make_strand_handler(rw_strand, handler);}
 
 	//execute in the IO strand -- rw_strand
 	template<typename F> void post_in_io_strand(const F& handler) {post_strand(rw_strand, handler);}
@@ -590,11 +590,11 @@ protected:
 			return SUCCESS;
 		}
 
-		in_msg unused(msg, true);
-		BOOST_AUTO(p, unused.p);
+		in_msg xvalue(msg, true);
+		BOOST_AUTO(p, xvalue.p);
 		typename in_msg::future f;
 		p->get_future().swap(f);
-		if (!(prior ? send_buffer.enqueue_front(unused) : send_buffer.enqueue(unused)))
+		if (!(prior ? send_buffer.enqueue_front(xvalue) : send_buffer.enqueue(xvalue)))
 			return NOT_APPLICABLE;
 
 		send_msg();
@@ -615,11 +615,11 @@ protected:
 			return SUCCESS;
 		}
 
-		in_msg unused(msg, true);
-		BOOST_AUTO(p, unused.p);
+		in_msg xvalue(msg, true);
+		BOOST_AUTO(p, xvalue.p);
 		typename in_msg::future f;
 		p->get_future().swap(f);
-		if (!(prior ? send_buffer.enqueue_front(unused) : send_buffer.enqueue(unused)))
+		if (!(prior ? send_buffer.enqueue_front(xvalue) : send_buffer.enqueue(xvalue)))
 			return NOT_APPLICABLE;
 
 		send_msg();
