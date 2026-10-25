@@ -57,7 +57,7 @@ public:
 		{return (aci, boost::lambda::bind(boost::lambda::unlambda(handler), boost::lambda::_1, boost::lambda::_2));}
 
 	long get_aci_ref() const {return aci.use_count();}
-	bool is_async_calling() const {return !aci.unique();}
+	bool is_async_calling() const {return aci.use_count() > 1;}
 	int is_last_async_call() const //can only be called in callbacks, 0-not, -1-fault error, 1-yes
 	{
 		long cur_ref = aci.use_count();

@@ -256,7 +256,7 @@ public:
 	{
 		boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
 		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&Object::is_equal_to, boost::placeholders::_1, id)));
-		if (iter != invalid_object_can.end() && (*iter).unique() && (*iter)->obsoleted())
+		if (iter != invalid_object_can.end() && 1 == iter->use_count() && (*iter)->obsoleted())
 		{
 			BOOST_AUTO(object_ptr, *iter);
 			invalid_object_can.erase(iter);
@@ -270,7 +270,7 @@ public:
 	{
 		boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
 		for (BOOST_AUTO(iter, invalid_object_can.begin()); iter != invalid_object_can.end(); ++iter)
-			if ((*iter).unique() && (*iter)->obsoleted())
+			if (1 == iter->use_count() && (*iter)->obsoleted())
 			{
 				BOOST_AUTO(object_ptr, *iter);
 				invalid_object_can.erase(iter);
@@ -331,7 +331,7 @@ public:
 			//	socket_ptr->set_timer(...);
 			//}
 			//then in the future, when invoke the timer handler, the socket has been freed and its this pointer already became wild.
-			if ((*iter).unique() && (*iter)->obsoleted())
+			if (1 == iter->use_count() && (*iter)->obsoleted())
 			{
 				--num;
 				++num_affected;
