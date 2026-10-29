@@ -67,7 +67,7 @@ public:
 	virtual bool obsoleted() {return !need_reconnect && super::obsoleted();}
 	virtual void reset() {need_reconnect = ST_ASIO_RECONNECT; super::reset();}
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip.empty() ? ST_ASIO_SERVER_IP : ip);}
 #else
 	bool set_server_addr(unsigned short port, const std::string& ip = ST_ASIO_SERVER_IP) {return set_addr(server_addr, port, ip);}

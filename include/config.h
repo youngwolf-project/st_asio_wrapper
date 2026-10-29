@@ -960,6 +960,9 @@
 		#if !defined(ST_ASIO_HIDE_WARNINGS) && _MSC_VER >= 1800
 			#pragma message("Your compiler is Visual C++ 12.0 (2013) or higher, you can use ascs to gain some performance improvement.")
 		#endif
+		#if !defined(ST_ASIO_HIDE_WARNINGS) && _MSVC_LANG >= 201103L
+			#pragma message("st_asio_wrapper does not need any c++11 features except for websocket support.")
+		#endif
 	#endif
 #elif defined(__GNUC__)
 	#define ST_ASIO_SF "%zu" //format used to print 'size_t'

@@ -615,7 +615,7 @@ template<typename T> struct obj_with_begin_time_promise : public obj_with_begin_
 #endif
 
 //free functions, used to do something to any container(except map and multimap) optionally with any mutex
-#if defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
+#if _MSVC_LANG >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
 template<typename _Can, typename _Mutex, typename _Predicate, template<typename> class LockType = boost::lock_guard>
 #else
 template<typename _Can, typename _Mutex, typename _Predicate, template<typename> class LockType>
@@ -629,7 +629,7 @@ void do_something_to_all(_Can& __can, _Mutex& __mutex, const _Predicate& __pred)
 template<typename _Can, typename _Predicate>
 void do_something_to_all(_Can& __can, const _Predicate& __pred) {for (BOOST_AUTO(iter, __can.begin()); iter != __can.end(); ++iter) __pred(*iter);}
 
-#if defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
+#if _MSVC_LANG >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
 template<typename _Can, typename _Mutex, typename _Predicate, template<typename> class LockType = boost::lock_guard>
 #else
 template<typename _Can, typename _Mutex, typename _Predicate, template<typename> class LockType>
@@ -647,7 +647,7 @@ template<typename _Can>
 size_t get_size_in_byte(const _Can& __can)
 {
 	size_t size_in_byte = 0;
-#if __cplusplus >= 201703L
+#if _MSVC_LANG >= 201703L || __cplusplus >= 201703L
 	do_something_to_all(__can, [&](const auto& item) {size_in_byte += item.size();});
 #else
 	do_something_to_all(__can, size_in_byte += boost::lambda::bind(&_Can::value_type::size, boost::lambda::_1));
@@ -1042,18 +1042,14 @@ public:
 		to_time_str(time(NULL), os);
 		os << " -> ";
 
-#if defined(_MSC_VER) || defined(__clang__)
+#if defined(_MSVC_STL_VERSION) || defined(_LIBCPP_VERSION)
 		os.rdbuf()->sgetn(buff, buff_len);
 #endif
 		size_t len = (size_t) os.tellp();
 		if (len >= buff_len)
 			*boost::next(buff, buff_len - 1) = '\0';
 		else
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
-			vsnprintf_s(boost::next(buff, len),  buff_len - len, _TRUNCATE, fmt, ap);
-#else
 			vsnprintf(boost::next(buff, len), buff_len - len, fmt, ap);
-#endif
 	}
 };
 
