@@ -216,11 +216,7 @@ public:
 	object_type find(int id)
 	{
 		boost::lock_guard<boost::mutex> lock(service_can_mutex);
-#if _MSVC_LANG >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
-		auto iter = std::find_if(service_can.begin(), service_can.end(), [&](const i_service* service) {return service->is_equal_to(id);});
-#else
-		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), std::bind2nd(std::mem_fun(&i_service::is_equal_to), id)));
-#endif
+		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), boost::bind(&i_service::is_equal_to, boost::placeholders::_1, id)));
 		return iter == service_can.end() ? NULL : *iter;
 	}
 
@@ -238,11 +234,7 @@ public:
 	void remove(int id)
 	{
 		boost::unique_lock<boost::mutex> lock(service_can_mutex);
-#if _MSVC_LANG >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
-		auto iter = std::find_if(service_can.begin(), service_can.end(), [&](const i_service* service) {return service->is_equal_to(id);});
-#else
-		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), std::bind2nd(std::mem_fun(&i_service::is_equal_to), id)));
-#endif
+		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), boost::bind(&i_service::is_equal_to, boost::placeholders::_1, id)));
 		if (iter != service_can.end())
 		{
 			object_type i_service_ = *iter;
