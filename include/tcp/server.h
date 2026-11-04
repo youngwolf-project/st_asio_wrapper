@@ -27,27 +27,7 @@ protected:
 	~generic_server() {clear_io_context_refs(); Pool::clear_io_context_refs();}
 
 public:
-	bool set_server_addr(unsigned short port, const std::string& ip = std::string())
-	{
-		if (ip.empty())
-			server_addr = typename Family::endpoint(ST_ASIO_TCP_DEFAULT_IP_VERSION, port);
-		else
-		{
-			boost::system::error_code ec;
-#if BOOST_ASIO_VERSION >= 101100
-			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec));
-#else
-			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec));
-#endif
-			if (ec)
-				return false;
-
-			server_addr = boost::asio::ip::tcp::endpoint(addr, port);
-		}
-
-		return true;
-	}
-	bool set_server_addr(const std::string& file_name) {server_addr = typename Family::endpoint(file_name); return true;}
+	bool set_server_addr(const typename Family::endpoint& addr) {server_addr = addr; return true;}
 	const typename Family::endpoint& get_server_addr() const {return server_addr;}
 
 	void add_io_context_refs(unsigned count)
@@ -277,11 +257,27 @@ template<typename Socket, typename Pool = object_pool<Socket>, typename Server =
 class server_base : public generic_server<Socket, boost::asio::ip::tcp, Pool, Server>
 {
 private:
-	typedef generic_server<Socket, boost::asio::ip::tcp, Pool, Server> super;
+	typedef boost::asio::ip::tcp Family;
+	typedef generic_server<Socket, Family, Pool, Server> super;
 
 public:
-	server_base(service_pump& service_pump_) : super(service_pump_) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT);}
-	template<typename Arg> server_base(service_pump& service_pump_, const Arg& arg) : super(service_pump_, arg) {ST_THIS set_server_addr(ST_ASIO_SERVER_PORT);}
+	server_base(service_pump& service_pump_) : super(service_pump_) {set_server_addr(ST_ASIO_SERVER_PORT);}
+	template<typename Arg> server_base(service_pump& service_pump_, const Arg& arg) : super(service_pump_, arg) {set_server_addr(ST_ASIO_SERVER_PORT);}
+
+	using super::set_server_addr;
+	bool set_server_addr(unsigned short port, const std::string& ip = std::string())
+	{
+		if (ip.empty())
+			return set_server_addr(Family::endpoint(ST_ASIO_TCP_DEFAULT_IP_VERSION, port));
+
+		boost::system::error_code ec;
+#if BOOST_ASIO_VERSION >= 101100
+		BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec));
+#else
+		BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec));
+#endif
+		return ec ? false : set_server_addr(Family::endpoint(addr, port));
+	}
 };
 
 #ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
@@ -289,10 +285,15 @@ template<typename Socket, typename Pool = object_pool<Socket>, typename Server =
 class unix_server_base : public generic_server<Socket, boost::asio::local::stream_protocol, Pool, Server>
 {
 private:
-	typedef generic_server<Socket, boost::asio::local::stream_protocol, Pool, Server> super;
+	typedef boost::asio::local::stream_protocol Family;
+	typedef generic_server<Socket, Family, Pool, Server> super;
 
 public:
-	unix_server_base(service_pump& service_pump_) : super(service_pump_) {ST_THIS set_server_addr("./st-unix-socket");}
+	unix_server_base(service_pump& service_pump_) : super(service_pump_) {set_server_addr("./st-unix-socket");}
+
+	using super::set_server_addr;
+	bool set_server_addr(const std::string& file_name) {return file_name.empty() ? false : set_server_addr(Family::endpoint(file_name));}
+	bool set_server_addr(const char* file_name) {return NULL == file_name || '\0' == *file_name ? false : set_server_addr(Family::endpoint(file_name));}
 };
 #endif
 

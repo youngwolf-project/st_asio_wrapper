@@ -31,37 +31,16 @@ public:
 private:
 	typedef socket<Socket, Packer, Unpacker, in_msg_type, out_msg_type, InQueue, InContainer, OutQueue, OutContainer> super;
 
-public:
-	static bool set_addr(boost::asio::ip::udp::endpoint& endpoint, unsigned short port, const std::string& ip)
-	{
-		if (ip.empty())
-			endpoint = boost::asio::ip::udp::endpoint(ST_ASIO_UDP_DEFAULT_IP_VERSION, port);
-		else
-		{
-			boost::system::error_code ec;
-#if BOOST_ASIO_VERSION >= 101100
-			BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec)); assert(!ec);
-#else
-			BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec)); assert(!ec);
-#endif
-			if (ec)
-			{
-				unified_out::error_out("invalid IP address %s.", ip.data());
-				return false;
-			}
-
-			endpoint = boost::asio::ip::udp::endpoint(addr, port);
-		}
-
-		return true;
-	}
-
 protected:
 	generic_socket(boost::asio::io_context& io_context_) : super(io_context_), is_bound(false), is_connected(false), connect_mode(ST_ASIO_UDP_CONNECT_MODE), matrix(NULL) {}
 	generic_socket(Matrix& matrix_) : super(matrix_.get_service_pump()), is_bound(false), is_connected(false), connect_mode(ST_ASIO_UDP_CONNECT_MODE), matrix(&matrix_) {}
 	~generic_socket() {ST_THIS clear_io_context_refs();}
 
 public:
+	virtual const char* type_name() const {return "UDP";}
+	virtual int type_id() const {return 0;}
+
+	virtual bool is_addr_valid(const typename Family::endpoint& addr) const = 0;
 	virtual bool is_ready() {return is_bound;}
 	virtual void send_heartbeat()
 	{
@@ -69,8 +48,6 @@ public:
 		ST_THIS packer()->pack_heartbeat(msg);
 		do_direct_send_msg(msg);
 	}
-	virtual const char* type_name() const {return "UDP";}
-	virtual int type_id() const {return 0;}
 
 	//reset all, be ensure that there's no any operations performed on this socket when invoke it
 	//subclass must re-write this function to initialize itself, and then do not forget to invoke superclass' reset function too
@@ -89,12 +66,10 @@ public:
 	void set_connect_mode() {connect_mode = true;}
 	bool get_connect_mode() const {return connect_mode;}
 
-	bool set_local_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(local_addr, port, ip);}
-	bool set_local_addr(const std::string& file_name) {local_addr = typename Family::endpoint(file_name); return true;}
+	bool set_local_addr(const typename Family::endpoint& addr) {local_addr = addr; return true;}
 	const typename Family::endpoint& get_local_addr() const {return local_addr;}
 
-	bool set_peer_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(peer_addr, port, ip);}
-	bool set_peer_addr(const std::string& file_name) {peer_addr = typename Family::endpoint(file_name); return true;}
+	bool set_peer_addr(const typename Family::endpoint& addr) {peer_addr = addr; return true;}
 	const typename Family::endpoint& get_peer_addr() const {return peer_addr;}
 
 	void disconnect() {force_shutdown();}
@@ -177,33 +152,57 @@ protected:
 	Matrix* get_matrix() {return matrix;}
 	const Matrix* get_matrix() const {return matrix;}
 
-	virtual bool bind(const typename Family::endpoint& local_addr) {return true;}
-	virtual bool connect(const typename Family::endpoint& peer_addr) {return false;}
+	virtual bool bind()
+	{
+		if (is_addr_valid(local_addr))
+		{
+			boost::system::error_code ec;
+			BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
+
+			if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
+			{
+				lowest_object.open(local_addr.protocol(), ec); assert(!ec);
+				if (ec)
+				{
+					unified_out::error_out("cannot create socket: %s", ec.message().data());
+					return (is_bound = false);
+				}
+
+#ifndef ST_ASIO_NOT_REUSE_ADDRESS
+				lowest_object.set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
+#endif
+			}
+
+			lowest_object.bind(local_addr, ec);
+			if (ec && boost::asio::error::invalid_argument != ec)
+			{
+				unified_out::error_out("cannot bind socket: %s", ec.message().data());
+				return (is_bound = false);
+			}
+		}
+
+		return (is_bound = true);
+	}
 
 	virtual bool do_start()
 	{
-		BOOST_AUTO(&lowest_object, ST_THIS lowest_layer());
-		if (!lowest_object.is_open()) //user maybe has opened this socket (to set options for example)
+		assert(is_ready());
+		if (connect_mode)
 		{
-			boost::system::error_code ec;
-			lowest_object.open(local_addr.protocol(), ec); assert(!ec);
-			if (ec)
+			if (is_addr_valid(peer_addr))
 			{
-				unified_out::error_out("cannot create socket: %s", ec.message().data());
-				return (is_bound = false);
+				boost::system::error_code ec;
+				ST_THIS lowest_layer().connect(peer_addr, ec);
+				if (ec)
+					unified_out::error_out("cannot connect to the peer");
+				else
+					is_connected = true;
 			}
-
-#ifndef ST_ASIO_NOT_REUSE_ADDRESS
-			lowest_object.set_option(boost::asio::socket_base::reuse_address(true), ec); assert(!ec);
-#endif
+			else
+				unified_out::error_out("invalid peer address");
 		}
 
-		if (!bind(local_addr))
-			return (is_bound = false);
-		else if (connect_mode)
-			is_connected = connect(peer_addr);
-
-		return (is_bound = true) && super::do_start();
+		return super::do_start();
 	}
 
 	//msg was failed to send and udp::generic_socket will not hold it any more, if you want to re-send it in the future,
@@ -399,9 +398,7 @@ private:
 
 	bool is_bound, is_connected, connect_mode;
 	typename super::in_msg sending_msg;
-	typename Family::endpoint local_addr;
-	typename Family::endpoint temp_addr; //used when receiving messages
-	typename Family::endpoint peer_addr;
+	typename Family::endpoint local_addr, peer_addr, temp_addr; //temp_addr is used when receiving messages
 
 	Matrix* matrix;
 };
@@ -412,44 +409,34 @@ template<typename Packer, typename Unpacker, typename Matrix = i_matrix,
 class socket_base : public generic_socket<Packer, Unpacker, Matrix, boost::asio::ip::udp::socket, boost::asio::ip::udp, InQueue, InContainer, OutQueue, OutContainer>
 {
 private:
-	typedef generic_socket<Packer, Unpacker, Matrix, boost::asio::ip::udp::socket, boost::asio::ip::udp, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef boost::asio::ip::udp Family;
+	typedef generic_socket<Packer, Unpacker, Matrix, Family::socket, Family, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	socket_base(boost::asio::io_context& io_context_) : super(io_context_) {}
 	socket_base(Matrix& matrix_) : super(matrix_) {}
 
-protected:
-	virtual bool bind(const boost::asio::ip::udp::endpoint& local_addr)
+	using super::set_local_addr;
+	bool set_local_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(port, ip, &super::set_local_addr, this);}
+
+	using super::set_peer_addr;
+	bool set_peer_addr(unsigned short port, const std::string& ip = std::string()) {return set_addr(port, ip, &super::set_peer_addr, this);}
+
+	virtual bool is_addr_valid(const Family::endpoint& addr) const {return 0 != addr.port() || !addr.address().is_unspecified();}
+
+private:
+	static bool set_addr(unsigned short port, const std::string& ip, bool (super::*setter)(const Family::endpoint&), super* o)
 	{
-		if (0 != local_addr.port() || !local_addr.address().is_unspecified())
-		{
-			boost::system::error_code ec;
-			ST_THIS lowest_layer().bind(local_addr, ec);
-			if (ec && boost::asio::error::invalid_argument != ec)
-			{
-				unified_out::error_out("cannot bind socket: %s", ec.message().data());
-				return false;
-			}
-		}
+		if (ip.empty())
+			return (o->*setter)(Family::endpoint(ST_ASIO_UDP_DEFAULT_IP_VERSION, port));
 
-		return true;
-	}
-
-	virtual bool connect(const boost::asio::ip::udp::endpoint& peer_addr)
-	{
-		if (0 != peer_addr.port() || !peer_addr.address().is_unspecified())
-		{
-			boost::system::error_code ec;
-			ST_THIS lowest_layer().connect(peer_addr, ec);
-			if (ec)
-				unified_out::error_out("cannot connect to the peer");
-			else
-				return true;
-		}
-		else
-			unified_out::error_out("invalid peer ip address");
-
-		return false;
+		boost::system::error_code ec;
+#if BOOST_ASIO_VERSION >= 101100
+		BOOST_AUTO(addr, boost::asio::ip::make_address(ip, ec)); assert(!ec);
+#else
+		BOOST_AUTO(addr, boost::asio::ip::address::from_string(ip, ec)); assert(!ec);
+#endif
+		return ec ? false : (o->*setter)(Family::endpoint(addr, port));
 	}
 };
 
@@ -460,45 +447,22 @@ template<typename Packer, typename Unpacker, typename Matrix = i_matrix,
 class unix_socket_base : public generic_socket<Packer, Unpacker, Matrix, boost::asio::local::datagram_protocol::socket, boost::asio::local::datagram_protocol, InQueue, InContainer, OutQueue, OutContainer>
 {
 private:
-	typedef generic_socket<Packer, Unpacker, Matrix, boost::asio::local::datagram_protocol::socket, boost::asio::local::datagram_protocol, InQueue, InContainer, OutQueue, OutContainer> super;
+	typedef boost::asio::local::datagram_protocol Family;
+	typedef generic_socket<Packer, Unpacker, Matrix, Family::socket, Family, InQueue, InContainer, OutQueue, OutContainer> super;
 
 public:
 	unix_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {}
 	unix_socket_base(Matrix& matrix_) : super(matrix_) {}
 
-protected:
-	virtual bool bind(const boost::asio::local::datagram_protocol::endpoint& local_addr)
-	{
-		if (!local_addr.path().empty())
-		{
-			boost::system::error_code ec;
-			ST_THIS lowest_layer().bind(local_addr, ec);
-			if (ec && boost::asio::error::invalid_argument != ec)
-			{
-				unified_out::error_out("cannot bind socket: %s", ec.message().data());
-				return false;
-			}
-		}
+	using super::set_local_addr;
+	bool set_local_addr(const std::string& file_name) {return file_name.empty() ? false : set_local_addr(Family::endpoint(file_name));}
+	bool set_local_addr(const char* file_name) {return NULL == file_name || '\0' == *file_name ? false : set_local_addr(Family::endpoint(file_name));}
 
-		return true;
-	}
+	using super::set_peer_addr;
+	bool set_peer_addr(const std::string& file_name) {return file_name.empty() ? false : set_peer_addr(Family::endpoint(file_name));}
+	bool set_peer_addr(const char* file_name) {return NULL == file_name || '\0' == *file_name ? false : set_peer_addr(Family::endpoint(file_name));}
 
-	virtual bool connect(const boost::asio::local::datagram_protocol::endpoint& peer_addr)
-	{
-		if (!peer_addr.path().empty())
-		{
-			boost::system::error_code ec;
-			ST_THIS lowest_layer().connect(peer_addr, ec);
-			if (ec)
-				unified_out::error_out("cannot connect to the peer");
-			else
-				return true;
-		}
-		else
-			unified_out::error_out("invalid peer path");
-
-		return false;
-	}
+	virtual bool is_addr_valid(const Family::endpoint& addr) const {return !addr.path().empty();}
 };
 #endif
 

@@ -214,7 +214,7 @@ public:
 
 		if (capacity != cap)
 		{
-#ifdef _MSC_VER
+#ifdef _MSVC_STL_VERSION
 			if (cap < capacity && capacity < cap + cap / 2) //memory expansion strategy -- quoted from std::string.
 			{
 				capacity = cap + cap / 2;

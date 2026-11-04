@@ -155,10 +155,10 @@ public:
 		if (!started_ && !is_timer(TIMER_DELAY_CLOSE) && !stopped())
 		{
 			scope_atomic_lock lock(start_atomic);
-			if (!started_ && lock.locked())
-				started_ = do_start();
-			else
+			if (started_ || !lock.locked())
 				unified_out::error_out(ST_ASIO_LLF " starting failed.", id());
+			else if (bind())
+				(void) (started_ = true), do_start();
 		}
 		else
 			unified_out::error_out(ST_ASIO_LLF " starting failed because of already stared or closing timer exists or service_pump stopped.", id());
@@ -322,6 +322,7 @@ public:
 	POP_ALL_PENDING_MSG(pop_all_pending_recv_msg, recv_buffer, out_container_type)
 
 protected:
+	virtual bool bind() {return true;}
 	virtual bool do_start()
 	{
 		stat.last_recv_time = time(NULL);
