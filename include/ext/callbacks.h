@@ -263,6 +263,7 @@ public:
 
 public:
 	template<typename Arg> object_pool(Arg& arg) : ObjectPool(arg) {}
+	template<typename Arg1, typename Arg2> object_pool(Arg1& arg1, Arg2& arg2) : ObjectPool(arg1, arg2) {}
 
 	register_cb_2(on_create, false)
 
