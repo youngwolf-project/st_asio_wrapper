@@ -10,7 +10,7 @@ using namespace st_asio_wrapper::ext;
 #define QUIT_COMMAND	"quit"
 
 //this callback can be invoked concurrently for different sockets
-template<typename Socket, typename Msg> bool cb_handle_msg(Socket* socket, Msg& msg) {printf("handle msg: %s\n", msg.data()); return true;}
+template<typename Socket, typename Msg> bool cb_handle_msg(Socket*, Msg& msg) {printf("handle msg: %s\n", msg.data()); return true;}
 
 //this callback can be invoked concurrently for different object pools, callback can be a raw function
 template<typename Pool, typename Object, typename Socket, typename Msg> void cb_object_create(Pool*, Object& object) {object->register_on_msg_handle(&cb_handle_msg<Socket, Msg>);}

@@ -131,7 +131,7 @@ public:
 	boost::asio::ssl::context& context() {return ctx;}
 
 protected:
-	template<typename Arg> typename super::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
+	template<typename Arg> typename super::object_type create_object(Arg& arg) {return super::create_object(arg, ctx);}
 
 private:
 	boost::asio::ssl::context ctx;

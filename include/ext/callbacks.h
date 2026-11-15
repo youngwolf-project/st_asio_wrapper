@@ -30,7 +30,7 @@ namespace st_asio_wrapper { namespace ext { namespace callbacks {
 #define call_cb_2_combine(super, fun, p1, p2) {bool re = cb_##fun.first ? cb_##fun.first(this, p1, p2) : true; if (re && !cb_##fun.second) re = super::fun(p1, p2); return re;}
 
 #define register_cb(fun, init) template<typename CallBack> \
-void register_##fun(const CallBack& cb, bool pass_on = init) {cb_##fun.first = cb; cb_##fun.second = !pass_on;} \
+void register_##fun(const CallBack& cb, bool pass_on = init) {cb_##fun = std::make_pair(cb, !pass_on);} \
 void register_##fun(fo_##fun* cb, bool pass_on = init)
 
 #define register_cb_1(fun, init) register_cb(fun, init) {register_##fun(boost::bind(cb, boost::placeholders::_1), pass_on);}

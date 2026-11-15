@@ -68,12 +68,12 @@ public:
 	virtual service_pump& get_service_pump() {return Pool::get_service_pump();}
 	virtual const service_pump& get_service_pump() const {return Pool::get_service_pump();}
 
-	virtual bool socket_exist(boost::uint_fast64_t id) {return ST_THIS exist(id);}
-	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return ST_THIS find(id);}
+	virtual bool socket_exist(boost::uint_fast64_t id) const {return ST_THIS exist(id);}
+	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) const {return ST_THIS find(id);}
 	virtual bool del_socket(boost::uint_fast64_t id) {return ST_THIS del_object(id);}
 
-	typename Pool::object_type create_object() {return Pool::create_object(boost::ref(*this));}
-	template<typename Arg> typename Pool::object_type create_object(Arg& arg) {return Pool::create_object(boost::ref(*this), arg);}
+	typename Pool::object_type create_object() {return Pool::create_object(*this);}
+	template<typename Arg> typename Pool::object_type create_object(Arg& arg) {return Pool::create_object(*this, arg);}
 
 	//will call socket_ptr's start function if the service_pump already started.
 	bool add_socket(typename Pool::object_ctype& socket_ptr, unsigned additional_io_context_refs = 0)

@@ -167,14 +167,16 @@ protected:
 #define CREATE_OBJECT_1_ARG(first_way) \
 BOOST_AUTO(object_ptr, first_way()); \
 if (!object_ptr) \
-	try {object_ptr = boost::make_shared<Object>(arg);} catch (const std::exception& e) {unified_out::error_out("cannot create object (%s)", e.what());} \
+	try {object_ptr = boost::make_shared<Object>(boost::ref(arg));} \
+	catch (const std::exception& e) {unified_out::error_out("cannot create object (%s)", e.what());} \
 init_object(object_ptr); \
 return object_ptr;
 
 #define CREATE_OBJECT_2_ARG(first_way) \
 BOOST_AUTO(object_ptr, first_way()); \
 if (!object_ptr) \
-	try {object_ptr = boost::make_shared<Object>(arg1, arg2);} catch (const std::exception& e) {unified_out::error_out("cannot create object (%s)", e.what());} \
+	try {object_ptr = boost::make_shared<Object>(boost::ref(arg1), boost::ref(arg2));} \
+	catch (const std::exception& e) {unified_out::error_out("cannot create object (%s)", e.what());} \
 init_object(object_ptr); \
 return object_ptr;
 
@@ -202,19 +204,19 @@ public:
 	size_t max_size() const {return max_size_;}
 	void max_size(size_t _max_size) {max_size_ = _max_size;}
 
-	size_t size()
+	size_t size() const
 	{
 		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		return object_can.size();
 	}
 
-	bool exist(boost::uint_fast64_t id)
+	bool exist(boost::uint_fast64_t id) const
 	{
 		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		return object_can.count(id) > 0;
 	}
 
-	object_type find(boost::uint_fast64_t id)
+	object_type find(boost::uint_fast64_t id) const
 	{
 		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		BOOST_AUTO(iter, object_can.find(id));
@@ -222,21 +224,21 @@ public:
 	}
 
 	//this method has linear complexity, please note.
-	object_type at(size_t index)
+	object_type at(size_t index) const
 	{
 		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
 		assert(index < object_can.size());
 		return index < object_can.size() ? boost::next(object_can.begin(), index)->second : object_type();
 	}
 
-	size_t invalid_object_size()
+	size_t invalid_object_size() const
 	{
 		boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
 		return invalid_object_can.size();
 	}
 
 	//this method has linear complexity, please note.
-	object_type invalid_object_find(boost::uint_fast64_t id)
+	object_type invalid_object_find(boost::uint_fast64_t id) const
 	{
 		boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
 		BOOST_AUTO(iter, std::find_if(invalid_object_can.begin(), invalid_object_can.end(), boost::bind(&Object::is_equal_to, boost::placeholders::_1, id)));
@@ -244,7 +246,7 @@ public:
 	}
 
 	//this method has linear complexity, please note.
-	object_type invalid_object_at(size_t index)
+	object_type invalid_object_at(size_t index) const
 	{
 		boost::lock_guard<boost::mutex> lock(invalid_object_can_mutex);
 		assert(index < invalid_object_can.size());
@@ -366,7 +368,7 @@ private:
 	atomic_uint_fast64 cur_id;
 
 	container_type object_can;
-	ST_ASIO_SHARED_MUTEX_TYPE object_can_mutex;
+	mutable ST_ASIO_SHARED_MUTEX_TYPE object_can_mutex;
 	size_t max_size_;
 
 	//because all objects are dynamic created and stored in object_can, after receiving error occurred (you are recommended to delete the object from object_can,
@@ -375,7 +377,7 @@ private:
 	//from the heap or reuse them in the near future. if ST_ASIO_CLEAR_OBJECT_INTERVAL been defined, clear_obsoleted_object() will be invoked automatically and
 	//periodically to move all invalid objects into invalid_object_can.
 	boost::container::list<object_type> invalid_object_can;
-	boost::mutex invalid_object_can_mutex;
+	mutable boost::mutex invalid_object_can_mutex;
 };
 
 } //namespace
