@@ -19,6 +19,8 @@
 
 namespace st_asio_wrapper { namespace ext { namespace callbacks {
 
+#define define_cb(fun) std::pair<boost::function<fo_##fun>, bool> cb_##fun
+
 #define call_cb_void(super, fun) virtual void fun() {if (cb_##fun.first) cb_##fun.first(this); if (!cb_##fun.second) super::fun();}
 #define call_cb_1_void(super, fun, p) {if (cb_##fun.first) cb_##fun.first(this, p); if (!cb_##fun.second) super::fun(p);}
 #define call_cb_2_void(super, fun, p1, p2) {if (cb_##fun.first) cb_##fun.first(this, p1, p2); if (!cb_##fun.second) super::fun(p1, p2);}
@@ -134,30 +136,30 @@ private:
 #endif
 
 private:
-	std::pair<boost::function<fo_obsoleted>, bool> cb_obsoleted;
-	std::pair<boost::function<fo_is_ready>, bool> cb_is_ready;
-	std::pair<boost::function<fo_send_heartbeat>, bool> cb_send_heartbeat;
-	std::pair<boost::function<fo_reset>, bool> cb_reset;
-	std::pair<boost::function<fo_on_heartbeat_error>, bool> cb_on_heartbeat_error;
-	std::pair<boost::function<fo_on_send_error>, bool> cb_on_send_error;
-	std::pair<boost::function<fo_on_recv_error>, bool> cb_on_recv_error;
-	std::pair<boost::function<fo_on_close>, bool> cb_on_close;
-	std::pair<boost::function<fo_after_close>, bool> cb_after_close;
+	define_cb(obsoleted);
+	define_cb(is_ready);
+	define_cb(send_heartbeat);
+	define_cb(reset);
+	define_cb(on_heartbeat_error);
+	define_cb(on_send_error);
+	define_cb(on_recv_error);
+	define_cb(on_close);
+	define_cb(after_close);
 
 #ifdef ST_ASIO_SYNC_DISPATCH
-	std::pair<boost::function<fo_on_msg>, bool> cb_on_msg;
+	define_cb(on_msg);
 #endif
-	std::pair<boost::function<fo_on_msg_handle>, bool> cb_on_msg_handle;
+	define_cb(on_msg_handle);
 #ifdef ST_ASIO_WANT_MSG_SEND_NOTIFY
-	std::pair<boost::function<fo_on_msg_send>, bool> cb_on_msg_send;
+	define_cb(on_msg_send);
 #endif
 #ifdef ST_ASIO_WANT_ALL_MSG_SEND_NOTIFY
-	std::pair<boost::function<fo_on_all_msg_send>, bool> cb_on_all_msg_send;
+	define_cb(on_all_msg_send);
 #endif
 
 #ifdef ST_ASIO_SHRINK_SEND_BUFFER
-	std::pair<boost::function<fo_calc_shrink_size>, bool> cb_calc_shrink_size;
-	std::pair<boost::function<fo_on_msg_discard>, bool> cb_on_msg_discard;
+	define_cb(calc_shrink_size);
+	define_cb(on_msg_discard);
 #endif
 };
 
@@ -182,9 +184,9 @@ private:
 	call_cb_void(Socket, on_async_shutdown_error)
 
 private:
-	std::pair<boost::function<fo_on_connect>, bool> cb_on_connect;
-	std::pair<boost::function<fo_on_unpack_error>, bool> cb_on_unpack_error;
-	std::pair<boost::function<fo_on_async_shutdown_error>, bool> cb_on_async_shutdown_error;
+	define_cb(on_connect);
+	define_cb(on_unpack_error);
+	define_cb(on_async_shutdown_error);
 };
 
 template<typename Socket> class c_socket : public tcp_socket<Socket> //for client socket
@@ -202,7 +204,7 @@ private:
 	virtual int prepare_reconnect(const boost::system::error_code& ec) call_cb_1_return(Socket, int, prepare_reconnect, ec)
 
 private:
-	std::pair<boost::function<fo_prepare_reconnect>, bool> cb_prepare_reconnect;
+	define_cb(prepare_reconnect);
 };
 
 template<typename Socket> class s_socket : public tcp_socket<Socket> //for server socket
@@ -220,7 +222,7 @@ public:
 	virtual void take_over(boost::shared_ptr<typename Socket::type_of_object_restore> socket_ptr) call_cb_1_void(Socket, take_over, socket_ptr)
 
 private:
-	std::pair<boost::function<fo_take_over>, bool> cb_take_over;
+	define_cb(take_over);
 };
 
 template<typename Server> class server : public Server //for server
@@ -247,10 +249,10 @@ private:
 	virtual bool on_accept_error(const boost::system::error_code& ec, typename Server::object_ctype& socket_ptr) call_cb_2_combine(Server, on_accept_error, ec, socket_ptr)
 
 private:
-	std::pair<boost::function<fo_async_accept_num>, bool> cb_async_accept_num;
-	std::pair<boost::function<fo_start_next_accept>, bool> cb_start_next_accept;
-	std::pair<boost::function<fo_on_accept>, bool> cb_on_accept;
-	std::pair<boost::function<fo_on_accept_error>, bool> cb_on_accept_error;
+	define_cb(async_accept_num);
+	define_cb(start_next_accept);
+	define_cb(on_accept);
+	define_cb(on_accept_error);
 };
 
 template<typename ObjectPool> class object_pool : public ObjectPool
@@ -271,7 +273,7 @@ private:
 	virtual void on_create(typename ObjectPool::object_ctype& object_ptr) call_cb_1_void(ObjectPool, on_create, object_ptr)
 
 private:
-	std::pair<boost::function<fo_on_create>, bool> cb_on_create;
+	define_cb(on_create);
 };
 
 }}} //namespace

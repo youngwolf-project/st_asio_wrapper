@@ -31,24 +31,19 @@ public:
 
 	bool stopped() const {return io_context_.stopped();}
 
-	#if BOOST_ASIO_VERSION >= 101100
+#if BOOST_ASIO_VERSION >= 101100
 	template<typename F> void post(const F& handler) {boost::asio::post(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
 	template<typename F> void defer(const F& handler) {boost::asio::defer(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
 	template<typename F> void dispatch(const F& handler) {boost::asio::dispatch(io_context_, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	template<typename F> void post_strand(boost::asio::io_context::strand& strand, const F& handler)
-		{boost::asio::post(strand, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	template<typename F> void defer_strand(boost::asio::io_context::strand& strand, const F& handler)
-		{boost::asio::defer(strand, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	template<typename F> void dispatch_strand(boost::asio::io_context::strand& strand, const F& handler)
-		{boost::asio::dispatch(strand, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	#else
+	template<typename F> void post_strand(const boost::asio::io_context::strand& strand, const F& handler) const {boost::asio::post(strand, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	template<typename F> void defer_strand(const boost::asio::io_context::strand& strand, const F& handler) const {boost::asio::defer(strand, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	template<typename F> void dispatch_strand(const boost::asio::io_context::strand& strand, const F& handler) const {boost::asio::dispatch(strand, (aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+#else
 	template<typename F> void post(const F& handler) {io_context_.post((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
 	template<typename F> void dispatch(const F& handler) {io_context_.dispatch((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	template<typename F> void post_strand(boost::asio::io_context::strand& strand, const F& handler)
-		{strand.post((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	template<typename F>void dispatch_strand(boost::asio::io_context::strand& strand, const F& handler)
-		{strand.dispatch((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
-	#endif
+	template<typename F> void post_strand(boost::asio::io_context::strand& strand, const F& handler) {strand.post((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+	template<typename F>void dispatch_strand(boost::asio::io_context::strand& strand, const F& handler) {strand.dispatch((aci, boost::lambda::bind(boost::lambda::unlambda(handler))));}
+#endif
 
 	//convert lambda to boost::function is a waste, but we have no choice without c++0x
 	template<typename F> handler_with_error make_handler_error(const F& handler) const

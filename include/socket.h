@@ -106,9 +106,19 @@ protected:
 		recv_buffer.clear();
 	}
 
-	//convert the result to RE is a waste, but we have no choice without c++0x
-	template<typename RE, typename F> RE make_io_strand_handler(const F& handler) {return make_strand_handler(rw_strand, handler);}
+#if BOOST_ASIO_VERSION >= 101100
+	//execute in the IO strand -- rw_strand
+	template<typename F> void post_in_io_strand(const F& handler) const {post_strand(rw_strand, handler);}
+	template<typename F> void defer_in_io_strand(const F& handler) const {defer_strand(rw_strand, handler);}
+	//execute in the IO strand -- rw_strand, or current thead, use it carefully
+	template<typename F> void dispatch_in_io_strand(const F& handler) const {dispatch_strand(rw_strand, handler);}
 
+	//execute in the dispatch strand -- dis_strand
+	template<typename F> void post_in_dis_strand(const F& handler) const {post_strand(dis_strand, handler);}
+	template<typename F> void defer_in_dis_strand(const F& handler) const {defer_strand(dis_strand, handler);}
+	//execute in the dispatch strand -- dis_strand, or current thead, use it carefully
+	template<typename F> void dispatch_in_dis_strand(const F& handler) const {dispatch_strand(dis_strand, handler);}
+#else
 	//execute in the IO strand -- rw_strand
 	template<typename F> void post_in_io_strand(const F& handler) {post_strand(rw_strand, handler);}
 	//execute in the IO strand -- rw_strand, or current thead, use it carefully
@@ -118,6 +128,9 @@ protected:
 	template<typename F> void post_in_dis_strand(const F& handler) {post_strand(dis_strand, handler);}
 	//execute in the dispatch strand -- dis_strand, or current thead, use it carefully
 	template<typename F> void dispatch_in_dis_strand(const F& handler) {dispatch_strand(dis_strand, handler);}
+#endif
+	//convert the result to RE is a waste, but we have no choice without c++0x
+	template<typename RE, typename F> RE make_io_strand_handler(const F& handler) {return make_strand_handler(rw_strand, handler);}
 
 public:
 #ifdef ST_ASIO_SYNC_SEND

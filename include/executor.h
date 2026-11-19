@@ -35,9 +35,9 @@ public:
 	template<typename F> void post(const F& handler) {boost::asio::post(io_context_, handler);}
 	template<typename F> void defer(const F& handler) {boost::asio::defer(io_context_, handler);}
 	template<typename F> void dispatch(const F& handler) {boost::asio::dispatch(io_context_, handler);}
-	template<typename F> void post_strand(boost::asio::io_context::strand& strand, const F& handler) {boost::asio::post(strand, handler);}
-	template<typename F> void defer_strand(boost::asio::io_context::strand& strand, const F& handler) {boost::asio::defer(strand, handler);}
-	template<typename F> void dispatch_strand(boost::asio::io_context::strand& strand, const F& handler) {boost::asio::dispatch(strand, handler);}
+	template<typename F> void post_strand(const boost::asio::io_context::strand& strand, const F& handler) const {boost::asio::post(strand, handler);}
+	template<typename F> void defer_strand(const boost::asio::io_context::strand& strand, const F& handler) const {boost::asio::defer(strand, handler);}
+	template<typename F> void dispatch_strand(const boost::asio::io_context::strand& strand, const F& handler) const {boost::asio::dispatch(strand, handler);}
 #else
 	template<typename F> void post(const F& handler) {io_context_.post(handler);}
 	template<typename F> void dispatch(const F& handler) {io_context_.dispatch(handler);}
