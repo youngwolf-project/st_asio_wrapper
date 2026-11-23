@@ -327,18 +327,14 @@ private:
 	virtual void do_recv_msg()
 	{
 #ifdef ST_ASIO_PASSIVE_RECV
-		if (!is_ready())
-			return;
-		else if (ST_THIS test_and_set_reading())
-			return;
-#endif
-		BOOST_AUTO(cb, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
-			ST_THIS make_handler_error_size(boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
-#ifdef ST_ASIO_PASSIVE_RECV
-		if (!ST_THIS async_read(cb))
+		if (!is_ready() || ST_THIS test_and_set_reading())
+			;
+		else if (!ST_THIS async_read(ST_THIS make_io_strand_handler_error_size(
+			boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))))
 			ST_THIS clear_reading();
 #else
-		ST_THIS async_read(cb);
+		ST_THIS async_read(ST_THIS make_io_strand_handler_error_size(
+			boost::bind(&socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 #endif
 	}
 
@@ -396,8 +392,8 @@ private:
 		if (!sending_buffer.empty())
 		{
 			sending_msgs.front().restart();
-			ST_THIS async_write(sending_buffer, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
-				ST_THIS make_handler_error_size(boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
+			ST_THIS async_write(sending_buffer, ST_THIS make_io_strand_handler_error_size(
+				boost::bind(&socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 			return true;
 		}
 

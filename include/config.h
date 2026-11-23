@@ -1006,7 +1006,7 @@
 	#define ST_ASIO_LLF "%lld"
 #endif
 
-#if (_MSVC_LANG > 201402L || __cplusplus > 201402L)
+#if _MSVC_LANG > 201402L || (defined(__cpp_if_constexpr) && __cpp_if_constexpr >= 201606L)
 	#define constexpr_if if constexpr
 #else
 	#define constexpr_if if
