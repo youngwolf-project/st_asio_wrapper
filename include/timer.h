@@ -13,6 +13,7 @@
 #ifndef ST_ASIO_TIMER_H_
 #define ST_ASIO_TIMER_H_
 
+#include <boost/functional.hpp>
 #ifdef ST_ASIO_USE_STEADY_TIMER
 #include <boost/asio/steady_timer.hpp>
 #else
@@ -21,18 +22,17 @@
 
 #include "base.h"
 
-//If you inherit a class from class X, your own timer ids must begin from X::TIMER_END
 namespace st_asio_wrapper
 {
 
-//timers are identified by id.
-//for the same timer in the same timer object, any manipulations are not thread safe, please pay special attention.
-//to resolve this defect, we must add a mutex member variable to timer_info, it's not worth. otherwise, they are thread safe.
-//
-//suppose you have more than one service thread(see service_pump for service thread number controlling), then:
-//for same timer object: same timer, on_timer is called in sequence
-//for same timer object: distinct timer, on_timer is called concurrently
-//for distinct timer object: on_timer is always called concurrently
+//timers are identified by id and thread safe
+//if you inherit a class from class X, your own timer ids must begin from X::TIMER_END
+//suppose you have more than one service thread (see service_pump for service thread number controlling), then:
+//in same timer object: same timer, callback is called in sequence, but:
+// if you set the same timer during the execution of the callback (for example, in its callback), and timeout happens before the callback returns,
+// then the two callbacks will be performed concurrently.
+//in same timer object: distinct timer, callback is called concurrently
+//in distinct timer objects: callback is always called concurrently
 template<typename Executor>
 class timer : public Executor
 {
@@ -61,12 +61,13 @@ public:
 		unsigned char seq;
 		timer_status status;
 		unsigned interval_ms;
+		mutable boost::mutex mutex;
 		timer_type timer;
 		handler_with_tid handler; //return true from handler to continue the timer, or the timer will stop
 
 		timer_info(tid id_, boost::asio::io_context& io_context_) : id(id_), seq(-1), status(TIMER_CREATED), interval_ms(0), timer(io_context_) {}
-		bool operator ==(const timer_info& other) {return id == other.id;}
-		bool operator ==(tid id_) {return id == id_;}
+		bool operator ==(const timer_info& other) const {return id == other.id;}
+		bool operator ==(tid id_) const {return id == id_;}
 	};
 	typedef const timer_info timer_cinfo;
 
@@ -92,8 +93,7 @@ public:
 	}
 	void clear_io_context_refs() {sub_io_context_refs(io_context_refs);}
 
-	//after this call, handler cannot be used again, please note.
-	bool create_or_update_timer(tid id, unsigned interval, handler_with_tid& handler, bool start = false)
+	template<typename T> bool create_or_update_timer(tid id, unsigned interval, const T& handler, bool start = false)
 	{
 		timer_info* ti = NULL;
 		{
@@ -109,29 +109,32 @@ public:
 		}
 		assert(NULL != ti);
 
+		boost::unique_lock<boost::mutex> lock(ti->mutex);
 		ti->interval_ms = interval;
-		ti->handler.swap(handler);
+		ti->handler = handler;
 
 		if (start)
 			start_timer(*ti);
 
 		return true;
 	}
-	bool create_or_update_timer(tid id, unsigned interval, const handler_with_tid& handler, bool start = false)
-		{BOOST_AUTO(xvalue, handler); return create_or_update_timer(id, interval, xvalue, start);}
+	template<typename T> bool set_timer(tid id, unsigned interval, const T& handler) {return create_or_update_timer(id, interval, handler, true);}
 
-	bool change_timer_status(tid id, typename timer_info::timer_status status) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->status = status, true : false;}
-	bool change_timer_interval(tid id, unsigned interval) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->interval_ms = interval, true : false;}
+	template<typename T> bool change_timer(tid id, const T& setter)
+	{
+		BOOST_AUTO(ti, find_timer(id));
+		if (NULL == ti)
+			return false;
 
-	//after this call, handler cannot be used again, please note.
-	bool change_timer_handler(tid id, handler_with_tid& handler) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? ti->handler.swap(handler), true : false;}
-	bool change_timer_handler(tid id, const handler_with_tid& handler) {BOOST_AUTO(xvalue, handler); return change_timer_handler(id, xvalue);}
+		boost::lock_guard<boost::mutex> lock(ti->mutex);
+		return setter(ti);
+	}
+	bool change_timer_status(tid id, typename timer_info::timer_status status) {return change_timer(id, (boost::lambda::_1->*&timer_info::status = status, true));}
+	bool change_timer_interval(tid id, unsigned interval) {return change_timer(id, (boost::lambda::_1->*&timer_info::interval_ms = interval, true));}
+	template<typename T> bool change_timer_handler(tid id, const T& handler)
+		{return change_timer(id, (boost::lambda::_1->*&timer_info::handler = boost::lambda::var(boost::cref(handler)), true));}
 
-	//after this call, handler cannot be used again, please note.
-	bool set_timer(tid id, unsigned interval, handler_with_tid& handler) {return create_or_update_timer(id, interval, handler, true);}
-	bool set_timer(tid id, unsigned interval, const handler_with_tid& handler) {return create_or_update_timer(id, interval, handler, true);}
-
-	timer_info* find_timer(tid id)
+	timer_cinfo* find_timer(tid id) const
 	{
 		boost::lock_guard<boost::mutex> lock(timer_can_mutex);
 		BOOST_AUTO(iter, std::find(timer_can.begin(), timer_can.end(), id));
@@ -141,8 +144,17 @@ public:
 		return NULL;
 	}
 
-	bool is_timer(tid id) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? timer_info::TIMER_STARTED == ti->status : false;}
-	bool start_timer(tid id) {BOOST_AUTO(ti, find_timer(id)); return NULL != ti ? start_timer(*ti) : false;}
+	bool is_timer(tid id) const
+	{
+		BOOST_AUTO(ti, find_timer(id));
+		if (NULL == ti)
+			return false;
+
+		boost::lock_guard<boost::mutex> lock(ti->mutex);
+		return timer_info::TIMER_STARTED == ti->status;
+	}
+
+	bool start_timer(tid id) {BOOST_AUTO(ti, find_timer(id)); if (NULL == ti) return false; boost::lock_guard<boost::mutex> lock(ti->mutex); return start_timer(*ti);}
 	void stop_timer(tid id) {BOOST_AUTO(ti, find_timer(id)); if (NULL != ti) stop_timer(*ti);}
 	void stop_all_timer() {do_something_to_all(boost::bind((void (timer::*) (timer_info&)) &timer::stop_timer, this, boost::placeholders::_1));}
 	void stop_all_timer(tid excepted_id)
@@ -155,64 +167,88 @@ public:
 	DO_SOMETHING_TO_ONE_MUTEX(timer_can, timer_can_mutex, boost::lock_guard<boost::mutex>)
 
 protected:
+	void reset_io_context_refs() {if (0 == io_context_refs) add_io_context_refs(1);}
+	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) {}
+	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {}
+
+private:
+	timer_info* find_timer(tid id) {return const_cast<timer_info*>(static_cast<const timer*>(this)->find_timer(id));}
+
+	bool start_timer(timer_info& ti) {return start_timer(ti, ti.interval_ms);}
 	bool start_timer(timer_info& ti, unsigned interval_ms)
 	{
-		if (!ti.handler)
-			return false;
-
 		ti.status = timer_info::TIMER_STARTED;
 #if BOOST_ASIO_VERSION >= 101100
 		ti.timer.expires_after(milliseconds(interval_ms));
 #else
 		ti.timer.expires_from_now(milliseconds(interval_ms));
 #endif
-
 		//if timer already started, this will cancel it first
-		ti.timer.async_wait(ST_THIS make_handler_error(boost::bind(&timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti), ++ti.seq)));
+		ti.timer.async_wait(ST_THIS track_async_call_error(boost::bind(&timer::timer_handler, this, boost::asio::placeholders::error, boost::ref(ti), ++ti.seq)));
 		return true;
 	}
-	bool start_timer(timer_info& ti) {return start_timer(ti, ti.interval_ms);}
 
 	void timer_handler(const boost::system::error_code& ec, timer_info& ti, unsigned char prev_seq)
 	{
-		//the first 'timer_info::TIMER_STARTED == ti.status' judgement means stop_timer can also invalidate cumulative timer callbacks
-		//the second 'timer_info::TIMER_STARTED == ti.status' judgement is used to exclude a particular situation--stop the same timer in handler and return true
 #ifdef ST_ASIO_ALIGNED_TIMER
 		BOOST_AUTO(begin_time, boost::chrono::system_clock::now());
-		if (timer_info::TIMER_STARTED == ti.status && !ec && ti.handler(ti.id) && timer_info::TIMER_STARTED == ti.status)
-		{
-			unsigned elapsed_ms = (unsigned) boost::chrono::duration_cast<boost::chrono::milliseconds>(boost::chrono::system_clock::now() - begin_time).count();
-			if (elapsed_ms > ti.interval_ms)
-				elapsed_ms %= ti.interval_ms;
-
-			start_timer(ti, ti.interval_ms - elapsed_ms);
-		}
-#else
-		if (timer_info::TIMER_STARTED == ti.status && !ec && ti.handler(ti.id) && timer_info::TIMER_STARTED == ti.status)
-			start_timer(ti);
 #endif
-		else if (prev_seq == ti.seq) //exclude a particular situation--start the same timer in handler and return false
+		boost::unique_lock<boost::mutex> lock(ti.mutex);
+		//the same timer is started again, or
+		//the timer has been stopped, which means stop_timer can also invalidate cumulative timer callbacks
+		if (prev_seq != ti.seq || timer_info::TIMER_STARTED != ti.status)
+			;
+		else if (ec || !ti.handler)
+		{
 			ti.status = timer_info::TIMER_CANCELED;
+			ti.handler = NULL;
+		}
+		else
+		{
+			BOOST_AUTO(handler, ti.handler); //in case the handler is changed in the execution of the handler (for example, via set_timer)
+			lock.unlock();
+			bool re = handler(ti.id);
+			lock.lock();
+
+			//the same timer is started or stopped in the handler or during the execution of the handler
+			if (prev_seq != ti.seq || timer_info::TIMER_STARTED != ti.status)
+				;
+			else if (!re)
+			{
+				ti.status = timer_info::TIMER_CANCELED;
+				ti.handler = NULL;
+			}
+			else
+			{
+#ifdef ST_ASIO_ALIGNED_TIMER
+				unsigned elapsed_ms = (unsigned) boost::chrono::duration_cast<boost::chrono::milliseconds>(boost::chrono::system_clock::now() - begin_time).count();
+				if (elapsed_ms > ti.interval_ms)
+					elapsed_ms %= ti.interval_ms;
+
+				start_timer(ti, ti.interval_ms - elapsed_ms);
+#else
+				start_timer(ti);
+#endif
+			}
+		}
 	}
 
 	void stop_timer(timer_info& ti)
 	{
+		boost::lock_guard<boost::mutex> lock(ti.mutex);
 		if (timer_info::TIMER_STARTED == ti.status) //enable stopping timers that has been stopped
 		{
 			ti.status = timer_info::TIMER_CANCELED; //invalidate cumulative timer callbacks first
+			ti.handler = NULL;
 			try {ti.timer.cancel();}
 			catch (const boost::system::system_error& e) {unified_out::error_out("cannot stop timer %d (%d %s)", ti.id, e.code().value(), e.what());}
 		}
 	}
 
-	void reset_io_context_refs() {if (0 == io_context_refs) add_io_context_refs(1);}
-	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) {}
-	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {}
-
 private:
 	typedef boost::container::list<timer_info> container_type;
 	container_type timer_can;
-	boost::mutex timer_can_mutex;
+	mutable boost::mutex timer_can_mutex;
 
 	using Executor::io_context_;
 	unsigned io_context_refs;

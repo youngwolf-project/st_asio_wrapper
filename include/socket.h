@@ -65,10 +65,9 @@ protected:
 	template<typename Arg> void reset_next_layer(Arg& arg) {reset_next_layer(next_layer_.get_io_service(), arg);}
 #elif BOOST_ASIO_VERSION < 101300
 	void reset_next_layer() {reset_next_layer(next_layer_.get_executor().context());}
-	template<typename Arg>
-	void reset_next_layer(Arg& arg) {reset_next_layer(next_layer_.get_executor().context(), arg);}
+	template<typename Arg> void reset_next_layer(Arg& arg) {reset_next_layer(next_layer_.get_executor().context(), arg);}
 #else
-	void reset_next_layer() {reset_next_layer((const boost::asio::any_io_executor&) next_layer_.get_executor());}
+	void reset_next_layer() {reset_next_layer(next_layer_.get_executor());}
 	template<typename Arg> void reset_next_layer(Arg& arg) {reset_next_layer(next_layer_.get_executor(), arg);}
 #endif
 
@@ -106,18 +105,25 @@ protected:
 		recv_buffer.clear();
 	}
 
-	//convert the result to RE is a waste, but we have no choice without c++0x
-	template<typename RE, typename F> RE make_io_strand_handler(const F& handler) {return make_strand_handler(rw_strand, handler);}
+#if BOOST_ASIO_VERSION >= 101100
+	template<typename F> void defer_in_io_strand(const F& handler) ST_STRAND_QUALIFIER {defer_strand(rw_strand, handler);}
+	template<typename F> void defer_in_dis_strand(const F& handler) ST_STRAND_QUALIFIER {defer_strand(dis_strand, handler);}
+#endif
+
+	template<typename F> handler_with_error make_io_strand_handler_error(const F& handler) ST_STRAND_QUALIFIER
+		{return make_strand_handler_error(rw_strand, handler);}
+	template<typename F> handler_with_error_size make_io_strand_handler_error_size(const F& handler) ST_STRAND_QUALIFIER
+		{return make_strand_handler_error_size(rw_strand, handler);}
 
 	//execute in the IO strand -- rw_strand
-	template<typename F> void post_in_io_strand(const F& handler) {post_strand(rw_strand, handler);}
+	template<typename F> void post_in_io_strand(const F& handler) ST_STRAND_QUALIFIER {post_strand(rw_strand, handler);}
 	//execute in the IO strand -- rw_strand, or current thead, use it carefully
-	template<typename F> void dispatch_in_io_strand(const F& handler) {dispatch_strand(rw_strand, handler);}
+	template<typename F> void dispatch_in_io_strand(const F& handler) ST_STRAND_QUALIFIER {dispatch_strand(rw_strand, handler);}
 
 	//execute in the dispatch strand -- dis_strand
-	template<typename F> void post_in_dis_strand(const F& handler) {post_strand(dis_strand, handler);}
+	template<typename F> void post_in_dis_strand(const F& handler) ST_STRAND_QUALIFIER {post_strand(dis_strand, handler);}
 	//execute in the dispatch strand -- dis_strand, or current thead, use it carefully
-	template<typename F> void dispatch_in_dis_strand(const F& handler) {dispatch_strand(dis_strand, handler);}
+	template<typename F> void dispatch_in_dis_strand(const F& handler) ST_STRAND_QUALIFIER {dispatch_strand(dis_strand, handler);}
 
 public:
 #ifdef ST_ASIO_SYNC_SEND

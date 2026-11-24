@@ -63,8 +63,8 @@ private:
 
 		unified_out::info_out("connected to the proxy server, begin to negotiate with it.");
 		ST_THIS status = super::HANDSHAKING;
-		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len),
-			ST_THIS make_handler_error_size(boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len), ST_THIS track_async_call_error_size(
+			boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
 	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
@@ -75,8 +75,8 @@ private:
 			ST_THIS force_shutdown(false);
 		}
 		else
-			boost::asio::async_read(ST_THIS next_layer(), boost::asio::buffer(buff, 8),
-				ST_THIS make_handler_error_size(boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+			boost::asio::async_read(ST_THIS next_layer(), boost::asio::buffer(buff, 8), ST_THIS track_async_call_error_size(
+				boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
@@ -188,8 +188,8 @@ private:
 		}
 		buff[2] = 0;
 
-		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len),
-			ST_THIS make_handler_error_size(boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len), ST_THIS track_async_call_error_size(
+			boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
 	void send_auth()
@@ -203,8 +203,8 @@ private:
 		memcpy(boost::next(buff, 3 + username.size()), password.data(), password.size());
 		req_len = 1 + 1 + username.size() + 1 + password.size();
 
-		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len),
-			ST_THIS make_handler_error_size(boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len), ST_THIS track_async_call_error_size(
+			boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
 	void send_request()
@@ -245,8 +245,8 @@ private:
 			req_len = 22;
 		}
 
-		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len),
-			ST_THIS make_handler_error_size(boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+		boost::asio::async_write(ST_THIS next_layer(), boost::asio::buffer(buff, req_len), ST_THIS track_async_call_error_size(
+			boost::bind(&client_socket_base::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
 	void send_handler(const boost::system::error_code& ec, size_t bytes_transferred)
@@ -259,8 +259,8 @@ private:
 		else
 		{
 			++step;
-			ST_THIS next_layer().async_read_some(boost::asio::buffer(buff, sizeof(buff)),
-				ST_THIS make_handler_error_size(boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+			ST_THIS next_layer().async_read_some(boost::asio::buffer(buff, sizeof(buff)), ST_THIS track_async_call_error_size(
+				boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
 	}
 
@@ -359,8 +359,8 @@ private:
 				ST_THIS force_shutdown(false);
 			}
 			else
-				ST_THIS next_layer().async_read_some(boost::asio::buffer(boost::next(buff, res_len), sizeof(buff) - res_len),
-					ST_THIS make_handler_error_size(boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+				ST_THIS next_layer().async_read_some(boost::asio::buffer(boost::next(buff, res_len), sizeof(buff) - res_len), ST_THIS track_async_call_error_size(
+					boost::bind(&client_socket_base::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 		}
 	}
 

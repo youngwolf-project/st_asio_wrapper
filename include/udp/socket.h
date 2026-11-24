@@ -73,7 +73,7 @@ public:
 	const typename Family::endpoint& get_peer_addr() const {return peer_addr;}
 
 	void disconnect() {force_shutdown();}
-	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_in_io_strand(boost::bind(&generic_socket::close_, this));}
+	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_in_io_strand(boost::bind(&generic_socket::close, this, true));}
 	void graceful_shutdown() {force_shutdown();}
 
 	static std::string endpoint_to_string(const boost::asio::ip::udp::endpoint& ep) {return ep.address().to_string() + ':' + boost::to_string(ep.port());}
@@ -254,8 +254,6 @@ private:
 	using super::do_direct_sync_send_msg;
 #endif
 
-	void close_() {close(true);} //workaround for old compilers, otherwise, we can bind to close directly in dispatch_strand
-
 	//call following two functions (via timer object's add_io_context_refs, sub_io_context_refs or clear_io_context_refs) in:
 	// 1. on_xxxx callbacks on this object;
 	// 2. use this->post or this->set_timer to emit an async event, then in the callback.
@@ -273,18 +271,20 @@ private:
 		BOOST_AUTO(recv_buff, ST_THIS unpacker()->prepare_next_recv());
 		assert(boost::asio::buffer_size(recv_buff) > 0);
 		if (0 == boost::asio::buffer_size(recv_buff))
-			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
-		else
 		{
-			BOOST_AUTO(cb, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
-				ST_THIS make_handler_error_size(boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
-			is_connected ? ST_THIS next_layer().async_receive(recv_buff, cb) : ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, cb);
+			unified_out::error_out(ST_ASIO_LLF " the unpacker returned an empty buffer, quit receiving!", ST_THIS id());
+#ifdef ST_ASIO_PASSIVE_RECV
+			ST_THIS clear_reading();
+#endif
 			return;
 		}
 
-#ifdef ST_ASIO_PASSIVE_RECV
-		ST_THIS clear_reading();
-#endif
+		if (is_connected)
+			ST_THIS next_layer().async_receive(recv_buff, ST_THIS make_io_strand_handler_error_size(
+				boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+		else
+			ST_THIS next_layer().async_receive_from(recv_buff, temp_addr, ST_THIS make_io_strand_handler_error_size(
+				boost::bind(&generic_socket::recv_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 	}
 
 	void recv_handler(const boost::system::error_code& ec, size_t bytes_transferred)
@@ -338,9 +338,12 @@ private:
 			else
 			{
 				BOOST_AUTO(send_buff, boost::asio::buffer(sending_msg.data(), sending_msg.size()));
-				BOOST_AUTO(cb, ST_THIS template make_io_strand_handler<typename super::handler_with_error_size>(
-					ST_THIS make_handler_error_size(boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred))));
-				is_connected ? ST_THIS next_layer().async_send(send_buff, cb) : ST_THIS next_layer().async_send_to(send_buff, sending_msg.peer_addr, cb);
+				if (is_connected)
+					ST_THIS next_layer().async_send(send_buff, ST_THIS make_io_strand_handler_error_size(
+						boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
+				else
+					ST_THIS next_layer().async_send_to(send_buff, sending_msg.peer_addr, ST_THIS make_io_strand_handler_error_size(
+						boost::bind(&generic_socket::send_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred)));
 
 			}
 			return true;

@@ -82,7 +82,6 @@ protected:
 			, work(io_context.get_executor())
 #else
 			, work(boost::make_shared<boost::asio::io_context::work>(boost::ref(io_context)))
-			//this wrapper boost::ref (and many others in st_asio_wrapper) is just for gcc 4.7, terrible gcc 4.7
 #endif
 #endif
 		{}
@@ -138,7 +137,7 @@ public:
 	virtual ~service_pump() {stop_service();}
 
 	int get_io_context_num() const {return (int) context_can.size();}
-	void get_io_context_refs(boost::container::list<unsigned>& refs)
+	void get_io_context_refs(boost::container::list<unsigned>& refs) const
 	{
 		if (!single_ctx)
 		{
@@ -213,7 +212,7 @@ public:
 		}
 	}
 
-	object_type find(int id)
+	object_type find(int id) const
 	{
 		boost::lock_guard<boost::mutex> lock(service_can_mutex);
 		BOOST_AUTO(iter, std::find_if(service_can.begin(), service_can.end(), boost::bind(&i_service::is_equal_to, boost::placeholders::_1, id)));
@@ -528,7 +527,7 @@ private:
 private:
 	bool started, first;
 	container_type service_can;
-	boost::mutex service_can_mutex;
+	mutable boost::mutex service_can_mutex;
 
 #ifdef ST_ASIO_DECREASE_THREAD_AT_RUNTIME
 	atomic_int_fast32_t real_thread_num;
@@ -537,7 +536,7 @@ private:
 
 	bool single_ctx;
 	boost::container::list<context> context_can;
-	boost::mutex context_can_mutex;
+	mutable boost::mutex context_can_mutex;
 };
 
 } //namespace

@@ -119,8 +119,6 @@ public:
 
 		return *this;
 	}
-
-	template<typename Buff> basic_buffer& append(const Buff& other) {return append(other.data(), other.size());}
 	basic_buffer& append(char* buff) {return append((const char*) buff);}
 	basic_buffer& append(const char* buff) {return append(buff, strlen(buff));}
 	basic_buffer& append(const char* _buff, size_t _len)
@@ -141,17 +139,18 @@ public:
 	}
 	template<size_t size> basic_buffer& append(char(&buff)[size], size_t len) {return append((const char*) buff, std::min(size, len));}
 	template<size_t size> basic_buffer& append(const char(&buff)[size], size_t len) {return append((const char*) buff, std::min(size, len));}
+	template<typename Buff> basic_buffer& append(const Buff& other) {return append(other.data(), other.size());}
 
 	//nonstandard function append2 -- delete the last character if it's '\0' before appending another string.
 	//this feature makes basic_buffer to be able to works as std::string, which will append '\0' automatically.
-	//please note that the second verion of append2 still needs you to provide '\0' at the end of the fed string.
+	//please note that only the first verion of append2 will append '\0' automatically, others still need you to provide '\0' at the end of the fed string.
 	//usage:
 	/*
 		basic_buffer bb("1"); //not include the '\0' character
 		printf("%s\n", bb.data()); //not ok, random characters can be outputted after "1", use basic_buffer bb("1", 2) instead.
-		bb.append2("23"); //include the '\0' character, but just append2, please note.
+		bb.append2("23"); //include the '\0' character automatically, but just append2, please note.
 		printf("%s\n", bb.data()); //ok, additional '\0' has been added automatically so no random characters can be outputted after "123".
-		bb.append2("456", 4); //include the '\0' character
+		bb.append2("456", 4); //include the '\0' character manually
 		printf("%s\n", bb.data()); //ok, additional '\0' has been added manually so no random characters can be outputted after "123456".
 		bb.append2("789", 3); //not include the '\0' character
 		printf("%s\n", bb.data()); //not ok, random characters can be outputted after "123456789"
@@ -168,6 +167,7 @@ public:
 
 		return append(_buff, _len);
 	}
+	template<typename Buff> basic_buffer& append2(const Buff& other) {return append2(other.data(), other.size());}
 
 	basic_buffer& erase(size_t pos = 0, size_t len = UINT_MAX)
 	{

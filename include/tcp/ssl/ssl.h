@@ -50,7 +50,7 @@ private:
 	{
 		ST_THIS show_info("ssl link:", "been shutting down.");
 		ST_THIS start_graceful_shutdown_monitoring();
-		ST_THIS next_layer().async_shutdown(ST_THIS make_handler_error(boost::bind(&socket::shutdown_handler, this, boost::asio::placeholders::error)));
+		ST_THIS next_layer().async_shutdown(ST_THIS track_async_call_error(boost::bind(&socket::shutdown_handler, this, boost::asio::placeholders::error)));
 	}
 
 	//do not stop the shutdown monitoring at here, sometimes, this async_shutdown cannot trigger on_recv_error,
@@ -105,7 +105,7 @@ private:
 		{
 			ST_THIS status = super::HANDSHAKING;
 			ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::client,
-				ST_THIS make_handler_error(boost::bind(&client_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+				ST_THIS track_async_call_error(boost::bind(&client_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
 		}
 		else
 			super::connect_handler(ec);
@@ -131,7 +131,7 @@ public:
 	boost::asio::ssl::context& context() {return ctx;}
 
 protected:
-	template<typename Arg> typename super::object_type create_object(Arg& arg) {return super::create_object(arg, boost::ref(ctx));}
+	template<typename Arg> typename super::object_type create_object(Arg& arg) {return super::create_object(arg, ctx);}
 
 private:
 	boost::asio::ssl::context ctx;
@@ -161,7 +161,7 @@ protected:
 	{
 		ST_THIS status = super::HANDSHAKING;
 		ST_THIS next_layer().async_handshake(boost::asio::ssl::stream_base::server,
-			ST_THIS make_handler_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
+			ST_THIS track_async_call_error(boost::bind(&server_socket_base::handle_handshake, this, boost::asio::placeholders::error)));
 		return true;
 	}
 

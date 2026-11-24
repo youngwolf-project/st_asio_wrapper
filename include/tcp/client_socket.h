@@ -121,7 +121,7 @@ protected:
 		return true;
 	}
 
-	virtual bool do_start() {assert(!ST_THIS is_connected()); return connect(true);} //connect
+	virtual bool do_start() {assert(!ST_THIS is_connected()); return connect();} //connect
 	virtual void connect_handler(const boost::system::error_code& ec) {ec ? prepare_next_reconnect(ec) : super::do_start();} //already started, so cannot call start()
 
 	//after how much time (ms), generic_client_socket will try to reconnect the server, negative value means give up.
@@ -159,10 +159,10 @@ private:
 	virtual void attach_io_context(boost::asio::io_context& io_context_, unsigned refs) {if (NULL != matrix) matrix->get_service_pump().assign_io_context(io_context_, refs);}
 	virtual void detach_io_context(boost::asio::io_context& io_context_, unsigned refs) {if (NULL != matrix) matrix->get_service_pump().return_io_context(io_context_, refs);}
 
-	bool connect(bool first)
+	bool connect()
 	{
-		BOOST_AUTO(cb, ST_THIS make_handler_error(boost::bind(&generic_client_socket::connect_handler, this, boost::asio::placeholders::error)));
-		ST_THIS lowest_layer().async_connect(server_addr, first ? cb : ST_THIS template make_io_strand_handler<typename super::handler_with_error>(cb));
+		ST_THIS lowest_layer().async_connect(server_addr,
+			ST_THIS track_async_call_error(boost::bind(&generic_client_socket::connect_handler, this, boost::asio::placeholders::error)));
 		return true;
 	}
 
@@ -186,8 +186,7 @@ private:
 				if (ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&generic_client_socket::prepare_next_reconnect, this, ec), false)))
 					return true;
 			}
-			else if (ST_THIS set_timer(TIMER_CONNECT, delay, ST_THIS template make_io_strand_handler<typename super::handler_with_tid>(
-				boost::lambda::ret<bool>((boost::lambda::bind(&generic_client_socket::connect, this, false), false)))))
+			else if (ST_THIS set_timer(TIMER_CONNECT, delay, (boost::lambda::bind(&generic_client_socket::connect, this), false)))
 				return true;
 		}
 

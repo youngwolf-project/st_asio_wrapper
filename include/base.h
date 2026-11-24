@@ -123,8 +123,8 @@ public:
 	virtual const service_pump& get_service_pump() const = 0;
 
 	//following implementation is useful for a dummy matrix, for example, in a proxy server, each server_socket (dummy matrix) contains a client_socket
-	virtual bool socket_exist(boost::uint_fast64_t id) {return false;}
-	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) {return boost::shared_ptr<tracked_executor>();}
+	virtual bool socket_exist(boost::uint_fast64_t id) const {return false;}
+	virtual boost::shared_ptr<tracked_executor> find_socket(boost::uint_fast64_t id) const {return boost::shared_ptr<tracked_executor>();}
 	virtual bool del_socket(boost::uint_fast64_t id) {return false;}
 };
 
@@ -705,7 +705,7 @@ bool FUNNAME(in_msg_type& msg, bool can_overflow = false, bool prior = false) \
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return false; \
-	else if (NATIVE) \
+	else constexpr_if (NATIVE) \
 		return do_direct_send_msg(msg, prior); \
 	typename Packer::container_type msg_can; \
 	auto_duration dur(stat.pack_time_sum); \
@@ -717,7 +717,7 @@ bool FUNNAME(in_msg_ctype& msg, bool can_overflow = false, bool prior = false) \
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return false; \
-	else if (NATIVE) \
+	else constexpr_if (NATIVE) \
 		return do_direct_send_msg(msg, prior); \
 	typename Packer::container_type msg_can; \
 	auto_duration dur(stat.pack_time_sum); \
@@ -730,7 +730,7 @@ bool FUNNAME(in_msg_type& msg1, in_msg_type& msg2, bool can_overflow = false, bo
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return false; \
 	typename Packer::container_type msg_can; \
-	if (NATIVE) \
+	constexpr_if (NATIVE) \
 	{ \
 		msg_can.emplace_back().swap(msg1); msg_can.emplace_back().swap(msg2); \
 		return do_direct_send_msg(msg_can, prior); \
@@ -745,7 +745,7 @@ bool FUNNAME(in_msg_ctype& msg1, in_msg_ctype& msg2, bool can_overflow = false, 
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return false; \
 	typename Packer::container_type msg_can; \
-	if (NATIVE) \
+	constexpr_if (NATIVE) \
 	{ \
 		msg_can.emplace_back(msg1); msg_can.emplace_back(msg2); \
 		return do_direct_send_msg(msg_can, prior); \
@@ -759,7 +759,7 @@ bool FUNNAME(typename Packer::container_type& msg_can, bool can_overflow = false
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return false; \
-	else if (NATIVE) \
+	else constexpr_if (NATIVE) \
 		return do_direct_send_msg(msg_can, prior); \
 	typename Packer::container_type out; \
 	auto_duration dur(stat.pack_time_sum); \
@@ -826,7 +826,7 @@ sync_call_result FUNNAME(in_msg_type& msg, unsigned duration = 0, bool can_overf
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return NOT_APPLICABLE; \
-	else if (NATIVE) \
+	else constexpr_if (NATIVE) \
 		return do_direct_sync_send_msg(msg, duration, prior); \
 	typename Packer::container_type msg_can; \
 	auto_duration dur(stat.pack_time_sum); \
@@ -838,7 +838,7 @@ sync_call_result FUNNAME(in_msg_ctype& msg, unsigned duration = 0, bool can_over
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return NOT_APPLICABLE; \
-	else if (NATIVE) \
+	else constexpr_if (NATIVE) \
 		return do_direct_sync_send_msg(msg, duration, prior); \
 	typename Packer::container_type msg_can; \
 	auto_duration dur(stat.pack_time_sum); \
@@ -851,7 +851,7 @@ sync_call_result FUNNAME(in_msg_type& msg1, in_msg_type& msg2, unsigned duration
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return NOT_APPLICABLE; \
 	typename Packer::container_type msg_can; \
-	if (NATIVE) \
+	constexpr_if (NATIVE) \
 	{ \
 		msg_can.emplace_back().swap(msg1); msg_can.emplace_back().swap(msg2); \
 		return do_direct_sync_send_msg(msg_can, duration, prior); \
@@ -866,7 +866,7 @@ sync_call_result FUNNAME(in_msg_ctype& msg1, in_msg_ctype& msg2, unsigned durati
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return NOT_APPLICABLE; \
 	typename Packer::container_type msg_can; \
-	if (NATIVE) \
+	constexpr_if (NATIVE) \
 	{ \
 		msg_can.emplace_back(msg1); msg_can.emplace_back(msg2); \
 		return do_direct_sync_send_msg(msg_can, duration, prior); \
@@ -880,7 +880,7 @@ sync_call_result FUNNAME(typename Packer::container_type& msg_can, unsigned dura
 { \
 	if (!can_overflow && !ST_THIS shrink_send_buffer()) \
 		return NOT_APPLICABLE; \
-	else if (NATIVE) \
+	else constexpr_if (NATIVE) \
 		return do_direct_sync_send_msg(msg_can, duration, prior); \
 	typename Packer::container_type out; \
 	auto_duration dur(stat.pack_time_sum); \

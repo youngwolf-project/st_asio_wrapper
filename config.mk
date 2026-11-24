@@ -50,7 +50,7 @@ ifneq (, ${findstring mingw, ${target_machine}})
 	exe_ext = .exe
 	ignore = 1>nul
 	make_dir = md ${dir} 2>nul
-	del_dirs = -rd /S /Q debug release 2>nul
+	del_dirs = -rd /S /Q debug release 2>nul || exit /b 0
 else
 	ifneq (, ${findstring windows, ${target_machine}})
 		link_to_win = 1

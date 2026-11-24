@@ -21,7 +21,7 @@ namespace st_asio_wrapper
 class dummy_lockable
 {
 public:
-	typedef boost::lock_guard<dummy_lockable> lock_guard;
+	typedef boost::lock_guard<const dummy_lockable> lock_guard;
 
 	//lockable, dummy
 	bool is_lockable() const {return false;}
@@ -32,15 +32,15 @@ public:
 class lockable
 {
 public:
-	typedef boost::lock_guard<lockable> lock_guard;
+	typedef boost::lock_guard<const lockable> lock_guard;
 
 	//lockable
 	bool is_lockable() const {return true;}
-	void lock() {mutex.lock();}
-	void unlock() {mutex.unlock();}
+	void lock() const {mutex.lock();}
+	void unlock() const {mutex.unlock();}
 
 private:
-	boost::mutex mutex; //boost::mutex is more efficient than boost::shared_mutex
+	mutable boost::mutex mutex; //boost::mutex is more efficient than boost::shared_mutex
 };
 
 //Container must at least has the following functions (like boost::container::list):
@@ -78,7 +78,7 @@ public:
 	if your queue is lock free, you must guarantee that after the content of the container been changed in one thread, function 'is_empty' (not 'empty')
 	should returns exact state (empty or not) of the container in another thread, for example, via an boost::atomic with appropriate boost::memory_order.
 	*/
-	bool is_empty() {typename Lockable::lock_guard lock(*this); return empty();}
+	bool is_empty() const {typename Lockable::lock_guard lock(*this); return empty();}
 	void clear() {typename Lockable::lock_guard lock(*this); Container::clear(); total_size = 0;}
 	void swap(Container& can)
 	{
