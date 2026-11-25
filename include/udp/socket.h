@@ -73,7 +73,7 @@ public:
 	const typename Family::endpoint& get_peer_addr() const {return peer_addr;}
 
 	void disconnect() {force_shutdown();}
-	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_in_io_strand(boost::bind(&generic_socket::close_, this));}
+	void force_shutdown() {show_info("link:", "been shutting down."); ST_THIS dispatch_in_io_strand(boost::bind(&generic_socket::close, this, true));}
 	void graceful_shutdown() {force_shutdown();}
 
 	static std::string endpoint_to_string(const boost::asio::ip::udp::endpoint& ep) {return ep.address().to_string() + ':' + boost::to_string(ep.port());}
@@ -253,8 +253,6 @@ private:
 #ifdef ST_ASIO_SYNC_SEND
 	using super::do_direct_sync_send_msg;
 #endif
-
-	void close_() {close(true);} //workaround for old compilers, otherwise, we can bind to close directly in dispatch_strand
 
 	//call following two functions (via timer object's add_io_context_refs, sub_io_context_refs or clear_io_context_refs) in:
 	// 1. on_xxxx callbacks on this object;

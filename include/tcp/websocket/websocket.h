@@ -171,8 +171,7 @@ protected:
 		// Provide the value of the Host HTTP header during the WebSocket handshake.
 		// See https://tools.ietf.org/html/rfc7230#section-5.4
 		// Perform the websocket handshake
-		this->next_layer().async_handshake(this->endpoint_to_string(this->get_server_addr()), "/",
-			this->track_async_call_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
+		this->next_layer().async_handshake(this->endpoint_to_string(this->get_server_addr()), "/", this->track_async_call_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
 	}
 
 private:

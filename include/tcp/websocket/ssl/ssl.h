@@ -107,8 +107,7 @@ private:
 			return super::connect_handler(boost::beast::error_code(static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()));
 
 		// Perform the SSL handshake
-		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::client,
-			this->track_async_call_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
+		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::client, this->track_async_call_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
 	}
 
 	void handle_handshake(const boost::system::error_code& ec)

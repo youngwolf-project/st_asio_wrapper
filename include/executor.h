@@ -32,9 +32,9 @@ public:
 	bool stopped() const {return io_context_.stopped();}
 
 #if BOOST_ASIO_VERSION >= 101100
-	template<typename F> void post(const F& handler) {boost::asio::post(io_context_, handler);}
-	template<typename F> void defer(const F& handler) {boost::asio::defer(io_context_, handler);}
-	template<typename F> void dispatch(const F& handler) {boost::asio::dispatch(io_context_, handler);}
+	template<typename F> void post(const F& handler) const {boost::asio::post(io_context_, handler);}
+	template<typename F> void defer(const F& handler) const {boost::asio::defer(io_context_, handler);}
+	template<typename F> void dispatch(const F& handler) const {boost::asio::dispatch(io_context_, handler);}
 	template<typename F> void post_strand(const boost::asio::io_context::strand& strand, const F& handler) const
 		{assert(&io_context_ == &strand.context()); boost::asio::post(strand, handler);}
 	template<typename F> void defer_strand(const boost::asio::io_context::strand& strand, const F& handler) const
