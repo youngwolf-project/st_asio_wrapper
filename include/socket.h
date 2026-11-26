@@ -190,13 +190,13 @@ public:
 		assert(interval > 0 && max_absence > 0);
 
 		if (!is_timer(TIMER_HEARTBEAT_CHECK))
-			set_timer(TIMER_HEARTBEAT_CHECK, interval * 1000, boost::lambda::if_then_else_return(boost::lambda::bind(&socket::check_heartbeat, this,
-				interval, max_absence), true, false));
+			set_timer(TIMER_HEARTBEAT_CHECK, interval * 1000, boost::bind(&socket::check_heartbeat, this, interval, max_absence));
 	}
 
 	//interval's unit is second
-	//if macro ST_ASIO_HEARTBEAT_INTERVAL been defined and is bigger than zero, start_heartbeat will be called automatically with interval equal to ST_ASIO_HEARTBEAT_INTERVAL,
-	//and max_absence equal to ST_ASIO_HEARTBEAT_MAX_ABSENCE (so check_heartbeat will be called regularly). otherwise, you can call check_heartbeat with you own logic.
+	//if macro ST_ASIO_HEARTBEAT_INTERVAL been defined and is bigger than zero, start_heartbeat will be called automatically with interval equal to
+	//ST_ASIO_HEARTBEAT_INTERVAL, and max_absence equal to ST_ASIO_HEARTBEAT_MAX_ABSENCE (so check_heartbeat will be called regularly).
+	//otherwise, you can call check_heartbeat with you own logic.
 	//return false for timeout (timeout check will only be performed on valid links), otherwise true (even the link has not established yet).
 	bool check_heartbeat(int interval, int max_absence = ST_ASIO_HEARTBEAT_MAX_ABSENCE)
 	{
@@ -281,7 +281,8 @@ public:
 	//don't use the packer but insert into send buffer directly, then wait the sending to finish, unit of the duration is millisecond, 0 means wait infinitely
 	sync_call_result direct_sync_send_msg(const InMsgType& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false)
 		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg, duration, prior) : NOT_APPLICABLE;}
-	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false) //after this call, msg becomes empty, please note.
+	//after this call, msg becomes empty, please note.
+	sync_call_result direct_sync_send_msg(InMsgType& msg, unsigned duration = 0, bool can_overflow = false, bool prior = false)
 		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg, duration, prior) : NOT_APPLICABLE;}
 	sync_call_result direct_sync_send_msg(list<InMsgType>& msg_can, unsigned duration = 0, bool can_overflow = false, bool prior = false)
 		{return can_overflow || shrink_send_buffer() ? do_direct_sync_send_msg(msg_can, duration, prior) : NOT_APPLICABLE;}
@@ -485,7 +486,7 @@ protected:
 			sr_status = RESPONDED_FAILURE;
 			sync_recv_cv.notify_one();
 
-			sync_recv_cv.wait(lock, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || RESPONDED_FAILURE != boost::lambda::var(sr_status), true, false));
+			sync_recv_cv.wait(lock, !boost::lambda::var(started_) || RESPONDED_FAILURE != boost::lambda::var(sr_status));
 		}
 #endif
 	}
@@ -502,7 +503,7 @@ protected:
 			sr_status = RESPONDED;
 			sync_recv_cv.notify_one();
 
-			sync_recv_cv.wait(lock, boost::lambda::if_then_else_return(!boost::lambda::var(started_) || RESPONDED != boost::lambda::var(sr_status), true, false));
+			sync_recv_cv.wait(lock, !boost::lambda::var(started_) || RESPONDED != boost::lambda::var(sr_status));
 			if (RESPONDED == sr_status) //eliminate race condition on temp_msg_can with sync_recv_msg
 				return false;
 			else if (temp_msg_can.empty())
@@ -689,8 +690,7 @@ private:
 #ifdef ST_ASIO_SYNC_RECV
 	sync_call_result sync_recv_waiting(boost::unique_lock<boost::mutex>& lock, unsigned duration)
 	{
-		//BOOST_AUTO cannot deduce the return type from lambda expressions in Clang
-		boost::function<bool ()> pred = boost::lambda::if_then_else_return(!boost::lambda::var(started_) || REQUESTED != boost::lambda::var(sr_status), true, false);
+		BOOST_AUTO(pred, !boost::lambda::var(started_) || REQUESTED != boost::lambda::var(sr_status));
 		if (0 == duration)
 			sync_recv_cv.wait(lock, pred);
 		else if (!sync_recv_cv.wait_for(lock, boost::chrono::milliseconds(duration), pred))
@@ -700,7 +700,7 @@ private:
 	}
 #endif
 
-	bool check_receiving(bool raise_recv)
+	bool check_suspend_receiving(bool raise_recv)
 	{
 		if (is_recv_buffer_available())
 		{
@@ -713,7 +713,7 @@ private:
 			if (raise_recv)
 				recv_msg(); //receive msg in sequence
 
-			return true;
+			return false;
 		}
 		else if (!recv_idle_began)
 		{
@@ -721,16 +721,16 @@ private:
 			recv_idle_begin_time = statistic::now();
 		}
 
-		return false;
+		return true;
 	}
 
 	bool handled_msg()
 	{
 #ifndef ST_ASIO_PASSIVE_RECV
-		if (check_receiving(false))
+		if (!check_suspend_receiving(false))
 			return true;
 
-		set_timer(TIMER_CHECK_RECV, msg_resuming_interval_, boost::lambda::if_then_else_return(boost::lambda::bind(&socket::check_receiving, this, true), false, true));
+		set_timer(TIMER_CHECK_RECV, msg_resuming_interval_, boost::bind(&socket::check_suspend_receiving, this, true));
 #endif
 		return false;
 	}

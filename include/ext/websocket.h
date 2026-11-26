@@ -36,7 +36,8 @@ template<typename Socket, typename Matrix = i_matrix> using multi_client2 = st_a
 typedef multi_client client;
 
 typedef st_asio_wrapper::websocket::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER> server_socket;
-template<typename Server = st_asio_wrapper::tcp::i_server> using server_socket2 = st_asio_wrapper::websocket::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server>;
+template<typename Server = st_asio_wrapper::tcp::i_server>
+using server_socket2 = st_asio_wrapper::websocket::server_socket_base<ST_ASIO_DEFAULT_PACKER, ST_ASIO_DEFAULT_UNPACKER, Server>;
 typedef st_asio_wrapper::tcp::server_base<server_socket> server;
 template<typename Socket, typename Server = st_asio_wrapper::tcp::i_server> using server2 = st_asio_wrapper::tcp::server_base<Socket, object_pool<Socket>, Server>;
 

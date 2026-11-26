@@ -20,7 +20,8 @@ namespace st_asio_wrapper { namespace udp {
 template<typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::asio::ip::udp::socket, typename Family = boost::asio::ip::udp,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class generic_socket : public socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type, Family>, udp_msg<typename Unpacker::msg_type, Family>, InQueue, InContainer, OutQueue, OutContainer>
+class generic_socket : public socket<Socket, Packer, Unpacker, udp_msg<typename Packer::msg_type, Family>, udp_msg<typename Unpacker::msg_type, Family>,
+	InQueue, InContainer, OutQueue, OutContainer>
 {
 public:
 	typedef udp_msg<typename Packer::msg_type, Family> in_msg_type;
@@ -447,7 +448,8 @@ private:
 template<typename Packer, typename Unpacker, typename Matrix = i_matrix,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class unix_socket_base : public generic_socket<Packer, Unpacker, Matrix, boost::asio::local::datagram_protocol::socket, boost::asio::local::datagram_protocol, InQueue, InContainer, OutQueue, OutContainer>
+class unix_socket_base : public generic_socket<Packer, Unpacker, Matrix, boost::asio::local::datagram_protocol::socket, boost::asio::local::datagram_protocol,
+	InQueue, InContainer, OutQueue, OutContainer>
 {
 private:
 	typedef boost::asio::local::datagram_protocol Family;

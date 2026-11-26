@@ -1069,9 +1069,9 @@
 	#error message capacity must be bigger than zero.
 #endif
 
-//the message mode for websocket, !0 - binary mode (default), 0 - text mode
+//the message mode for websocket, true - binary mode (default), false - text mode
 #ifndef ST_ASIO_WEBSOCKET_BINARY
-#define ST_ASIO_WEBSOCKET_BINARY	1
+#define ST_ASIO_WEBSOCKET_BINARY	true
 #endif
 
 //i_unpacker's default value of the stripped property, must be boolean.

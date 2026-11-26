@@ -109,7 +109,7 @@ public:
 		}
 		assert(NULL != ti);
 
-		boost::unique_lock<boost::mutex> lock(ti->mutex);
+		boost::lock_guard<boost::mutex> lock(ti->mutex);
 		ti->interval_ms = interval;
 		ti->handler = handler;
 

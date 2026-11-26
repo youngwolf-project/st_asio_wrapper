@@ -62,7 +62,8 @@ private:
 template<typename Socket, typename Packer, typename Unpacker,
 	template<typename> class InQueue, template<typename> class InContainer, template<typename> class OutQueue, template<typename> class OutContainer,
 	template<typename, typename> class ReaderWriter = reader_writer>
-class socket_base : public ReaderWriter<socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type, InQueue, InContainer, OutQueue, OutContainer>, typename Unpacker::msg_type>
+class socket_base : public ReaderWriter<socket<Socket, Packer, Unpacker, typename Packer::msg_type, typename Unpacker::msg_type,
+	InQueue, InContainer, OutQueue, OutContainer>, typename Unpacker::msg_type>
 {
 public:
 	typedef typename Packer::msg_type in_msg_type;
@@ -151,6 +152,10 @@ public:
 			local_addr.data(), remote_addr.data(), NULL == tail ? "" : tail, ec.value(), ec.message().data());
 	}
 
+	void show_info_2(const boost::system::error_code& ec, const char* head = NULL, const char* error_info = NULL, const char* succ_info = NULL) const
+		{ec ? show_info(ec, head, error_info) : show_info(head, succ_info);}
+	void show_error_info(const boost::system::error_code& ec, const char* head = NULL, const char* tail = NULL) const {if (ec) show_info(ec, head, tail);}
+
 	void show_status() const
 	{
 		std::stringstream s;
@@ -225,15 +230,13 @@ public:
 	///////////////////////////////////////////////////
 
 protected:
-	void force_shutdown() {ST_THIS dispatch_in_io_strand(boost::bind(&socket_base::_force_shutdown, this));}
+	void force_shutdown()
+		{ST_THIS dispatch_in_io_strand(boost::lambda::if_then(FORCE_SHUTTING_DOWN != boost::lambda::var(status), boost::lambda::bind(&socket_base::shutdown, this)));}
 	void graceful_shutdown() {ST_THIS dispatch_in_io_strand(boost::bind(&socket_base::_graceful_shutdown, this));}
 
 	//used by ssl and websocket
 	void start_graceful_shutdown_monitoring()
-	{
-		ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 1000,
-			boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this, 1), true, false));
-	}
+		{ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 1000, boost::bind(&socket_base::shutdown_handler, this, 1));}
 	void stop_graceful_shutdown_monitoring() {ST_THIS stop_timer(TIMER_ASYNC_SHUTDOWN);}
 
 	virtual bool do_start()
@@ -294,7 +297,6 @@ private:
 	using super::do_direct_sync_send_msg;
 #endif
 
-	void _force_shutdown() {if (FORCE_SHUTTING_DOWN != status) shutdown();}
 	void _graceful_shutdown()
 	{
 		if (is_broken())
@@ -308,8 +310,7 @@ private:
 			if (ec) //graceful shutdown is impossible
 				shutdown();
 			else
-				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this,
-					ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100), true, false));
+				ST_THIS set_timer(TIMER_ASYNC_SHUTDOWN, 10, boost::bind(&socket_base::shutdown_handler, this, ST_ASIO_GRACEFUL_SHUTDOWN_MAX_DURATION * 100));
 		}
 	}
 
@@ -460,8 +461,7 @@ private:
 			--loop_num;
 			if (loop_num > 0)
 			{
-				ST_THIS change_timer_handler(TIMER_ASYNC_SHUTDOWN,
-					boost::lambda::if_then_else_return(boost::lambda::bind(&socket_base::shutdown_handler, this, loop_num), true, false));
+				ST_THIS change_timer_handler(TIMER_ASYNC_SHUTDOWN, boost::bind(&socket_base::shutdown_handler, this, loop_num));
 				return true;
 			}
 			else

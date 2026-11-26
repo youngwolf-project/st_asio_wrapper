@@ -21,8 +21,7 @@ template<typename Socket> class single_client_base : public single_socket_servic
 {
 public:
 	single_client_base(service_pump& service_pump_) : single_socket_service<Socket>(service_pump_) {}
-	template<typename Arg>
-	single_client_base(service_pump& service_pump_, Arg& arg) : single_socket_service<Socket>(service_pump_, arg) {}
+	template<typename Arg> single_client_base(service_pump& service_pump_, Arg& arg) : single_socket_service<Socket>(service_pump_, arg) {}
 };
 
 template<typename Socket, typename Pool = object_pool<Socket>, typename Matrix = i_matrix>
@@ -58,8 +57,8 @@ public:
 		socket_ptr->set_server_addr(port, ip);
 		return add_socket(socket_ptr, additional_io_context_refs) ? socket_ptr : typename Pool::object_type();
 	}
-	typename Pool::object_type add_socket(unsigned short port, unsigned short local_port, const std::string& ip = ST_ASIO_SERVER_IP, const std::string& local_ip = std::string(),
-		unsigned additional_io_context_refs = 0)
+	typename Pool::object_type add_socket(unsigned short port, unsigned short local_port, const std::string& ip = ST_ASIO_SERVER_IP,
+		const std::string& local_ip = std::string(), unsigned additional_io_context_refs = 0)
 	{
 		BOOST_AUTO(socket_ptr, ST_THIS create_object());
 		if (!socket_ptr)

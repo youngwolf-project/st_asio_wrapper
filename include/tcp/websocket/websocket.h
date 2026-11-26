@@ -37,7 +37,7 @@ public:
 #endif
 
 public:
-	template<class... Args> explicit lowest_layer_getter(Args&&... args) : Stream(std::forward<Args>(args)...) {}
+	using Stream::Stream;
 };
 
 template<typename NextLayer, template<typename> class LowestLayerGetter = lowest_layer_getter>
@@ -47,9 +47,9 @@ private:
 	typedef LowestLayerGetter<boost::beast::websocket::stream<NextLayer>> super;
 
 public:
-	template<class... Args> explicit stream(Args&&... args) : super(std::forward<Args>(args)...) {this->binary(0 != ST_ASIO_WEBSOCKET_BINARY);}
+	template<class... Args> explicit stream(Args&&... args) : super(std::forward<Args>(args)...) {this->binary(ST_ASIO_WEBSOCKET_BINARY);}
 
-	template<typename F> void async_read(const F& handler) {super::async_read(recv_buff, handler);}
+	template<typename F> void async_read(F&& handler) {super::async_read(recv_buff, std::forward<F>(handler));}
 	template<typename OutMsgType> bool parse_msg(list<OutMsgType>& msg_can)
 	{
 #if BOOST_VERSION < 107000
@@ -62,7 +62,7 @@ public:
 
 		return re;
 	}
-	template<typename Buffer, typename F> void async_write(const Buffer& buff, const F& handler) {super::async_write(buff, handler);}
+	template<typename Buffer, typename F> void async_write(const Buffer& buff, F&& handler) {super::async_write(buff, std::forward<F>(handler));}
 
 private:
 	boost::beast::flat_buffer recv_buff;
@@ -71,31 +71,23 @@ private:
 template<typename Socket, typename OutMsgType> class reader_writer : public Socket
 {
 public:
-	reader_writer(boost::asio::io_context& io_context_) : Socket(io_context_) {}
-	template<typename Arg> reader_writer(boost::asio::io_context& io_context_, Arg& arg) : Socket(io_context_, arg) {}
+	using Socket::Socket;
 
 protected:
-	template<typename F> bool async_read(const F& handler) {this->next_layer().async_read(handler); return true;}
+	template<typename F> bool async_read(F&& handler) {this->next_layer().async_read(std::forward<F>(handler)); return true;}
 	bool parse_msg(size_t bytes_transferred, list<OutMsgType>& msg_can) {return this->next_layer().parse_msg(msg_can);}
 
 	size_t batch_msg_send_size() const {return 0;}
-	template<typename Buffer, typename F> void async_write(const Buffer& buff, const F& handler) {this->next_layer().async_write(buff, handler);}
+	template<typename Buffer, typename F> void async_write(const Buffer& buff, F&& handler) {this->next_layer().async_write(buff, std::forward<F>(handler));}
 };
 
 template<typename Socket> class socket : public Socket
 {
 public:
-	template<typename Arg> socket(Arg& arg) : Socket(arg) {}
-	template<typename Arg1, typename Arg2> socket(Arg1& arg1, Arg2& arg2) : Socket(arg1, arg2) {}
+	using Socket::Socket;
 
 protected:
-	virtual void on_handshake(const boost::system::error_code& ec)
-	{
-		if (!ec)
-			this->show_info(nullptr, "handshake success.");
-		else
-			this->show_info(ec, nullptr, "handshake failed");
-	}
+	virtual void on_handshake(const boost::system::error_code& ec) {this->show_info_2(ec, nullptr, "handshake failed", "handshake success.");}
 
 	void shutdown_websocket()
 	{
@@ -105,28 +97,25 @@ protected:
 			this->start_graceful_shutdown_monitoring();
 			this->next_layer().async_close(boost::beast::websocket::close_code::normal, this->track_async_call_error([this](const boost::system::error_code& ec) {
 				this->stop_graceful_shutdown_monitoring();
-				if (ec)
-					this->show_info(ec, "websocket link", "async shutdown failed");
+				this->show_error_info(ec, "websocket link", "async shutdown failed");
 			}));
 		});
 	}
 };
 
-template<typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::beast::tcp_stream, template<typename> class LowestLayerGetter = lowest_layer_getter,
+template<typename Packer, typename Unpacker, typename Matrix = i_matrix, typename Socket = boost::beast::tcp_stream,
+	template<typename> class LowestLayerGetter = lowest_layer_getter,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER,
 	template<typename, typename> class ReaderWriter = reader_writer>
-class client_socket_base : public socket<tcp::client_socket_base<Packer, Unpacker, Matrix, stream<Socket, LowestLayerGetter>, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>>
+class client_socket_base : public socket<tcp::client_socket_base<Packer, Unpacker, Matrix, stream<Socket, LowestLayerGetter>,
+	InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>>
 {
 private:
 	typedef socket<tcp::client_socket_base<Packer, Unpacker, Matrix, stream<Socket, LowestLayerGetter>, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>> super;
 
 public:
-	client_socket_base(boost::asio::io_context& io_context_) : super(io_context_) {}
-	template<typename Arg> client_socket_base(boost::asio::io_context& io_context_, Arg& arg) : super(io_context_, arg) {}
-
-	client_socket_base(Matrix& matrix_) : super(matrix_) {}
-	template<typename Arg> client_socket_base(Matrix& matrix_, Arg& arg) : super(matrix_, arg) {}
+	using super::super;
 
 	virtual const char* type_name() const {return "websocket (client endpoint)";}
 	virtual int type_id() const {return 7;}
@@ -146,7 +135,8 @@ public:
 	}
 
 protected:
-	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", this->id()); this->unpacker()->dump_left_data(); force_shutdown(this->is_reconnect());}
+	virtual void on_unpack_error()
+		{unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", this->id()); this->unpacker()->dump_left_data(); force_shutdown(this->is_reconnect());}
 
 	virtual void connect_handler(const boost::system::error_code& ec) //intercept tcp::client_socket_base::connect_handler
 	{
@@ -171,7 +161,8 @@ protected:
 		// Provide the value of the Host HTTP header during the WebSocket handshake.
 		// See https://tools.ietf.org/html/rfc7230#section-5.4
 		// Perform the websocket handshake
-		this->next_layer().async_handshake(this->endpoint_to_string(this->get_server_addr()), "/", this->track_async_call_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
+		this->next_layer().async_handshake(this->endpoint_to_string(this->get_server_addr()), "/",
+			this->track_async_call_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
 	}
 
 private:
@@ -184,18 +175,19 @@ private:
 	using super::shutdown_websocket;
 };
 
-template<typename Packer, typename Unpacker, typename Server = tcp::i_server, typename Socket = boost::beast::tcp_stream, template<typename> class LowestLayerGetter = lowest_layer_getter,
+template<typename Packer, typename Unpacker, typename Server = tcp::i_server, typename Socket = boost::beast::tcp_stream,
+	template<typename> class LowestLayerGetter = lowest_layer_getter,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER,
 	template<typename, typename> class ReaderWriter = reader_writer>
-class server_socket_base : public socket<tcp::server_socket_base<Packer, Unpacker, Server, stream<Socket, LowestLayerGetter>, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>>
+class server_socket_base : public socket<tcp::server_socket_base<Packer, Unpacker, Server, stream<Socket, LowestLayerGetter>,
+	InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>>
 {
 private:
 	typedef socket<tcp::server_socket_base<Packer, Unpacker, Server, stream<Socket, LowestLayerGetter>, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>> super;
 
 public:
-	server_socket_base(Server& server_) : super(server_) {}
-	template<typename Arg> server_socket_base(Server& server_, Arg& arg) : super(server_, arg) {}
+	using super::super;
 
 	virtual const char* type_name() const {return "websocket (server endpoint)";}
 	virtual int type_id() const {return 8;}

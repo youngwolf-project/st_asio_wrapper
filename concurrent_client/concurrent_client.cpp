@@ -65,7 +65,7 @@ protected:
 		send_msg(buff, msg_len, true);
 
 		delete[] buff;
-		set_timer(TIMER_END, 5000, boost::lambda::if_then_else_return(boost::lambda::bind(&echo_socket::check_delay, this, false), true, false));
+		set_timer(TIMER_END, 5000, boost::bind(&echo_socket::check_delay, this, false));
 
 		client_socket::on_connect();
 	}

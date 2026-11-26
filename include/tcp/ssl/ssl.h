@@ -34,13 +34,7 @@ public:
 	boost::asio::ssl::context& get_context() {return ctx;}
 
 protected:
-	virtual void on_handshake(const boost::system::error_code& ec)
-	{
-		if (!ec)
-			ST_THIS show_info(NULL, "handshake success.");
-		else
-			ST_THIS show_info(ec, NULL, "handshake failed");
-	}
+	virtual void on_handshake(const boost::system::error_code& ec) {ST_THIS show_info_2(ec, NULL, "handshake failed", "handshake success.");}
 	virtual void on_recv_error(const boost::system::error_code& ec) {ST_THIS stop_graceful_shutdown_monitoring(); Socket::on_recv_error(ec);}
 
 	void shutdown_ssl() {ST_THIS status = Socket::GRACEFUL_SHUTTING_DOWN; ST_THIS dispatch_in_io_strand(boost::bind(&socket::async_shutdown, this));}
@@ -50,12 +44,12 @@ private:
 	{
 		ST_THIS show_info("ssl link:", "been shutting down.");
 		ST_THIS start_graceful_shutdown_monitoring();
-		ST_THIS next_layer().async_shutdown(ST_THIS track_async_call_error(boost::bind(&socket::shutdown_handler, this, boost::asio::placeholders::error)));
+		ST_THIS next_layer().async_shutdown(ST_THIS track_async_call_error(
+			//do not stop the shutdown monitoring at here, sometimes, this async_shutdown cannot trigger on_recv_error,
+			//very strange, maybe, there's a bug in Asio. so we stop it in on_recv_error.
+			//this->stop_graceful_shutdown_monitoring();
+			boost::lambda::if_then(boost::lambda::_1, boost::lambda::bind(&socket::show_error_info, this, boost::lambda::_1, "ssl link", "async shutdown failed"))));
 	}
-
-	//do not stop the shutdown monitoring at here, sometimes, this async_shutdown cannot trigger on_recv_error,
-	//very strange, maybe, there's a bug in Asio. so we stop it in on_recv_error.
-	void shutdown_handler(const boost::system::error_code& ec) {if (ec) ST_THIS show_info(ec, "ssl link", "async shutdown failed");}
 
 private:
 	boost::asio::ssl::context& ctx;
@@ -64,10 +58,12 @@ private:
 template<typename Packer, typename Unpacker, typename Matrix = i_matrix,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class client_socket_base : public socket<tcp::client_socket_base<Packer, Unpacker, Matrix, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, InQueue, InContainer, OutQueue, OutContainer> >
+class client_socket_base : public socket<tcp::client_socket_base<Packer, Unpacker, Matrix, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	InQueue, InContainer, OutQueue, OutContainer> >
 {
 private:
-	typedef socket<tcp::client_socket_base<Packer, Unpacker, Matrix, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, InQueue, InContainer, OutQueue, OutContainer> > super;
+	typedef socket<tcp::client_socket_base<Packer, Unpacker, Matrix, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+		InQueue, InContainer, OutQueue, OutContainer> > super;
 
 public:
 	client_socket_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx_) : super(io_context_, ctx_) {}
@@ -91,7 +87,8 @@ public:
 	}
 
 protected:
-	virtual void on_unpack_error() {unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); force_shutdown(ST_THIS is_reconnect());}
+	virtual void on_unpack_error()
+		{unified_out::info_out(ST_ASIO_LLF " can not unpack msg.", ST_THIS id()); ST_THIS unpacker()->dump_left_data(); force_shutdown(ST_THIS is_reconnect());}
 	virtual void on_close()
 	{
 		ST_THIS reset_next_layer(ST_THIS get_context());
@@ -140,10 +137,12 @@ private:
 template<typename Packer, typename Unpacker, typename Server = tcp::i_server,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class server_socket_base : public socket<tcp::server_socket_base<Packer, Unpacker, Server, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, InQueue, InContainer, OutQueue, OutContainer> >
+class server_socket_base : public socket<tcp::server_socket_base<Packer, Unpacker, Server, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+	InQueue, InContainer, OutQueue, OutContainer> >
 {
 private:
-	typedef socket<tcp::server_socket_base<Packer, Unpacker, Server, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>, InQueue, InContainer, OutQueue, OutContainer> > super;
+	typedef socket<tcp::server_socket_base<Packer, Unpacker, Server, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>,
+		InQueue, InContainer, OutQueue, OutContainer> > super;
 
 public:
 	server_socket_base(Server& server_, boost::asio::ssl::context& ctx_) : super(server_, ctx_) {}

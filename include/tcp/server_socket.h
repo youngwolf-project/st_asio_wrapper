@@ -17,7 +17,8 @@
 
 namespace st_asio_wrapper { namespace tcp {
 
-template<typename Socket, typename Server = i_server> class generic_server_socket : public Socket, public boost::enable_shared_from_this<generic_server_socket<Socket, Server> >
+template<typename Socket, typename Server = i_server>
+class generic_server_socket : public Socket, public boost::enable_shared_from_this<generic_server_socket<Socket, Server> >
 {
 public:
 	typedef generic_server_socket<Socket, Server> type_of_object_restore;
@@ -104,10 +105,12 @@ template<typename Packer, typename Unpacker, typename Server = i_server,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER,
 	template<typename, typename> class ReaderWriter = reader_writer>
-class unix_server_socket_base : public generic_server_socket<socket_base<boost::asio::local::stream_protocol::socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Server>
+class unix_server_socket_base : public generic_server_socket<socket_base<boost::asio::local::stream_protocol::socket, Packer, Unpacker,
+	InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Server>
 {
 private:
-	typedef generic_server_socket<socket_base<boost::asio::local::stream_protocol::socket, Packer, Unpacker, InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Server> super;
+	typedef generic_server_socket<socket_base<boost::asio::local::stream_protocol::socket, Packer, Unpacker,
+		InQueue, InContainer, OutQueue, OutContainer, ReaderWriter>, Server> super;
 
 public:
 	unix_server_socket_base(Server& server_) : super(server_) {}

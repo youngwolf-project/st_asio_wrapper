@@ -38,7 +38,7 @@ public:
 #endif
 
 public:
-	template<class... Args> explicit lowest_layer_getter(Args&&... args) : Stream(std::forward<Args>(args)...) {}
+	using Stream::Stream;
 };
 
 template<typename Socket> class socket : public Socket
@@ -55,14 +55,7 @@ protected:
 	virtual void on_ssl_handshake(const boost::system::error_code& ec) {show_handshake(ec, "ssl");}
 
 	void show_handshake(const boost::system::error_code& ec, const char* type)
-	{
-		assert(nullptr != type);
-
-		if (!ec)
-			this->show_info(type, "handshake success.");
-		else
-			this->show_info(ec, type, "handshake failed");
-	}
+		{assert(nullptr != type); this->show_info_2(ec, type, "handshake failed", "handshake success.");}
 
 private:
 	boost::asio::ssl::context& ctx;
@@ -71,14 +64,15 @@ private:
 template<typename Packer, typename Unpacker, typename Matrix = i_matrix,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class client_socket_base : public socket<websocket::client_socket_base<Packer, Unpacker, Matrix, boost::beast::ssl_stream<boost::beast::tcp_stream>, lowest_layer_getter, InQueue, InContainer, OutQueue, OutContainer>>
+class client_socket_base : public socket<websocket::client_socket_base<Packer, Unpacker, Matrix, boost::beast::ssl_stream<boost::beast::tcp_stream>, lowest_layer_getter,
+	InQueue, InContainer, OutQueue, OutContainer>>
 {
 private:
-	typedef socket<websocket::client_socket_base<Packer, Unpacker, Matrix, boost::beast::ssl_stream<boost::beast::tcp_stream>, lowest_layer_getter, InQueue, InContainer, OutQueue, OutContainer>> super;
+	typedef socket<websocket::client_socket_base<Packer, Unpacker, Matrix, boost::beast::ssl_stream<boost::beast::tcp_stream>, lowest_layer_getter,
+		InQueue, InContainer, OutQueue, OutContainer>> super;
 
 public:
-	client_socket_base(boost::asio::io_context& io_context_, boost::asio::ssl::context& ctx_) : super(io_context_, ctx_) {}
-	client_socket_base(Matrix& matrix_, boost::asio::ssl::context& ctx_) : super(matrix_, ctx_) {}
+	using super::super;
 
 	virtual const char* type_name() const {return "ssl websocket (client endpoint)";}
 	virtual int type_id() const {return 9;}
@@ -107,7 +101,8 @@ private:
 			return super::connect_handler(boost::beast::error_code(static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()));
 
 		// Perform the SSL handshake
-		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::client, this->track_async_call_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
+		this->next_layer().next_layer().async_handshake(boost::asio::ssl::stream_base::client,
+			this->track_async_call_error([this](const boost::system::error_code& ec) {handle_handshake(ec);}));
 	}
 
 	void handle_handshake(const boost::system::error_code& ec)
@@ -120,13 +115,15 @@ private:
 template<typename Packer, typename Unpacker, typename Server = tcp::i_server,
 	template<typename> class InQueue = ST_ASIO_INPUT_QUEUE, template<typename> class InContainer = ST_ASIO_INPUT_CONTAINER,
 	template<typename> class OutQueue = ST_ASIO_OUTPUT_QUEUE, template<typename> class OutContainer = ST_ASIO_OUTPUT_CONTAINER>
-class server_socket_base : public socket<websocket::server_socket_base<Packer, Unpacker, Server, boost::beast::ssl_stream<boost::beast::tcp_stream>, lowest_layer_getter, InQueue, InContainer, OutQueue, OutContainer>>
+class server_socket_base : public socket<websocket::server_socket_base<Packer, Unpacker, Server, boost::beast::ssl_stream<boost::beast::tcp_stream>, lowest_layer_getter,
+	InQueue, InContainer, OutQueue, OutContainer>>
 {
 private:
-	typedef socket<websocket::server_socket_base<Packer, Unpacker, Server, boost::beast::ssl_stream<boost::beast::tcp_stream>, lowest_layer_getter, InQueue, InContainer, OutQueue, OutContainer>> super;
+	typedef socket<websocket::server_socket_base<Packer, Unpacker, Server, boost::beast::ssl_stream<boost::beast::tcp_stream>, lowest_layer_getter,
+		InQueue, InContainer, OutQueue, OutContainer>> super;
 
 public:
-	server_socket_base(Server& server_, boost::asio::ssl::context& ctx_) : super(server_, ctx_) {}
+	using super::super;
 
 	virtual const char* type_name() const {return "ssl websocket (server endpoint)";}
 	virtual int type_id() const {return 10;}

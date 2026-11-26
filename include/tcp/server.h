@@ -180,7 +180,7 @@ public:
 
 protected:
 	virtual bool init() {return start_listen() ? (ST_THIS start(), true) : false;}
-	virtual void uninit() {ST_THIS stop(); stop_listen(); force_shutdown();} //if you wanna graceful shutdown, call graceful_shutdown before service_pump::stop_service invocation.
+	virtual void uninit() {ST_THIS stop(); stop_listen(); force_shutdown();} //if you wanna graceful shutdown, call graceful_shutdown before stop_service.
 
 	virtual int async_accept_num() {return ST_ASIO_ASYNC_ACCEPT_NUM;}
 	virtual void start_next_accept() {boost::lock_guard<boost::mutex> lock(mutex); do_async_accept(create_object());}

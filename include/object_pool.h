@@ -26,6 +26,9 @@ namespace st_asio_wrapper
 template<typename Object>
 class object_pool : public service_pump::i_service, public timer<executor>
 {
+private:
+	typedef timer<executor> super;
+
 public:
 	typedef typename Object::in_msg_type in_msg_type;
 	typedef typename Object::in_msg_ctype in_msg_ctype;
@@ -35,13 +38,13 @@ public:
 	typedef const object_type object_ctype;
 	typedef boost::unordered::unordered_map<boost::uint_fast64_t, object_type> container_type;
 
-	static const tid TIMER_BEGIN = timer<executor>::TIMER_END;
+	static const tid TIMER_BEGIN = super::TIMER_END;
 	static const tid TIMER_FREE_SOCKET = TIMER_BEGIN;
 	static const tid TIMER_CLEAR_SOCKET = TIMER_BEGIN + 1;
 	static const tid TIMER_END = TIMER_BEGIN + 10;
 
 public:
-	object_pool(service_pump& service_pump_) : i_service(service_pump_), timer<executor>(service_pump_), cur_id(ST_ASIO_START_OBJECT_ID - 1), max_size_(ST_ASIO_MAX_OBJECT_NUM) {}
+	object_pool(service_pump& service_pump_) : i_service(service_pump_), super(service_pump_), cur_id(ST_ASIO_START_OBJECT_ID - 1), max_size_(ST_ASIO_MAX_OBJECT_NUM) {}
 	void set_start_object_id(boost::uint_fast64_t id) {cur_id.store(id - 1, boost::memory_order_relaxed);} //call this right after object_pool been constructed
 
 protected:
@@ -354,7 +357,11 @@ public:
 	void list_all_object() {do_something_to_all(boost::bind(&Object::show_info, boost::placeholders::_1, "", ""));}
 
 	template<typename _Predicate> void do_something_to_all(const _Predicate& __pred)
-		{ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex); for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter) __pred(iter->second);}
+	{
+		ST_ASIO_SHARED_LOCK_TYPE<ST_ASIO_SHARED_MUTEX_TYPE> lock(object_can_mutex);
+		for (BOOST_AUTO(iter, object_can.begin()); iter != object_can.end(); ++iter)
+			__pred(iter->second);
+	}
 
 	template<typename _Predicate> void do_something_to_one(const _Predicate& __pred)
 	{
