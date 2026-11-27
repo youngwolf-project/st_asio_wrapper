@@ -48,7 +48,7 @@ private:
 			//do not stop the shutdown monitoring at here, sometimes, this async_shutdown cannot trigger on_recv_error,
 			//very strange, maybe, there's a bug in Asio. so we stop it in on_recv_error.
 			//this->stop_graceful_shutdown_monitoring();
-			boost::lambda::if_then(boost::lambda::_1, boost::lambda::bind(&socket::show_error_info, this, boost::lambda::_1, "ssl link", "async shutdown failed"))));
+			boost::bind(&socket::show_error_info, this, boost::placeholders::_1, "ssl link", "async shutdown failed")));
 	}
 
 private:

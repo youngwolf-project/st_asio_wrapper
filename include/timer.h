@@ -66,8 +66,12 @@ public:
 		handler_with_tid handler; //return true from handler to continue the timer, or the timer will stop
 
 		timer_info(tid id_, boost::asio::io_context& io_context_) : id(id_), seq(-1), status(TIMER_CREATED), interval_ms(0), timer(io_context_) {}
-		bool operator ==(const timer_info& other) const {return id == other.id;}
-		bool operator ==(tid id_) const {return id == id_;}
+		inline bool operator==(const timer_info& other) const {return other == id;}
+		inline bool operator!=(const timer_info& other) const {return other != id;}
+		inline bool operator==(tid id_) const {return id == id_;}
+		inline bool operator!=(tid id_) const {return id != id_;}
+		friend inline bool operator==(tid id, const timer_info& other) {return other == id;}
+		friend inline bool operator!=(tid id, const timer_info& other) {return other != id;}
 	};
 	typedef const timer_info timer_cinfo;
 
@@ -132,7 +136,7 @@ public:
 	bool change_timer_status(tid id, typename timer_info::timer_status status) {return change_timer(id, (boost::lambda::_1->*&timer_info::status = status, true));}
 	bool change_timer_interval(tid id, unsigned interval) {return change_timer(id, (boost::lambda::_1->*&timer_info::interval_ms = interval, true));}
 	template<typename T> bool change_timer_handler(tid id, const T& handler)
-		{return change_timer(id, (boost::lambda::_1->*&timer_info::handler = boost::lambda::var(boost::cref(handler)), true));}
+		{return change_timer(id, (boost::lambda::_1->*&timer_info::handler = boost::lambda::constant_ref(handler), true));}
 
 	timer_cinfo* find_timer(tid id) const
 	{
@@ -159,7 +163,7 @@ public:
 	void stop_all_timer() {do_something_to_all(boost::bind((void (timer::*) (timer_info&)) &timer::stop_timer, this, boost::placeholders::_1));}
 	void stop_all_timer(tid excepted_id)
 	{
-		do_something_to_all(boost::lambda::if_then(excepted_id != boost::lambda::bind(&timer_info::id, boost::lambda::_1),
+		do_something_to_all(boost::lambda::if_then(excepted_id != boost::lambda::_1,
 			boost::lambda::bind((void (timer::*) (timer_info&)) &timer::stop_timer, this, boost::lambda::_1)));
 	}
 
