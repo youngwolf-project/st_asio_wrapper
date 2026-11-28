@@ -1015,7 +1015,7 @@
 #if BOOST_VERSION < 104900
 	#error st_asio_wrapper only support boost 1.49 or higher.
 #elif BOOST_VERSION < 106000
-	namespace boost {namespace placeholders {using ::_1; using ::_2;}}
+	namespace boost {namespace placeholders {using ::_1; using ::_2; using ::_3;}}
 #endif
 
 #if !defined(BOOST_THREAD_USES_CHRONO)

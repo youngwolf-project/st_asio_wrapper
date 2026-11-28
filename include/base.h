@@ -26,7 +26,11 @@
 #include <boost/version.hpp>
 #include <boost/date_time.hpp>
 #include <boost/smart_ptr.hpp>
+#if BOOST_VERSION >= 107300
 #include <boost/bind/bind.hpp>
+#else
+#include <boost/bind.hpp>
+#endif
 #include <boost/typeof/typeof.hpp>
 #include <boost/container/list.hpp>
 #include <boost/lambda/lambda.hpp>
@@ -80,7 +84,7 @@ typedef boost::atomic_int_fast32_t atomic_int_fast32_t;
 
 	private:
 		T data;
-		boost::mutex data_mutex;
+		mutable boost::mutex data_mutex;
 	};
 	#endif
 typedef atomic<boost::uint_fast64_t> atomic_uint_fast64;
